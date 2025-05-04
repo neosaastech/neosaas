@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  neosaas-db:
+    image: postgres:14
+    container_name: neosaas-db
+    restart: always
+    environment:
+      POSTGRES_USER: neosaas
+      POSTGRES_PASSWORD: neosaas
+      POSTGRES_DB: neosaasdb
+    volumes:
+      - neosaas_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  neosaas-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neosaas-admin
+    depends_on:
+      - neosaas-db
+    command: >
+      sh -c "pnpm db:push && pnpm tsx scripts/create-admin.ts"
+    environment:
+      DATABASE_URL: postgres://neosaas:neosaas@neosaas-db:5432/neosaasdb
+      ADMIN_NAME: "Admin"
+      ADMIN_EMAIL: "admin@neosaas.local"
+      ADMIN_PASSWORD: "admin1234"
+    restart: "no"
+
+  neosaas-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neosaas-web
+    depends_on:
+      - neosaas-db
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://neosaas:neosaas@neosaas-db:5432/neosaasdb
+    restart: always
+
+volumes:
+  neosaas_db_data:

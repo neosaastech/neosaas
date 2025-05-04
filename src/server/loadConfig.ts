@@ -1,24 +1,14 @@
-import fs from "fs"
-import path from "path"
+// src/server/loadConfig.ts
 
-export function loadNeosaasConfig() {
-  const configPath = path.join(process.cwd(), "main.neosaas")
+import fs from 'fs'
+import path from 'path'
 
+export function loadConfig() {
+  const configPath = path.join(process.cwd(), 'main.neosaas')
   if (!fs.existsSync(configPath)) {
-    console.error("❌ Fichier main.neosaas introuvable !")
-    throw new Error("Erreur 404 - Fichier main.neosaas non trouvé")
+    throw new Error('Fichier main.neosaas introuvable à la racine du projet.')
   }
 
-  const rawConfig = fs.readFileSync(configPath, "utf-8")
-
-  try {
-    const config = JSON.parse(rawConfig)
-
-    console.log("✅ main.neosaas chargé avec succès (Status 200 OK)")
-    return config
-  } catch (error) {
-    console.error("❌ Erreur de parsing dans main.neosaas !")
-    throw new Error("Erreur 500 - Fichier main.neosaas invalide")
-  }
+  const rawData = fs.readFileSync(configPath, 'utf-8')
+  return JSON.parse(rawData)
 }
-// export default loadNeosaasConfig;

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "🚀 Migration des imports DatePicker vers @mui/x-date-pickers..."
+
+# Remplacer tous les anciens imports react-datepicker
+find ./app ./components -type f -name "*.tsx" -exec sed -i 's|import DatePicker from "react-datepicker";|import { DatePicker } from "@mui/x-date-pickers/DatePicker";|g' {} +
+
+# Remplacer react-day-picker s'il y a
+find ./app ./components -type f -name "*.tsx" -exec sed -i 's|import { DayPicker } from "react-day-picker";|import { DatePicker } from "@mui/x-date-pickers/DatePicker";|g' {} +
+
+# Ajouter un rappel pour l'adapter
+echo "🧠 N'oublie pas d'ajouter <LocalizationProvider dateAdapter={AdapterDateFns}> autour de ton composant !"
+
+echo "✅ Migration terminée."
+echo "🚀 Migration des imports DateTimePicker vers @mui/x-date-pickers...
+# Remplacer tous les anciens imports react-datepicker"
