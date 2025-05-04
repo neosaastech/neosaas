@@ -1,0 +1,59 @@
+{
+  "appName": "NeoSaaS",
+  "domain": "neosaas.tech",
+  "siteUrl": "https://www.neosaas.tech",
+  "analytics": {
+    "provider": "plausible",
+    "plausibleDomain": "neosaas.tech"
+  },
+  "email": {
+    "provider": "resend",
+    "apiKey": "re_h6p97BUv_NNgs3NFEvbPDnvnmpbagfELk"
+  },
+  "storage": {
+    "provider": "aws-s3",
+    "bucketName": "TON_BUCKET_S3",
+    "region": "eu-west-1"
+  },
+  "payment": {
+    "provider": "stripe",
+    "publicKey": "pk_test_xxx",
+    "secretKey": "sk_test_xxx"
+  },
+  "roles": ["admin", "user"],
+  "features": {
+    "enableAnalytics": true,
+    "enablePayment": true,
+    "enableStorage": true
+  },
+  "scheduledTasks": {
+    "enableCron": true,
+    "cronTime": "0 0 * * *"
+  },
+  "deployment": {
+    "platforms": ["railway", "fly.io"]
+  },
+  "documentation": {
+    "provider": "starlight",
+    "url": "https://doc.neosaas.tech"
+  },
+  "seoDefaults": {
+    "title": "NeoSaaS - Build Your SaaS Faster",
+    "description": "NeoSaaS helps you build and scale your SaaS business with minimal effort.",
+    "keywords": "saas, platform, startup, business, neosaas",
+    "author": "NeoSaaS Team"
+  },
+  "socialDefaults": {
+    "ogTitle": "NeoSaaS - Your SaaS Companion",
+    "ogDescription": "NeoSaaS accelerates your SaaS journey. Build, scale, and grow faster.",
+    "ogImage": "https://neosaas.tech/og-default.png",
+    "ogUrl": "https://www.neosaas.tech", 
+    "twitterTitle": "NeoSaaS - The Best SaaS Framework",
+    "twitterDescription": "Create and manage your SaaS business easily with NeoSaaS.",
+    "twitterImage": "https://neosaas.tech/twitter-default.png"
+  },
+  "poweredBy": {
+    "label": "Propulsé par NeoSaaS",
+    "url": "https://www.neosaas.tech"
+  }
+}
