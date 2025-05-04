@@ -1,24 +1,24 @@
-import type React from "react";
-import { Inter } from "next/font/google";
-import { ThemeProvider } from "@/components/theme-provider";
-import { loadNeosaasConfig } from "@/server/loadConfig";
-import "./globals.css";
+import type React from "react"
+import { Inter } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
+import { loadNeosaasConfig } from "@/server/loadConfig"
+import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] })
 
-const neosaasConfig = loadNeosaasConfig();
-const seo = neosaasConfig.seoDefaults ?? {};
+const neosaasConfig = loadNeosaasConfig()
+const seo = neosaasConfig.seoDefaults ?? {}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-  const title = seo.title || "NeoSaaS";
-  const description = seo.description || "A modern SaaS platform.";
-  const keywords = seo.keywords || "saas, platform, startup, tech";
-  const image = seo.image || `https://${neosaasConfig.domain}/og-image.png`;
-  const domain = `https://${neosaasConfig.domain}`;
+  const title = seo.title || "NeoSaaS"
+  const description = seo.description || "A modern SaaS platform."
+  const keywords = seo.keywords || "saas, platform, startup, tech"
+  const image = seo.image || `https://${neosaasConfig.domain}/og-image.png`
+  const domain = `https://${neosaasConfig.domain}`
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -60,16 +60,11 @@ export default function RootLayout({
         )}
       </head>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
-console.log("✅ Configuration NeoSaaS chargée :", neosaasConfig);
+console.log("✅ Configuration NeoSaaS chargée :", neosaasConfig)

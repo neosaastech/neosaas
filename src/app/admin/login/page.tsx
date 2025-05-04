@@ -1,52 +1,52 @@
-"use client";
+"use client"
 
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import type React from "react"
+
+import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 
 export default function AdminLoginPage() {
-  const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [adminExists, setAdminExists] = useState(false);
+  const router = useRouter()
+  const [password, setPassword] = useState("")
+  const [adminExists, setAdminExists] = useState(false)
 
   useEffect(() => {
     async function checkAdmin() {
-      const res = await fetch("/api/check-admin");
-      const data = await res.json();
-      setAdminExists(data.adminExists);
+      const res = await fetch("/api/check-admin")
+      const data = await res.json()
+      setAdminExists(data.adminExists)
     }
 
-    checkAdmin();
-  }, []);
+    checkAdmin()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!adminExists) {
       // Aucun admin → setup obligatoire
       if (password === process.env.NEXT_PUBLIC_ADMIN_TEMP_PASSWORD) {
-        router.push("/admin/setup");
+        router.push("/admin/setup")
       } else {
-        alert("Mot de passe temporaire incorrect.");
+        alert("Mot de passe temporaire incorrect.")
       }
-      return;
+      return
     }
 
     // Ici, INTERDICTION d'utiliser 123456 si admin existe
     if (password === process.env.NEXT_PUBLIC_ADMIN_TEMP_PASSWORD) {
-      alert("Accès temporaire désactivé. Utilisez votre compte admin.");
-      return;
+      alert("Accès temporaire désactivé. Utilisez votre compte admin.")
+      return
     }
 
     // Ici tu pourras connecter ton admin normal plus tard
-    alert("Pas encore de connexion standard active.");
-  };
+    alert("Pas encore de connexion standard active.")
+  }
 
   return (
     <div className="flex items-center justify-center h-screen bg-gray-100">
       <form onSubmit={handleLogin} className="bg-white p-8 rounded shadow-md w-full max-w-md">
-        <h2 className="text-2xl mb-6 text-center font-bold">
-          {adminExists ? "Connexion Admin" : "Setup Initial"}
-        </h2>
+        <h2 className="text-2xl mb-6 text-center font-bold">{adminExists ? "Connexion Admin" : "Setup Initial"}</h2>
         <input
           type="password"
           placeholder="Mot de passe"
@@ -59,5 +59,5 @@ export default function AdminLoginPage() {
         </button>
       </form>
     </div>
-  );
+  )
 }

@@ -1,8 +1,8 @@
-import { loadNeosaasConfig } from "@/server/loadConfig";
+import { loadNeosaasConfig } from "@/server/loadConfig"
 
 export async function generateSitemapXml() {
-  const config = await loadNeosaasConfig();
-  const siteUrl = config.siteUrl || `https://${config.domain}`;
+  const config = await loadNeosaasConfig()
+  const siteUrl = config.siteUrl || `https://${config.domain}`
 
   const pages = [
     {
@@ -17,8 +17,8 @@ export async function generateSitemapXml() {
         {
           loc: `${siteUrl}/public/dashboard.jpg`,
           title: "Dashboard Screenshot",
-        }
-      ]
+        },
+      ],
     },
     {
       loc: `${siteUrl}/features`,
@@ -34,33 +34,39 @@ export async function generateSitemapXml() {
       loc: `${siteUrl}/contact`,
       changefreq: "yearly",
       priority: 0.5,
-    }
-  ];
+    },
+  ]
 
-  const urls = pages.map(page => {
-    const images = page.images
-      ? page.images.map(img => `
+  const urls = pages
+    .map((page) => {
+      const images = page.images
+        ? page.images
+            .map(
+              (img) => `
         <image:image>
           <image:loc>${img.loc}</image:loc>
           <image:title>${img.title}</image:title>
         </image:image>
-      `).join("")
-      : "";
+      `,
+            )
+            .join("")
+        : ""
 
-    return `
+      return `
     <url>
       <loc>${page.loc}</loc>
       <changefreq>${page.changefreq}</changefreq>
       <priority>${page.priority}</priority>
       ${images}
     </url>
-    `.trim();
-  }).join("\n");
+    `.trim()
+    })
+    .join("\n")
 
   return `
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls}
 </urlset>
-  `.trim();
+  `.trim()
 }

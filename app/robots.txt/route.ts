@@ -4,11 +4,11 @@ User-agent: *
 Allow: /
 
 Sitemap: https://www.neosaas.tech/sitemap.xml
-`.trim();
+`.trim()
 
   return new Response(robotsTxt, {
     headers: {
       "Content-Type": "text/plain",
     },
-  });
+  })
 }
