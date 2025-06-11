@@ -1,7 +1,7 @@
 import type React from "react"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
-import { loadNeosaasConfig } from "@/server/loadConfig"
+import { loadConfig as loadNeosaasConfig } from '@/server/loadConfig'
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
