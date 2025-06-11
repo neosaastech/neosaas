@@ -22,6 +22,7 @@ export async function runBuild() {
   fs.copyFileSync('prisma/schema.prisma', path.join(neosaasPath, 'prisma/schema.prisma'));
   fs.copyFileSync('scripts/build/Dockerfile', path.join(neosaasPath, 'Dockerfile'));
   fs.copyFileSync('scripts/build/docker-compose.prod.yml', path.join(neosaasPath, 'docker-compose.prod.yml'));
+  fs.copyFileSync('scripts/build/docker-compose.yml', path.join(neosaasPath, 'docker-compose.yml')); // <-- ✅ AJOUT
   fs.copyFileSync('scripts/build/create-admin.ts', path.join(neosaasPath, 'scripts/create-admin.ts'));
 
   // Copier les fichiers d'environnement si existants
