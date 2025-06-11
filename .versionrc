@@ -1,0 +1,3 @@
+VERSION_FILE="VERSION"
+TAG_PREFIX="v"
+COMMIT_MSG="chore: bump to %s"
