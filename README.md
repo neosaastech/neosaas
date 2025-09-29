@@ -1,7 +1,3 @@
-Parfait 👍 Voici la traduction anglaise complète avec la mise en forme respectée :
-
----
-
 ![logo\_neolux](https://github.com/user-attachments/assets/0f3b275c-a0da-4512-bfd1-4887ed773500)
 
 ### ✅ File `README.md`
