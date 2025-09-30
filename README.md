@@ -1,3 +1,14 @@
+Exact 👌 ton **`README.md`** actuel dans la branche `docker` n’est pas encore celui qu’on a préparé (avec le logo, la section versioning et le lien de licence).
+
+On va le mettre à jour proprement.
+
+---
+
+### ✅ Nouveau `README.md` pour la branche `docker`
+
+````markdown
+![logo_neosaas](https://github-production-user-asset-6210df.s3.amazonaws.com/17944080/436394487-0f3b275c-a0da-4512-bfd1-4887ed773500.jpg)
+
 # 🚀 NeoSaaS – Docker Setup
 
 This branch provides a **Dockerized environment** for running **NeoSaaS**.
@@ -10,7 +21,7 @@ This branch provides a **Dockerized environment** for running **NeoSaaS**.
 
 ---
 
-## 🔨 Build & Run
+## 🔨 Build & Run (Basic)
 
 ```bash
 # Build and start containers
@@ -21,3 +32,66 @@ docker compose logs -f
 
 # Stop containers
 docker compose down
+````
+
+---
+
+## 🏷️ Versioning
+
+Docker images for NeoSaaS are published to **GitHub Container Registry (GHCR)**.
+
+Available tags:
+
+* `latest` → always points to the most recent build on the `docker` branch
+* `<commit-sha>` → unique build reference (e.g. `ghcr.io/neosaastech/neosaas:efd7530`)
+* `<package-version>` → matches the version defined in `package.json` (e.g. `ghcr.io/neosaastech/neosaas:0.1.1`)
+
+Examples:
+
+```bash
+# Run the latest version
+docker run -p 3000:3000 ghcr.io/neosaastech/neosaas:latest
+
+# Run a specific version
+docker run -p 3000:3000 ghcr.io/neosaastech/neosaas:0.1.1
+```
+
+---
+
+## 📂 Project Structure
+
+```
+neosaas/
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+├── README.md
+└── ...
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](https://github.com/neosaastech/neosaas/blob/docker/LICENCE).
+© 2025 Charles Van den Driessche @ Neomnia
+
+````
+
+---
+
+### ✅ Étapes pour mettre à jour
+
+```bash
+git checkout docker
+echo '<colle ici le nouveau README.md>' > README.md
+git add README.md
+git commit -m "📝 Update Docker README with logo, versioning, and license link"
+git push origin docker --force
+````
+
+---
+
+👉 Après ça, ton README sera bien à jour sur GitHub dans la branche `docker`.
+
+Tu veux que je t’ajoute aussi dans ce README une **section sur l’utilisation du workflow GitHub Actions** (expliquer que l’image est buildée et publiée automatiquement à chaque push sur la branche `docker`) ?
