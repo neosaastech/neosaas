@@ -1,9 +1,3 @@
-Exact 👌 ton **`README.md`** actuel dans la branche `docker` n’est pas encore celui qu’on a préparé (avec le logo, la section versioning et le lien de licence).
-
-On va le mettre à jour proprement.
-
----
-
 ### ✅ Nouveau `README.md` pour la branche `docker`
 
 ````markdown
