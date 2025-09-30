@@ -75,23 +75,3 @@ neosaas/
 
 This project is licensed under the [MIT License](https://github.com/neosaastech/neosaas/blob/docker/LICENCE).
 © 2025 Charles Van den Driessche @ Neomnia
-
-````
-
----
-
-### ✅ Étapes pour mettre à jour
-
-```bash
-git checkout docker
-echo '<colle ici le nouveau README.md>' > README.md
-git add README.md
-git commit -m "📝 Update Docker README with logo, versioning, and license link"
-git push origin docker --force
-````
-
----
-
-👉 Après ça, ton README sera bien à jour sur GitHub dans la branche `docker`.
-
-Tu veux que je t’ajoute aussi dans ce README une **section sur l’utilisation du workflow GitHub Actions** (expliquer que l’image est buildée et publiée automatiquement à chaque push sur la branche `docker`) ?
