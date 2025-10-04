@@ -1,0 +1,35 @@
+{
+  "appName": "NeoSaaS",
+  "domain": "neosaas.tech",
+  "siteUrl": "https://neosaas.tech",
+  "features": {
+    "enableAnalytics": true,
+    "enableEmailNotifications": true,
+    "enableMultitenancy": true,
+    "enableStorage": true
+  },
+  "analytics": {
+    "plausibleDomain": "neosaas.tech"
+  },
+  "seoDefaults": {
+    "title": "NeoSaaS - The Complete SaaS Platform for Modern Businesses",
+    "description": "NeoSaaS provides all the tools you need to build, launch, and scale your SaaS business. Start your journey today.",
+    "keywords": "saas, platform, startup, tech, business, software, cloud",
+    "image": "https://neosaas.tech/og-image.png"
+  },
+  "email": {
+    "provider": "resend",
+    "fromEmail": "no-reply@neosaas.tech",
+    "fromName": "NeoSaaS Team"
+  },
+  "storage": {
+    "provider": "s3",
+    "region": "us-east-1",
+    "buckets": ["neosaas-assets", "neosaas-uploads", "neosaas-backups"]
+  },
+  "payments": {
+    "providers": ["stripe", "paypal"],
+    "defaultProvider": "stripe",
+    "currency": "USD"
+  }
+}
