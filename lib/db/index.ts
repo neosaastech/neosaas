@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-http"
 import { neon } from "@neondatabase/serverless"
-import * as schema from "./schema"
+import * as schema from "@/lib/db/schema"
 
 console.log("[v0] Initializing database connection...")
 
@@ -47,4 +47,4 @@ try {
 export { db }
 
 // Export schema for external use
-export * from "./schema"
+export * from "@/lib/db/schema"

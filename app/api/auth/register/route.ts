@@ -1,21 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { eq } from "drizzle-orm"
-
-console.log("[v0] Loading register route...")
-
-let db: any
-let users: any
-
-try {
-  console.log("[v0] Importing database connection...")
-  const dbModule = await import("@/lib/db")
-  db = dbModule.db
-  users = dbModule.users
-  console.log("[v0] Database imported successfully")
-} catch (importError) {
-  console.error("[v0] Failed to import database:", importError)
-}
+import { db, users } from "@/lib/db"
 
 const registerSchema = z
   .object({
@@ -33,11 +19,6 @@ const registerSchema = z
 export async function POST(request: Request) {
   try {
     console.log("[v0] Register endpoint hit")
-
-    if (!db || !users) {
-      console.error("[v0] Database not initialized")
-      return NextResponse.json({ error: "Database connection not available" }, { status: 503 })
-    }
 
     let body
     try {
