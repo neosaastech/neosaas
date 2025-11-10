@@ -3,11 +3,19 @@ import { eq, desc, gte } from "drizzle-orm"
 
 // User queries
 export async function getUserByEmail(email: string) {
-  const [user] = await db.select().from(users).where(eq(users.email, email))
-  return user
+  console.log("[v0] getUserByEmail called with:", email)
+  try {
+    const result = await db.select().from(users).where(eq(users.email, email))
+    console.log("[v0] getUserByEmail result:", result.length > 0 ? "User found" : "No user found")
+    return result[0]
+  } catch (error) {
+    console.error("[v0] Error in getUserByEmail:", error)
+    throw error
+  }
 }
 
 export async function getUserById(id: string) {
+  console.log("[v0] getUserById called with:", id)
   const [user] = await db.select().from(users).where(eq(users.id, id))
   return user
 }
@@ -18,8 +26,15 @@ export async function createUser(data: {
   password?: string
   image?: string
 }) {
-  const [user] = await db.insert(users).values(data).returning()
-  return user
+  console.log("[v0] createUser called with:", { email: data.email, hasName: !!data.name })
+  try {
+    const result = await db.insert(users).values(data).returning()
+    console.log("[v0] createUser result:", result.length > 0 ? "User created" : "No user returned")
+    return result[0]
+  } catch (error) {
+    console.error("[v0] Error in createUser:", error)
+    throw error
+  }
 }
 
 export async function updateUser(
