@@ -79,6 +79,10 @@ export function DocsSidebar() {
           href: "/docs/installation",
         },
         {
+          title: "Architecture",
+          href: "/docs/architecture",
+        },
+        {
           title: "Download from GitHub",
           href: "/docs/download",
         },
