@@ -17,7 +17,7 @@ export function SiteHeader() {
       <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/images/logo_neolux.svg" alt="NeoSaaS" width={32} height={32} />
+            <Image src="/images/logo_neolux.jpg" alt="NeoSaaS" width={32} height={32} className="rounded" />
             <span className="font-bold text-lg hidden md:inline-block">
               <span className="text-foreground">Neo</span>
               <span className="text-[#CD7F32]">SaaS</span>

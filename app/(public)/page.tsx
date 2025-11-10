@@ -8,6 +8,7 @@ import { ArrowRight, Check, ChevronRight, Globe, Shield, Zap } from "lucide-reac
 import { Users, CreditCard, BarChart4, Star } from "lucide-react"
 import { MobileMenu } from "@/components/mobile-menu"
 import { BrandIcon } from "@/components/brand-icon"
+import { NeoSaasArchitectureDiagram } from "@/components/neosaas-architecture-diagram"
 
 export default function HomePage() {
   return (
@@ -449,6 +450,9 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
+            </div>
+            <div className="flex items-center justify-center">
+              <NeoSaasArchitectureDiagram />
             </div>
           </div>
         </div>
