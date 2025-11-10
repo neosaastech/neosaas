@@ -155,6 +155,52 @@ export default function DocsPage() {
             </div>
           </div>
         </div>
+
+        <div className="space-y-4 border-t pt-6">
+          <h2 className="text-2xl font-bold tracking-tight">Project Structure</h2>
+          <p className="text-muted-foreground">
+            NeoSaaS follows a clean and organized folder structure to keep your code maintainable and scalable.
+          </p>
+          <div className="rounded-lg border bg-card p-6">
+            <pre className="text-sm overflow-x-auto">
+              <code>{`src
+├── app
+│   ├── (auth)
+│   │   ├── layout.tsx
+│   │   ├── sign-in
+│   │   │   └── page.tsx
+│   │   └── sign-up
+│   │       └── page.tsx
+│   ├── (protected)
+│   │   ├── dashboard
+│   │   │   └── page.tsx
+│   │   └── layout.tsx
+│   ├── api
+│   │   └── auth
+│   │       └── [...all]
+│   │           └── route.ts
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components
+│   ├── forms
+│   │   ├── sign-in-form.tsx
+│   │   └── sign-up-form.tsx
+│   └── ui
+│       ├── button.tsx
+│       ├── card.tsx
+│       └── input.tsx
+├── config
+└── lib
+    ├── auth-client.ts
+    ├── auth.ts
+    └── prisma.ts
+
+15 directories, 18 files`}</code>
+            </pre>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 md:items-center bg-[#CD7F32]/10 border border-[#CD7F32]/20 rounded-lg p-4">
@@ -171,7 +217,7 @@ export default function DocsPage() {
         </Link>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -205,9 +251,7 @@ export default function DocsPage() {
             </ul>
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Popular Articles</CardTitle>
