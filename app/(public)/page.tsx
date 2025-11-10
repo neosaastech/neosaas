@@ -394,9 +394,9 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="mx-auto grid justify-center gap-4 sm:grid-cols-2 md:max-w-[64rem] md:grid-cols-2 lg:gap-8 mt-8">
+        <div className="mx-auto grid justify-center gap-4 md:max-w-[64rem] mt-8">
           {/* Project Structure Visualization */}
-          <div className="relative overflow-hidden rounded-lg border bg-background p-2">
+          <div className="relative overflow-hidden rounded-lg border bg-background p-2 max-w-2xl mx-auto">
             <div className="flex h-full flex-col justify-between rounded-md p-6">
               <div className="space-y-2">
                 <h3 className="font-bold">Project Structure</h3>
@@ -440,26 +440,6 @@ export default function HomePage() {
     ├── auth.ts
     └── prisma.ts`}
                 </pre>
-              </div>
-            </div>
-          </div>
-
-          {/* Updated Modular Architecture Visualization */}
-          <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-            <div className="flex h-full flex-col justify-between rounded-md p-6">
-              <div className="space-y-2">
-                <h3 className="font-bold">Modular Architecture</h3>
-                <p className="text-sm text-muted-foreground">
-                  Each component of NeoSaaS is designed as a separate module that can be scaled independently.
-                </p>
-              </div>
-              <div className="relative h-[300px] w-full overflow-hidden rounded-md bg-black mt-4">
-                <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/interconnected-saas-Mx7rSGnQE0NrPxpC3aPdHfJ32JjHK2.png"
-                  alt="NeoSaaS Interconnected Architecture"
-                  fill
-                  className="object-contain p-4"
-                />
               </div>
             </div>
           </div>
