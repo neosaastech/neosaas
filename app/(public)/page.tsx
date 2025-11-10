@@ -384,6 +384,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Project Structure Section */}
       <section className="container py-12 md:py-24 lg:py-32">
         <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
           <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Built for scale</h2>
@@ -393,8 +394,58 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="mx-auto grid justify-center gap-4 sm:grid-cols-2 md:max-w-[64rem] md:grid-cols-3 lg:gap-8 mt-8">
-          <div className="relative overflow-hidden rounded-lg border bg-background p-2 md:col-span-3">
+        <div className="mx-auto grid justify-center gap-4 sm:grid-cols-2 md:max-w-[64rem] md:grid-cols-2 lg:gap-8 mt-8">
+          {/* Project Structure Visualization */}
+          <div className="relative overflow-hidden rounded-lg border bg-background p-2">
+            <div className="flex h-full flex-col justify-between rounded-md p-6">
+              <div className="space-y-2">
+                <h3 className="font-bold">Project Structure</h3>
+                <p className="text-sm text-muted-foreground">
+                  Clean and organized folder structure following Next.js best practices with Better Auth integration.
+                </p>
+              </div>
+              <div className="mt-4 rounded-md bg-muted p-4 overflow-x-auto">
+                <pre className="text-xs text-left">
+                  {`src
+├── app
+│   ├── (auth)
+│   │   ├── layout.tsx
+│   │   ├── sign-in
+│   │   │   └── page.tsx
+│   │   └── sign-up
+│   │       └── page.tsx
+│   ├── (protected)
+│   │   ├── dashboard
+│   │   │   └── page.tsx
+│   │   └── layout.tsx
+│   ├── api
+│   │   └── auth
+│   │       └── [...all]
+│   │           └── route.ts
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components
+│   ├── forms
+│   │   ├── sign-in-form.tsx
+│   │   └── sign-up-form.tsx
+│   └── ui
+│       ├── button.tsx
+│       ├── card.tsx
+│       └── input.tsx
+├── config
+└── lib
+    ├── auth-client.ts
+    ├── auth.ts
+    └── prisma.ts`}
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          {/* Updated Modular Architecture Visualization */}
+          <div className="relative overflow-hidden rounded-lg border bg-background p-2">
             <div className="flex h-full flex-col justify-between rounded-md p-6">
               <div className="space-y-2">
                 <h3 className="font-bold">Modular Architecture</h3>
@@ -402,14 +453,14 @@ export default function HomePage() {
                   Each component of NeoSaaS is designed as a separate module that can be scaled independently.
                 </p>
               </div>
-            </div>
-            <div className="relative h-[300px] md:h-[400px] w-full overflow-hidden rounded-md bg-black">
-              <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/interconnected-saas-Mx7rSGnQE0NrPxpC3aPdHfJ32JjHK2.png"
-                alt="NeoSaaS Interconnected Architecture"
-                fill
-                className="object-contain p-4"
-              />
+              <div className="relative h-[300px] w-full overflow-hidden rounded-md bg-black mt-4">
+                <Image
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/interconnected-saas-Mx7rSGnQE0NrPxpC3aPdHfJ32JjHK2.png"
+                  alt="NeoSaaS Interconnected Architecture"
+                  fill
+                  className="object-contain p-4"
+                />
+              </div>
             </div>
           </div>
         </div>
