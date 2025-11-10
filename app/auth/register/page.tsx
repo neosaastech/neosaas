@@ -26,7 +26,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Form submitted:", { email: formData.email })
+    console.log("[v0] Form submitted:", formData)
 
     if (!formData.acceptTerms) {
       toast({
@@ -54,7 +54,19 @@ export default function RegisterPage() {
         }),
       })
 
-      const data = await response.json()
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type")
+      let data
+
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json()
+      } else {
+        // Handle non-JSON responses (like HTML error pages)
+        const text = await response.text()
+        console.error("[v0] Non-JSON response:", text)
+        throw new Error("Server error: Received invalid response")
+      }
+
       console.log("[v0] API response:", data)
 
       if (!response.ok) {

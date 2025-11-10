@@ -19,14 +19,32 @@ const registerSchema = z
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    console.log("[v0] Register endpoint hit")
+
+    let body
+    try {
+      body = await request.json()
+    } catch (parseError) {
+      console.error("[v0] Failed to parse request body:", parseError)
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
+
     console.log("[v0] Register request received:", { email: body.email })
 
-    // Validate input
-    const validatedData = registerSchema.parse(body)
-    console.log("[v0] Validation passed")
+    let validatedData
+    try {
+      validatedData = registerSchema.parse(body)
+      console.log("[v0] Validation passed")
+    } catch (validationError) {
+      console.error("[v0] Validation error:", validationError)
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json({ error: "Validation failed", details: validationError.errors }, { status: 400 })
+      }
+      throw validationError
+    }
 
     // Check if user already exists
+    console.log("[v0] Checking for existing user...")
     const existingUser = await db.select().from(users).where(eq(users.email, validatedData.email)).limit(1)
 
     if (existingUser.length > 0) {
@@ -61,10 +79,21 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[v0] Registration error:", error)
 
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Validation failed", details: error.errors }, { status: 400 })
+    if (error instanceof Error) {
+      console.error("[v0] Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      })
     }
 
-    return NextResponse.json({ error: "Failed to register user" }, { status: 500 })
+    // Always return JSON, even for unexpected errors
+    return NextResponse.json(
+      {
+        error: "Failed to register user",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }
