@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { db } from "@/lib/db"
-import { users } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+
+console.log("[v0] Loading register route...")
+
+let db: any
+let users: any
+
+try {
+  console.log("[v0] Importing database connection...")
+  const dbModule = await import("@/lib/db")
+  db = dbModule.db
+  users = dbModule.users
+  console.log("[v0] Database imported successfully")
+} catch (importError) {
+  console.error("[v0] Failed to import database:", importError)
+}
 
 const registerSchema = z
   .object({
@@ -21,6 +34,11 @@ export async function POST(request: Request) {
   try {
     console.log("[v0] Register endpoint hit")
 
+    if (!db || !users) {
+      console.error("[v0] Database not initialized")
+      return NextResponse.json({ error: "Database connection not available" }, { status: 503 })
+    }
+
     let body
     try {
       body = await request.json()
@@ -29,7 +47,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
-    console.log("[v0] Register request received:", { email: body.email })
+    console.log("[v0] Register request received:", {
+      email: body.email,
+      firstName: body.firstName,
+      lastName: body.lastName,
+    })
 
     let validatedData
     try {
@@ -45,7 +67,17 @@ export async function POST(request: Request) {
 
     // Check if user already exists
     console.log("[v0] Checking for existing user...")
-    const existingUser = await db.select().from(users).where(eq(users.email, validatedData.email)).limit(1)
+    let existingUser
+    try {
+      existingUser = await db.select().from(users).where(eq(users.email, validatedData.email)).limit(1)
+      console.log("[v0] Existing user check complete:", existingUser.length > 0 ? "Found" : "Not found")
+    } catch (dbError) {
+      console.error("[v0] Database query error:", dbError)
+      return NextResponse.json(
+        { error: "Database error", message: dbError instanceof Error ? dbError.message : "Unknown error" },
+        { status: 500 },
+      )
+    }
 
     if (existingUser.length > 0) {
       console.log("[v0] User already exists:", validatedData.email)
@@ -55,16 +87,29 @@ export async function POST(request: Request) {
     // In production, you should hash the password with bcrypt or similar
     // For now, we'll store it directly (NOT RECOMMENDED FOR PRODUCTION)
     console.log("[v0] Creating new user...")
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        name: `${validatedData.firstName} ${validatedData.lastName}`,
-        email: validatedData.email,
-        password: validatedData.password, // SHOULD BE HASHED IN PRODUCTION
-      })
-      .returning()
+    let newUser
+    try {
+      const result = await db
+        .insert(users)
+        .values({
+          name: `${validatedData.firstName} ${validatedData.lastName}`,
+          email: validatedData.email,
+          password: validatedData.password, // SHOULD BE HASHED IN PRODUCTION
+        })
+        .returning()
 
-    console.log("[v0] User created successfully:", newUser.id)
+      newUser = result[0]
+      console.log("[v0] User created successfully:", newUser.id)
+    } catch (insertError) {
+      console.error("[v0] Database insert error:", insertError)
+      return NextResponse.json(
+        {
+          error: "Failed to create user",
+          message: insertError instanceof Error ? insertError.message : "Unknown error",
+        },
+        { status: 500 },
+      )
+    }
 
     // Return user without password
     const { password, ...userWithoutPassword } = newUser
