@@ -1,4 +1,4 @@
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { ArrowRight, Check, ChevronRight, Globe, Shield, Zap } from "lucide-reac
 import { Users, CreditCard, BarChart4, Star } from "lucide-react"
 import { MobileMenu } from "@/components/mobile-menu"
 import { BrandIcon } from "@/components/brand-icon"
+import { NeoSaasArchitectureDiagram } from "@/components/neosaas-architecture-diagram"
 
 export default function HomePage() {
   return (
@@ -17,7 +18,6 @@ export default function HomePage() {
         <MobileMenu />
       </div>
 
-      {/* Rest of the page content remains the same */}
       {/* Hero Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gradient-to-b from-background to-muted">
         <div className="container px-4 md:px-6">
@@ -54,14 +54,47 @@ export default function HomePage() {
               </div>
             </div>
             <div className="flex items-center justify-center">
-              <div className="relative w-full max-w-[500px] h-[400px] rounded-lg overflow-hidden shadow-xl">
-                <Image
-                  src="/clean-data-overview.png"
-                  alt="NeoSaaS Technical Dashboard"
-                  fill
-                  className="object-cover"
-                  priority
-                />
+              <div className="relative w-full max-w-[500px] h-[400px] rounded-lg overflow-hidden bg-gradient-to-br from-[#CD7F32]/10 to-background border border-[#CD7F32]/20 shadow-xl">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="grid grid-cols-3 gap-4 p-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-16 w-16 rounded-full bg-[#CD7F32]/20 flex items-center justify-center">
+                        <Users className="h-8 w-8 text-[#CD7F32]" />
+                      </div>
+                      <span className="text-xs text-muted-foreground">Users</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-16 w-16 rounded-full bg-[#CD7F32]/20 flex items-center justify-center">
+                        <Shield className="h-8 w-8 text-[#CD7F32]" />
+                      </div>
+                      <span className="text-xs text-muted-foreground">Security</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-16 w-16 rounded-full bg-[#CD7F32]/20 flex items-center justify-center">
+                        <Globe className="h-8 w-8 text-[#CD7F32]" />
+                      </div>
+                      <span className="text-xs text-muted-foreground">Global</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-16 w-16 rounded-full bg-[#CD7F32]/20 flex items-center justify-center">
+                        <CreditCard className="h-8 w-8 text-[#CD7F32]" />
+                      </div>
+                      <span className="text-xs text-muted-foreground">Billing</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-20 w-20 rounded-full bg-[#CD7F32] flex items-center justify-center shadow-lg shadow-[#CD7F32]/50">
+                        <Zap className="h-10 w-10 text-white" />
+                      </div>
+                      <span className="text-xs font-bold text-[#CD7F32]">NeoSaaS</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-16 w-16 rounded-full bg-[#CD7F32]/20 flex items-center justify-center">
+                        <BarChart4 className="h-8 w-8 text-[#CD7F32]" />
+                      </div>
+                      <span className="text-xs text-muted-foreground">Analytics</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -163,6 +196,95 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Technology Stack Section */}
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="space-y-2">
+              <Badge className="bg-[#CD7F32] text-white">Technology Stack</Badge>
+              <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">Built with Modern Technologies</h2>
+              <p className="max-w-[900px] text-muted-foreground md:text-xl">
+                NeoSaaS leverages the best technologies to deliver a robust, scalable, and secure platform.
+              </p>
+            </div>
+          </div>
+          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 md:grid-cols-3 lg:grid-cols-4 mt-12 items-center">
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp.webp"
+                alt="Next.js"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.2qv4I5DCIN_XE8cT6M_sFQAAAA.webp"
+                alt="Prisma"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.rMNgqM_B76VzXugyzHZt0QHaEB.webp"
+                alt="Neon Serverless Postgres"
+                width={140}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa.webp"
+                alt="Better Auth"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa.webp"
+                alt="Resend"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.YorcsMZ-6bBZtrx_g494ZwHaEK.webp"
+                alt="Stripe"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.h3_xyxCdva0e9rRTncAzjgHaHa.webp"
+                alt="PayPal"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="/images/design-mode/OIP.k8AS-V_kTYFYl4SCg4HjggAAAA.webp"
+                alt="TailAdmin"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Testimonials Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
         <div className="container px-4 md:px-6">
@@ -189,9 +311,10 @@ export default function HomePage() {
                     saved us countless hours of work."
                   </p>
                   <div className="flex items-center space-x-2">
-                    <div className="rounded-full bg-muted-foreground/10 p-1">
-                      <Avatar className="h-8 w-8" />
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src="/images/design-mode/44.jpg" alt="Jane Smith" />
+                      <AvatarFallback>JS</AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-sm font-medium">Jane Smith</p>
                       <p className="text-xs text-muted-foreground">CEO, TechCorp</p>
@@ -213,9 +336,10 @@ export default function HomePage() {
                     data-driven decisions with confidence."
                   </p>
                   <div className="flex items-center space-x-2">
-                    <div className="rounded-full bg-muted-foreground/10 p-1">
-                      <Avatar className="h-8 w-8" />
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src="/images/design-mode/32.jpg" alt="John Doe" />
+                      <AvatarFallback>JD</AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-sm font-medium">John Doe</p>
                       <p className="text-xs text-muted-foreground">CTO, Innovate Inc.</p>
@@ -237,9 +361,10 @@ export default function HomePage() {
                     support team is always there when we need them."
                   </p>
                   <div className="flex items-center space-x-2">
-                    <div className="rounded-full bg-muted-foreground/10 p-1">
-                      <Avatar className="h-8 w-8" />
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src="/images/design-mode/68.jpg" alt="Sarah Johnson" />
+                      <AvatarFallback>SJ</AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-sm font-medium">Sarah Johnson</p>
                       <p className="text-xs text-muted-foreground">Founder, StartUp Labs</p>
@@ -272,7 +397,11 @@ export default function HomePage() {
                 </Button>
               </Link>
               <Link href="/pricing">
-                <Button size="lg" variant="outline" className="text-white border-white hover:bg-white/10">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-white border-white hover:bg-white/10 bg-transparent"
+                >
                   View Pricing
                 </Button>
               </Link>
@@ -297,50 +426,51 @@ export default function HomePage() {
                 <div className="flex items-start space-x-3">
                   <Check className="h-5 w-5 text-[#CD7F32] mt-0.5" />
                   <div>
-                    <h3 className="font-bold">Scalable Infrastructure</h3>
+                    <h3 className="font-bold">Next.js 16 Framework</h3>
                     <p className="text-muted-foreground">
-                      Built on a modern, cloud-native architecture that scales automatically with your needs.
+                      Built on the latest Next.js with React Server Components for optimal performance and developer
+                      experience.
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="h-5 w-5 text-[#CD7F32] mt-0.5" />
                   <div>
-                    <h3 className="font-bold">Global Availability</h3>
+                    <h3 className="font-bold">Prisma ORM & Neon Database</h3>
                     <p className="text-muted-foreground">
-                      Deploy your application in multiple regions for low-latency access worldwide.
+                      Type-safe database access with Prisma and serverless PostgreSQL powered by Neon for scalability.
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="h-5 w-5 text-[#CD7F32] mt-0.5" />
                   <div>
-                    <h3 className="font-bold">Enterprise-grade Security</h3>
+                    <h3 className="font-bold">Better Auth Integration</h3>
                     <p className="text-muted-foreground">
-                      Advanced security features including SSO, 2FA, and data encryption at rest and in transit.
+                      Modern authentication with Better Auth supporting multiple providers and advanced security
+                      features.
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Check className="h-5 w-5 text-[#CD7F32] mt-0.5" />
                   <div>
-                    <h3 className="font-bold">Flexible Pricing</h3>
+                    <h3 className="font-bold">Resend Email API</h3>
                     <p className="text-muted-foreground">
-                      Create custom pricing plans that grow with your business and adapt to your customers' needs.
+                      Reliable transactional emails via Resend API with fallback to Nodemailer for SMTP support.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-center">
-              <div className="relative w-full max-w-[500px] h-[400px] rounded-lg overflow-hidden shadow-xl">
-                <Image src="/tech-stack.png" alt="NeoSaaS Technical Architecture" fill className="object-cover" />
-              </div>
+              <NeoSaasArchitectureDiagram />
             </div>
           </div>
         </div>
       </section>
 
+      {/* Project Structure Section */}
       <section className="container py-12 md:py-24 lg:py-32">
         <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
           <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Built for scale</h2>
@@ -350,97 +480,53 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="mx-auto grid justify-center gap-4 sm:grid-cols-2 md:max-w-[64rem] md:grid-cols-3 lg:gap-8 mt-8">
-          <div className="relative overflow-hidden rounded-lg border bg-background p-2 md:col-span-3">
+        <div className="mx-auto grid justify-center gap-4 md:max-w-[64rem] mt-8">
+          {/* Project Structure Visualization */}
+          <div className="relative overflow-hidden rounded-lg border bg-background p-2 max-w-2xl mx-auto">
             <div className="flex h-full flex-col justify-between rounded-md p-6">
               <div className="space-y-2">
-                <h3 className="font-bold">Modular Architecture</h3>
+                <h3 className="font-bold">Project Structure</h3>
                 <p className="text-sm text-muted-foreground">
-                  Each component of NeoSaaS is designed as a separate module that can be scaled independently.
+                  Clean and organized folder structure following Next.js best practices with Better Auth integration.
                 </p>
               </div>
-            </div>
-            <div className="relative h-[300px] md:h-[400px] w-full overflow-hidden rounded-md bg-black">
-              <Image
-                src="/schema-neosaas-architecture.png"
-                alt="NeoSaaS Architecture Diagram"
-                fill
-                className="object-contain p-4"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="container py-12 md:py-24 lg:py-32 bg-muted/50">
-        <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
-          <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Unified Back Office</h2>
-          <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
-            The NeoSaaS back office provides a centralized management system that connects all modules through a jointed
-            schema architecture.
-          </p>
-        </div>
-
-        <div className="mx-auto grid justify-center gap-8 sm:grid-cols-2 md:max-w-[64rem] md:grid-cols-3 mt-8">
-          <div className="relative overflow-hidden rounded-lg border bg-background p-6">
-            <div className="flex h-full flex-col justify-between">
-              <div className="space-y-2">
-                <h3 className="font-bold">Jointed Schema Design</h3>
-                <p className="text-muted-foreground">
-                  Our jointed schema architecture allows different modules to share data while maintaining independence.
-                  This enables seamless integration between analytics, email, storage, payments, and documentation
-                  systems.
-                </p>
+              <div className="mt-4 rounded-md bg-muted p-4 overflow-x-auto">
+                <pre className="text-xs text-left">
+                  {`src
+├── app
+│   ├── (auth)
+│   │   ├── layout.tsx
+│   │   ├── sign-in
+│   │   │   └── page.tsx
+│   │   └── sign-up
+│   │       └── page.tsx
+│   ├── (protected)
+│   │   ├── dashboard
+│   │   │   └── page.tsx
+│   │   └── layout.tsx
+│   ├── api
+│   │   └── auth
+│   │       └── [...all]
+│   │           └── route.ts
+│   ├── favicon.ico
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components
+│   ├── forms
+│   │   ├── sign-in-form.tsx
+│   │   └── sign-up-form.tsx
+│   └── ui
+│       ├── button.tsx
+│       ├── card.tsx
+│       └── input.tsx
+├── config
+└── lib
+    ├── auth-client.ts
+    ├── auth.ts
+    └── prisma.ts`}
+                </pre>
               </div>
-            </div>
-          </div>
-
-          <div className="relative overflow-hidden rounded-lg border bg-background p-6">
-            <div className="flex h-full flex-col justify-between">
-              <div className="space-y-2">
-                <h3 className="font-bold">Centralized Control</h3>
-                <p className="text-muted-foreground">
-                  The back office provides a single interface to manage all aspects of your SaaS, from user management
-                  to subscription handling, while each module operates independently behind the scenes.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative overflow-hidden rounded-lg border bg-background p-6">
-            <div className="flex h-full flex-col justify-between">
-              <div className="space-y-2">
-                <h3 className="font-bold">Extensible Framework</h3>
-                <p className="text-muted-foreground">
-                  Add new modules or replace existing ones without disrupting the entire system. The jointed schema
-                  adapts to new components while maintaining data integrity across the platform.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Technical Architecture Section */}
-      <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
-        <div className="container px-4 md:px-6">
-          <div className="flex flex-col items-center justify-center space-y-4 text-center">
-            <div className="space-y-2">
-              <Badge className="bg-[#CD7F32] text-white">Technical Architecture</Badge>
-              <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">Built for Developers</h2>
-              <p className="max-w-[900px] text-muted-foreground md:text-xl">
-                Our platform is designed with developers in mind, providing powerful APIs and integrations.
-              </p>
-            </div>
-          </div>
-          <div className="mt-12">
-            <div className="relative w-full max-w-4xl mx-auto h-[500px] rounded-lg overflow-hidden shadow-xl">
-              <Image
-                src="/interconnected-saas.png"
-                alt="NeoSaaS Technical Architecture"
-                fill
-                className="object-contain"
-              />
             </div>
           </div>
         </div>

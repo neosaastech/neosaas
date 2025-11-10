@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { MobileMenu } from "@/components/mobile-menu"
 import Image from "next/image"
+import { Github, Linkedin } from "lucide-react"
 
 export function SiteHeader() {
   const pathname = usePathname()
@@ -17,7 +18,7 @@ export function SiteHeader() {
       <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/images/logo_neolux.svg" alt="NeoSaaS" width={32} height={32} />
+            <Image src="/images/logo_neolux.jpg" alt="NeoSaaS" width={32} height={32} className="rounded" />
             <span className="font-bold text-lg hidden md:inline-block">
               <span className="text-foreground">Neo</span>
               <span className="text-[#CD7F32]">SaaS</span>
@@ -28,6 +29,24 @@ export function SiteHeader() {
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
             {!isDemo && <MobileMenu />}
+            <div className="hidden md:flex items-center space-x-2 mr-2">
+              <Link
+                href="https://www.linkedin.com/company/109552979/admin/dashboard/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Linkedin className="h-5 w-5" />
+              </Link>
+              <Link
+                href="https://github.com/neosaastech"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Github className="h-5 w-5" />
+              </Link>
+            </div>
             <ThemeToggle />
             <div className="hidden md:flex space-x-1">
               <Link href="/auth/login">

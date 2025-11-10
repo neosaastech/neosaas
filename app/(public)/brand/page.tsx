@@ -305,7 +305,7 @@ export default function BrandPage() {
                   <h3 className="text-lg font-medium mb-4">Frontend Technologies</h3>
                   <div className="space-y-4">
                     <div className="p-4 border rounded-lg">
-                      <h4 className="font-medium">Next.js 14</h4>
+                      <h4 className="font-medium">Next.js</h4>
                       <p className="text-sm text-muted-foreground mt-1">React framework with App Router</p>
                       <ul className="list-disc pl-5 mt-2 text-sm space-y-1">
                         <li>Server Components for improved performance</li>

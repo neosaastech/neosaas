@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Book, FileText, Layers, Lightbulb, Settings, Zap } from "lucide-react"
+import { Book } from "lucide-react"
 
 interface DocsSidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
@@ -79,73 +79,10 @@ export function DocsSidebar() {
           href: "/docs/installation",
         },
         {
-          title: "Configuration",
-          href: "/docs/configuration",
+          title: "Download from GitHub",
+          href: "/docs/download",
         },
       ],
-    },
-    {
-      title: "Core Concepts",
-      href: "/docs/core-concepts",
-      icon: Layers,
-      items: [
-        {
-          title: "User Management",
-          href: "/docs/core-concepts/user-management",
-        },
-        {
-          title: "Billing & Subscriptions",
-          href: "/docs/core-concepts/billing",
-        },
-        {
-          title: "Analytics",
-          href: "/docs/core-concepts/analytics",
-        },
-      ],
-    },
-    {
-      title: "API Reference",
-      href: "/docs/api-reference",
-      icon: Zap,
-      items: [
-        {
-          title: "Authentication",
-          href: "/docs/api-reference/authentication",
-        },
-        {
-          title: "Users API",
-          href: "/docs/api-reference/users",
-        },
-        {
-          title: "Payments API",
-          href: "/docs/api-reference/payments",
-        },
-      ],
-    },
-    {
-      title: "Guides",
-      href: "/docs/guides",
-      icon: FileText,
-      items: [
-        {
-          title: "Custom Integrations",
-          href: "/docs/guides/custom-integrations",
-        },
-        {
-          title: "White Labeling",
-          href: "/docs/guides/white-labeling",
-        },
-      ],
-    },
-    {
-      title: "Best Practices",
-      href: "/docs/best-practices",
-      icon: Lightbulb,
-    },
-    {
-      title: "Advanced Configuration",
-      href: "/docs/advanced-configuration",
-      icon: Settings,
     },
   ]
 

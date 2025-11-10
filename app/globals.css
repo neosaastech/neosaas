@@ -24,6 +24,12 @@
     --input: 0 0% 89.8%;
     --ring: 25 60% 50%;
     --radius: 0.5rem;
+    /* Added NeoSaaS brand chart colors */
+    --chart-1: 25 60% 50%;
+    --chart-2: 25 70% 65%;
+    --chart-3: 25 80% 73%;
+    --chart-4: 25 50% 42%;
+    --chart-5: 25 40% 35%;
   }
 
   .dark {
@@ -46,6 +52,12 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 25 60% 50%;
+    /* Added NeoSaaS brand chart colors for dark mode */
+    --chart-1: 25 60% 50%;
+    --chart-2: 25 70% 65%;
+    --chart-3: 25 80% 73%;
+    --chart-4: 25 50% 42%;
+    --chart-5: 25 40% 35%;
   }
 }
 

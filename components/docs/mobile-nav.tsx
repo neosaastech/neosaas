@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Menu } from "lucide-react"
-import { Book, FileText, Layers, Lightbulb, Settings, Zap } from "lucide-react"
+import { Book } from "lucide-react"
 
 export function DocsMobileNav() {
   const [open, setOpen] = React.useState(false)
@@ -29,73 +29,10 @@ export function DocsMobileNav() {
           href: "/docs/installation",
         },
         {
-          title: "Configuration",
-          href: "/docs/configuration",
+          title: "Download from GitHub",
+          href: "/docs/download",
         },
       ],
-    },
-    {
-      title: "Core Concepts",
-      href: "/docs/core-concepts",
-      icon: Layers,
-      items: [
-        {
-          title: "User Management",
-          href: "/docs/core-concepts/user-management",
-        },
-        {
-          title: "Billing & Subscriptions",
-          href: "/docs/core-concepts/billing",
-        },
-        {
-          title: "Analytics",
-          href: "/docs/core-concepts/analytics",
-        },
-      ],
-    },
-    {
-      title: "API Reference",
-      href: "/docs/api-reference",
-      icon: Zap,
-      items: [
-        {
-          title: "Authentication",
-          href: "/docs/api-reference/authentication",
-        },
-        {
-          title: "Users API",
-          href: "/docs/api-reference/users",
-        },
-        {
-          title: "Payments API",
-          href: "/docs/api-reference/payments",
-        },
-      ],
-    },
-    {
-      title: "Guides",
-      href: "/docs/guides",
-      icon: FileText,
-      items: [
-        {
-          title: "Custom Integrations",
-          href: "/docs/guides/custom-integrations",
-        },
-        {
-          title: "White Labeling",
-          href: "/docs/guides/white-labeling",
-        },
-      ],
-    },
-    {
-      title: "Best Practices",
-      href: "/docs/best-practices",
-      icon: Lightbulb,
-    },
-    {
-      title: "Advanced Configuration",
-      href: "/docs/advanced-configuration",
-      icon: Settings,
     },
   ]
 
@@ -103,7 +40,7 @@ export function DocsMobileNav() {
     <div className="flex w-full items-center justify-between">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="mr-2">
+          <Button variant="outline" size="icon" className="mr-2 bg-transparent">
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>
           </Button>

@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Mail, MapPin, Phone, Globe, Facebook, Twitter, Linkedin, ArrowLeft } from "lucide-react"
+import { Mail, MapPin, Phone, Globe, ArrowLeft } from "lucide-react"
 
 export default function ContactPage() {
   return (
@@ -70,9 +70,9 @@ export default function ContactPage() {
                 <div>
                   <p className="font-medium">Address</p>
                   <p className="text-sm text-muted-foreground">
-                    123 Innovation Way,
+                    8 rue de la gare,
                     <br />
-                    San Francisco, CA 94107
+                    62860 SAUCHY LESTREE, France
                   </p>
                 </div>
               </div>
@@ -80,7 +80,7 @@ export default function ContactPage() {
                 <Phone className="mr-3 h-5 w-5 text-primary" />
                 <div>
                   <p className="font-medium">Phone</p>
-                  <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
+                  <p className="text-sm text-muted-foreground">+33 7 60 40 55 73</p>
                 </div>
               </div>
               <div className="flex items-start">
@@ -105,37 +105,16 @@ export default function ContactPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <p>Monday - Friday</p>
-                <p className="font-medium">9:00 AM - 6:00 PM (PST)</p>
+                <p className="font-medium">9:00 AM - 6:00 PM (CET)</p>
               </div>
               <div className="flex justify-between items-center">
                 <p>Saturday</p>
-                <p className="font-medium">10:00 AM - 4:00 PM (PST)</p>
+                <p className="font-medium">10:00 AM - 4:00 PM (CET)</p>
               </div>
               <div className="flex justify-between items-center">
                 <p>Sunday</p>
                 <p className="font-medium">Closed</p>
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-xl font-semibold mb-4">Connect With Us</h2>
-            <div className="flex space-x-4">
-              <Button variant="outline" size="icon" asChild>
-                <Link href="#" aria-label="Facebook">
-                  <Facebook className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="icon" asChild>
-                <Link href="#" aria-label="Twitter">
-                  <Twitter className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="icon" asChild>
-                <Link href="#" aria-label="LinkedIn">
-                  <Linkedin className="h-4 w-4" />
-                </Link>
-              </Button>
             </div>
           </div>
         </div>

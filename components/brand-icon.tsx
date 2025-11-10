@@ -14,7 +14,7 @@ export function BrandIcon({ size = "md", className = "" }: BrandIconProps) {
 
   return (
     <div className={`relative ${sizeClasses[size]} ${className}`}>
-      <Image src="/images/logo_neolux.png" alt="NeoSaaS" fill className="object-contain" />
+      <Image src="/images/logo_neolux.jpg" alt="NeoSaaS" fill className="object-contain rounded" />
     </div>
   )
 }

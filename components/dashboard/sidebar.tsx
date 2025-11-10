@@ -2,21 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  LayoutDashboard,
-  Users,
-  Package,
-  CreditCard,
-  Mail,
-  HardDrive,
-  BarChart4,
-  Calendar,
-  Settings,
-  FileText,
-  LogOut,
-  Menu,
-  X,
-} from "lucide-react"
+import { LayoutDashboard, Users, CreditCard, Mail, HardDrive, BarChart4, LogOut, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
@@ -33,9 +19,9 @@ const navItems = [
     icon: Users,
   },
   {
-    title: "Plans",
-    href: "/dashboard/plans",
-    icon: Package,
+    title: "Customers",
+    href: "/dashboard/customers",
+    icon: Users,
   },
   {
     title: "Payments",
@@ -56,21 +42,6 @@ const navItems = [
     title: "Analytics",
     href: "/dashboard/analytics",
     icon: BarChart4,
-  },
-  {
-    title: "Tasks",
-    href: "/dashboard/tasks",
-    icon: Calendar,
-  },
-  {
-    title: "Documentation",
-    href: "/dashboard/docs",
-    icon: FileText,
-  },
-  {
-    title: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
   },
 ]
 
@@ -125,7 +96,7 @@ export function DashboardSidebar() {
             </nav>
           </div>
           <div className="border-t p-4">
-            <Button variant="outline" className="w-full justify-start" asChild>
+            <Button variant="outline" className="w-full justify-start bg-transparent" asChild>
               <Link href="/">
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout

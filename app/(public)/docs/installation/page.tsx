@@ -26,28 +26,42 @@ export default function InstallationPage() {
           <p>Before you begin, make sure you have the following installed:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Node.js 18.0 or higher</li>
-            <li>npm 8.0 or higher, or yarn 1.22 or higher</li>
-            <li>A database (PostgreSQL, MySQL, or MongoDB)</li>
+            <li>npm 8.0 or higher (or yarn/pnpm)</li>
+            <li>Git (for cloning the repository)</li>
           </ul>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Required Technologies</AlertTitle>
+            <AlertDescription>
+              NeoSaaS is built on Next.js 16+ and Tailwind CSS. These will be included when you download the project.
+            </AlertDescription>
+          </Alert>
         </div>
 
         <div className="space-y-4">
-          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Installation Options</h2>
+          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Step 1: Download from GitHub</h2>
           <p>
-            You can install NeoSaaS using npm, yarn, or by cloning the repository directly. Choose the method that works
-            best for your workflow.
+            Download the latest version of NeoSaaS from the official GitHub repository at{" "}
+            <a
+              href="https://github.com/neosaastech/neosaas"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#CD7F32] hover:underline font-medium"
+            >
+              https://github.com/neosaastech/neosaas
+            </a>
           </p>
 
-          <Tabs defaultValue="npm" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="npm">npm</TabsTrigger>
-              <TabsTrigger value="yarn">yarn</TabsTrigger>
-              <TabsTrigger value="git">Git</TabsTrigger>
+          <Tabs defaultValue="clone" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="clone">Git Clone</TabsTrigger>
+              <TabsTrigger value="download">Direct Download</TabsTrigger>
             </TabsList>
-            <TabsContent value="npm" className="space-y-4">
+            <TabsContent value="clone" className="space-y-4">
+              <p>Clone the repository using Git:</p>
               <div className="relative">
                 <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                  <code>npm install neosaas</code>
+                  <code>git clone https://github.com/neosaastech/neosaas.git</code>
                 </pre>
                 <Button
                   variant="ghost"
@@ -58,39 +72,10 @@ export default function InstallationPage() {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              <p>Then, initialize your project:</p>
+              <p>Then navigate to the project directory:</p>
               <div className="relative">
                 <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                  <code>npx neosaas init</code>
-                </pre>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  aria-label="Copy code"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </TabsContent>
-            <TabsContent value="yarn" className="space-y-4">
-              <div className="relative">
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                  <code>yarn add neosaas</code>
-                </pre>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  aria-label="Copy code"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-              <p>Then, initialize your project:</p>
-              <div className="relative">
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                  <code>yarn neosaas init</code>
+                  <code>cd neosaas</code>
                 </pre>
                 <Button
                   variant="ghost"
@@ -102,70 +87,62 @@ export default function InstallationPage() {
                 </Button>
               </div>
             </TabsContent>
-            <TabsContent value="git" className="space-y-4">
-              <div className="relative">
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                  <code>git clone https://github.com/neosaas/neosaas.git</code>
-                </pre>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  aria-label="Copy code"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-              <p>Then, navigate to the directory and install dependencies:</p>
-              <div className="relative">
-                <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-                  <code>cd neosaas && npm install</code>
-                </pre>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
-                  aria-label="Copy code"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
+            <TabsContent value="download" className="space-y-4">
+              <p>Download the ZIP file directly from GitHub and extract it to your desired location.</p>
+              <Link href="https://github.com/neosaastech/neosaas/archive/refs/heads/main.zip">
+                <Button className="bg-[#CD7F32] hover:bg-[#CD7F32]/90">Download ZIP</Button>
+              </Link>
+              <p className="text-sm text-muted-foreground">
+                After downloading, extract the files and navigate to the extracted folder in your terminal.
+              </p>
             </TabsContent>
           </Tabs>
         </div>
 
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertTitle>Note</AlertTitle>
-          <AlertDescription>
-            For production environments, we recommend using a specific version number instead of the latest version to
-            ensure consistency across deployments.
-          </AlertDescription>
-        </Alert>
+        <div className="space-y-4">
+          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Step 2: Install Node Dependencies</h2>
+          <p>Install all required Node.js packages using npm:</p>
+          <div className="relative">
+            <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+              <code>npm install</code>
+            </pre>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+              aria-label="Copy code"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            This will install Next.js 16, Tailwind CSS, Prisma, and all other dependencies defined in package.json.
+          </p>
+        </div>
 
         <div className="space-y-4">
-          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Configuration</h2>
+          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Step 3: Configure Environment Variables</h2>
           <p>
-            After installation, you'll need to configure your environment variables. Create a <code>.env</code> file in
-            the root of your project with the following variables:
+            Create a <code className="bg-muted px-2 py-1 rounded">.env</code> file in the root of your project. You can
+            copy the example file:
           </p>
           <div className="relative">
             <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
-              <code>
-                DATABASE_URL=postgresql://username:password@localhost:5432/neosaas
-                <br />
-                JWT_SECRET=your-secret-key
-                <br />
-                STRIPE_SECRET_KEY=sk_test_your_stripe_key
-                <br />
-                SMTP_HOST=smtp.example.com
-                <br />
-                SMTP_PORT=587
-                <br />
-                SMTP_USER=your-smtp-username
-                <br />
-                SMTP_PASSWORD=your-smtp-password
-              </code>
+              <code>cp .env.example .env</code>
+            </pre>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+              aria-label="Copy code"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <p>Add your PostgreSQL database URL (from Neon or local PostgreSQL):</p>
+          <div className="relative">
+            <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+              <code>DATABASE_URL="postgresql://username:password@localhost:5432/neosaas"</code>
             </pre>
             <Button
               variant="ghost"
@@ -178,18 +155,114 @@ export default function InstallationPage() {
           </div>
         </div>
 
+        <div className="space-y-4">
+          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Step 4: Set Up Prisma Database</h2>
+          <p>NeoSaaS uses Prisma as the ORM. Follow these steps to set up your database:</p>
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">4.1. Generate Prisma Client</h3>
+            <p className="text-sm text-muted-foreground">Generate the Prisma Client based on your schema:</p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                <code>npx prisma generate</code>
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label="Copy code"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">4.2. Run Database Migrations</h3>
+            <p className="text-sm text-muted-foreground">Push the database schema to your database (creates tables):</p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                <code>npx prisma db push</code>
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label="Copy code"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">Or run migrations for production:</p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                <code>npx prisma migrate deploy</code>
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label="Copy code"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">4.3. (Optional) Seed the Database</h3>
+            <p className="text-sm text-muted-foreground">If you want to populate your database with sample data:</p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                <code>npx prisma db seed</code>
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label="Copy code"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">4.4. Open Prisma Studio (Optional)</h3>
+            <p className="text-sm text-muted-foreground">
+              Prisma Studio provides a visual interface to view and edit your database:
+            </p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                <code>npx prisma studio</code>
+              </pre>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                aria-label="Copy code"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This will open Prisma Studio at <code className="bg-muted px-2 py-1 rounded">http://localhost:5555</code>
+            </p>
+          </div>
+        </div>
+
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Warning</AlertTitle>
+          <AlertTitle>Important: Database URL</AlertTitle>
           <AlertDescription>
-            Never commit your <code>.env</code> file to version control. Add it to your <code>.gitignore</code> file to
-            prevent accidentally exposing sensitive information.
+            Make sure your <code>DATABASE_URL</code> in the <code>.env</code> file is correctly configured before
+            running Prisma commands. The URL should include your database credentials and connection string.
           </AlertDescription>
         </Alert>
 
         <div className="space-y-4">
-          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Running the Application</h2>
-          <p>Once you've configured your environment variables, you can start the application:</p>
+          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Step 5: Start the Development Server</h2>
+          <p>Once everything is configured, start the Next.js development server:</p>
           <div className="relative">
             <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono">
               <code>npm run dev</code>
@@ -204,42 +277,36 @@ export default function InstallationPage() {
             </Button>
           </div>
           <p>
-            This will start the development server at <code>http://localhost:3000</code>. You can access the admin
-            dashboard at <code>http://localhost:3000/dashboard</code>.
+            Your application will be available at{" "}
+            <code className="bg-muted px-2 py-1 rounded">http://localhost:3000</code>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Access the admin dashboard at{" "}
+            <code className="bg-muted px-2 py-1 rounded">http://localhost:3000/dashboard</code>
           </p>
         </div>
 
-        <div className="space-y-4">
-          <h2 className="scroll-m-20 text-2xl font-semibold tracking-tight">Next Steps</h2>
-          <p>Now that you have NeoSaaS installed and running, you can:</p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li>
-              <Link href="/docs/configuration" className="text-[#CD7F32] hover:underline">
-                Configure your application settings
-              </Link>
-            </li>
-            <li>
-              <Link href="/docs/core-concepts/user-management" className="text-[#CD7F32] hover:underline">
-                Set up user management
-              </Link>
-            </li>
-            <li>
-              <Link href="/docs/core-concepts/billing" className="text-[#CD7F32] hover:underline">
-                Configure billing and subscriptions
-              </Link>
-            </li>
-          </ul>
-        </div>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Next Steps</AlertTitle>
+          <AlertDescription>
+            Congratulations! Your NeoSaaS installation is complete. Check out the{" "}
+            <Link href="/docs/architecture" className="text-[#CD7F32] hover:underline">
+              Architecture documentation
+            </Link>{" "}
+            to understand how the application is structured.
+          </AlertDescription>
+        </Alert>
 
         <div className="flex justify-between pt-4 border-t">
           <Link href="/docs">
-            <Button variant="outline" className="gap-1">
+            <Button variant="outline" className="gap-1 bg-transparent">
               <ArrowLeft className="h-4 w-4" /> Introduction
             </Button>
           </Link>
-          <Link href="/docs/configuration">
-            <Button variant="outline" className="gap-1">
-              Configuration <ArrowRight className="h-4 w-4" />
+          <Link href="/docs/download">
+            <Button variant="outline" className="gap-1 bg-transparent">
+              Download from GitHub <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
