@@ -195,6 +195,86 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Technology Stack Section */}
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="space-y-2">
+              <Badge className="bg-[#CD7F32] text-white">Technology Stack</Badge>
+              <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">Built with Modern Technologies</h2>
+              <p className="max-w-[900px] text-muted-foreground md:text-xl">
+                NeoSaaS leverages the best technologies to deliver a robust, scalable, and secure platform.
+              </p>
+            </div>
+          </div>
+          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 md:grid-cols-3 lg:grid-cols-4 mt-12 items-center">
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp-oqBWOOeYFDBEYObqOKNwZpw9ZNggYz.webp"
+                alt="Next.js"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.2qv4I5DCIN_XE8cT6M_sFQAAAA-au5Is5P8VHru2kYg5UqHWWB7GKof2r.webp"
+                alt="Prisma"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.rMNgqM_B76VzXugyzHZt0QHaEB-mNgs7vYBK9DwYIdx5WNmhIdBTj8Gqm.webp"
+                alt="Neon Serverless Postgres"
+                width={140}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa-GRdWyW0OFk4W8pH4qSCoTmytDvUNSS.webp"
+                alt="Better Auth"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa-sGqHsCL9N8ZzBhaBofo6JuyvXjsYDp.webp"
+                alt="Resend"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.YorcsMZ-6bBZtrx_g494ZwHaEK-4HMJTqtgRkG1gLpYk0zqRf5nHaVhlw.webp"
+                alt="Stripe"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.h3_xyxCdva0e9rRTncAzjgHaHa-YSzIjeiRcQk1nq72voSmegiZyb6QAa.webp"
+                alt="PayPal"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Testimonials Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
         <div className="container px-4 md:px-6">
