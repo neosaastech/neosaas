@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { signIn } from "@/lib/auth-client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -25,14 +24,23 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const result = await signIn.email({
-        email: formData.email,
-        password: formData.password,
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
       })
 
-      if (result.error) {
-        throw new Error(result.error.message || "Login failed")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Login failed" }))
+        throw new Error(errorData.error || "Invalid credentials")
       }
+
+      const data = await response.json()
 
       toast({
         title: "Welcome back!",
