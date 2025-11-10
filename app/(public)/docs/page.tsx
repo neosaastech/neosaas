@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowRight, Book, FileText, Layers, Lightbulb, Settings, Zap } from "lucide-react"
+import { ArrowRight, Book } from "lucide-react"
 
 export default function DocsPage() {
   return (
@@ -34,7 +34,7 @@ export default function DocsPage() {
           </p>
         </div>
         <Link href="/docs/whats-new">
-          <Button variant="outline" className="border-[#CD7F32] text-[#CD7F32] hover:bg-[#CD7F32]/10">
+          <Button variant="outline" className="border-[#CD7F32] text-[#CD7F32] hover:bg-[#CD7F32]/10 bg-transparent">
             What's New <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
@@ -62,131 +62,8 @@ export default function DocsPage() {
                 </Link>
               </li>
               <li>
-                <Link href="/docs/configuration" className="text-muted-foreground hover:text-foreground">
-                  Configuration
-                </Link>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-[#CD7F32]" />
-              <CardTitle>Core Concepts</CardTitle>
-            </div>
-            <CardDescription>Learn about the fundamental concepts of NeoSaaS</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link
-                  href="/docs/core-concepts/user-management"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  User Management
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs/core-concepts/billing" className="text-muted-foreground hover:text-foreground">
-                  Billing & Subscriptions
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs/core-concepts/analytics" className="text-muted-foreground hover:text-foreground">
-                  Analytics
-                </Link>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-[#CD7F32]" />
-              <CardTitle>API Reference</CardTitle>
-            </div>
-            <CardDescription>Comprehensive API documentation for developers</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/docs/api-reference/authentication" className="text-muted-foreground hover:text-foreground">
-                  Authentication
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs/api-reference/users" className="text-muted-foreground hover:text-foreground">
-                  Users API
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs/api-reference/payments" className="text-muted-foreground hover:text-foreground">
-                  Payments API
-                </Link>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#CD7F32]" />
-              <CardTitle>Guides</CardTitle>
-            </div>
-            <CardDescription>Step-by-step guides for common tasks and integrations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/docs/guides/custom-integrations" className="text-muted-foreground hover:text-foreground">
-                  Custom Integrations
-                </Link>
-              </li>
-              <li>
-                <Link href="/docs/guides/white-labeling" className="text-muted-foreground hover:text-foreground">
-                  White Labeling
-                </Link>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-[#CD7F32]" />
-              <CardTitle>Best Practices</CardTitle>
-            </div>
-            <CardDescription>Recommendations for getting the most out of NeoSaaS</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/docs/best-practices" className="text-muted-foreground hover:text-foreground">
-                  Overview
-                </Link>
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-[#CD7F32]" />
-              <CardTitle>Advanced Configuration</CardTitle>
-            </div>
-            <CardDescription>Detailed configuration options for power users</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/docs/advanced-configuration" className="text-muted-foreground hover:text-foreground">
-                  Overview
+                <Link href="/docs/download" className="text-muted-foreground hover:text-foreground">
+                  Download from GitHub
                 </Link>
               </li>
             </ul>
@@ -209,22 +86,10 @@ export default function DocsPage() {
                 <Badge variant="outline">Beginner</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <Link href="/docs/core-concepts/user-management" className="text-sm hover:underline">
-                  User Management and Authentication
+                <Link href="/docs/download" className="text-sm hover:underline">
+                  Download Latest Version from GitHub
                 </Link>
                 <Badge variant="outline">Essential</Badge>
-              </li>
-              <li className="flex items-center justify-between">
-                <Link href="/docs/api-reference/authentication" className="text-sm hover:underline">
-                  API Authentication Guide
-                </Link>
-                <Badge variant="outline">Developer</Badge>
-              </li>
-              <li className="flex items-center justify-between">
-                <Link href="/docs/guides/custom-integrations" className="text-sm hover:underline">
-                  Building Custom Integrations
-                </Link>
-                <Badge variant="outline">Advanced</Badge>
               </li>
             </ul>
           </CardContent>

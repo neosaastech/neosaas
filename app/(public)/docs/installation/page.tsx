@@ -27,7 +27,8 @@ export default function InstallationPage() {
           <ul className="list-disc pl-6 space-y-2">
             <li>Node.js 18.0 or higher</li>
             <li>npm 8.0 or higher, or yarn 1.22 or higher</li>
-            <li>A database (PostgreSQL, MySQL, or MongoDB)</li>
+            <li>Next.js 16+</li>
+            <li>Tailwind CSS</li>
           </ul>
         </div>
 
@@ -214,18 +215,8 @@ export default function InstallationPage() {
           <p>Now that you have NeoSaaS installed and running, you can:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>
-              <Link href="/docs/configuration" className="text-[#CD7F32] hover:underline">
-                Configure your application settings
-              </Link>
-            </li>
-            <li>
-              <Link href="/docs/core-concepts/user-management" className="text-[#CD7F32] hover:underline">
-                Set up user management
-              </Link>
-            </li>
-            <li>
-              <Link href="/docs/core-concepts/billing" className="text-[#CD7F32] hover:underline">
-                Configure billing and subscriptions
+              <Link href="/docs/download" className="text-[#CD7F32] hover:underline">
+                Download the latest version from GitHub
               </Link>
             </li>
           </ul>
@@ -233,13 +224,13 @@ export default function InstallationPage() {
 
         <div className="flex justify-between pt-4 border-t">
           <Link href="/docs">
-            <Button variant="outline" className="gap-1">
+            <Button variant="outline" className="gap-1 bg-transparent">
               <ArrowLeft className="h-4 w-4" /> Introduction
             </Button>
           </Link>
-          <Link href="/docs/configuration">
-            <Button variant="outline" className="gap-1">
-              Configuration <ArrowRight className="h-4 w-4" />
+          <Link href="/docs/download">
+            <Button variant="outline" className="gap-1 bg-transparent">
+              Download from GitHub <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
         </div>
