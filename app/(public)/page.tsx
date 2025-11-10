@@ -1,4 +1,4 @@
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -272,6 +272,15 @@ export default function HomePage() {
                 className="object-contain"
               />
             </Card>
+            <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.k8AS-V_kTYFYl4SCg4HjggAAAA-sjjSiInHnI3bX0mFx2Sm7ldsq8ICLs.webp"
+                alt="TailAdmin"
+                width={120}
+                height={60}
+                className="object-contain"
+              />
+            </Card>
           </div>
         </div>
       </section>
@@ -302,9 +311,10 @@ export default function HomePage() {
                     saved us countless hours of work."
                   </p>
                   <div className="flex items-center space-x-2">
-                    <div className="rounded-full bg-muted-foreground/10 p-1">
-                      <Avatar className="h-8 w-8" />
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Jane Smith" />
+                      <AvatarFallback>JS</AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-sm font-medium">Jane Smith</p>
                       <p className="text-xs text-muted-foreground">CEO, TechCorp</p>
@@ -326,9 +336,10 @@ export default function HomePage() {
                     data-driven decisions with confidence."
                   </p>
                   <div className="flex items-center space-x-2">
-                    <div className="rounded-full bg-muted-foreground/10 p-1">
-                      <Avatar className="h-8 w-8" />
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src="/placeholder.svg?height=40&width=40" alt="John Doe" />
+                      <AvatarFallback>JD</AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-sm font-medium">John Doe</p>
                       <p className="text-xs text-muted-foreground">CTO, Innovate Inc.</p>
@@ -350,9 +361,10 @@ export default function HomePage() {
                     support team is always there when we need them."
                   </p>
                   <div className="flex items-center space-x-2">
-                    <div className="rounded-full bg-muted-foreground/10 p-1">
-                      <Avatar className="h-8 w-8" />
-                    </div>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Sarah Johnson" />
+                      <AvatarFallback>SJ</AvatarFallback>
+                    </Avatar>
                     <div>
                       <p className="text-sm font-medium">Sarah Johnson</p>
                       <p className="text-xs text-muted-foreground">Founder, StartUp Labs</p>
