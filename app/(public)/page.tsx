@@ -312,7 +312,7 @@ export default function HomePage() {
                   </p>
                   <div className="flex items-center space-x-2">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="https://randomuser.me/api/portraits/women/44.jpg" alt="Jane Smith" />
+                      <AvatarImage src="/images/design-mode/44.jpg" alt="Jane Smith" />
                       <AvatarFallback>JS</AvatarFallback>
                     </Avatar>
                     <div>
@@ -337,7 +337,7 @@ export default function HomePage() {
                   </p>
                   <div className="flex items-center space-x-2">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="https://randomuser.me/api/portraits/men/32.jpg" alt="John Doe" />
+                      <AvatarImage src="/images/design-mode/32.jpg" alt="John Doe" />
                       <AvatarFallback>JD</AvatarFallback>
                     </Avatar>
                     <div>
@@ -362,7 +362,7 @@ export default function HomePage() {
                   </p>
                   <div className="flex items-center space-x-2">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="https://randomuser.me/api/portraits/women/68.jpg" alt="Sarah Johnson" />
+                      <AvatarImage src="/images/design-mode/68.jpg" alt="Sarah Johnson" />
                       <AvatarFallback>SJ</AvatarFallback>
                     </Avatar>
                     <div>

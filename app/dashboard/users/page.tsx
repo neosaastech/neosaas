@@ -78,7 +78,7 @@ export default function UsersPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Avatar className="h-24 w-24">
-                <AvatarImage src="https://randomuser.me/api/portraits/men/32.jpg" alt="Musharof Chowdhury" />
+                <AvatarImage src="/images/design-mode/32.jpg" alt="Musharof Chowdhury" />
                 <AvatarFallback>MC</AvatarFallback>
               </Avatar>
               <div>
