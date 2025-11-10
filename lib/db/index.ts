@@ -9,12 +9,7 @@ function getDb() {
 
   console.log("[v0] Initializing database connection...")
 
-  // Check for database URL with priority order
-  const databaseUrl =
-    process.env.NEON_DATABASE_URL ||
-    process.env.DATABASE_URL ||
-    process.env.NEON_POSTGRES_URL ||
-    process.env.NEON_DATABASE_URL_UNPOOLED
+  const databaseUrl = process.env.NEON_DATABASE_URL || process.env.NEON_POSTGRES_URL || process.env.DATABASE_URL
 
   console.log("[v0] Database URL found:", databaseUrl ? "YES" : "NO")
 

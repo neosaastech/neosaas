@@ -19,6 +19,11 @@ const navItems = [
     icon: Users,
   },
   {
+    title: "Customers",
+    href: "/dashboard/customers",
+    icon: Users,
+  },
+  {
     title: "Payments",
     href: "/dashboard/payments",
     icon: CreditCard,
