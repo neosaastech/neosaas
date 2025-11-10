@@ -1,18 +1,57 @@
 import type React from "react"
 
 import { ThemeProvider } from "@/components/theme-provider"
-import { loadNeosaasConfig } from "@/server/loadConfig"
 import "./globals.css"
 
-import { Inter, Geist_Mono as V0_Font_Geist_Mono } from 'next/font/google'
+import { Inter, Geist_Mono as V0_Font_Geist_Mono } from "next/font/google"
 
 // Initialize fonts
-const _geistMono = V0_Font_Geist_Mono({ subsets: ['latin'], weight: ["100","200","300","400","500","600","700","800","900"], variable: '--v0-font-geist-mono' })
+const _geistMono = V0_Font_Geist_Mono({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--v0-font-geist-mono",
+})
 const _v0_fontVariables = `${_geistMono.variable}`
 
 const inter = Inter({ subsets: ["latin"] })
 
-const neosaasConfig = loadNeosaasConfig()
+const neosaasConfig = {
+  appName: "NeoSaaS",
+  domain: "neosaas.tech",
+  siteUrl: "https://neosaas.tech",
+  features: {
+    enableAnalytics: true,
+    enableEmailNotifications: true,
+    enableMultitenancy: true,
+    enableStorage: true,
+  },
+  analytics: {
+    plausibleDomain: "neosaas.tech",
+  },
+  seoDefaults: {
+    title: "NeoSaaS - The Complete SaaS Platform for Modern Businesses",
+    description:
+      "NeoSaaS provides all the tools you need to build, launch, and scale your SaaS business. Start your journey today.",
+    keywords: "saas, platform, startup, tech, business, software, cloud",
+    image: "https://neosaas.tech/og-image.png",
+  },
+  email: {
+    provider: "resend",
+    fromEmail: "no-reply@neosaas.tech",
+    fromName: "NeoSaaS Team",
+  },
+  storage: {
+    provider: "s3",
+    region: "us-east-1",
+    buckets: ["neosaas-assets", "neosaas-uploads", "neosaas-backups"],
+  },
+  payments: {
+    providers: ["stripe", "paypal"],
+    defaultProvider: "stripe",
+    currency: "USD",
+  },
+}
+
 const seo = neosaasConfig.seoDefaults ?? {}
 
 export default function RootLayout({
@@ -73,7 +112,6 @@ export default function RootLayout({
     </html>
   )
 }
-console.log("✅ Configuration NeoSaaS chargée :", neosaasConfig)
 
 export const metadata = {
       generator: 'v0.app'
