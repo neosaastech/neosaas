@@ -16,6 +16,14 @@ const registerSchema = z
     path: ["confirmPassword"],
   })
 
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
+}
+
 export async function POST(request: Request) {
   try {
     console.log("[v0] Register endpoint hit")
@@ -65,8 +73,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User with this email already exists" }, { status: 400 })
     }
 
-    // In production, you should hash the password with bcrypt or similar
-    // For now, we'll store it directly (NOT RECOMMENDED FOR PRODUCTION)
+    console.log("[v0] Hashing password...")
+    const hashedPassword = await hashPassword(validatedData.password)
+    console.log("[v0] Password hashed successfully")
+
     console.log("[v0] Creating new user...")
     let newUser
     try {
@@ -75,7 +85,7 @@ export async function POST(request: Request) {
         .values({
           name: `${validatedData.firstName} ${validatedData.lastName}`,
           email: validatedData.email,
-          password: validatedData.password, // SHOULD BE HASHED IN PRODUCTION
+          password: hashedPassword, // Now storing hashed password
         })
         .returning()
 

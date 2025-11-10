@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
-import { signUp } from "@/lib/auth-client"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -49,23 +48,36 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      const result = await signUp.email({
-        email: formData.email,
-        password: formData.password,
-        name: `${formData.firstName} ${formData.lastName}`,
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+        }),
       })
 
-      if (result.error) {
-        throw new Error(result.error.message || "Registration failed")
+      console.log("[v0] Response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Registration failed" }))
+        throw new Error(errorData.error || "Registration failed")
       }
+
+      const data = await response.json()
+      console.log("[v0] Registration successful:", data)
 
       toast({
         title: "Success!",
         description: "Your account has been created successfully",
       })
 
-      // Redirect to dashboard
-      router.push("/dashboard")
+      // Redirect to login
+      router.push("/auth/login")
     } catch (error) {
       console.error("[v0] Registration error:", error)
       toast({
