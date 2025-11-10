@@ -63,9 +63,11 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Button className="w-full bg-transparent" variant="outline">
-              Get started
-            </Button>
+            <Link href="/contact" className="w-full">
+              <Button className="w-full bg-transparent" variant="outline">
+                Get started
+              </Button>
+            </Link>
 
             <div className="space-y-2">
               <p className="text-sm font-semibold">Possible focus areas:</p>
@@ -117,7 +119,9 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Button className="w-full bg-[#22C55E] hover:bg-[#22C55E]/90">Get started</Button>
+            <Link href="/contact" className="w-full">
+              <Button className="w-full bg-[#22C55E] hover:bg-[#22C55E]/90">Get started</Button>
+            </Link>
 
             <div className="space-y-2">
               <p className="text-sm font-semibold">Potential session topics:</p>
@@ -170,9 +174,11 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Button className="w-full bg-transparent" variant="outline">
-              Get started
-            </Button>
+            <Link href="/contact" className="w-full">
+              <Button className="w-full bg-transparent" variant="outline">
+                Get started
+              </Button>
+            </Link>
 
             <div className="space-y-2">
               <p className="text-sm font-semibold">Areas we could address:</p>
@@ -227,9 +233,11 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Button className="w-full bg-transparent" variant="outline">
-              Contact us
-            </Button>
+            <Link href="/contact" className="w-full">
+              <Button className="w-full bg-transparent" variant="outline">
+                Contact us
+              </Button>
+            </Link>
 
             <div className="space-y-2">
               <p className="text-sm font-semibold">We typically assist with:</p>
