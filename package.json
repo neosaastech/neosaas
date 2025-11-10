@@ -4,6 +4,11 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:studio": "drizzle-kit studio",
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start"
