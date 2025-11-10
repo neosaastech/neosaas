@@ -8,7 +8,16 @@ module.exports = {
     "./src/**/*.{ts,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
+  corePlugins: {
+    preflight: true,
+  },
   theme: {
+    colors: {
+      transparent: "transparent",
+      current: "currentColor",
+      black: "#000",
+      white: "#fff",
+    },
     container: {
       center: true,
       padding: "2rem",
