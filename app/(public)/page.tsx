@@ -450,16 +450,6 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-center">
-              <div className="relative w-full max-w-[500px] h-[400px] rounded-lg overflow-hidden shadow-xl bg-background border">
-                <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/tech-stack-ugbMaMITQsreo6B6xqNCRMeY7QeAUn.png"
-                  alt="NeoSaaS Technical Architecture"
-                  fill
-                  className="object-contain p-4"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
