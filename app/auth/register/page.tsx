@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
+import { signUp } from "@/lib/auth-client"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -26,7 +27,6 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Form submitted:", formData)
 
     if (!formData.acceptTerms) {
       toast({
@@ -37,40 +37,26 @@ export default function RegisterPage() {
       return
     }
 
+    if (formData.password !== formData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords don't match",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-          confirmPassword: formData.confirmPassword,
-        }),
+      const result = await signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: `${formData.firstName} ${formData.lastName}`,
       })
 
-      // Check if response is JSON before parsing
-      const contentType = response.headers.get("content-type")
-      let data
-
-      if (contentType && contentType.includes("application/json")) {
-        data = await response.json()
-      } else {
-        // Handle non-JSON responses (like HTML error pages)
-        const text = await response.text()
-        console.error("[v0] Non-JSON response:", text)
-        throw new Error("Server error: Received invalid response")
-      }
-
-      console.log("[v0] API response:", data)
-
-      if (!response.ok) {
-        throw new Error(data.error || "Registration failed")
+      if (result.error) {
+        throw new Error(result.error.message || "Registration failed")
       }
 
       toast({
@@ -78,8 +64,8 @@ export default function RegisterPage() {
         description: "Your account has been created successfully",
       })
 
-      // Redirect to login page
-      router.push("/auth/login")
+      // Redirect to dashboard
+      router.push("/dashboard")
     } catch (error) {
       console.error("[v0] Registration error:", error)
       toast({
