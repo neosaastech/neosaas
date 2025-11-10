@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Book } from "lucide-react"
+import Image from "next/image"
 
 export default function DocsPage() {
   return (
@@ -25,17 +26,147 @@ export default function DocsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 md:items-center bg-[#CD7F32]/10 border border-[#CD7F32]/20 rounded-lg p-4">
-        <div className="flex-1">
-          <h3 className="font-semibold text-[#CD7F32]">New in NeoSaaS v2.0</h3>
-          <p className="text-sm text-muted-foreground">
-            Explore our latest features including multi-region support, enhanced analytics, and improved API
-            performance.
+      <div className="space-y-6 border-t pt-6">
+        <div className="space-y-4">
+          <h2 className="scroll-m-20 text-3xl font-bold tracking-tight">Introduction</h2>
+          <p className="text-lg text-muted-foreground">
+            NeoSaaS is a modern full-stack SaaS boilerplate built with the latest web technologies. It provides
+            everything you need to build, launch, and scale your SaaS application with industry best practices built-in.
           </p>
         </div>
-        <Link href="/docs/whats-new">
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">What is NeoSaaS?</h3>
+          <p className="text-muted-foreground">
+            NeoSaaS is an opinionated way of building full-stack web applications. It takes care of all three major
+            parts of a web application: client (front-end), server (back-end), and database. Built on top of proven
+            technologies, NeoSaaS handles the complexity of connecting all parts of your stack.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">Built on Modern Technologies</h3>
+          <p className="text-muted-foreground mb-6">
+            NeoSaaS uses Next.js, Prisma, and leading authentication and database solutions under the hood. This allows
+            you to focus on building features while NeoSaaS handles the infrastructure.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <Image
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp-VytrnDptTHfvN93HM9hn4trSG9a9Zm.webp"
+                  alt="Next.js"
+                  width={96}
+                  height={96}
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center">
+                <h4 className="font-semibold">Next.js 16</h4>
+                <p className="text-xs text-muted-foreground">React Framework</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <Image
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.UOCNslnMZiDcU4dXrJDeqwHaH0-zDllqAOLHzRIDCojPlU0Apy6bPBiB3.webp"
+                  alt="Prisma"
+                  width={96}
+                  height={96}
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center">
+                <h4 className="font-semibold">Prisma</h4>
+                <p className="text-xs text-muted-foreground">Database ORM</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <Image
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.rMNgqM_B76VzXugyzHZt0QHaEB-M4F7yaNpuceXHKsCBdfuI7SPg5bIMn.webp"
+                  alt="Neon"
+                  width={96}
+                  height={96}
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center">
+                <h4 className="font-semibold">Neon</h4>
+                <p className="text-xs text-muted-foreground">Serverless Postgres</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <Image
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa-YyzTUWKsNFDXaBXb2YaGOVdNeVnlCT.webp"
+                  alt="Better Auth"
+                  width={96}
+                  height={96}
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center">
+                <h4 className="font-semibold">Better Auth</h4>
+                <p className="text-xs text-muted-foreground">Authentication</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">What's Included?</h3>
+          <p className="text-muted-foreground">NeoSaaS comes with everything you need to launch your SaaS:</p>
+          <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+            <li>Authentication and authorization with Better Auth</li>
+            <li>Database integration with Prisma ORM and PostgreSQL</li>
+            <li>Responsive UI components built with Tailwind CSS and shadcn/ui</li>
+            <li>Admin dashboard with analytics and user management</li>
+            <li>API routes and server actions for backend logic</li>
+            <li>Type-safe development with TypeScript</li>
+            <li>Modern styling with Tailwind CSS v4</li>
+            <li>Production-ready deployment configuration</li>
+          </ul>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold">When to Use NeoSaaS</h3>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <h4 className="font-semibold text-green-600">Best Used For</h4>
+              <ul className="list-disc pl-6 space-y-1 text-sm text-muted-foreground">
+                <li>Building full-stack SaaS applications</li>
+                <li>Starting projects with industry best practices</li>
+                <li>Rapid MVP development</li>
+                <li>Projects requiring authentication and database</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold text-yellow-600">Consider Alternatives For</h4>
+              <ul className="list-disc pl-6 space-y-1 text-sm text-muted-foreground">
+                <li>Static websites or landing pages</li>
+                <li>No-code solution requirements</li>
+                <li>Non-JavaScript/TypeScript projects</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4 md:items-center bg-[#CD7F32]/10 border border-[#CD7F32]/20 rounded-lg p-4">
+        <div className="flex-1">
+          <h3 className="font-semibold text-[#CD7F32]">Ready to Get Started?</h3>
+          <p className="text-sm text-muted-foreground">
+            Follow our installation guide to set up NeoSaaS in your Next.js project.
+          </p>
+        </div>
+        <Link href="/docs/installation">
           <Button variant="outline" className="border-[#CD7F32] text-[#CD7F32] hover:bg-[#CD7F32]/10 bg-transparent">
-            What's New <ArrowRight className="ml-2 h-4 w-4" />
+            View Installation Guide <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>
       </div>
@@ -66,6 +197,11 @@ export default function DocsPage() {
                   Download from GitHub
                 </Link>
               </li>
+              <li>
+                <Link href="/docs/architecture" className="text-muted-foreground hover:text-foreground">
+                  Architecture
+                </Link>
+              </li>
             </ul>
           </CardContent>
         </Card>
@@ -91,101 +227,13 @@ export default function DocsPage() {
                 </Link>
                 <Badge variant="outline">Essential</Badge>
               </li>
+              <li className="flex items-center justify-between">
+                <Link href="/docs/architecture" className="text-sm hover:underline">
+                  Understanding the Architecture
+                </Link>
+                <Badge variant="outline">Advanced</Badge>
+              </li>
             </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Need Help?</CardTitle>
-            <CardDescription>Resources for additional support</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full bg-[#CD7F32]/10 p-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-[#CD7F32]"
-                >
-                  <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z" />
-                  <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium">Community Forum</h4>
-                <p className="text-xs text-muted-foreground">
-                  Join our community forum to ask questions and connect with other users.
-                </p>
-                <Link href="#" className="text-xs text-[#CD7F32] hover:underline">
-                  Visit Forum →
-                </Link>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full bg-[#CD7F32]/10 p-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-[#CD7F32]"
-                >
-                  <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium">GitHub</h4>
-                <p className="text-xs text-muted-foreground">
-                  Report issues, contribute, or explore our open source components.
-                </p>
-                <Link href="#" className="text-xs text-[#CD7F32] hover:underline">
-                  View GitHub →
-                </Link>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-3">
-              <div className="rounded-full bg-[#CD7F32]/10 p-1">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-[#CD7F32]"
-                >
-                  <rect width="20" height="16" x="2" y="4" rx="2" />
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium">Contact Support</h4>
-                <p className="text-xs text-muted-foreground">
-                  Get in touch with our support team for personalized assistance.
-                </p>
-                <Link href="#" className="text-xs text-[#CD7F32] hover:underline">
-                  Contact Us →
-                </Link>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
