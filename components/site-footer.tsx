@@ -4,7 +4,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t bg-[#1A1A1A] text-white">
       <div className="container py-10">
-        <div className="grid gap-8 md:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-3">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="font-bold text-xl tracking-tight">
@@ -31,11 +31,6 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/appearance" className="text-sm text-white/70 hover:text-white">
-                  Appearance
-                </Link>
-              </li>
-              <li>
                 <Link href="/brand" className="text-sm text-white/70 hover:text-white">
                   Brand
                 </Link>
@@ -59,27 +54,6 @@ export function SiteFooter() {
               <li>
                 <Link href="/legacy/affiliate" className="text-sm text-white/70 hover:text-white">
                   Affiliates
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-medium mb-4 text-[#CD7F32]">Legal</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="#" className="text-sm text-white/70 hover:text-white">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-sm text-white/70 hover:text-white">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-sm text-white/70 hover:text-white">
-                  Cookie Policy
                 </Link>
               </li>
             </ul>
