@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/neon-http"
 import { neon } from "@neondatabase/serverless"
-import * as schema from "@/lib/db/schema"
+import * as schema from "./schema"
 
 let _db: ReturnType<typeof drizzle> | null = null
 
@@ -43,5 +43,4 @@ export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   },
 })
 
-// Export schema for external use
-export * from "@/lib/db/schema"
+export * from "./schema"
