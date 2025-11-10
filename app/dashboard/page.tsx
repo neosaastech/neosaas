@@ -142,19 +142,19 @@ export default function DashboardPage() {
           <CardContent>
             <div className="flex gap-4 mb-4 text-xs">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-[#3C50E0]" />
+                <div className="h-3 w-3 rounded-full bg-[#CD7F32]" />
                 <span>Ad Impressions</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-[#6577F3]" />
+                <div className="h-3 w-3 rounded-full bg-[#E69A5C]" />
                 <span>Website Session</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-[#8FD0EF]" />
+                <div className="h-3 w-3 rounded-full bg-[#F4B183]" />
                 <span>App Download</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-[#0FADCF]" />
+                <div className="h-3 w-3 rounded-full bg-[#B26B27]" />
                 <span>New Users</span>
               </div>
             </div>
@@ -164,10 +164,10 @@ export default function DashboardPage() {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="impressions" stackId="a" fill="#3C50E0" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="sessions" stackId="a" fill="#6577F3" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="downloads" stackId="a" fill="#8FD0EF" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="users" stackId="a" fill="#0FADCF" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="impressions" stackId="a" fill="#CD7F32" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="sessions" stackId="a" fill="#E69A5C" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="downloads" stackId="a" fill="#F4B183" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="users" stackId="a" fill="#B26B27" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
             </div>
             <ResponsiveContainer width="100%" height={150}>
               <BarChart data={dailySalesData}>
-                <Bar dataKey="sales" fill="#3C50E0" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="sales" fill="#CD7F32" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
