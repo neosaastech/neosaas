@@ -94,7 +94,7 @@
     "react-hook-form": "^7.54.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "latest",
-    "sonner": "^1.7.1",
+    "sonner": "latest",
     "sql.js": "latest",
     "sqlite3": "latest",
     "tailwind-merge": "^2.5.5",
