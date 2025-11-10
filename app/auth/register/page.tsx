@@ -20,7 +20,7 @@ export default function RegisterPage() {
           </div>
           <div className="grid gap-4">
             <div className="grid gap-4">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full bg-transparent">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   height="24"
@@ -107,13 +107,105 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-      <div className="hidden bg-muted md:block">
-        <div className="relative h-full w-full bg-[url('/interconnected-saas.png')] bg-cover bg-center">
-          <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-background/20" />
-          <div className="absolute bottom-0 left-0 right-0 p-8">
-            <div className="mx-auto w-full max-w-md rounded-lg bg-background/90 p-4 backdrop-blur-sm">
-              <p className="text-xl font-semibold">"Join thousands of businesses already growing with OpenSaaS."</p>
-              <p className="mt-2 text-sm text-muted-foreground">Start your journey today.</p>
+      <div className="hidden bg-muted md:flex items-center justify-center p-8">
+        <div className="relative w-full max-w-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
+          <div className="relative rounded-2xl border bg-background/50 backdrop-blur-sm p-12">
+            <div className="flex flex-col items-center space-y-8">
+              <div className="relative">
+                <div className="h-32 w-32 rounded-full bg-primary/10 flex items-center justify-center">
+                  <svg
+                    className="h-16 w-16 text-primary"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                </div>
+                <div className="absolute -right-2 -top-2 h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                  <svg
+                    className="h-5 w-5 text-primary-foreground"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-center space-y-4">
+                <h2 className="text-2xl font-bold">Join Our Community</h2>
+                <p className="text-muted-foreground max-w-sm">
+                  Join thousands of businesses already growing with NeoSaaS. Start your journey today.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-4 w-full pt-4">
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <svg
+                      className="h-6 w-6 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-medium">Quick Setup</span>
+                </div>
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <svg
+                      className="h-6 w-6 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-medium">Verified</span>
+                </div>
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <svg
+                      className="h-6 w-6 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-xs font-medium">Trusted</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
