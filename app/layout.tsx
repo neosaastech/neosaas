@@ -3,14 +3,10 @@ import type React from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
-import { Inter, Geist_Mono as V0_Font_Geist_Mono } from "next/font/google"
+import { Inter, Geist_Mono as V0_Font_Geist_Mono } from 'next/font/google'
 
 // Initialize fonts
-const _geistMono = V0_Font_Geist_Mono({
-  subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
-  variable: "--v0-font-geist-mono",
-})
+const _geistMono = V0_Font_Geist_Mono({ subsets: ['latin'], weight: ["100","200","300","400","500","600","700","800","900"], variable: '--v0-font-geist-mono' })
 const _v0_fontVariables = `${_geistMono.variable}`
 
 const inter = Inter({ subsets: ["latin"] })
