@@ -36,7 +36,7 @@ export function NeoSaasArchitectureDiagram() {
             <div className="flex justify-center">
               <div className="bg-background border rounded-lg p-2">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp-oqBWOOeYFDBEYObqOKNwZpw9ZNggYz.webp"
+                  src="/images/design-mode/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp.webp"
                   alt="Next.js"
                   width={80}
                   height={40}
@@ -74,7 +74,7 @@ export function NeoSaasArchitectureDiagram() {
             <div className="flex justify-center">
               <div className="bg-background border rounded-lg p-2">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.2qv4I5DCIN_XE8cT6M_sFQAAAA-au5Is5P8VHru2kYg5UqHWWB7GKof2r.webp"
+                  src="/images/design-mode/OIP.2qv4I5DCIN_XE8cT6M_sFQAAAA.webp"
                   alt="Prisma"
                   width={80}
                   height={40}
@@ -87,7 +87,7 @@ export function NeoSaasArchitectureDiagram() {
             <div className="flex justify-center">
               <div className="bg-background border rounded-lg p-2">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.rMNgqM_B76VzXugyzHZt0QHaEB-mNgs7vYBK9DwYIdx5WNmhIdBTj8Gqm.webp"
+                  src="/images/design-mode/OIP.rMNgqM_B76VzXugyzHZt0QHaEB.webp"
                   alt="Neon"
                   width={80}
                   height={40}

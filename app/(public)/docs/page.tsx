@@ -55,7 +55,7 @@ export default function DocsPage() {
             <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp-VytrnDptTHfvN93HM9hn4trSG9a9Zm.webp"
+                  src="/images/design-mode/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp.webp"
                   alt="Next.js"
                   width={96}
                   height={96}
@@ -71,7 +71,7 @@ export default function DocsPage() {
             <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.UOCNslnMZiDcU4dXrJDeqwHaH0-zDllqAOLHzRIDCojPlU0Apy6bPBiB3.webp"
+                  src="/images/design-mode/OIP.UOCNslnMZiDcU4dXrJDeqwHaH0.webp"
                   alt="Prisma"
                   width={96}
                   height={96}
@@ -87,7 +87,7 @@ export default function DocsPage() {
             <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.rMNgqM_B76VzXugyzHZt0QHaEB-M4F7yaNpuceXHKsCBdfuI7SPg5bIMn.webp"
+                  src="/images/design-mode/OIP.rMNgqM_B76VzXugyzHZt0QHaEB.webp"
                   alt="Neon"
                   width={96}
                   height={96}
@@ -103,7 +103,7 @@ export default function DocsPage() {
             <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa-YyzTUWKsNFDXaBXb2YaGOVdNeVnlCT.webp"
+                  src="/images/design-mode/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa.webp"
                   alt="Better Auth"
                   width={96}
                   height={96}
@@ -119,7 +119,7 @@ export default function DocsPage() {
             <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
               <div className="relative w-24 h-24 flex items-center justify-center">
                 <Image
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa-6dktgWMn3wUGj7IX5V3377BmTmFkdo.webp"
+                  src="/images/design-mode/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa.webp"
                   alt="Resend"
                   width={96}
                   height={96}

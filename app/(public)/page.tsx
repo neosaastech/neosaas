@@ -211,7 +211,7 @@ export default function HomePage() {
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 md:grid-cols-3 lg:grid-cols-4 mt-12 items-center">
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp-oqBWOOeYFDBEYObqOKNwZpw9ZNggYz.webp"
+                src="/images/design-mode/OIP.mJ5m2pvYDrgXgQV26fLoDQHaGp.webp"
                 alt="Next.js"
                 width={120}
                 height={60}
@@ -220,7 +220,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.2qv4I5DCIN_XE8cT6M_sFQAAAA-au5Is5P8VHru2kYg5UqHWWB7GKof2r.webp"
+                src="/images/design-mode/OIP.2qv4I5DCIN_XE8cT6M_sFQAAAA.webp"
                 alt="Prisma"
                 width={120}
                 height={60}
@@ -229,7 +229,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.rMNgqM_B76VzXugyzHZt0QHaEB-mNgs7vYBK9DwYIdx5WNmhIdBTj8Gqm.webp"
+                src="/images/design-mode/OIP.rMNgqM_B76VzXugyzHZt0QHaEB.webp"
                 alt="Neon Serverless Postgres"
                 width={140}
                 height={60}
@@ -238,7 +238,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa-GRdWyW0OFk4W8pH4qSCoTmytDvUNSS.webp"
+                src="/images/design-mode/OIP.NZCHYfcUrSHlM7-QtwCwWAHaHa.webp"
                 alt="Better Auth"
                 width={120}
                 height={60}
@@ -247,7 +247,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa-sGqHsCL9N8ZzBhaBofo6JuyvXjsYDp.webp"
+                src="/images/design-mode/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa.webp"
                 alt="Resend"
                 width={120}
                 height={60}
@@ -256,7 +256,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.YorcsMZ-6bBZtrx_g494ZwHaEK-4HMJTqtgRkG1gLpYk0zqRf5nHaVhlw.webp"
+                src="/images/design-mode/OIP.YorcsMZ-6bBZtrx_g494ZwHaEK.webp"
                 alt="Stripe"
                 width={120}
                 height={60}
@@ -265,7 +265,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.h3_xyxCdva0e9rRTncAzjgHaHa-YSzIjeiRcQk1nq72voSmegiZyb6QAa.webp"
+                src="/images/design-mode/OIP.h3_xyxCdva0e9rRTncAzjgHaHa.webp"
                 alt="PayPal"
                 width={120}
                 height={60}
@@ -274,7 +274,7 @@ export default function HomePage() {
             </Card>
             <Card className="flex items-center justify-center p-6 h-32 bg-background hover:shadow-lg transition-shadow">
               <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.k8AS-V_kTYFYl4SCg4HjggAAAA-sjjSiInHnI3bX0mFx2Sm7ldsq8ICLs.webp"
+                src="/images/design-mode/OIP.k8AS-V_kTYFYl4SCg4HjggAAAA.webp"
                 alt="TailAdmin"
                 width={120}
                 height={60}

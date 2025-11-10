@@ -35,7 +35,7 @@ export default function ArchitecturePage() {
         <CardContent>
           <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border bg-muted">
             <Image
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/tech-stack-Zj8DhjO9p7eRcprmPcX0CzMQJpTTj4.png"
+              src="/images/design-mode/tech-stack.png"
               alt="NeoSaaS Technical Architecture Diagram"
               fill
               className="object-contain p-4"
