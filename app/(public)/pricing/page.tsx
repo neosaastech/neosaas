@@ -63,7 +63,7 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Link href="/contact" className="w-full">
+            <Link href="/legacy/contact" className="w-full">
               <Button className="w-full bg-transparent" variant="outline">
                 Get started
               </Button>
@@ -119,7 +119,7 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Link href="/contact" className="w-full">
+            <Link href="/legacy/contact" className="w-full">
               <Button className="w-full bg-[#22C55E] hover:bg-[#22C55E]/90">Get started</Button>
             </Link>
 
@@ -174,7 +174,7 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Link href="/contact" className="w-full">
+            <Link href="/legacy/contact" className="w-full">
               <Button className="w-full bg-transparent" variant="outline">
                 Get started
               </Button>
@@ -233,7 +233,7 @@ export default function PricingPage() {
             </div>
           </CardHeader>
           <CardContent className="flex-1 space-y-4">
-            <Link href="/contact" className="w-full">
+            <Link href="/legacy/contact" className="w-full">
               <Button className="w-full bg-transparent" variant="outline">
                 Contact us
               </Button>
