@@ -115,6 +115,22 @@ export default function DocsPage() {
                 <p className="text-xs text-muted-foreground">Authentication</p>
               </div>
             </div>
+
+            <div className="flex flex-col items-center gap-3 p-4 rounded-lg border bg-card hover:shadow-md transition-shadow">
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <Image
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIP.dVVJ2i1BrGFxU5GBBuzyPAHaHa-6dktgWMn3wUGj7IX5V3377BmTmFkdo.webp"
+                  alt="Resend"
+                  width={96}
+                  height={96}
+                  className="object-contain"
+                />
+              </div>
+              <div className="text-center">
+                <h4 className="font-semibold">Resend</h4>
+                <p className="text-xs text-muted-foreground">Transactional Emails</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -126,6 +142,7 @@ export default function DocsPage() {
             <li>Database integration with Prisma ORM and PostgreSQL</li>
             <li>Responsive UI components built with Tailwind CSS and shadcn/ui</li>
             <li>Admin dashboard with analytics and user management</li>
+            <li>Transactional emails with Resend API and Nodemailer for basic SMTP</li>
             <li>API routes and server actions for backend logic</li>
             <li>Type-safe development with TypeScript</li>
             <li>Modern styling with Tailwind CSS v4</li>
