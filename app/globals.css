@@ -125,6 +125,17 @@
     @apply border-border outline-ring/50;
   }
   body {
+    /* Added proper body styling with full width and height */
     @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Ensure html element doesn't cause overflow issues */
+  html {
+    width: 100%;
+    overflow-x: hidden;
   }
 }
