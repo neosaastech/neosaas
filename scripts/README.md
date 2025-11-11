@@ -93,5 +93,5 @@ Cette variable est automatiquement disponible via l'intégration Neon de Vercel.
 Toutes les dépendances sont déjà installées dans le projet.
 \`\`\`
 
-```sql file="scripts/001-init-database.sql" isDeleted="true"
+\`\`\`sql file="scripts/001-init-database.sql" isDeleted="true"
 ...deleted...
