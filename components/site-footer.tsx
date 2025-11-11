@@ -2,8 +2,8 @@ import Link from "next/link"
 
 export function SiteFooter() {
   return (
-    <footer className="border-t bg-[#1A1A1A] text-white">
-      <div className="container py-10">
+    <footer className="w-full border-t bg-[#1A1A1A] text-white">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-10">
         <div className="grid gap-8 md:grid-cols-3">
           <div className="space-y-4">
             <div className="flex items-center gap-2">

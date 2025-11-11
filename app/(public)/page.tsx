@@ -6,21 +6,15 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, Check, ChevronRight, Globe, Shield, Zap } from "lucide-react"
 import { Users, CreditCard, BarChart4, Star } from "lucide-react"
-import { MobileMenu } from "@/components/mobile-menu"
 import { BrandIcon } from "@/components/brand-icon"
 import { NeoSaasArchitectureDiagram } from "@/components/neosaas-architecture-diagram"
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Add mobile menu button at the top right corner */}
-      <div className="fixed top-4 right-4 z-50 md:hidden">
-        <MobileMenu />
-      </div>
-
       {/* Hero Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gradient-to-b from-background to-muted">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 xl:grid-cols-2">
             <div className="flex flex-col justify-center space-y-4">
               <div className="space-y-2">
@@ -103,7 +97,7 @@ export default function HomePage() {
 
       {/* Features Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <Badge className="bg-[#CD7F32] text-white">Core Features</Badge>
@@ -198,7 +192,7 @@ export default function HomePage() {
 
       {/* Technology Stack Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <Badge className="bg-[#CD7F32] text-white">Technology Stack</Badge>
@@ -287,7 +281,7 @@ export default function HomePage() {
 
       {/* Testimonials Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <Badge className="bg-[#CD7F32] text-white">Testimonials</Badge>
@@ -379,7 +373,7 @@ export default function HomePage() {
 
       {/* CTA Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-[#1A1A1A] text-white">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-3 mb-4">
@@ -412,7 +406,7 @@ export default function HomePage() {
 
       {/* Features List Section */}
       <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
-        <div className="container px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid gap-6 lg:grid-cols-2 lg:gap-12">
             <div className="flex flex-col justify-center space-y-4">
               <div className="space-y-2">
@@ -471,28 +465,29 @@ export default function HomePage() {
       </section>
 
       {/* Project Structure Section */}
-      <section className="container py-12 md:py-24 lg:py-32">
-        <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
-          <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Built for scale</h2>
-          <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
-            NeoSaaS is designed with a modular architecture that allows you to scale each component independently. Our
-            back office system provides a unified management interface while maintaining separation of concerns.
-          </p>
-        </div>
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
+          <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
+            <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Built for scale</h2>
+            <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
+              NeoSaaS is designed with a modular architecture that allows you to scale each component independently. Our
+              back office system provides a unified management interface while maintaining separation of concerns.
+            </p>
+          </div>
 
-        <div className="mx-auto grid justify-center gap-4 md:max-w-[64rem] mt-8">
-          {/* Project Structure Visualization */}
-          <div className="relative overflow-hidden rounded-lg border bg-background p-2 max-w-2xl mx-auto">
-            <div className="flex h-full flex-col justify-between rounded-md p-6">
-              <div className="space-y-2">
-                <h3 className="font-bold">Project Structure</h3>
-                <p className="text-sm text-muted-foreground">
-                  Clean and organized folder structure following Next.js best practices with Better Auth integration.
-                </p>
-              </div>
-              <div className="mt-4 rounded-md bg-muted p-4 overflow-x-auto">
-                <pre className="text-xs text-left">
-                  {`src
+          <div className="mx-auto grid justify-center gap-4 md:max-w-[64rem] mt-8">
+            {/* Project Structure Visualization */}
+            <div className="relative overflow-hidden rounded-lg border bg-background p-2 max-w-2xl mx-auto">
+              <div className="flex h-full flex-col justify-between rounded-md p-6">
+                <div className="space-y-2">
+                  <h3 className="font-bold">Project Structure</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Clean and organized folder structure following Next.js best practices with Better Auth integration.
+                  </p>
+                </div>
+                <div className="mt-4 rounded-md bg-muted p-4 overflow-x-auto">
+                  <pre className="text-xs text-left">
+                    {`src
 ├── app
 │   ├── (auth)
 │   │   ├── layout.tsx
@@ -525,7 +520,8 @@ export default function HomePage() {
     ├── auth-client.ts
     ├── auth.ts
     └── prisma.ts`}
-                </pre>
+                  </pre>
+                </div>
               </div>
             </div>
           </div>
