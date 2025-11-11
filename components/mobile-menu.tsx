@@ -3,22 +3,24 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function MobileMenu() {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="md:hidden">
+        <Button variant="ghost" size="icon">
           <Menu className="h-6 w-6" />
           <span className="sr-only">Open menu</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[75vw] sm:max-w-sm">
-        <div className="flex items-center mb-8 mt-2">
+        <div className="flex items-center justify-between mb-8 mt-2">
           <div className="font-bold text-2xl tracking-tight">
             <span className="text-foreground">Neo</span>
             <span className="text-[#CD7F32]">SaaS</span>
           </div>
+          <ThemeToggle />
         </div>
         <div className="flex flex-col gap-6 px-2 py-6">
           <nav className="flex flex-col space-y-4">
@@ -47,7 +49,7 @@ export function MobileMenu() {
 
           <div className="flex flex-col gap-2 mt-4">
             <Link href="/auth/login">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full bg-transparent">
                 Login
               </Button>
             </Link>
