@@ -1,102 +1,10 @@
-"use client"
-
-import type React from "react"
-
 import Link from "next/link"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    acceptTerms: false,
-  })
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.acceptTerms) {
-      toast({
-        title: "Terms Required",
-        description: "Please accept the terms and conditions",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords don't match",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
-
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-        }),
-      })
-
-      console.log("[v0] Response status:", response.status)
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Registration failed" }))
-        throw new Error(errorData.error || "Registration failed")
-      }
-
-      const data = await response.json()
-      console.log("[v0] Registration successful:", data)
-
-      toast({
-        title: "Success!",
-        description: "Your account has been created successfully",
-      })
-
-      // Redirect to login
-      router.push("/auth/login")
-    } catch (error) {
-      console.error("[v0] Registration error:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create account",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.id]: e.target.value,
-    }))
-  }
-
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
       <div className="flex items-center justify-center py-12">
@@ -112,7 +20,7 @@ export default function RegisterPage() {
           </div>
           <div className="grid gap-4">
             <div className="grid gap-4">
-              <Button variant="outline" className="w-full bg-transparent" disabled>
+              <Button variant="outline" className="w-full bg-transparent">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   height="24"
@@ -149,43 +57,20 @@ export default function RegisterPage() {
                 <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
               </div>
             </div>
-            <form className="grid gap-4" onSubmit={handleSubmit}>
+            <form className="grid gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="firstName">First name</Label>
-                  <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    required
-                    disabled={isLoading}
-                  />
+                  <Label htmlFor="first-name">First name</Label>
+                  <Input id="first-name" placeholder="John" required />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="lastName">Last name</Label>
-                  <Input
-                    id="lastName"
-                    placeholder="Smith"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    required
-                    disabled={isLoading}
-                  />
+                  <Label htmlFor="last-name">Last name</Label>
+                  <Input id="last-name" placeholder="Smith" required />
                 </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  placeholder="name@example.com"
-                  type="email"
-                  autoComplete="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  disabled={isLoading}
-                />
+                <Input id="email" placeholder="name@example.com" type="email" autoComplete="email" required />
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
@@ -194,44 +79,23 @@ export default function RegisterPage() {
                     Forgot password?
                   </Link>
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  required
-                  disabled={isLoading}
-                />
+                <Input id="password" type="password" autoComplete="new-password" required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  required
-                  disabled={isLoading}
-                />
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input id="confirm-password" type="password" autoComplete="new-password" required />
               </div>
               <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="acceptTerms"
-                  checked={formData.acceptTerms}
-                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, acceptTerms: checked as boolean }))}
-                  disabled={isLoading}
-                />
-                <label htmlFor="acceptTerms" className="text-sm font-medium leading-none">
+                <Checkbox id="terms" />
+                <label htmlFor="terms" className="text-sm font-medium leading-none">
                   I agree to the{" "}
                   <Link href="#" className="underline underline-offset-4">
                     terms and conditions
                   </Link>
                 </label>
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Create account"}
+              <Button type="submit" className="w-full">
+                Create account
               </Button>
             </form>
           </div>

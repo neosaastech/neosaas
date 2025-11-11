@@ -34,10 +34,10 @@ export function DashboardHeader() {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/users">Users</Link>
+                <Link href="/dashboard/profile">Profile</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/account">Account Settings</Link>
+                <Link href="/dashboard/settings">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
