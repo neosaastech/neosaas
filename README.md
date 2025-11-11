@@ -125,4 +125,3 @@ THE SOFTWARE.
 ```
 
 ---
-Would you like me to push this directly to your GitHub repository, or do you need a French version as well? Let me know how you'd like to proceed!
