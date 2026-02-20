@@ -1,0 +1,88 @@
+name: db-migrate
+
+on:
+  # Trigger on any push that modifies schema or migration files
+  push:
+    branches:
+      - main
+      - preview
+      - dev
+      - 'claude/**'
+    paths:
+      - 'db/schema.ts'
+      - 'drizzle/**'
+      - 'scripts/migrate.ts'
+      - 'scripts/db-migrate-safe.sh'
+      - 'scripts/db-ensure-columns.ts'
+      - 'scripts/db-schema-sync-http.ts'
+      - 'drizzle.config.ts'
+  # Manual trigger from GitHub UI (force full migration + seed)
+  workflow_dispatch:
+    inputs:
+      force_push:
+        description: 'Force drizzle-kit push even if schema unchanged'
+        required: false
+        default: 'true'
+        type: boolean
+      run_seed:
+        description: 'Run full seed (roles, permissions, VAT, platform config)'
+        required: false
+        default: 'true'
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check DB connection strings
+        run: |
+          if [ -z "$DATABASE_URL_UNPOOLED" ] && [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL_UNPOOLED (preferred) or DATABASE_URL is not configured"
+            echo "Go to: Settings > Secrets and variables > Actions > New repository secret"
+            echo "Name: DATABASE_URL_UNPOOLED"
+            echo "Value: your Neon/PostgreSQL unpooled connection string"
+            exit 1
+          fi
+          echo "✅ DB connection string is configured"
+
+      - name: Run safe DB migration
+        env:
+          FORCE_PUSH: ${{ inputs.force_push || 'true' }}
+          NODE_OPTIONS: '--dns-result-order=ipv4first'
+        run: bash scripts/db-migrate-safe.sh
+
+      - name: Seed roles, permissions & base data
+        if: success()
+        run: pnpm db:seed-base
+
+      - name: Seed email templates
+        if: success()
+        run: pnpm seed:email-templates
+
+      - name: Seed page permissions
+        if: success()
+        run: pnpm seed:pages

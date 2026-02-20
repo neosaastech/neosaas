@@ -1,0 +1,19 @@
+{
+  "validBooking": {
+    "serviceId": "00000000-0000-0000-0000-000000000001",
+    "attendeeName": "Jean Test",
+    "attendeeEmail": "jean.test@example.com",
+    "attendeePhone": "+33612345678",
+    "notes": "Test booking from Cypress"
+  },
+  "invalidBooking": {
+    "serviceId": "invalid-uuid",
+    "attendeeName": "",
+    "attendeeEmail": "invalid-email"
+  },
+  "expectedStatuses": {
+    "pending": "pending_payment",
+    "confirmed": "confirmed",
+    "cancelled": "cancelled"
+  }
+}
