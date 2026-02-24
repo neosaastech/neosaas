@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "neosaas-tech",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": false,
+      "bump-patch-for-minor-pre-major": false,
+      "draft": false,
+      "prerelease": false,
+      "include-component-in-tag": false,
+      "tag-separator": "v",
+      "extra-files": []
+    }
+  },
+  "changelog-sections": [
+    { "type": "feat",     "section": "✨ Nouvelles fonctionnalités" },
+    { "type": "fix",      "section": "🐛 Correctifs" },
+    { "type": "perf",     "section": "⚡ Performances" },
+    { "type": "refactor", "section": "♻️  Refactoring", "hidden": false },
+    { "type": "docs",     "section": "📖 Documentation", "hidden": false },
+    { "type": "chore",    "section": "🔧 Maintenance", "hidden": true },
+    { "type": "ci",       "section": "👷 CI/CD", "hidden": true },
+    { "type": "test",     "section": "🧪 Tests", "hidden": true }
+  ]
+}

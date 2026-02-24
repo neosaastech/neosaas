@@ -1,0 +1,10 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "git rev-parse": true,
+        "git config": true,
+        "ForEach-Object": true,
+        "paymentStatus:\\s*": true,
+        "psql": true,
+        "q": true
+    }
+}

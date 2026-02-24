@@ -1,0 +1,5 @@
+{
+  "buildCommand": "bash scripts/build-with-db.sh",
+  "installCommand": "pnpm install --no-frozen-lockfile --reporter=append-only",
+  "framework": "nextjs"
+}
