@@ -1,118 +1,122 @@
+Here is the English translation of your **NeoSaaS - Free Version** documentation:
+
+---
+
 # NeoSaaS - Free Version 🚀
 
-> **Version gratuite minimaliste** - Plateforme SaaS avec authentification, gestion d'utilisateurs, paiements Lago et emails
+> **Minimalist Free Version** – SaaS platform with authentication, user management, Lago payments, and emails.
 
-## ✅ Fonctionnalités Incluses
+## ✅ Included Features
 
-- 🔐 **Authentification complète** - Inscription, connexion, JWT
-- � **OAuth Social Login** - GitHub & Google (100% database config)
-- 👥 **Gestion des utilisateurs** - Multi-tenant, rôles et permissions
-- 💳 **Intégration Lago** - Abonnements et facturation
-- 📧 **Emails transactionnels** - Resend, Scaleway, AWS SES
-- 🎨 **Interface moderne** - Tailwind CSS + shadcn/ui (English-only)
-- 📞 **Formulaire de contact** - Support par email
-- ⚙️ **API Manager** - Configuration centralisée des services tiers
+- 🔐 **Complete Authentication** – Registration, login, JWT
+- 🔗 **OAuth Social Login** – GitHub & Google (100% database config)
+- 👥 **User Management** – Multi-tenant, roles, and permissions
+- 💳 **Lago Integration** – Subscriptions and billing
+- 📧 **Transactional Emails** – Resend, Scaleway, AWS SES
+- 🎨 **Modern Interface** – Tailwind CSS + shadcn/ui (English-only)
+- 📞 **Contact Form** – Email support
+- ⚙️ **API Manager** – Centralized third-party service configuration
 
-## 🚀 Installation Rapide
+## 🚀 Quick Installation
 
 ```bash
-# Installer les dépendances  
+# Install dependencies
 pnpm install
 
-# Configurer l'environnement
+# Configure environment
 cp .env.example .env
-# ⚠️ ÉDITER .env avec vos valeurs
+# ⚠️ EDIT .env with your values
 
-# Initialiser la base de données
+# Initialize the database
 pnpm db:push && pnpm db:seed
 
-# Lancer en développement
+# Run in development
 pnpm dev
 ```
 
-Accéder à: http://localhost:3000
+Access at: [http://localhost:3000](http://localhost:3000)
 
-## 🛠️ Stack Technique
+## 🛠️ Tech Stack
 
 - Next.js 15+ (App Router)
-- PostgreSQL + Drizzle ORM  
+- PostgreSQL + Drizzle ORM
 - Tailwind CSS + shadcn/ui
 - OAuth: GitHub & Google (no ENV vars needed)
 - Lago Billing
 - Emails: Resend / Scaleway / AWS SES
 
-## � Documentation Complète
+## 📚 Full Documentation
 
 ### 📖 [Documentation → docs/00-START-HERE.md](./docs/00-START-HERE.md)
 
-**Navigation complète**, guides d'installation, architecture, OAuth, déploiement, et plus.
+**Comprehensive navigation**, installation guides, architecture, OAuth, deployment, and more.
 
-### Navigation Rapide
+### Quick Navigation
 
-| Pour... | Lire... |
-|---------|---------|
-| **Installer le projet** | [docs/setup/QUICK_START.md](./docs/setup/QUICK_START.md) |
-| **⚠️ Migrer OAuth** | [docs/OAUTH_ACTION_REQUIRED.md](./docs/OAUTH_ACTION_REQUIRED.md) |
-| **État du projet** | [docs/STATUS.md](./docs/STATUS.md) |
-| **Déployer Vercel** | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
+| For... | Read... |
+|--------|---------|
+| **Install the project** | [docs/setup/QUICK_START.md](./docs/setup/QUICK_START.md) |
+| **⚠️ Migrate OAuth** | [docs/OAUTH_ACTION_REQUIRED.md](./docs/OAUTH_ACTION_REQUIRED.md) |
+| **Project status** | [docs/STATUS.md](./docs/STATUS.md) |
+| **Deploy on Vercel** | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
 | **Architecture** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 
 ---
 
-## �🔑 Configuration OAuth
+## 🔑🔗 OAuth Configuration
 
-**Aucune variable d'environnement requise** - Tout se configure via l'interface admin !
+**No environment variables required** – Everything is configured via the admin interface!
 
-1. **Créer OAuth App sur GitHub/Google**
-2. **Admin → API Manager** → Configurer GitHub/Google
-3. **Copier l'URL de callback** (bouton copier disponible)
-4. **Tester la configuration** (validation automatique)
-5. Les boutons sociaux apparaissent automatiquement sur login/register
+1. **Create OAuth App on GitHub/Google**
+2. **Admin → API Manager** → Configure GitHub/Google
+3. **Copy the callback URL** (copy button available)
+4. **Test the configuration** (automatic validation)
+5. Social login buttons appear automatically on login/register
 
-✨ **Nouveautés UX** :
-- URL callback dynamique et copiable
-- Test automatique de configuration
-- Interface organisée en sections (OAuth / API)
-- Configuration 3x plus rapide
+✨ **New UX Features**:
+- Dynamic and copyable callback URL
+- Automatic configuration testing
+- Organized interface (OAuth / API sections)
+- 3x faster configuration
 
-### ⚠️ ACTION REQUISE - Migration OAuth
+### ⚠️ REQUIRED ACTION – OAuth Migration
 
-**Le système OAuth contient actuellement des doublons** qui nécessitent une migration.
+**The OAuth system currently contains duplicates** that require migration.
 
-📖 **Documentation complète**: [`docs/OAUTH_ACTION_REQUIRED.md`](./docs/OAUTH_ACTION_REQUIRED.md)
+📖 **Full documentation**: [`docs/OAUTH_ACTION_REQUIRED.md`](./docs/OAUTH_ACTION_REQUIRED.md)
 
-**Résumé**:
-- 🔴 **7 catégories de doublons** identifiées (340+ lignes dupliquées)
-- ✅ **Système modulaire** déjà créé et prêt
-- 🚀 **Migration** requise pour éliminer les doublons (95% de réduction!)
-- ⚡ **Bénéfice immédiat**: Google OAuth en 15 minutes au lieu de 4 heures
+**Summary**:
+- 🔴 **7 categories of duplicates** identified (340+ duplicated lines)
+- ✅ **Modular system** already created and ready
+- 🚀 **Migration required** to eliminate duplicates (95% reduction!)
+- ⚡ **Immediate benefit**: Google OAuth in 15 minutes instead of 4 hours
 
-**Fichiers à lire** (dans l'ordre):
-1. [`OAUTH_ACTION_REQUIRED.md`](./docs/OAUTH_ACTION_REQUIRED.md) - Vue d'ensemble et actions
-2. [`OAUTH_DUPLICATES_AUDIT.md`](./docs/OAUTH_DUPLICATES_AUDIT.md) - Audit détaillé
-3. [`OAUTH_MIGRATION_PLAN.md`](./docs/OAUTH_MIGRATION_PLAN.md) - Plan de migration pas à pas
-4. [`OAUTH_ARCHITECTURE.md`](./docs/OAUTH_ARCHITECTURE.md) - Architecture modulaire
+**Files to read** (in order):
+1. [`OAUTH_ACTION_REQUIRED.md`](./docs/OAUTH_ACTION_REQUIRED.md) – Overview and actions
+2. [`OAUTH_DUPLICATES_AUDIT.md`](./docs/OAUTH_DUPLICATES_AUDIT.md) – Detailed audit
+3. [`OAUTH_MIGRATION_PLAN.md`](./docs/OAUTH_MIGRATION_PLAN.md) – Step-by-step migration plan
+4. [`OAUTH_ARCHITECTURE.md`](./docs/OAUTH_ARCHITECTURE.md) – Modular architecture
 
-**Index navigation**: [`docs/OAUTH_INDEX.md`](./docs/OAUTH_INDEX.md)
+**Navigation index**: [`docs/OAUTH_INDEX.md`](./docs/OAUTH_INDEX.md)
 
-## � Base de Données
+## 🗄️ Database
 
-⚠️ **Mode Reset Automatique Activé**
+⚠️ **Auto-Reset Mode Enabled**
 
-La base de données est **automatiquement réinitialisée** à chaque déploiement :
-- 🗑️ Suppression de toutes les tables existantes
-- 🏗️ Recréation du schéma complet
-- 🌱 Insertion des données de seed (admin, configs)
-- 📧 Templates d'email réinitialisés
+The database is **automatically reset** on every deployment:
+- 🗑️ Deletes all existing tables
+- 🏗️ Recreates the full schema
+- 🌱 Seeds admin and config data
+- 📧 Resets email templates
 
-**Conséquences :**
-- ❌ Toutes les données sont perdues à chaque déploiement
-- ❌ Les utilisateurs créés sont supprimés
-- ✅ Environnement toujours propre et prévisible
-- ✅ Idéal pour développement et démo
+**Consequences**:
+- ❌ All data is lost on every deployment
+- ❌ Created users are deleted
+- ✅ Always clean and predictable environment
+- ✅ Ideal for development and demos
 
-**Script concerné :** `scripts/build-with-db.sh`
+**Script involved**: `scripts/build-with-db.sh`
 
-## �🔒 Sécurité
+## 🔒 Security
 
-⚠️ **CRITIQUE**: Ne JAMAIS committer `.env` - Contient des credentials sensibles!
+⚠️ **CRITICAL**: NEVER commit `.env` – Contains sensitive credentials!
