@@ -4,8 +4,6 @@ import { appointments } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { verifyAuth, isAdmin } from '@/lib/auth/server'
 import { z } from 'zod'
-import { syncAppointmentToCalendars, deleteAppointmentFromCalendars } from '@/lib/calendar/sync'
-
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
@@ -24,7 +22,6 @@ const updateSchema = z.object({
   attendeePhone: z.string().optional(),
   notes: z.string().optional(),
   cancellationReason: z.string().optional(),
-  syncToCalendar: z.boolean().optional().default(true),
   assignedAdminId: z.string().uuid().optional().nullable(),
 })
 
@@ -162,15 +159,6 @@ export async function PUT(
       .where(eq(appointments.id, id))
       .returning()
 
-    // Sync to external calendars if requested
-    if (validated.syncToCalendar !== false) {
-      try {
-        await syncAppointmentToCalendars(id)
-      } catch (syncError) {
-        console.error('Calendar sync failed:', syncError)
-      }
-    }
-
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -209,13 +197,6 @@ export async function DELETE(
 
     if (!existing) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
-    }
-
-    // Delete from external calendars first
-    try {
-      await deleteAppointmentFromCalendars(id)
-    } catch (syncError) {
-      console.error('Failed to delete from external calendars:', syncError)
     }
 
     await db.delete(appointments).where(eq(appointments.id, id))

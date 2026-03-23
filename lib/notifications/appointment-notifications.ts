@@ -5,7 +5,6 @@ import { db } from '@/db'
 import { platformConfig, users, userRoles, roles } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { sendAdminNotification } from './admin-notifications'
-import { generateICalendarFile, generateICalendarFilename } from '@/lib/calendar/icalendar'
 
 interface AppointmentEmailParams {
   appointmentId: string
@@ -177,15 +176,6 @@ export async function sendAppointmentConfirmationToClient(params: AppointmentEma
                   </td>
                 </tr>
               </table>
-              <!-- Calendar File Info -->
-              <div style="background-color: #EBF5FF; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #3B82F6;">
-                <p style="margin: 0 0 8px; color: #1E40AF; font-size: 14px; font-weight: 600;">
-                  📅 Ajouter à votre calendrier
-                </p>
-                <p style="margin: 0; color: #1E40AF; font-size: 13px; line-height: 1.5;">
-                  Un fichier .ics est joint à cet email. Ouvrez-le pour ajouter automatiquement ce rendez-vous à votre calendrier (Google Calendar, Outlook, Apple Calendar, etc.).
-                </p>
-              </div>
               <p style="margin: 30px 0 0; color: #999999; font-size: 14px; line-height: 1.6;">
                 Questions? Feel free to contact us.
               </p>
@@ -231,36 +221,11 @@ Questions? Feel free to contact us.
   try {
     console.log('[AppointmentNotifications] Sending confirmation email to client:', params.attendeeEmail)
 
-    // 📅 GÉNÉRATION FICHIER .ICS pour ajout au calendrier
-    const icsContent = generateICalendarFile({
-      appointmentId: params.appointmentId,
-      title: params.productTitle,
-      description: params.notes || `Rendez-vous: ${params.productTitle}`,
-      startTime: params.startTime,
-      endTime: params.endTime,
-      timezone: params.timezone,
-      organizerEmail: adminEmail,
-      organizerName: siteName,
-      attendeeEmail: params.attendeeEmail,
-      attendeeName: params.attendeeName
-    })
-
-    const icsFilename = generateICalendarFilename(params.appointmentId, params.startTime)
-
-    console.log('[AppointmentNotifications] Generated .ics file:', icsFilename)
-
     const result = await emailRouter.sendEmail({
       to: [params.attendeeEmail],
       subject: `Appointment Confirmation - ${params.productTitle}`,
       htmlContent,
       textContent,
-      attachments: [
-        {
-          filename: icsFilename,
-          content: Buffer.from(icsContent, 'utf-8'),
-          contentType: 'text/calendar; charset=utf-8; method=REQUEST'
-        }
-      ]
     })
 
     console.log('[AppointmentNotifications] Client email result:', result)
@@ -406,34 +371,11 @@ Automated notification from ${siteName}
   try {
     console.log('[AppointmentNotifications] Sending notification email to admin:', adminEmail)
 
-    // 📅 GÉNÉRATION FICHIER .ICS pour l'admin également
-    const icsContent = generateICalendarFile({
-      appointmentId: params.appointmentId,
-      title: `[CLIENT] ${params.productTitle} - ${params.attendeeName}`,
-      description: `Rendez-vous avec ${params.attendeeName} (${params.attendeeEmail})${params.notes ? `\\n\\nNotes: ${params.notes}` : ''}`,
-      startTime: params.startTime,
-      endTime: params.endTime,
-      timezone: params.timezone,
-      organizerEmail: adminEmail,
-      organizerName: siteName,
-      attendeeEmail: params.attendeeEmail,
-      attendeeName: params.attendeeName
-    })
-
-    const icsFilename = generateICalendarFilename(params.appointmentId, params.startTime)
-
     const result = await emailRouter.sendEmail({
       to: [adminEmail],
       subject: `[NEW APPT] ${params.productTitle} - ${params.attendeeName}`,
       htmlContent,
       textContent,
-      attachments: [
-        {
-          filename: icsFilename,
-          content: Buffer.from(icsContent, 'utf-8'),
-          contentType: 'text/calendar; charset=utf-8; method=REQUEST'
-        }
-      ]
     })
 
     console.log('[AppointmentNotifications] Admin email result:', result)

@@ -5,7 +5,6 @@ import {
   appointments,
   appointmentSlots,
   appointmentExceptions,
-  calendarConnections,
   products
 } from "@/db/schema"
 import { eq, and, desc, gte, lte, or, between } from "drizzle-orm"
@@ -183,7 +182,7 @@ export async function createAppointment(data: z.infer<typeof appointmentSchema>)
     }).returning()
 
     revalidatePath("/dashboard/appointments")
-    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/appointments")
 
     return { success: true, data: result }
   } catch (error) {
@@ -249,7 +248,7 @@ export async function updateAppointment(id: string, data: Partial<z.infer<typeof
       .returning()
 
     revalidatePath("/dashboard/appointments")
-    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/appointments")
 
     return { success: true, data: result }
   } catch (error) {
@@ -291,7 +290,7 @@ export async function cancelAppointment(id: string, reason?: string) {
       .returning()
 
     revalidatePath("/dashboard/appointments")
-    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/appointments")
 
     return { success: true, data: result }
   } catch (error) {
@@ -332,7 +331,7 @@ export async function confirmAppointment(id: string) {
       .returning()
 
     revalidatePath("/dashboard/appointments")
-    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/appointments")
 
     return { success: true, data: result }
   } catch (error) {
@@ -368,7 +367,7 @@ export async function completeAppointment(id: string) {
       .returning()
 
     revalidatePath("/dashboard/appointments")
-    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/appointments")
 
     return { success: true, data: result }
   } catch (error) {
@@ -398,7 +397,7 @@ export async function deleteAppointment(id: string) {
     await db.delete(appointments).where(eq(appointments.id, id))
 
     revalidatePath("/dashboard/appointments")
-    revalidatePath("/dashboard/calendar")
+    revalidatePath("/dashboard/appointments")
 
     return { success: true }
   } catch (error) {
@@ -626,59 +625,6 @@ export async function deleteAppointmentException(id: string) {
   } catch (error) {
     console.error("Failed to delete appointment exception:", error)
     return { success: false, error: "Failed to delete appointment exception" }
-  }
-}
-
-// =============================================================================
-// CALENDAR CONNECTIONS
-// =============================================================================
-
-export async function getCalendarConnections() {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return { success: false, error: "Unauthorized" }
-    }
-
-    const connections = await db.query.calendarConnections.findMany({
-      where: eq(calendarConnections.userId, user.userId),
-      columns: {
-        id: true,
-        provider: true,
-        email: true,
-        isActive: true,
-        lastSyncAt: true,
-        createdAt: true,
-        // Exclude tokens for security
-      },
-    })
-
-    return { success: true, data: connections }
-  } catch (error) {
-    console.error("Failed to fetch calendar connections:", error)
-    return { success: false, error: "Failed to fetch calendar connections" }
-  }
-}
-
-export async function deleteCalendarConnection(id: string) {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return { success: false, error: "Unauthorized" }
-    }
-
-    await db.delete(calendarConnections)
-      .where(and(
-        eq(calendarConnections.id, id),
-        eq(calendarConnections.userId, user.userId)
-      ))
-
-    revalidatePath("/dashboard/calendar/settings")
-
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to delete calendar connection:", error)
-    return { success: false, error: "Failed to delete calendar connection" }
   }
 }
 

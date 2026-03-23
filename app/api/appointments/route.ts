@@ -4,7 +4,6 @@ import { appointments, users } from '@/db/schema'
 import { eq, and, desc, gte, lte, or } from 'drizzle-orm'
 import { verifyAuth } from '@/lib/auth/server'
 import { z } from 'zod'
-import { syncAppointmentToCalendars } from '@/lib/calendar/sync'
 import { sendAdminNotification } from '@/lib/notifications/admin-notifications'
 
 // Force dynamic to prevent caching issues
@@ -29,7 +28,6 @@ const appointmentSchema = z.object({
   attendeeName: z.string().optional(),
   attendeePhone: z.string().optional(),
   notes: z.string().optional(),
-  syncToCalendar: z.boolean().optional().default(true),
   isPaid: z.boolean().optional(), // Allow explicit isPaid setting
 })
 
@@ -188,16 +186,6 @@ export async function POST(request: NextRequest) {
     console.log('[API /appointments] Appointment created successfully!')
     console.log('[API /appointments] Created appointment ID:', result.id)
     console.log('[API /appointments] Full result:', JSON.stringify(result, null, 2))
-
-    // Sync to external calendars if requested
-    if (validated.syncToCalendar) {
-      try {
-        await syncAppointmentToCalendars(result.id)
-      } catch (syncError) {
-        console.error('Calendar sync failed:', syncError)
-        // Don't fail the request if sync fails
-      }
-    }
 
     // Send notification to admin for new appointment requests
     try {

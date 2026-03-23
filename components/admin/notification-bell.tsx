@@ -155,7 +155,7 @@ export function NotificationBell() {
       // Use viewLink if available (e.g., for digital products), otherwise go to admin order page
       router.push(`/admin/orders/${meta.orderId}`)
     } else if (meta?.appointmentId) {
-      router.push(`/admin/appointments/calendar`)
+      router.push(`/admin/appointments`)
     } else if (notification.type === 'support') {
       router.push('/admin/chat')
     } else if (notification.type === 'order') {
