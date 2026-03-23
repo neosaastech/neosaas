@@ -1,5 +1,7 @@
 # NeoSaaS 🚀
 
+![NeoSaaS Logo](https://avatars.githubusercontent.com/u/215877912?s=48&v=4)
+
 > Full-stack multi-tenant SaaS boilerplate — authentication, user management, payments, and transactional emails out of the box.
 
 ## Features
@@ -32,6 +34,34 @@ pnpm dev
 
 Open http://localhost:3000
 
+## Versioning automatique
+
+Le flux officiel de release est géré par GitHub Actions avec le workflow `.github/workflows/release.yml`.
+
+1. Ouvrir l'onglet Actions sur GitHub
+2. Lancer le workflow release
+3. Choisir le type de bump: patch, minor ou major
+
+Le workflow effectue automatiquement:
+- mise à jour de la version dans package.json
+- commit sur main
+- création du tag vX.Y.Z
+- création d'une GitHub Release avec notes automatiques
+
+### Commandes locales utiles
+
+```bash
+pnpm release:auto
+pnpm version:patch
+pnpm version:minor
+pnpm version:major
+```
+
+## Vidéo et chaîne (FR)
+
+- Vidéo d'explication: https://www.youtube.com/watch?v=liJcHlZO2gI&t=1s
+- Chaîne (contenu en français pour le moment): https://www.youtube.com/watch?v=liJcHlZO2gI&t=1s
+
 ## Tech Stack
 
 | Category | Technology |
@@ -55,7 +85,7 @@ Full developer reference: **[docs/PROJECT.md](./docs/PROJECT.md)**
 | Quick start & setup | [docs/setup/QUICK_START.md](./docs/setup/QUICK_START.md) |
 | Architecture | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Vercel deployment | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
-| Project status | [docs/STATUS.md](./docs/STATUS.md) |
+| Project status | [STATUS.md](./STATUS.md) |
 
 ## OAuth Configuration
 

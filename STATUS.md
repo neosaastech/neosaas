@@ -9,6 +9,26 @@
 
 ## 🚨 Corrections Récentes
 
+### README — Versioning auto + logo + vidéo FR (23 mars 2026)
+
+**Contexte** : Les changements de release n'étaient pas suffisamment visibles. Besoin d'une distinction claire dans `README.md` avec branding et ressource vidéo.
+
+**Changements** :
+
+- ✅ **Logo ajouté** : intégration du logo NeoSaaS depuis `https://avatars.githubusercontent.com/u/215877912?s=48&v=4` en tête du README.
+- ✅ **Versioning automatique documenté** : nouvelle section dédiée au workflow GitHub release (`.github/workflows/release.yml`) et aux commandes locales associées.
+- ✅ **Vidéo et chaîne FR ajoutées** : intégration du lien YouTube d'explication dans une section dédiée.
+- ✅ **Lien status corrigé** : mise à jour du lien `Project status` vers `./STATUS.md`.
+
+**Fichiers modifiés** :
+
+- `README.md`
+- `STATUS.md`
+
+**Impact** : La stratégie de release automatique est immédiatement visible depuis la page d'accueil du repository, avec accès direct à la vidéo d'explication en français.
+
+---
+
 ### Release GitHub Actions — Workflow officiel (23 mars 2026)
 
 **Contexte** : La configuration de release devait être centralisée dans `.github/workflows` plutôt que dépendre uniquement de commandes locales.
