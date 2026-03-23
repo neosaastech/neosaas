@@ -1,118 +1,93 @@
-# NeoSaaS - Free Version 🚀
+# NeoSaaS 🚀
 
-> **Version gratuite minimaliste** - Plateforme SaaS avec authentification, gestion d'utilisateurs, paiements Lago et emails
+> Full-stack multi-tenant SaaS boilerplate — authentication, user management, payments, and transactional emails out of the box.
 
-## ✅ Fonctionnalités Incluses
+## Features
 
-- 🔐 **Authentification complète** - Inscription, connexion, JWT
-- � **OAuth Social Login** - GitHub & Google (100% database config)
-- 👥 **Gestion des utilisateurs** - Multi-tenant, rôles et permissions
-- 💳 **Intégration Lago** - Abonnements et facturation
-- 📧 **Emails transactionnels** - Resend, Scaleway, AWS SES
-- 🎨 **Interface moderne** - Tailwind CSS + shadcn/ui (English-only)
-- 📞 **Formulaire de contact** - Support par email
-- ⚙️ **API Manager** - Configuration centralisée des services tiers
+- 🔐 **Full authentication** — sign-up, login, JWT
+- 🌐 **Social OAuth login** — GitHub & Google (100% database-driven config)
+- 👥 **User management** — multi-tenant, roles and permissions
+- 💳 **Stripe + Lago billing** — subscriptions and invoicing
+- 📧 **Transactional emails** — Resend, Scaleway TEM, AWS SES
+- 🎨 **Modern UI** — Tailwind CSS + shadcn/ui
+- 📞 **Contact form** — email-based support
+- ⚙️ **API Manager** — centralised third-party service configuration
 
-## 🚀 Installation Rapide
+## Quick Start
 
 ```bash
-# Installer les dépendances  
+# Install dependencies
 pnpm install
 
-# Configurer l'environnement
+# Set up environment variables
 cp .env.example .env
-# ⚠️ ÉDITER .env avec vos valeurs
+# Edit .env with your values
 
-# Initialiser la base de données
+# Initialise the database
 pnpm db:push && pnpm db:seed
 
-# Lancer en développement
+# Start the dev server
 pnpm dev
 ```
 
-Accéder à: http://localhost:3000
+Open http://localhost:3000
 
-## 🛠️ Stack Technique
+## Tech Stack
 
-- Next.js 15+ (App Router)
-- PostgreSQL + Drizzle ORM  
-- Tailwind CSS + shadcn/ui
-- OAuth: GitHub & Google (no ENV vars needed)
-- Lago Billing
-- Emails: Resend / Scaleway / AWS SES
+| Category | Technology |
+|---|---|
+| Framework | Next.js 15 (App Router) + React 19 |
+| Language | TypeScript 5.7 |
+| Database | PostgreSQL (Drizzle ORM) |
+| UI | Tailwind CSS 3.4 + shadcn/ui |
+| Auth | JWT + OAuth (Google, GitHub, Microsoft, Facebook) |
+| Payments | Stripe + Lago |
+| Email | Scaleway TEM / AWS SES / Resend |
+| Package manager | pnpm |
+| Deployment | Vercel / Docker |
 
-## � Documentation Complète
+## Documentation
 
-### 📖 [Documentation → docs/00-START-HERE.md](./docs/00-START-HERE.md)
+Full developer reference: **[docs/PROJECT.md](./docs/PROJECT.md)**
 
-**Navigation complète**, guides d'installation, architecture, OAuth, déploiement, et plus.
+| Topic | File |
+|---|---|
+| Quick start & setup | [docs/setup/QUICK_START.md](./docs/setup/QUICK_START.md) |
+| Architecture | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+| Vercel deployment | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
+| Project status | [docs/STATUS.md](./docs/STATUS.md) |
 
-### Navigation Rapide
+## OAuth Configuration
 
-| Pour... | Lire... |
-|---------|---------|
-| **Installer le projet** | [docs/setup/QUICK_START.md](./docs/setup/QUICK_START.md) |
-| **⚠️ Migrer OAuth** | [docs/OAUTH_ACTION_REQUIRED.md](./docs/OAUTH_ACTION_REQUIRED.md) |
-| **État du projet** | [docs/STATUS.md](./docs/STATUS.md) |
-| **Déployer Vercel** | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
-| **Architecture** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
+No environment variables required — everything is configured through the admin UI:
 
----
+1. Create an OAuth app on GitHub or Google
+2. Go to **Admin → API Manager** → configure GitHub / Google
+3. Copy the callback URL (copy button available)
+4. Run the automatic configuration test
+5. Social login buttons appear automatically on the login / register pages
 
-## �🔑 Configuration OAuth
+## Database
 
-**Aucune variable d'environnement requise** - Tout se configure via l'interface admin !
+> **Auto-reset enabled on each deployment**
 
-1. **Créer OAuth App sur GitHub/Google**
-2. **Admin → API Manager** → Configurer GitHub/Google
-3. **Copier l'URL de callback** (bouton copier disponible)
-4. **Tester la configuration** (validation automatique)
-5. Les boutons sociaux apparaissent automatiquement sur login/register
+Each deployment runs the full build sequence:
+1. Schema migrations (no-op if already up to date)
+2. Base data seed (roles, permissions, VAT rates, platform config)
+3. Email template seed
+4. Page permission sync
 
-✨ **Nouveautés UX** :
-- URL callback dynamique et copiable
-- Test automatique de configuration
-- Interface organisée en sections (OAuth / API)
-- Configuration 3x plus rapide
+In demo / preview environments the database is reset on each deploy, so all user-created data is lost. This is intentional for clean, predictable preview environments.
 
-### ⚠️ ACTION REQUISE - Migration OAuth
+Script: `scripts/build-with-db.sh`
 
-**Le système OAuth contient actuellement des doublons** qui nécessitent une migration.
+## Security
 
-📖 **Documentation complète**: [`docs/OAUTH_ACTION_REQUIRED.md`](./docs/OAUTH_ACTION_REQUIRED.md)
+> **Never commit `.env`** — it contains sensitive credentials.
 
-**Résumé**:
-- 🔴 **7 catégories de doublons** identifiées (340+ lignes dupliquées)
-- ✅ **Système modulaire** déjà créé et prêt
-- 🚀 **Migration** requise pour éliminer les doublons (95% de réduction!)
-- ⚡ **Bénéfice immédiat**: Google OAuth en 15 minutes au lieu de 4 heures
-
-**Fichiers à lire** (dans l'ordre):
-1. [`OAUTH_ACTION_REQUIRED.md`](./docs/OAUTH_ACTION_REQUIRED.md) - Vue d'ensemble et actions
-2. [`OAUTH_DUPLICATES_AUDIT.md`](./docs/OAUTH_DUPLICATES_AUDIT.md) - Audit détaillé
-3. [`OAUTH_MIGRATION_PLAN.md`](./docs/OAUTH_MIGRATION_PLAN.md) - Plan de migration pas à pas
-4. [`OAUTH_ARCHITECTURE.md`](./docs/OAUTH_ARCHITECTURE.md) - Architecture modulaire
-
-**Index navigation**: [`docs/OAUTH_INDEX.md`](./docs/OAUTH_INDEX.md)
-
-## � Base de Données
-
-⚠️ **Mode Reset Automatique Activé**
-
-La base de données est **automatiquement réinitialisée** à chaque déploiement :
-- 🗑️ Suppression de toutes les tables existantes
-- 🏗️ Recréation du schéma complet
-- 🌱 Insertion des données de seed (admin, configs)
-- 📧 Templates d'email réinitialisés
-
-**Conséquences :**
-- ❌ Toutes les données sont perdues à chaque déploiement
-- ❌ Les utilisateurs créés sont supprimés
-- ✅ Environnement toujours propre et prévisible
-- ✅ Idéal pour développement et démo
-
-**Script concerné :** `scripts/build-with-db.sh`
-
-## �🔒 Sécurité
-
-⚠️ **CRITIQUE**: Ne JAMAIS committer `.env` - Contient des credentials sensibles!
+Security headers enforced on all responses (via `next.config.ts`):
+- `Strict-Transport-Security` — forces HTTPS, includes subdomains and preload
+- `Content-Security-Policy` — baseline policy (self, Stripe, inline styles for Tailwind)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-DNS-Prefetch-Control: on`
