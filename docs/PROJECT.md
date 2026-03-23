@@ -1,49 +1,47 @@
-# NeoSaaS — Documentation Projet
+# NeoSaaS — Developer Reference
 
-## Table des matières
+## Table of Contents
 
-1. [Vue d'ensemble](#vue-densemble)
-2. [Stack technique](#stack-technique)
-3. [Structure du projet](#structure-du-projet)
-4. [Architecture & patterns](#architecture--patterns)
-5. [Base de données](#base-de-données)
-6. [Déploiement](#déploiement)
-7. [Variables d'environnement](#variables-denvironnement)
-8. [Scripts disponibles](#scripts-disponibles)
-
----
-
-## Vue d'ensemble
-
-NeoSaaS est une plateforme SaaS multi-tenant full-stack construite avec Next.js 15. Elle couvre la gestion des utilisateurs, l'e-commerce, la prise de rendez-vous, le support client, les paiements Stripe et l'administration complète.
+1. [Overview](#overview)
+2. [Tech Stack](#tech-stack)
+3. [Project Structure](#project-structure)
+4. [Architecture](#architecture)
+5. [Database Schema](#database-schema)
+6. [Getting Started](#getting-started)
+7. [Available Scripts](#available-scripts)
 
 ---
 
-## Stack technique
+## Overview
 
-| Catégorie | Technologie |
+NeoSaaS is a full-stack multi-tenant SaaS boilerplate built with Next.js 15 App Router. It provides a production-ready foundation covering user management, e-commerce, appointment booking, customer support, Stripe payments, and a complete admin panel.
+
+---
+
+## Tech Stack
+
+| Category | Technology |
 |---|---|
 | Framework | Next.js 15 (App Router) + React 19 |
-| Langage | TypeScript 5.7 |
-| Base de données | PostgreSQL (Neon serverless) |
-| ORM | Drizzle ORM |
+| Language | TypeScript 5.7 |
+| Database | PostgreSQL (Drizzle ORM) |
 | UI | Tailwind CSS 3.4 + shadcn/ui (Radix UI) |
-| Authentification | JWT custom + OAuth (Google, GitHub, Microsoft, Facebook) |
-| Paiement | Stripe + Lago |
-| Email | Scaleway TEM (principal), AWS SES, Resend |
-| Gestionnaire de paquets | pnpm |
-| Déploiement | Vercel (principal) / Docker (GHCR) |
-| Tests E2E | Cypress |
+| Auth | JWT + OAuth (Google, GitHub, Microsoft, Facebook) |
+| Payments | Stripe + Lago |
+| Email | Multi-provider (Scaleway TEM, AWS SES, Resend) |
+| Package manager | pnpm |
+| Deployment | Vercel / Docker |
+| E2E Testing | Cypress |
 
 ---
 
-## Structure du projet
+## Project Structure
 
 ```
 Neosaas-app/
 │
 ├── app/                          # Next.js App Router
-│   ├── (auth)/                   # Routes publiques d'authentification
+│   ├── (auth)/                   # Public auth routes
 │   │   ├── login/
 │   │   ├── register/
 │   │   ├── recover-password/
@@ -51,531 +49,322 @@ Neosaas-app/
 │   │   ├── verify/
 │   │   └── accept-invite/
 │   │
-│   ├── (errors)/                 # Pages d'erreur
-│   │   ├── 404/
-│   │   ├── 500/
-│   │   ├── 503/
+│   ├── (errors)/                 # Error pages
+│   │   ├── 404/ 500/ 503/
 │   │   ├── maintenance/
 │   │   └── success/
 │   │
-│   ├── (private)/                # Routes protégées (authentification requise)
-│   │   ├── admin/                # Tableau de bord administrateur
-│   │   │   ├── page.tsx          # Dashboard principal admin
-│   │   │   ├── appointments/     # Gestion des rendez-vous
-│   │   │   ├── products/         # Gestion des produits
-│   │   │   ├── users/            # Gestion des utilisateurs
-│   │   │   ├── orders/           # Gestion des commandes
-│   │   │   ├── coupons/          # Codes de réduction
-│   │   │   ├── invoices/         # Factures
-│   │   │   ├── mail/             # Configuration email
-│   │   │   ├── chat/             # Chat support admin
-│   │   │   ├── support/          # Tickets support
-│   │   │   ├── api-management/   # Clés API
-│   │   │   ├── settings/         # Paramètres plateforme
-│   │   │   ├── vat-rates/        # Taux de TVA
-│   │   │   └── legal/            # Conformité légale
+│   ├── (private)/                # Protected routes (auth required)
+│   │   ├── admin/                # Admin dashboard
+│   │   │   ├── appointments/     # Appointment management
+│   │   │   ├── products/         # Product catalog
+│   │   │   ├── users/            # User management
+│   │   │   ├── orders/           # Orders
+│   │   │   ├── coupons/          # Discount codes
+│   │   │   ├── invoices/         # Invoices
+│   │   │   ├── mail/             # Email configuration
+│   │   │   ├── chat/             # Support chat (admin)
+│   │   │   ├── support/          # Support tickets
+│   │   │   ├── api-management/   # API keys
+│   │   │   ├── settings/         # Platform settings
+│   │   │   ├── vat-rates/        # VAT rates
+│   │   │   └── legal/            # Legal compliance
 │   │   │
-│   │   ├── dashboard/            # Tableau de bord client
-│   │   │   ├── page.tsx          # Vue principale
-│   │   │   ├── appointments/     # Rendez-vous du client
-│   │   │   ├── checkout/         # Tunnel d'achat
-│   │   │   ├── checkout-lago/    # Tunnel d'achat Lago
-│   │   │   ├── cart/             # Panier
-│   │   │   ├── chat/             # Chat support client
-│   │   │   ├── company-management/ # Gestion de l'entreprise
-│   │   │   ├── profile/          # Profil utilisateur
-│   │   │   ├── payment-methods/  # Moyens de paiement
-│   │   │   ├── payments/         # Historique paiements
-│   │   │   └── support/          # Tickets support client
+│   │   ├── dashboard/            # Client dashboard
+│   │   │   ├── appointments/     # Client appointments
+│   │   │   ├── checkout/         # Checkout flow
+│   │   │   ├── checkout-lago/    # Lago checkout
+│   │   │   ├── cart/             # Shopping cart
+│   │   │   ├── chat/             # Support chat (client)
+│   │   │   ├── company-management/
+│   │   │   ├── profile/
+│   │   │   ├── payment-methods/
+│   │   │   ├── payments/
+│   │   │   └── support/
 │   │   │
-│   │   └── onboarding/           # Flux d'onboarding
+│   │   └── onboarding/
 │   │
-│   ├── (public)/                 # Pages publiques
-│   │   ├── book/[productId]/     # Réservation d'un rendez-vous
-│   │   ├── brand/                # Page brand
-│   │   ├── configuration/        # Configuration initiale
-│   │   ├── demo/                 # Démo
-│   │   ├── docs/                 # Documentation publique
-│   │   ├── features/             # Fonctionnalités
-│   │   ├── pricing/              # Tarifs
-│   │   ├── legal/                # Mentions légales / CGV
-│   │   └── store/                # Boutique
+│   ├── (public)/                 # Public pages
+│   │   ├── book/[productId]/     # Appointment booking
+│   │   ├── brand/
+│   │   ├── configuration/        # Initial setup
+│   │   ├── demo/
+│   │   ├── docs/
+│   │   ├── features/
+│   │   ├── pricing/
+│   │   ├── legal/
+│   │   └── store/
 │   │
-│   ├── api/                      # Routes API (REST)
-│   │   ├── admin/                # APIs admin uniquement
-│   │   │   ├── appointments/     # CRUD rendez-vous (admin)
-│   │   │   ├── chat/             # Messages chat
-│   │   │   ├── email-templates/  # Templates email
-│   │   │   ├── notifications/    # Notifications admin
-│   │   │   ├── oauth/            # Config OAuth providers
-│   │   │   ├── stripe/           # Actions Stripe (admin)
-│   │   │   ├── users/            # Gestion utilisateurs
-│   │   │   ├── vat-rates/        # CRUD taux TVA
-│   │   │   └── payments/         # Paiements (admin)
+│   ├── api/                      # REST API routes
+│   │   ├── admin/                # Admin-only endpoints
+│   │   │   ├── appointments/
+│   │   │   ├── chat/
+│   │   │   ├── email-templates/
+│   │   │   ├── notifications/
+│   │   │   ├── oauth/
+│   │   │   ├── stripe/
+│   │   │   ├── users/
+│   │   │   ├── vat-rates/
+│   │   │   └── payments/
 │   │   │
-│   │   ├── auth/                 # Authentification
-│   │   │   ├── login/
-│   │   │   ├── logout/
-│   │   │   ├── register/
-│   │   │   ├── me/               # Utilisateur courant
-│   │   │   ├── oauth/            # Login social
+│   │   ├── auth/                 # Authentication
+│   │   │   ├── login/ logout/ register/
+│   │   │   ├── me/
+│   │   │   ├── oauth/
 │   │   │   └── onboarding/
 │   │   │
-│   │   ├── appointments/         # Rendez-vous (client)
-│   │   │   ├── route.ts          # GET/POST rendez-vous
-│   │   │   └── [id]/route.ts     # GET/PUT/DELETE par ID
+│   │   ├── appointments/         # Appointments (client)
+│   │   │   ├── route.ts          # GET / POST
+│   │   │   └── [id]/route.ts     # GET / PUT / DELETE
 │   │   │
-│   │   ├── checkout/             # Paiement
-│   │   │   └── available-slots/  # Créneaux disponibles
-│   │   ├── chat/                 # Messagerie
-│   │   ├── email/                # Envoi d'emails
-│   │   ├── stripe/               # Webhooks Stripe
-│   │   ├── products/             # Catalogue produits
-│   │   ├── orders/               # Commandes
-│   │   ├── services/             # Services API
-│   │   ├── llm/                  # Intégration LLM
-│   │   ├── health/               # Healthcheck
-│   │   └── debug/                # Debug (dev only)
+│   │   ├── checkout/
+│   │   │   └── available-slots/
+│   │   ├── chat/
+│   │   ├── email/
+│   │   ├── stripe/               # Stripe webhooks
+│   │   ├── products/
+│   │   ├── orders/
+│   │   ├── services/
+│   │   ├── llm/
+│   │   └── health/
 │   │
-│   ├── actions/                  # Server Actions Next.js
-│   │   ├── appointments.ts       # Actions rendez-vous & créneaux
-│   │   ├── auth.ts               # Actions authentification
-│   │   ├── ecommerce.ts          # Actions e-commerce
-│   │   ├── payments.ts           # Actions paiement
-│   │   ├── coupons.ts            # Actions coupons
-│   │   └── admin-dashboard.ts    # Actions dashboard admin
+│   ├── actions/                  # Next.js Server Actions
+│   │   ├── appointments.ts
+│   │   ├── auth.ts
+│   │   ├── ecommerce.ts
+│   │   ├── payments.ts
+│   │   ├── coupons.ts
+│   │   └── admin-dashboard.ts
 │   │
-│   ├── layout.tsx                # Layout racine
-│   ├── page.tsx                  # Page d'accueil
-│   └── not-found.tsx
+│   ├── layout.tsx
+│   └── page.tsx
 │
-├── components/                   # Composants React réutilisables
-│   ├── ui/                       # Composants de base (shadcn/ui)
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   ├── calendar.tsx          # Sélecteur de date (shadcn)
-│   │   ├── dialog.tsx
-│   │   ├── form.tsx
-│   │   ├── input.tsx
-│   │   ├── table.tsx
-│   │   └── [50+ composants]
-│   │
-│   ├── admin/                    # Composants spécifiques admin
-│   │   ├── dashboard-stats.tsx
-│   │   ├── dashboard-invoices.tsx
-│   │   ├── dashboard-payments.tsx
-│   │   ├── admin-alerts.tsx
-│   │   ├── users-table.tsx
-│   │   ├── admin-live-chat.tsx
-│   │   └── notification-bell.tsx
-│   │
-│   ├── layout/                   # Composants de mise en page
-│   │   ├── site-header.tsx
-│   │   ├── site-footer.tsx
-│   │   ├── main-nav.tsx
-│   │   ├── dashboard/            # Header/sidebar dashboard admin
-│   │   ├── private-dashboard/    # Header/sidebar dashboard client
-│   │   └── docs/                 # Navigation documentation
-│   │
-│   ├── checkout/                 # Composants tunnel d'achat
-│   │   ├── appointment-booking.tsx
-│   │   ├── appointment-modal.tsx
-│   │   └── checkout-confirmation-*.tsx
-│   │
-│   ├── chat/                     # Widget de chat
-│   │   ├── chat-widget.tsx
-│   │   └── chat-widget-wrapper.tsx
-│   │
-│   ├── legal/                    # Composants légaux
-│   │   ├── cookie-consent.tsx
-│   │   └── tos-modal.tsx
-│   │
-│   └── common/                   # Utilitaires partagés
-│       ├── theme-provider.tsx
-│       ├── theme-toggle.tsx
-│       └── dynamic-theme-provider.tsx
+├── components/
+│   ├── ui/                       # Base components (shadcn/ui)
+│   ├── admin/                    # Admin-specific components
+│   ├── layout/                   # Layout components
+│   │   ├── dashboard/            # Admin dashboard header/sidebar
+│   │   └── private-dashboard/    # Client dashboard header/sidebar
+│   ├── checkout/                 # Checkout components
+│   ├── chat/                     # Chat widget
+│   ├── legal/                    # Cookie consent, ToS modal
+│   └── common/                   # Shared utilities
 │
-├── lib/                          # Bibliothèques et logique métier
-│   ├── auth/                     # Authentification serveur
+├── lib/                          # Business logic & utilities
+│   ├── auth/                     # Auth helpers (server-side)
 │   │   ├── server.ts             # verifyAuth(), isAdmin()
 │   │   └── admin-auth.ts
-│   ├── auth.ts                   # getCurrentUser(), JWT
-│   │
-│   ├── oauth/                    # Providers OAuth
-│   │   ├── providers/
-│   │   │   ├── google.ts
-│   │   │   ├── github.ts
-│   │   │   ├── microsoft.ts
-│   │   │   └── facebook.ts
-│   │   └── oauth-user-service.ts
-│   │
-│   ├── email/                    # Système email multi-provider
-│   │   ├── index.ts              # emailRouter
-│   │   ├── providers/scaleway/
-│   │   ├── repositories/
-│   │   ├── services/
-│   │   └── types/
-│   │
-│   ├── checkout/                 # Logique tunnel d'achat
-│   │   ├── index.ts
-│   │   ├── types.ts
-│   │   └── lago-test-mode.ts
-│   │
-│   ├── notifications/            # Notifications
-│   │   ├── admin-notifications.ts
-│   │   └── appointment-notifications.ts
-│   │
-│   ├── services/                 # Abstraction services tiers
-│   │   ├── index.ts
-│   │   ├── repository.ts
-│   │   └── types.ts
-│   │
-│   ├── data/                     # Couche données (lecture)
-│   │   ├── admin-dashboard.ts
-│   │   ├── invoices.ts
-│   │   └── payments.ts
-│   │
-│   ├── theme/                    # Gestion des thèmes
-│   │   └── generate-css.ts
-│   │
-│   ├── stripe-*.ts               # Helpers Stripe
-│   ├── config.ts                 # Configuration globale
-│   ├── utils.ts                  # Utilitaires généraux
-│   └── contexts/
-│       └── user-context.tsx      # Context utilisateur React
+│   ├── auth.ts                   # getCurrentUser()
+│   ├── oauth/                    # OAuth providers
+│   ├── email/                    # Email router & providers
+│   ├── checkout/                 # Checkout logic
+│   ├── notifications/            # Admin & appointment notifications
+│   ├── services/                 # Third-party service abstraction
+│   ├── data/                     # Read-only data layer
+│   ├── theme/                    # Theme CSS generation
+│   ├── stripe-*.ts               # Stripe helpers
+│   ├── config.ts
+│   └── utils.ts
 │
-├── db/                           # Base de données
-│   ├── schema.ts                 # Schéma Drizzle (source de vérité)
-│   ├── index.ts                  # Connexion DB (Neon + Drizzle)
-│   ├── migrate.ts                # Runner de migrations
-│   └── setup/
-│       ├── database-setup.sql    # SQL setup initial
-│       └── full-reset.sql        # Reset complet
+├── db/
+│   ├── schema.ts                 # Drizzle schema (source of truth)
+│   ├── index.ts                  # DB connection
+│   └── migrate.ts
 │
-├── drizzle/                      # Fichiers de migration générés
-│   ├── 0000_oval_iron_man.sql    # Schéma initial
+├── drizzle/                      # Generated SQL migration files
+│   ├── 0000_oval_iron_man.sql
 │   ├── 0001_stripe_product_sync.sql
 │   ├── 0002_stripe_unification.sql
-│   └── meta/
-│       └── _journal.json         # Journal des migrations
+│   └── meta/_journal.json
 │
-├── scripts/                      # Scripts d'administration
-│   ├── build-with-db.sh          # Script de build Vercel (migrations + next build)
-│   ├── migrate.ts                # Applique les migrations SQL
-│   ├── db-migrate-safe.sh        # Migration sécurisée (GitHub Actions)
-│   ├── db-ensure-columns.ts      # Vérifie/ajoute les colonnes critiques
-│   ├── db-verify-schema.ts       # Vérification du schéma
-│   ├── db-connectivity-test.ts   # Test de connexion HTTP (Neon)
-│   ├── seed-database.ts          # Seed complet
-│   ├── seed-base-data.ts         # Seed données de base (rôles, TVA, config)
-│   ├── seed-email-templates.ts   # Seed templates email
-│   ├── sync-pages.ts             # Sync permissions de pages
-│   ├── reset-db.ts               # Reset base de données
-│   └── fix-*.ts / test-*.ts      # Scripts de maintenance
+├── scripts/                      # Admin & build scripts
+├── contexts/                     # Global React contexts
+├── hooks/                        # Custom React hooks
+├── types/                        # Global TypeScript types
+├── public/                       # Static assets
+├── styles/                       # Global CSS
+├── cypress/                      # E2E tests
 │
-├── .github/workflows/
-│   ├── docker-image.yml          # Build & push image Docker (GHCR)
-│   └── db-migrate.yml            # Migrations automatiques CI
-│
-├── contexts/                     # Contexts React globaux
-│   ├── cart-context.tsx
-│   └── platform-config-context.tsx
-│
-├── hooks/                        # Hooks React custom
-│   ├── use-mobile.ts
-│   └── use-toast.ts
-│
-├── types/                        # Types TypeScript globaux
-│   ├── index.ts
-│   ├── theme-config.ts
-│   └── github-config.ts
-│
-├── config/                       # Configuration applicative
-│   ├── env/
-│   └── seo/
-│
-├── public/                       # Assets statiques
-├── styles/                       # CSS global
-├── cypress/                      # Tests E2E
-│
-├── vercel.json                   # Configuration déploiement Vercel
-├── drizzle.config.ts             # Configuration Drizzle ORM
-├── next.config.mjs               # Configuration Next.js
+├── vercel.json
+├── drizzle.config.ts
+├── next.config.mjs
 ├── tailwind.config.ts
-├── tsconfig.json
-└── .env.example                  # Template des variables d'environnement
+└── .env.example
 ```
 
 ---
 
-## Architecture & patterns
+## Architecture
 
-### Routage Next.js App Router
+### Route Groups (Next.js App Router)
 
-Les routes sont organisées par groupes de layout (parenthèses) :
+| Group | Purpose |
+|---|---|
+| `(auth)` | Auth pages, no protected layout |
+| `(private)` | Requires valid session |
+| `(public)` | Accessible without login |
+| `(errors)` | Error pages |
 
-- `(auth)` — pages d'authentification sans layout protégé
-- `(private)` — pages nécessitant une session valide
-- `(public)` — pages accessibles sans connexion
-- `(errors)` — pages d'erreur
-
-### Flux de données
+### Data Flow
 
 ```
-Composant React (client)
-  ↓  Server Action  ou  fetch API route
-Vérification auth (verifyAuth / getCurrentUser)
+React Component
+  ↓  Server Action or fetch()
+Auth check (verifyAuth / getCurrentUser)
   ↓
-Logique métier (lib/)
+Business logic (lib/)
   ↓
-Drizzle ORM → PostgreSQL (Neon)
+Drizzle ORM → PostgreSQL
   ↓
-Réponse JSON → mise à jour état
+JSON response → state update
 ```
 
-### Authentification
+### Authentication
 
-- JWT custom (sans NextAuth) via `jose`
-- Sessions stockées en cookie HttpOnly
-- OAuth social pour Google, GitHub, Microsoft, Facebook
-- RBAC : rôles + permissions par scope (company / platform)
-- Admins sans company, clients avec company obligatoire
+- Custom JWT (no NextAuth) via `jose`
+- HttpOnly cookie sessions
+- Social OAuth: Google, GitHub, Microsoft, Facebook
+- RBAC with two scopes: `platform` (global admin) and `company` (tenant admin)
+- Platform admins: `companyId = null` — Clients: `companyId` required
 
-### Multi-tenant
+### Multi-tenancy
 
-- Table `companies` : isolation des clients B2B
-- Utilisateurs liés à une company via `companyId`
-- Admins plateforme : `companyId = null`
-- Permissions à double niveau : plateforme et company
+- `companies` table isolates tenants
+- All user data, products, orders, and payments are scoped to a `companyId`
+- Dual permission level: platform-wide and company-scoped
 
-### Email multi-provider
+### Email
 
-- `emailRouter` dans `lib/email/index.ts` route vers le provider actif
-- Provider principal : Scaleway TEM
-- Providers alternatifs : AWS SES, Resend (désactivés par défaut)
-- Configuration chiffrée en base via `serviceApiConfigs`
+- `emailRouter` in `lib/email/index.ts` routes to the active provider
+- Provider config stored encrypted in the database — switchable from the admin UI without redeployment
 
-### Paiement
+### Payments
 
-- Stripe : paiements unitaires, abonnements, webhooks
-- Lago : facturation usage-based
-- Moyens de paiement stockés par company (PCI compliant — côté Stripe)
+- **Stripe**: one-time payments, subscriptions, webhooks
+- **Lago**: usage-based billing (optional)
+- Payment methods stored per company (PCI compliant — no sensitive card data in DB)
 
 ---
 
-## Base de données
+## Database Schema
 
-### Connexion
-
-```typescript
-// db/index.ts
-DATABASE_URL          // URL poolée (Neon connection pooler)
-DATABASE_URL_UNPOOLED // URL directe (pour migrations)
-```
-
-**Important** : les migrations requièrent `DATABASE_URL_UNPOOLED` avec le rôle `neondb_owner`. Le rôle `authenticator` n'a pas les droits `CREATE`/`ALTER`.
-
-### Schéma — Tables principales
+### Main Tables
 
 | Table | Description |
 |---|---|
-| `companies` | Entreprises clientes (tenant) |
-| `subscriptions` | Abonnements Stripe par company |
-| `payment_methods` | Cartes Stripe par company |
-| `users` | Utilisateurs (clients + admins) |
-| `roles` | Rôles RBAC |
-| `permissions` | Permissions par rôle |
-| `user_roles` | Association user ↔ role |
-| `role_permissions` | Association role ↔ permission |
-| `oauth_connections` | Tokens OAuth par utilisateur |
-| `products` | Produits (physique, digital, rendez-vous) |
-| `orders` | Commandes |
-| `order_items` | Lignes de commande |
-| `coupons` | Codes de réduction |
-| `coupon_usage` | Usage des coupons |
-| `carts` | Paniers |
-| `cart_items` | Articles du panier |
-| `appointments` | Rendez-vous (client ↔ admin) |
-| `appointment_slots` | Créneaux de disponibilité |
-| `appointment_exceptions` | Exceptions (vacances, blocages) |
-| `chat_conversations` | Conversations support |
-| `chat_messages` | Messages |
-| `chat_quick_responses` | Réponses rapides admin |
-| `email_provider_configs` | Config providers email (chiffrée) |
-| `email_templates` | Templates d'email |
-| `email_send_history` | Historique d'envoi |
-| `service_api_configs` | Config services tiers (chiffrée) |
-| `user_api_keys` | Clés API utilisateurs |
-| `llm_api_keys` | Clés LLM |
-| `llm_usage_logs` | Logs d'usage LLM |
-| `vat_rates` | Taux de TVA |
-| `platform_config` | Configuration plateforme (clé/valeur) |
-| `page_permissions` | Permissions d'accès aux pages |
-| `tos_versions` | Versions CGU |
-| `user_tos_acceptances` | Acceptation CGU |
-| `cookie_consents` | Consentements cookies |
-| `system_logs` | Logs système |
+| `companies` | Tenant organizations |
+| `subscriptions` | Stripe subscriptions per company |
+| `payment_methods` | Stripe cards per company |
+| `users` | Users (clients + admins) |
+| `roles` | RBAC roles |
+| `permissions` | Permissions per role |
+| `user_roles` | User ↔ role mapping |
+| `role_permissions` | Role ↔ permission mapping |
+| `oauth_connections` | OAuth tokens per user |
+| `products` | Products (physical, digital, appointment) |
+| `orders` | Orders |
+| `order_items` | Order line items |
+| `coupons` | Discount codes |
+| `coupon_usage` | Coupon usage tracking |
+| `carts` | Shopping carts |
+| `cart_items` | Cart items |
+| `appointments` | Appointments (client ↔ admin) |
+| `appointment_slots` | Availability slots |
+| `appointment_exceptions` | Exceptions (blocked dates, vacations) |
+| `chat_conversations` | Support conversations |
+| `chat_messages` | Chat messages |
+| `chat_quick_responses` | Admin quick replies |
+| `email_provider_configs` | Email provider config (encrypted) |
+| `email_templates` | Email templates |
+| `email_send_history` | Send history |
+| `service_api_configs` | Third-party service config (encrypted) |
+| `user_api_keys` | User API keys |
+| `llm_api_keys` | LLM API keys |
+| `llm_usage_logs` | LLM usage tracking |
+| `vat_rates` | VAT rates |
+| `platform_config` | Platform settings (key/value) |
+| `page_permissions` | Page access control |
+| `tos_versions` | Terms of service versions |
+| `user_tos_acceptances` | ToS acceptance records |
+| `cookie_consents` | Cookie consent records |
+| `system_logs` | System logs |
 
 ### Migrations
 
-Les fichiers SQL de migration sont générés par `drizzle-kit` dans le dossier `drizzle/`. Le journal de suivi est dans `drizzle/meta/_journal.json`.
-
-Commandes :
+Migration files are generated by `drizzle-kit` into `drizzle/`. The migration journal is at `drizzle/meta/_journal.json`.
 
 ```bash
-pnpm db:generate    # Génère un nouveau fichier de migration depuis db/schema.ts
-pnpm db:migrate     # Applique les migrations en attente
-pnpm db:push        # Synchronisation directe (dev uniquement)
-pnpm db:studio      # Interface visuelle Drizzle Studio
+pnpm db:generate   # Generate a new migration file from schema changes
+pnpm db:migrate    # Apply pending migrations
+pnpm db:push       # Direct schema sync (development only)
+pnpm db:studio     # Open Drizzle Studio (visual DB browser)
 ```
 
 ---
 
-## Déploiement
+## Getting Started
 
-### Vercel (production)
+### Prerequisites
 
-**Configuration** (`vercel.json`) :
+- Node.js 20+
+- pnpm
+- A PostgreSQL database (Neon recommended)
+- A Stripe account
 
-```json
-{
-  "buildCommand": "bash scripts/build-with-db.sh",
-  "installCommand": "pnpm install --no-frozen-lockfile --reporter=append-only",
-  "framework": "nextjs"
-}
-```
-
-**Séquence de build** (`scripts/build-with-db.sh`) :
-
-1. Test de connectivité HTTP vers Neon (port 443 uniquement — TCP bloqué sur Vercel)
-2. Vérification des colonnes critiques (`db-ensure-columns.ts`)
-3. Application des migrations SQL (`scripts/migrate.ts`)
-4. Seeding données de base : rôles, permissions, TVA, config (`db:seed-base`)
-5. Seeding templates email (`seed:email-templates`)
-6. Seeding permissions de pages (`seed:pages`)
-7. Compilation Next.js (`next build`)
-
-> **Note** : sur Vercel, seule la connexion HTTP (port 443) vers Neon est disponible. La connexion TCP directe (port 5432 / ports custom Neon) est bloquée. `drizzle-kit push` (TCP) est donc réservé à GitHub Actions.
-
-**Variables Vercel requises** :
-
-| Variable | Rôle |
-|---|---|
-| `DATABASE_URL` | URL poolée Neon (`neondb_owner`) |
-| `DATABASE_URL_UNPOOLED` | URL directe Neon (pour migrations) |
-| `NEXT_PUBLIC_APP_URL` | URL publique de l'application |
-| `JWT_SECRET` | Secret signature JWT |
-| `STRIPE_SECRET_KEY` | Clé Stripe serveur |
-| `STRIPE_WEBHOOK_SECRET` | Secret webhook Stripe |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Clé publique Stripe |
-
-Variables optionnelles selon les features activées : email providers, OAuth providers, Lago, S3/Scaleway Object Storage.
-
-**Sauter les migrations** (si gérées par GitHub Actions) :
-
-```
-SKIP_DB_MIGRATIONS=true
-# ou
-DB_MIGRATIONS_STRATEGY=github-actions
-```
-
----
-
-### Docker
-
-**Workflow** : `.github/workflows/docker-image.yml`
-
-- Déclenché sur push vers `main` ou `docker`, ou manuellement
-- Build multi-plateforme (`linux/amd64`)
-- Publication sur GitHub Container Registry (GHCR)
-- Tag automatique : `sha-<commit>`, `<branch>`, `latest` (sur `main`)
-- Cache de build via GitHub Actions cache
-
-Image publiée :
-```
-ghcr.io/<organisation>/<repo>/web:latest
-```
-
----
-
-### GitHub Actions — Migrations automatiques
-
-**Workflow** : `.github/workflows/db-migrate.yml`
-
-Déclenché automatiquement lors d'un push sur `main`, `preview`, `dev`, `claude/**` si les fichiers suivants sont modifiés :
-
-- `db/schema.ts`
-- `drizzle/**`
-- `scripts/migrate.ts`
-- `scripts/db-ensure-columns.ts`
-- `drizzle.config.ts`
-
-**Séquence** :
-
-1. `bash scripts/db-migrate-safe.sh` — migration via `drizzle-kit push` (connexion TCP directe)
-2. `pnpm db:seed-base` — rôles, permissions, TVA, config plateforme
-3. `pnpm seed:email-templates` — templates email
-4. `pnpm seed:pages` — permissions des pages
-
-**Secrets GitHub requis** :
-
-| Secret | Description |
-|---|---|
-| `DATABASE_URL_UNPOOLED` | URL directe Neon (rôle `neondb_owner`) |
-| `DATABASE_URL` | URL poolée Neon (fallback) |
-
----
-
-## Variables d'environnement
-
-Consulter `.env.example` pour la liste complète. Les variables critiques :
+### Setup
 
 ```bash
-# Base de données (Neon PostgreSQL)
-DATABASE_URL=postgresql://neondb_owner:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
-DATABASE_URL_UNPOOLED=postgresql://neondb_owner:PASSWORD@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+# Install dependencies
+pnpm install
 
-# Application
-NEXT_PUBLIC_APP_URL=https://monapp.com
-JWT_SECRET=<secret-32-chars-minimum>
+# Copy environment template
+cp .env.example .env.local
+# Fill in DATABASE_URL, JWT_SECRET, Stripe keys, etc.
 
-# Stripe
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+# Push schema to database
+pnpm db:push
+
+# Seed base data (roles, permissions, VAT, platform config)
+pnpm db:seed-base
+
+# Seed email templates
+pnpm seed:email-templates
+
+# Start development server
+pnpm dev
 ```
+
+Open `http://localhost:3000`. For the initial admin account, navigate to `/configuration`.
 
 ---
 
-## Scripts disponibles
+## Available Scripts
 
 ```bash
-# Développement
-pnpm dev                  # Serveur de développement Next.js
+# Development
+pnpm dev                   # Start Next.js dev server
 
 # Build
-pnpm build                # Build production avec migrations (Vercel)
-pnpm build:local          # Build production sans migrations (local)
+pnpm build                 # Production build (with DB migrations)
+pnpm build:local           # Production build (without migrations)
+pnpm start                 # Start production server
 
-# Base de données
-pnpm db:generate          # Génère les fichiers de migration depuis le schéma
-pnpm db:migrate           # Applique les migrations en attente
-pnpm db:push              # Sync directe schéma → DB (dev)
-pnpm db:ensure            # Vérifie/ajoute les colonnes critiques
-pnpm db:verify            # Vérifie la cohérence schéma/DB
-pnpm db:reset             # Remet la base à zéro
-pnpm db:seed              # Seed complet (dev)
-pnpm db:seed-base         # Seed données de base (rôles, TVA, config)
-pnpm db:studio            # Drizzle Studio (interface visuelle)
+# Database
+pnpm db:generate           # Generate migration file from schema
+pnpm db:migrate            # Apply pending migrations
+pnpm db:push               # Sync schema directly to DB (dev)
+pnpm db:ensure             # Verify/add critical columns
+pnpm db:verify             # Check schema vs DB consistency
+pnpm db:reset              # Reset database (dev only)
+pnpm db:seed               # Full seed with demo data
+pnpm db:seed-base          # Seed roles, permissions, VAT, config
+pnpm db:studio             # Open Drizzle Studio
 
-# Seeding spécifique
-pnpm seed:email-templates # Seed templates d'email
-pnpm seed:pages           # Sync permissions de pages
+# Seeding
+pnpm seed:email-templates  # Seed email templates
+pnpm seed:pages            # Sync page permissions
 
-# Vérification
-pnpm check:email-config   # Vérifie la configuration email
-pnpm lint                 # ESLint
-
-# Production
-pnpm start                # Démarre le serveur Next.js en mode production
+# Quality
+pnpm check:email-config    # Verify email configuration
+pnpm lint                  # Run ESLint
 ```
