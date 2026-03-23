@@ -1,3 +1,0 @@
-QUICK_START.md
-
-...existing content...
