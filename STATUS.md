@@ -9,6 +9,26 @@
 
 ## 🚨 Corrections Récentes
 
+### Release GitHub Actions — Workflow officiel (23 mars 2026)
+
+**Contexte** : La configuration de release devait être centralisée dans `.github/workflows` plutôt que dépendre uniquement de commandes locales.
+
+**Changements** :
+
+- ✅ **Nouveau workflow release** : ajout de `.github/workflows/release.yml` avec déclenchement manuel (`workflow_dispatch`) et choix du bump (`patch|minor|major`).
+- ✅ **Automatisation complète** : bump de version, commit, tag Git (`vX.Y.Z`), puis création de GitHub Release avec notes auto-générées.
+- ✅ **Documentation mise à jour** : section `Release Automation` ajoutée dans `docs/PROJECT.md`.
+
+**Fichiers modifiés** :
+
+- `.github/workflows/release.yml`
+- `docs/PROJECT.md`
+- `STATUS.md`
+
+**Impact** : Le flux officiel de release est désormais exécutable depuis GitHub Actions, traçable et standardisé pour toute l'équipe.
+
+---
+
 ### Versioning automatique — Passage à 1.0.1 (23 mars 2026)
 
 **Contexte** : Le projet avait des références en `1.0.0` dans la documentation mais `package.json` était encore en `0.1.0`. Besoin d'un workflow simple pour générer automatiquement la prochaine version.
