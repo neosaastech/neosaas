@@ -367,4 +367,10 @@ pnpm seed:pages            # Sync page permissions
 # Quality
 pnpm check:email-config    # Verify email configuration
 pnpm lint                  # Run ESLint
+
+# Versioning
+pnpm release:auto          # Automatic patch bump (ex: 1.0.1 -> 1.0.2)
+pnpm version:patch         # Patch bump
+pnpm version:minor         # Minor bump
+pnpm version:major         # Major bump
 ```

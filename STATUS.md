@@ -3,11 +3,29 @@
 **Dernière mise à jour**: 22 janvier 2026
 **Branche principale**: main
 **Branche courante**: conn
-**Version**: 1.0.0-beta
+**Version**: 1.0.1
 
 ---
 
 ## 🚨 Corrections Récentes
+
+### Versioning automatique — Passage à 1.0.1 (23 mars 2026)
+
+**Contexte** : Le projet avait des références en `1.0.0` dans la documentation mais `package.json` était encore en `0.1.0`. Besoin d'un workflow simple pour générer automatiquement la prochaine version.
+
+**Changements** :
+- ✅ **Version applicative alignée** : `package.json` passe de `0.1.0` à `1.0.1`.
+- ✅ **Scripts de bump automatique ajoutés** : `version:patch`, `version:minor`, `version:major`, `release:auto`.
+- ✅ **Documentation des scripts** : section `Available Scripts` mise à jour dans `docs/PROJECT.md`.
+
+**Fichiers modifiés** :
+- `package.json`
+- `docs/PROJECT.md`
+- `STATUS.md`
+
+**Impact** : La prochaine version peut maintenant être générée automatiquement avec `pnpm release:auto` (bump patch) ou via les commandes semver dédiées.
+
+---
 
 ### Admin Recent Orders — Traduction EN + PDF Factures + Gestion Abonnements (25 mars 2026)
 
