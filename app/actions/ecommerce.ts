@@ -1455,21 +1455,6 @@ export async function processCheckout(
             console.log('[processCheckout] ✅ Appointment marqué payé et confirmé:', appointment.id)
           }
 
-          // 📅 SYNCHRONISATION CALENDRIER : Sync avec Google Calendar / Outlook (non-bloquant)
-          console.log('[processCheckout] 📅 Syncing appointment to external calendars')
-          try {
-            const { syncAppointmentToCalendars } = await import('@/lib/calendar/sync')
-            const syncResults = await syncAppointmentToCalendars(appointment.id)
-            
-            console.log('[processCheckout] ✅ Calendar sync completed:', {
-              google: syncResults.google?.success ? '✅ Synced' : syncResults.google?.error || 'Not configured',
-              microsoft: syncResults.microsoft?.success ? '✅ Synced' : syncResults.microsoft?.error || 'Not configured'
-            })
-          } catch (syncError) {
-            console.warn('[processCheckout] ⚠️ Calendar sync failed (non-critical):', syncError instanceof Error ? syncError.message : syncError)
-            // Non-bloquant - le checkout continue même si la sync échoue
-          }
-
           // Envoyer les notifications email pour le rendez-vous (non-bloquant)
           console.log('[processCheckout] 📧 Attempting to send appointment notifications (DEV mode - non-blocking)')
           try {
