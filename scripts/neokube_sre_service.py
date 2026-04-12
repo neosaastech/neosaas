@@ -1171,7 +1171,9 @@ def execute_tool(name: str, args: dict, k8s: K8sExecutor, scw: ScalewayClient,
         # ── Shell / Git / Fichiers ────────────────────────────────────────────
         if name == "shell_exec":
             cmd     = args.get("command", "")
-            workdir = args.get("workdir", "/home/neokube-beta")
+            # GIT_HOME est /workspace (hostPath) dans le pod, /home/neokube-beta en local
+            default_wd = os.getenv("GIT_HOME", "/home/neokube-beta")
+            workdir = args.get("workdir", default_wd)
             timeout = min(int(args.get("timeout", 60)), 300)
             if not cmd:
                 return "[ERROR] Paramètre 'command' manquant"
@@ -1223,8 +1225,9 @@ def execute_tool(name: str, args: dict, k8s: K8sExecutor, scw: ScalewayClient,
             if not path:
                 return "[ERROR] Paramètre 'path' manquant"
             try:
-                import os
-                os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
+                _dirname = os.path.dirname(path)
+                if _dirname:
+                    os.makedirs(_dirname, exist_ok=True)
                 mode = "a" if append else "w"
                 with open(path, mode) as f:
                     f.write(content)
@@ -1233,7 +1236,7 @@ def execute_tool(name: str, args: dict, k8s: K8sExecutor, scw: ScalewayClient,
                 return f"[ERROR] file_write: {e}"
 
         if name == "git_status":
-            repo = "/home/neokube-beta"
+            repo = os.getenv("GIT_HOME", "/home/neokube-beta")
             r1 = subprocess.run(
                 ["git", "-C", repo, "status", "--short"],
                 capture_output=True, text=True, timeout=15
@@ -1248,7 +1251,7 @@ def execute_tool(name: str, args: dict, k8s: K8sExecutor, scw: ScalewayClient,
             )
 
         if name == "git_commit_push":
-            repo        = "/home/neokube-beta"
+            repo        = os.getenv("GIT_HOME", "/home/neokube-beta")
             message     = args.get("message", "chore: mise à jour")
             add_pattern = args.get("add_pattern", "-A")
             do_push     = args.get("push", True)
