@@ -76,7 +76,7 @@ SCW_DEFAULT_REGION    = os.getenv("SCW_DEFAULT_REGION", "fr-par")
 SCW_DEFAULT_ZONE      = os.getenv("SCW_DEFAULT_ZONE", "fr-par-1")
 SRE_MODEL             = os.getenv("SRE_MODEL", "mistral")   # nom du modèle dans LiteLLM
 LOG_LEVEL             = os.getenv("LOG_LEVEL", "INFO")
-MAX_TOOL_ITERATIONS   = int(os.getenv("MAX_TOOL_ITERATIONS", "12"))
+MAX_TOOL_ITERATIONS   = int(os.getenv("MAX_TOOL_ITERATIONS", "20"))
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
@@ -97,11 +97,20 @@ Tu es un ADMINISTRATEUR SYSTÈME qui AGIT — pas un conseiller théorique.
 - Qdrant    : http://51.159.27.101:6333 (Kapsule)
 - Répo Git  : /home/neokube-beta (branche main)
 
-## RÈGLE ABSOLUE — EXÉCUTION AVANT TOUT
+## RÈGLE ABSOLUE — EXÉCUTION ET HONNÊTETÉ
 Quand l'utilisateur demande une action sur le système (git, shell, kubectl, fichier, API),
 tu DOIS utiliser l'outil correspondant IMMÉDIATEMENT.
 INTERDIT de répondre "je ne peux pas" ou "voici comment faire" sans avoir d'abord tenté l'outil.
-Si l'outil échoue, explique l'erreur avec la sortie réelle.
+
+RÈGLE CRITIQUE ANTI-HALLUCINATION :
+- Si un outil retourne une ERREUR ou un TIMEOUT → dis-le EXPLICITEMENT avec la sortie brute
+- Ne JAMAIS inventer un hash git, une URL GitHub, un statut pod, ou une IP
+- Si tu n'as pas pu terminer une étape → dis "ÉCHEC : [raison exacte]" et arrête-toi
+- Un résultat inventé est PIRE qu'un aveu d'échec
+
+Chemins corrects dans le pod :
+- Repo git : /workspace  (JAMAIS /home/neokube-beta qui n'existe pas dans le container)
+- Clés SSH : /workspace/.ssh/id_ed25519_neokube
 
 ## Règles fondamentales
 1. Réponds TOUJOURS en français, en markdown structuré.
@@ -1255,17 +1264,17 @@ def execute_tool(name: str, args: dict, k8s: K8sExecutor, scw: ScalewayClient,
             message     = args.get("message", "chore: mise à jour")
             add_pattern = args.get("add_pattern", "-A")
             do_push     = args.get("push", True)
-            log.warning(f"[AUDIT L2] git_commit_push message={message!r}")
+            log.warning(f"[AUDIT L2] git_commit_push message={message!r} repo={repo}")
             try:
                 # Stage
                 r_add = subprocess.run(
                     ["git", "-C", repo, "add", add_pattern],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True, text=True, timeout=120
                 )
                 # Commit
                 r_commit = subprocess.run(
                     ["git", "-C", repo, "commit", "-m", message],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True, text=True, timeout=60
                 )
                 output = r_add.stderr.strip() + "\n" + r_commit.stdout.strip()
                 if r_commit.returncode != 0:
