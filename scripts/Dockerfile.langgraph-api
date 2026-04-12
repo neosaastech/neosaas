@@ -1,0 +1,43 @@
+# ============================================================
+# Dockerfile — neokube/langgraph-api:v1
+# Image locale NeoKube pour LangGraph Server
+#
+# Build :
+#   docker build -t neokube/langgraph-api:v1 \
+#     -f scripts/Dockerfile.langgraph-api .
+#
+# Import K3s/containerd :
+#   docker save neokube/langgraph-api:v1 | \
+#     sudo ctr -n k8s.io images import -
+#
+# Dans le manifest : image: neokube/langgraph-api:v1
+#                    imagePullPolicy: Never
+# ============================================================
+
+FROM langchain/langgraph-api:3.12-wolfi
+
+# ── Dépendances Python supplémentaires NeoKube ────────────────────────────────
+# Ajouter ici les packages requis par vos graphes LangGraph
+# (ex: anthropic, httpx, penpot-sdk...)
+COPY scripts/langgraph-requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ── Graphes LangGraph (votre code métier) ────────────────────────────────────
+# Structure attendue par LangGraph Server :
+#   src/
+#     agent.py       ← définit les graphes (StateGraph, etc.)
+#     __init__.py
+#   langgraph.json   ← déclare les graphes et leur entrypoint
+#
+# Si vous n'avez pas encore de graphes, commenter les lignes COPY ci-dessous.
+# LangGraph Server démarrera quand même et exposera /ok + /docs.
+# COPY src/ /deps/__outer_src/src/
+# COPY langgraph.json /deps/__outer_src/langgraph.json
+
+# ── Variables d'environnement par défaut ──────────────────────────────────────
+ENV PENPOT_SIDECAR_URL="http://penpot-sidecar:8000" \
+    TEMPORAL_HOST="temporal-server:7233"
+
+EXPOSE 8000
+
+# Entrypoint inchangé (hérité de langchain/langgraph-api)

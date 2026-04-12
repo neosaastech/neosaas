@@ -1,0 +1,47 @@
+# ============================================================
+# Dockerfile — neokube/penpot-sidecar:v2.0
+# Penpot Agent + LangGraph Embedded (mode gratuit, pas de serveur)
+#
+# Build (depuis la racine du projet) :
+#   docker build -t neokube/penpot-sidecar:v2.0 \
+#     -f scripts/Dockerfile.penpot-sidecar scripts/
+#
+# Import K3s/containerd :
+#   docker save neokube/penpot-sidecar:v2.0 | \
+#     sudo ctr -n k8s.io images import -
+# ============================================================
+
+FROM python:3.12-slim
+
+# Dépendances système minimales pour SQLite et compilation C éventuelle
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        sqlite3 \
+        gcc \
+        libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/penpot
+
+# ── Dépendances Python ────────────────────────────────────────────────────────
+COPY langgraph-requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+# ── Code applicatif ───────────────────────────────────────────────────────────
+# Copie tous les modules : penpot_service, model_router, knowledge_db,
+#                          self_healing, monitor_api
+COPY *.py /app/penpot/
+
+# ── Répertoires de persistance (écrasés par les PVC en prod) ─────────────────
+RUN mkdir -p /data/graph-state /data
+
+# ── Variables d'environnement par défaut (surchargées par K8s) ───────────────
+ENV PYTHONUNBUFFERED=1 \
+    GRAPH_DB_PATH="/data/graph-state/neokube_state.db" \
+    KNOWLEDGE_DB_PATH="/data/neokube_knowledge.db" \
+    PENPOT_BACKEND="http://penpot-backend.penpot.svc.cluster.local:6060" \
+    CONTEXT_PATH="/data/sharepoint/Service-Marketing"
+
+EXPOSE 8000
+
+CMD ["python3", "-m", "uvicorn", "penpot_service:app", \
+     "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

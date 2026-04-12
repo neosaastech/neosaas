@@ -1,0 +1,69 @@
+---
+# ConfigMap contenant le code du micro-service
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: penpot-agent-service
+  namespace: open-webui
+data:
+  penpot_service.py: |
+    # Contenu injecté dynamiquement par deploy-penpot-sidecar.sh
+    pass
+
+---
+# Patch du déploiement open-webui pour ajouter le sidecar
+# Appliqué avec : kubectl patch deployment open-webui -n open-webui --patch-file penpot-sidecar-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-webui
+  namespace: open-webui
+spec:
+  template:
+    spec:
+      volumes:
+        - name: penpot-agent-code
+          configMap:
+            name: penpot-agent-service
+      containers:
+        - name: penpot-agent
+          image: ghcr.io/open-webui/open-webui:main
+          command:
+            - python3
+            - -m
+            - uvicorn
+            - penpot_service:app
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --app-dir
+            - /app/penpot
+          ports:
+            - containerPort: 8000
+              name: penpot-agent
+          env:
+            - name: PENPOT_TOKEN
+              value: "eyJhbGciOiJBMjU2S1ciLCJlbmMiOiJBMjU2R0NNIn0.1DB04WA3A6UeKt_ijd6Eaf7j1UgxbbcIigVyAMAJIJsqcn30sizaaA.XsWqhZdFBeQwZSF_.aP9GDzuQY1d6L2SrblgP5NG9ZvHbQ7xbOsMLKlxNlXvMXnRS9Pwe8ftu5Vh6-z7nnd3j6OQALlEMVpQss7bsxI6qCakUZh4TvXUZRVQl2dpdzrgnYCvz-HIPXdgez-DjvJbXA4xG8oLHwzzQ7TCKgDjSSAnmbarmg0vYCHuLvrq5D1Sq9KGbtP281oMkEfWul629XABLtzAd.gHQ6JQayWT5JnF880RBbbg"
+            - name: PENPOT_BACKEND
+              value: "http://penpot-backend.penpot.svc.cluster.local:6060"
+            - name: CONTEXT_PATH
+              value: "/data/sharepoint/Service-Marketing"
+          volumeMounts:
+            - name: penpot-agent-code
+              mountPath: /app/penpot
+            - name: data
+              mountPath: /data/sharepoint
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 15

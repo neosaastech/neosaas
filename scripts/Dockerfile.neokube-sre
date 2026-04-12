@@ -1,0 +1,43 @@
+# ============================================================
+# Dockerfile — neokube/neokube-sre-agent:1.0
+#
+# Build :
+#   docker build -t neokube/neokube-sre-agent:1.0 \
+#     -f scripts/Dockerfile.neokube-sre scripts/
+#
+# Import K3s :
+#   docker save neokube/neokube-sre-agent:1.0 | \
+#     sudo ctr -n k8s.io images import -
+# ============================================================
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        git \
+        bash \
+        jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# kubectl
+RUN curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && chmod +x kubectl && mv kubectl /usr/local/bin/kubectl
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    fastapi==0.115.0 \
+    uvicorn==0.30.6 \
+    openai>=1.0.0 \
+    mistralai>=1.0.0 \
+    kubernetes>=28.0.0
+
+COPY neokube_sre_service.py /app/neokube_sre_service.py
+
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8001
+
+CMD ["python3", "-m", "uvicorn", "neokube_sre_service:app", \
+     "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
