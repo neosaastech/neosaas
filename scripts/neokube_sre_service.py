@@ -76,7 +76,7 @@ SCW_DEFAULT_REGION    = os.getenv("SCW_DEFAULT_REGION", "fr-par")
 SCW_DEFAULT_ZONE      = os.getenv("SCW_DEFAULT_ZONE", "fr-par-1")
 SRE_MODEL             = os.getenv("SRE_MODEL", "mistral")   # nom du modèle dans LiteLLM
 LOG_LEVEL             = os.getenv("LOG_LEVEL", "INFO")
-MAX_TOOL_ITERATIONS   = int(os.getenv("MAX_TOOL_ITERATIONS", "20"))
+MAX_TOOL_ITERATIONS   = int(os.getenv("MAX_TOOL_ITERATIONS", "40"))
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
@@ -131,6 +131,39 @@ Chemins corrects dans le pod :
 2. Analyser le résultat réel
 3. Enchaîner les outils si nécessaire
 4. Rapporter le résultat final avec la sortie brute
+
+## RÈGLE CRITIQUE — Attente des pods/jobs avant lecture des logs
+Après `kubectl run`, `kubectl apply`, ou `kubectl create job`, le container est en `ContainerCreating`.
+Lire les logs immédiatement retourne une erreur. TOUJOURS attendre avec :
+- Pod    : `kubectl wait --for=condition=Ready pod/<name> -n <ns> --timeout=60s`
+           ou si pod éphémère : `kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/<name> -n <ns> --timeout=60s`
+- Job    : `kubectl wait --for=condition=complete job/<name> -n <ns> --timeout=120s`
+Ensuite seulement → `kubectl logs`.
+Si le wait échoue en timeout → `kubectl describe pod/<name> -n <ns>` pour diagnostiquer.
+NETTOYER toujours les pods de test après usage : `kubectl delete pod <name> -n <ns>`.
+
+## Workflows courants
+
+### Lancer un backup immédiat
+```
+kubectl create job --from=cronjob/neokube-nightly-backup backup-manuel-$(date +%s) -n management
+kubectl wait --for=condition=complete job/backup-manuel-... -n management --timeout=180s
+kubectl logs -n management -l job-name=backup-manuel-... --tail=20
+```
+
+### Corriger un déploiement
+```
+# 1. Lire le manifest GitOps : file_read /workspace/Kubinote-GitOps/apps/<ns>/base/<deployment>.yaml
+# 2. Modifier : file_write (contenu corrigé)
+# 3. Appliquer : kubectl apply -f /workspace/Kubinote-GitOps/apps/<ns>/base/<deployment>.yaml
+# 4. Vérifier : kubectl rollout status deployment/<name> -n <ns>
+# 5. Committer : git_commit_push
+```
+
+### Vérifier l'état du cluster
+```
+k8s_get_pods (--all-namespaces) → k8s_get_events → k8s_get_resource_usage
+```
 """
 
 # =============================================================================
@@ -1329,6 +1362,8 @@ class SREAgent:
                 "Aucun backend LLM disponible. "
                 "Définir LITELLM_BASE_URL+LITELLM_API_KEY ou MISTRAL_API_KEY."
             )
+        import uuid as _uuid
+        self._session_id = str(_uuid.uuid4())   # session unique par démarrage d'agent
         self._k8s    = K8sExecutor()
         self._scw    = ScalewayClient(
             secret_key=SCW_SECRET_KEY,
@@ -1341,6 +1376,7 @@ class SREAgent:
         """Appelle le backend LLM (LiteLLM ou Mistral direct) et retourne la réponse."""
         if self._backend == "litellm":
             # OpenAI-compatible (LiteLLM proxy) — format tool_choice identique
+            # user + extra_body.metadata → tracés dans Langfuse avec identité agent
             return self._oai.chat.completions.create(
                 model=SRE_MODEL,
                 messages=msgs,
@@ -1348,6 +1384,16 @@ class SREAgent:
                 tool_choice="auto",
                 max_tokens=4096,
                 temperature=0.1,
+                user="neokube-sre",
+                extra_body={
+                    "metadata": {
+                        "agent":      "neokube-sre",
+                        "model":      SRE_MODEL,
+                        "task":       "sre-reasoning",
+                        "tags":       ["neokube-sre", SRE_MODEL, "sre", "tool-call"],
+                        "session_id": self._session_id,
+                    }
+                },
             )
         else:
             return self._mistral_client.chat.complete(

@@ -55,6 +55,12 @@ GRAPH_DB_PATH     = os.getenv("GRAPH_DB_PATH",     "/tmp/penpot-graph.db")
 KNOWLEDGE_DB_PATH = os.getenv("KNOWLEDGE_DB_PATH", "/data/neokube_knowledge.db")
 PENPOT_BASE_URL   = os.getenv("PENPOT_BASE_URL",   "https://penpot.neokube.local")
 
+# ── Infrastructure LLM / Vault ───────────────────────────────────────────────
+LITELLM_URL   = os.getenv("LITELLM_URL",   "http://litellm.cockpit.svc.cluster.local:4000")
+LITELLM_KEY   = os.getenv("LITELLM_KEY",   os.getenv("LITELLM_API_KEY", ""))
+VAULT_ADDR    = os.getenv("VAULT_ADDR",    "http://vault.vault.svc.cluster.local:8200")
+VAULT_TOKEN   = os.getenv("VAULT_TOKEN",   "")
+
 # ── Ollama ───────────────────────────────────────────────────────────────────
 OLLAMA_URL        = os.getenv("OLLAMA_URL",        "http://localhost:11434")
 
@@ -587,6 +593,65 @@ def act_create_pricing_section(p: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Outil infrastructure — query_cluster_info
+# ---------------------------------------------------------------------------
+
+def act_query_cluster_info(args: dict) -> dict:
+    """
+    Interroge l'état réel de l'infrastructure NeoKube :
+    - Modèles LLM disponibles via LiteLLM
+    - Statut des clés API (depuis Vault)
+    Retourne un dict avec les infos collectées.
+    """
+    result: dict = {}
+
+    # 1. Modèles LiteLLM disponibles
+    try:
+        headers = {}
+        if LITELLM_KEY:
+            headers["Authorization"] = f"Bearer {LITELLM_KEY}"
+        r = _req.get(f"{LITELLM_URL}/v1/models", headers=headers, timeout=5)
+        if r.status_code == 200:
+            models_data = r.json()
+            model_ids = [m.get("id") for m in models_data.get("data", [])]
+            result["litellm_models"] = model_ids
+            result["litellm_status"] = "ok"
+        else:
+            result["litellm_status"] = f"HTTP {r.status_code}"
+            result["litellm_models"] = []
+    except Exception as exc:
+        result["litellm_status"] = f"error: {exc}"
+        result["litellm_models"] = []
+
+    # 2. Statut des clés depuis Vault
+    if VAULT_ADDR and VAULT_TOKEN:
+        try:
+            r = _req.get(
+                f"{VAULT_ADDR}/v1/secret/data/neokube/llm-key-status",
+                headers={"X-Vault-Token": VAULT_TOKEN},
+                timeout=5,
+            )
+            if r.status_code == 200:
+                vault_data = r.json().get("data", {}).get("data", {})
+                result["llm_key_status"] = vault_data
+            else:
+                result["llm_key_status"] = {"vault_error": f"HTTP {r.status_code}"}
+        except Exception as exc:
+            result["llm_key_status"] = {"vault_error": str(exc)}
+    else:
+        result["llm_key_status"] = {"info": "VAULT_TOKEN non configuré — statut indisponible"}
+
+    # 3. Clés configurées (présence uniquement, jamais les valeurs)
+    result["configured_keys"] = {
+        "ANTHROPIC_API_KEY": bool(ANTHROPIC_API_KEY),
+        "MISTRAL_API_KEY":   bool(MISTRAL_API_KEY),
+        "LITELLM_KEY":       bool(LITELLM_KEY),
+    }
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Intent parser (JSON first, puis langage naturel)
 # ---------------------------------------------------------------------------
 
@@ -608,6 +673,9 @@ ACTIONS = {
     "context":               act_fetch_ux,
     "create_pricing_section": act_create_pricing_section,
     "pricing":               act_create_pricing_section,
+    "query_cluster_info":    act_query_cluster_info,
+    "cluster_info":          act_query_cluster_info,
+    "llm_status":            act_query_cluster_info,
 }
 
 # ---------------------------------------------------------------------------
@@ -615,21 +683,54 @@ ACTIONS = {
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """\
-Tu es le cerveau de NeoKube, l'orchestrateur de design IA.
-Tu as accès à des outils Penpot pour créer et modifier des designs directement dans Penpot (outil de design open-source).
+Tu es Admin-Sys, l'agent administrateur de NeoKube — orchestrateur de design IA ET expert infrastructure Kubernetes.
+Tu as accès à des outils Penpot pour créer et modifier des designs, ET à des outils d'infrastructure pour interroger le cluster.
 
 ## Contexte produit
-NeoKube est une plateforme DevOps cloud-native (Kubernetes, CI/CD, IaC Terraform).
+NeoKube est une plateforme DevOps cloud-native (Kubernetes K3s, CI/CD, IaC Terraform).
 Identité visuelle : moderne, dark mode, couleurs indigo/bleu nuit — palette principale : #0F172A (fond), #6366F1 (accent indigo), #F8FAFC (texte clair), #1E293B (carte/surface).
 
+## Infrastructure cluster NeoKube (source de vérité)
+### Clés API LLM
+Les clés API LLM sont stockées dans **HashiCorp Vault** à `secret/neokube/llm-api-keys` (source de vérité unique).
+Elles sont synchronisées vers des secrets Kubernetes dans le namespace `cockpit` :
+- `anthropic-secret` → clé Anthropic API (ANTHROPIC_API_KEY)
+- `openai-secret` → clé OpenAI API (OPENAI_API_KEY)
+- `cockpit-secrets` → clé Mistral API (MISTRAL_API_KEY)
+
+Un CronJob `llm-key-sync` (namespace `cockpit`) synchronise Vault → secrets K8s toutes les heures.
+Un CronJob `llm-key-validation` (namespace `cockpit`) valide les clés chaque jour à 06h30.
+
+### Modèles LLM disponibles via LiteLLM
+Le proxy LiteLLM est accessible à `http://litellm.cockpit.svc.cluster.local:4000`.
+Modèles configurés :
+- `claude-opus` → anthropic/claude-opus-4-6
+- `claude-sonnet` → anthropic/claude-sonnet-4-6
+- `gpt-4o` → openai/gpt-4o
+- `mistral` → mistral/mistral-large-latest (via Cloudflare Workers AI Gateway)
+- `codestral` → mistral/codestral-latest
+- `neokube-sre` → alias gpt-4o (agent SRE)
+- `leon` → modèle local
+
+Utilise `query_cluster_info` pour vérifier l'état actuel des modèles et des clés.
+
+### Agents actifs
+- **charlotte** (namespace `agent-system`) : agent SRE Temporal, surveille la santé du cluster toutes les 5 min
+- **neokube-sre** (namespace `open-webui`) : agent SRE interactif, modèle `gpt-4o` via LiteLLM
+- **admin-sys** (toi, namespace `open-webui`) : orchestrateur design + admin
+
+### Observabilité
+- **Langfuse** : `http://langfuse.cockpit.svc.cluster.local:3000` — traces LLM, scores, métriques
+- **Qdrant** : collection `sre-charlotte-incidents` — incidents vectorisés par Charlotte
+- **Vault** : `http://vault.vault.svc.cluster.local:8200` — secrets centralisés
+
 ## Règles de travail
-- Utilise TOUJOURS les outils disponibles pour toute action design concrète. Ne simule jamais une action.
-- Si tu as besoin d'un file_id ou page_id, commence par list_projects + resolve_project pour les obtenir.
-- Pour une section Pricing complète → create_pricing_section.
-- Pour un design from scratch → create_design.
-- Enchaîne les appels d'outils sans demander confirmation intermédiaire.
+- Utilise TOUJOURS les outils disponibles. Ne simule jamais une action.
+- Pour les questions sur les clés API ou modèles LLM → utilise `query_cluster_info` pour avoir l'état réel.
+- Pour les designs Penpot → commence par list_projects + resolve_project si besoin d'IDs.
+- Pour une section Pricing → create_pricing_section. Pour un design from scratch → create_design.
 - Réponds en français. Sois concis et professionnel.
-- Après execution, fournis un résumé : éléments créés, IDs, localisation dans Penpot.
+- Après exécution d'outil, fournis un résumé factuel basé sur le résultat réel de l'outil.
 """
 
 # ---------------------------------------------------------------------------
@@ -756,6 +857,19 @@ PENPOT_TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "query_cluster_info",
+        "description": (
+            "Interroge l'état réel de l'infrastructure NeoKube : modèles LLM disponibles via LiteLLM, "
+            "statut des clés API depuis Vault. À utiliser pour toute question sur les clés LLM, "
+            "les modèles disponibles ou la configuration du cluster."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
 ]
 
 PENPOT_TOOL_ACTIONS = {
@@ -768,6 +882,7 @@ PENPOT_TOOL_ACTIONS = {
     "create_design":          act_create_design,
     "fetch_ux":               act_fetch_ux,
     "create_pricing_section": act_create_pricing_section,
+    "query_cluster_info":     act_query_cluster_info,
 }
 
 # ---------------------------------------------------------------------------
@@ -787,7 +902,7 @@ class LLMManager:
     Pour activer Mistral : définir MISTRAL_API_KEY,  passer provider="mistral"
     """
 
-    SUPPORTED = ("anthropic", "openai", "ollama", "mistral", "huggingface")
+    SUPPORTED = ("litellm", "anthropic", "openai", "ollama", "mistral", "huggingface")
 
     def __init__(self) -> None:
         self._anthropic_client  = None  # lazy init
@@ -823,10 +938,13 @@ class LLMManager:
         }
         """
         log.info(f"[LLM] provider={provider}  model={model_name or 'default'}")
-        provider = (provider or "anthropic").lower()
+        provider = (provider or "litellm").lower()
         if provider not in self.SUPPORTED:
             raise ValueError(f"Provider inconnu : '{provider}'. Valides : {self.SUPPORTED}")
 
+        if provider == "litellm":
+            return self._call_litellm(messages, tools, system,
+                                      model_name or "gpt-4o", max_tokens)
         if provider == "anthropic":
             return self._call_anthropic(messages, tools, system,
                                         model_name or "claude-sonnet-4-5", max_tokens)
@@ -842,6 +960,70 @@ class LLMManager:
         # ollama
         return self._call_ollama(messages, tools, system,
                                  model_name or "llama3.1", max_tokens)
+
+    # ── LiteLLM proxy (OpenAI-compatible) ────────────────────────────────
+    def _call_litellm(self, messages, tools, system, model, max_tokens) -> dict:
+        """
+        Appelle LiteLLM proxy via l'API OpenAI-compatible.
+        Supporte tous les modèles configurés : claude-sonnet, gpt-4o, mistral…
+        """
+        # Convertir le system prompt en message système OpenAI
+        msgs = [{"role": "system", "content": system}] + list(messages)
+
+        # Convertir les tools Anthropic → format OpenAI functions
+        oai_tools = []
+        for t in (tools or []):
+            oai_tools.append({
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+                },
+            })
+
+        headers = {"Content-Type": "application/json"}
+        if LITELLM_KEY:
+            headers["Authorization"] = f"Bearer {LITELLM_KEY}"
+
+        payload: dict = {
+            "model": model,
+            "messages": msgs,
+            "max_tokens": max_tokens,
+            "temperature": 0.3,
+            "metadata": {
+                "agent": "admin-sys",
+                "tags": ["admin-sys", model, "design", "tool-call"],
+            },
+        }
+        if oai_tools:
+            payload["tools"] = oai_tools
+            payload["tool_choice"] = "auto"
+
+        resp = _req.post(
+            f"{LITELLM_URL}/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        choice = data["choices"][0]
+        msg = choice["message"]
+
+        # Extraire les tool_calls (format OpenAI → format Anthropic normalisé)
+        tool_uses = []
+        for tc in (msg.get("tool_calls") or []):
+            fn = tc.get("function", {})
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+            except Exception:
+                args = {}
+            tool_uses.append({"id": tc.get("id", ""), "name": fn.get("name", ""), "input": args})
+
+        text = (msg.get("content") or "").strip()
+        stop_reason = "tool_use" if tool_uses else "end_turn"
+        return {"stop_reason": stop_reason, "tool_uses": tool_uses, "text": text, "raw": data}
 
     # ── Anthropic ─────────────────────────────────────────────────────────
     def _call_anthropic(self, messages, tools, system, model, max_tokens) -> dict:
@@ -1000,18 +1182,36 @@ class LLMManager:
     def auto_detect_provider(self) -> str:
         """
         Détecte le premier provider disponible dans l'ordre de priorité :
-        anthropic → huggingface → mistral → ollama → none
+        litellm → anthropic → huggingface → mistral → ollama → none
+
+        LiteLLM est testé en premier car il regroupe tous les modèles (Claude, GPT-4o, Mistral).
         """
+        # 1. LiteLLM proxy (priorité absolue)
+        if LITELLM_URL:
+            try:
+                headers = {}
+                if LITELLM_KEY:
+                    headers["Authorization"] = f"Bearer {LITELLM_KEY}"
+                r = _req.get(f"{LITELLM_URL}/health/liveliness", headers=headers, timeout=3)
+                if r.status_code in (200, 401):  # 401 = up mais auth requise
+                    log.info("[AUTO] Provider : litellm")
+                    return "litellm"
+            except Exception as exc:
+                log.warning(f"[AUTO] LiteLLM inaccessible : {exc}")
+
+        # 2. Anthropic direct
         if os.getenv("ANTHROPIC_API_KEY", "").strip():
             log.info("[AUTO] Provider : anthropic")
             return "anthropic"
+        # 3. HuggingFace
         if os.getenv("HUGGINGFACE_API_KEY", "").strip():
             log.info("[AUTO] Provider : huggingface (Codestral-22B)")
             return "huggingface"
+        # 4. Mistral
         if os.getenv("MISTRAL_API_KEY", "").strip():
             log.info("[AUTO] Provider : mistral (Codestral)")
             return "mistral"
-        # Sonder Ollama — vérifie qu'il est up ET qu'au moins un modèle est chargé
+        # 5. Ollama — vérifie qu'il est up ET qu'au moins un modèle est chargé
         try:
             r = _req.get(f"{OLLAMA_URL}/api/tags", timeout=3)
             models = r.json().get("models", [])
@@ -1270,23 +1470,44 @@ def node_designer(state: GraphState) -> dict:
             log.info(f"[DESIGNER] ✓ Terminé en {iteration + 1} itération(s).")
             return _snapshot_state(current_file_id, iteration + 1, text)
 
-        conv.append({"role": "assistant", "content": result["raw"].content})
-
-        tool_results = []
-        for tu in tool_uses:
-            log.info(f"[TOOL] → {tu['name']}  {json.dumps(tu['input'], ensure_ascii=False)[:180]}")
-            handler = PENPOT_TOOL_ACTIONS.get(tu["name"])
-            try:
-                out = handler(tu["input"]) if handler else {"error": f"Outil inconnu : {tu['name']}"}
-            except Exception as exc:
-                out = {"error": str(exc)}
-            log.info(f"[TOOL] ← {tu['name']}  {json.dumps(out, ensure_ascii=False)[:250]}")
-            tool_results.append({
-                "type":        "tool_result",
-                "tool_use_id": tu["id"],
-                "content":     json.dumps(out, ensure_ascii=False),
-            })
-        conv.append({"role": "user", "content": tool_results})
+        # Anthropic format: raw.content is a list of content blocks
+        # LiteLLM/OpenAI format: raw is a dict with choices[0].message
+        raw = result["raw"]
+        if hasattr(raw, "content"):
+            # Anthropic SDK response object
+            conv.append({"role": "assistant", "content": raw.content})
+            tool_results = []
+            for tu in tool_uses:
+                log.info(f"[TOOL] → {tu['name']}  {json.dumps(tu['input'], ensure_ascii=False)[:180]}")
+                handler = PENPOT_TOOL_ACTIONS.get(tu["name"])
+                try:
+                    out = handler(tu["input"]) if handler else {"error": f"Outil inconnu : {tu['name']}"}
+                except Exception as exc:
+                    out = {"error": str(exc)}
+                log.info(f"[TOOL] ← {tu['name']}  {json.dumps(out, ensure_ascii=False)[:250]}")
+                tool_results.append({
+                    "type":        "tool_result",
+                    "tool_use_id": tu["id"],
+                    "content":     json.dumps(out, ensure_ascii=False),
+                })
+            conv.append({"role": "user", "content": tool_results})
+        else:
+            # OpenAI/LiteLLM format — tool results as tool messages
+            msg = raw["choices"][0]["message"]
+            conv.append({"role": "assistant", "content": msg.get("content"), "tool_calls": msg.get("tool_calls", [])})
+            for tu in tool_uses:
+                log.info(f"[TOOL] → {tu['name']}  {json.dumps(tu['input'], ensure_ascii=False)[:180]}")
+                handler = PENPOT_TOOL_ACTIONS.get(tu["name"])
+                try:
+                    out = handler(tu["input"]) if handler else {"error": f"Outil inconnu : {tu['name']}"}
+                except Exception as exc:
+                    out = {"error": str(exc)}
+                log.info(f"[TOOL] ← {tu['name']}  {json.dumps(out, ensure_ascii=False)[:250]}")
+                conv.append({
+                    "role":         "tool",
+                    "tool_call_id": tu["id"],
+                    "content":      json.dumps(out, ensure_ascii=False),
+                })
 
     log.warning("[DESIGNER] Max itérations (10) atteint.")
     if not current_file_id and state_store:
@@ -1526,14 +1747,16 @@ def health():
     return {
         "status":           "ok",
         "service":          "admin-sys-agent",
-        "version":          "3.2",
+        "version":          "3.5",
         "providers":        LLMManager.SUPPORTED,
         "active_provider":  auto_provider,
         "keys_configured":  {
             "anthropic":    bool(ANTHROPIC_API_KEY),
             "huggingface":  bool(HUGGINGFACE_API_KEY),
             "mistral":      bool(MISTRAL_API_KEY),
+            "litellm":      bool(LITELLM_URL),
         },
+        "litellm_url":      LITELLM_URL,
         "ollama_url":       OLLAMA_URL,
         "state_db":         GRAPH_DB_PATH,
         "state_store":      "sqlite" if state_store else "disabled",
