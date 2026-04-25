@@ -83,6 +83,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `security` | Vault (Helm), vault-unsealer |
 | `management` | CronJob cluster-bootstrap, backup |
 | `penpot` | Penpot |
+| `mindstudio-prod` | Dify v1.13.3 (agent builder studio) — accès `http://dify.neokube.local` |
 
 ### Politique LLM
 **100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
@@ -189,3 +190,4 @@ datasets==4.8.4
 | 2026-04-25 | Migration Vault `vault` → namespace `security` (Helm + données Raft copiées) ; vault-unsealer mis à jour |
 | 2026-04-25 | Ajout ttyd (terminal web) dans namespace `interfaces` — `tsl0922/ttyd:1.7.7`, ingress `ttyd.neokube.local` |
 | 2026-04-25 | Migration embedding Ollama → HuggingFace : suppression Ollama (`-8Gi RAM requests`) ; LiteLLM `nomic-embed-text` → `paraphrase-multilingual-mpnet-base-v2` via HF router gratuit (768 dims, multilingue) ; `HUGGINGFACE_API_KEY` ajouté dans `cockpit-secrets` |
+| 2026-04-25 | Déploiement Dify v1.13.3 dans namespace `mindstudio-prod` — 7 composants (postgres, redis, api, worker, web, nginx, plugin-daemon) ; fix permissions storage (initContainer chown UID 1001) ; ajout `dify-plugin-daemon:0.5.3-local` requis par Dify v1.x ; ingress `dify.neokube.local` uniquement |
