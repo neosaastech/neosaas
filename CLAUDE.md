@@ -70,6 +70,54 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 ---
 
+## Architecture cluster Kubernetes
+
+### Namespaces
+| Namespace | Contenu |
+|---|---|
+| `kube-system` | Traefik, Headlamp (UI) |
+| `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
+| `interfaces` | Open WebUI, admin-sys-agent, ttyd |
+| `agent-system` | Charlotte SRE, Leon, Temporal |
+| `rag-system` | Qdrant |
+| `security` | Vault (Helm), vault-unsealer |
+| `management` | CronJob cluster-bootstrap, backup |
+| `penpot` | Penpot |
+
+### Politique LLM
+**100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
+Les futurs modèles locaux seront hébergés sur machines externes et exposés via API.
+
+### Embeddings
+- **Modèle actif** : `paraphrase-multilingual-mpnet-base-v2` (sentence-transformers, 768 dims, multilingue)
+- **Provider** : HuggingFace Inference API (router.huggingface.co) — **gratuit**
+- **Alias LiteLLM** : `nomic-embed-text` (inchangé pour les agents)
+- **Secret** : `HUGGINGFACE_API_KEY` dans `cockpit-secrets`
+
+### Collections Qdrant
+| Collection | Dims | Points | Modèle |
+|---|---|---|---|
+| `neomnia_core` | 384 | 260 642 | paraphrase-multilingual-MiniLM-L12-v2 |
+| `sre-charlotte-incidents` | 768 | ~4 800 | paraphrase-multilingual-mpnet-base-v2 * |
+| `charlotte-conversations` | 768 | ~660 | paraphrase-multilingual-mpnet-base-v2 * |
+| `neokube-process-docs` | 768 | ~91 | paraphrase-multilingual-mpnet-base-v2 * |
+| `kubinote-brain` | 1536 | ~12 | OpenAI ada-002 |
+| `zoho-tasks` | 768 | 0 | — |
+
+*\* anciens vecteurs nomic-embed-text-v1 en cours de remplacement progressif*
+
+### Interfaces web
+| URL | Service |
+|---|---|
+| `http://headlamp.neokube.local` | Headlamp (dashboard K8s) |
+| `http://open-webui.neokube.local` | Open WebUI |
+| `http://ttyd.neokube.local` | Terminal web (bash) |
+| `http://litellm.neokube.local` | LiteLLM proxy |
+| `http://langfuse.neokube.local` | Langfuse (observabilité) |
+| `http://temporal.neokube.local` | Temporal UI |
+
+---
+
 ## Évaluation RAG — RAGAS + Langfuse
 
 ### Présentation
@@ -138,3 +186,6 @@ datasets==4.8.4
 | 2026-04-21 | Intégration RAGAS 0.4 + Langfuse — script `rag_eval.py` |
 | 2026-04-25 | Fix post-restart : recréation namespaces Temporal `sre-charlotte` + `zoho-integration` ; fix `llm-key-sync` (`python3` → `jq`) |
 | 2026-04-25 | Architecture persistence cluster : Temporal emptyDir → PVC `/projets/temporal` (5Gi) + namespaces dans flags `start-dev` ; namespace `management` formalisé dans GitOps ; CronJob `cluster-bootstrap` (*/5 min, idempotent) dans `apps/management/base/` ; règle P8 ajoutée au carnet de processus |
+| 2026-04-25 | Migration Vault `vault` → namespace `security` (Helm + données Raft copiées) ; vault-unsealer mis à jour |
+| 2026-04-25 | Ajout ttyd (terminal web) dans namespace `interfaces` — `tsl0922/ttyd:1.7.7`, ingress `ttyd.neokube.local` |
+| 2026-04-25 | Migration embedding Ollama → HuggingFace : suppression Ollama (`-8Gi RAM requests`) ; LiteLLM `nomic-embed-text` → `paraphrase-multilingual-mpnet-base-v2` via HF router gratuit (768 dims, multilingue) ; `HUGGINGFACE_API_KEY` ajouté dans `cockpit-secrets` |
