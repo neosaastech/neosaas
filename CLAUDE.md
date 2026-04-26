@@ -83,7 +83,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
 | `agent-system` | Charlotte SRE, Leon, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (stub, port 8001), vercel-connector (stub, port 8002) |
+| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -191,7 +191,7 @@ Brief (Slack #produit / Open WebUI)
 |---|---|---|
 | **Phase 0** | RBAC Charlotte réduit, AgentSpec Leon v2.0 | ✅ Terminé 2026-04-26 |
 | **Phase 1** | Namespace `connector-system` + zoho-connector (complet) + stubs github/vercel | ✅ Terminé 2026-04-26 |
-| **Phase 1b** | Leon : migration activités Temporal Zoho → zoho-connector ; github-connector + vercel-connector complets | Planifié |
+| **Phase 1b** | Leon : migration activités Temporal Zoho → zoho-connector ; github-connector + vercel-connector complets ; Leon sans secrets directs Zoho/GitHub/Vercel | ✅ Terminé 2026-04-26 |
 | **Phase 2** | Sidecars `tool-validator` + `output-guard` sur Charlotte et Leon | ✅ Terminé 2026-04-26 |
 | **Phase 3** | `neon-connector` (pgBouncer) | Planifié |
 
@@ -317,3 +317,4 @@ datasets==4.8.4
 | 2026-04-26 | **Phase 0** : suppression `ClusterRoleBinding agent-sre-cluster-admin` ; `agent-sre-role` restreint ; AgentSpec charlotte v2.5 ; AgentSpec leon v2.0 (Chef de Projet, `forbidden_actions`, `output_schema` ProjectSpec) |
 | 2026-04-26 | **Phase 2** : sidecars `tool-validator` (port 8090) + `output-guard` (port 8091) sur Charlotte et Leon ; `configmap-agent-policies` (allowlist 10 outils Leon, 26 forbidden) ; hooks dans `_execute_tool` + `run_agent` + `_mission_execute_tool` + `POST /mission` |
 | 2026-04-26 | **Phase 1** : namespace `connector-system` ; `zoho-connector` complet (OAuth2 Vault + proxy `/proxy`) ; stubs `github-connector` + `vercel-connector` ; Charlotte migrée (`_zoho_api` → zoho-connector) |
+| 2026-04-26 | **Phase 1b** : `github-connector` v1.0 (proxy GitHub REST API, token `GITHUB_TOKEN` depuis `github-connector-secrets`) ; `vercel-connector` v1.0 (proxy Vercel API, `VERCEL_TOKEN` + `VERCEL_TEAM_ID` depuis `vercel-connector-secrets`, teamId injecté auto) ; Leon — toutes les activités Zoho/GitHub/Vercel migrées vers leurs connecteurs respectifs ; `leon_zoho_refresh_token` → no-op ; deployment Leon nettoyé (secrets Zoho/GitHub/Vercel directs supprimés, URLs connectors en env) |
