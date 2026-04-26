@@ -83,6 +83,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
 | `agent-system` | Charlotte SRE, Leon, Temporal, zoho-discovery, zoho-observer |
+| `connector-system` | **Planifié Phase 1** — zoho-connector, github-connector, vercel-connector |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -148,6 +149,50 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `neokube-nightly-backup` | management | `0 3 * * *` (Europe/Paris) | Sauvegarde nightly |
 | `llm-key-sync` | cockpit | `0 * * * *` | Sync clés LLM Vault → K8s secrets → restart LiteLLM/Langfuse si changement |
 | `llm-key-validation` | cockpit | `30 6 * * *` | Valide les clés LLM |
+
+---
+
+## Architecture agents
+
+### Rôles et périmètres
+
+| Agent | Rôle | Runtime | RBAC | Status |
+|---|---|---|---|---|
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | `agent-sre-role` (restreint) | active v2.5 |
+| **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho | Temporal | read-only `agent-system` | active v2.0 |
+| **admin-sys** | Penpot sidecar (outil appelé par Charlotte) | FastAPI | read-only `open-webui` | deprecated v3.5 |
+| **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | active v1.0 |
+
+### Flux Leon → Charlotte (ProjectSpec)
+
+```
+Brief (Slack #produit / Open WebUI)
+  → Leon : dialogue de clarification (max 10 tours)
+  → Leon : produit ProjectSpec JSON (11 champs validés)
+  → Signal Temporal "project_spec_received" → Charlotte
+  → Leon : crée tâches dans Zoho Projects
+  → Charlotte : déclenche SREProvisionWorkflow si infra requise
+```
+
+**Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec (enforcement par tool-validator en Phase 2).
+
+### RBAC agents (état 2026-04-26)
+
+| Agent | ServiceAccount | ClusterRole effectif |
+|---|---|---|
+| Charlotte | `agent-sre-sa` (agent-system) | `agent-sre-role` — lecture + remédiation, secrets read-only |
+| Leon | `leon-sa` (agent-system) | RoleBinding non appliqué (pod à 0 réplicas) |
+
+**Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
+
+### Roadmap sécurité agents
+
+| Phase | Contenu | État |
+|---|---|---|
+| **Phase 0** | RBAC Charlotte réduit, AgentSpec Leon v2.0 | ✅ Terminé 2026-04-26 |
+| **Phase 1** | Namespace `connector-system` — zoho-connector, github-connector, vercel-connector | Planifié |
+| **Phase 2** | Sidecars `tool-validator` + `output-guard` sur Charlotte et Leon | Planifié |
+| **Phase 3** | `neon-connector` (pgBouncer) | Planifié |
 
 ---
 
@@ -268,3 +313,4 @@ datasets==4.8.4
 | 2026-04-25 | Ajout ttyd (terminal web) dans namespace `interfaces` — `tsl0922/ttyd:1.7.7`, ingress `ttyd.neokube.local` |
 | 2026-04-25 | Migration embedding Ollama → HuggingFace : suppression Ollama (`-8Gi RAM requests`) ; LiteLLM `nomic-embed-text` → `paraphrase-multilingual-mpnet-base-v2` via HF router gratuit (768 dims, multilingue) ; `HUGGINGFACE_API_KEY` ajouté dans `cockpit-secrets` |
 | 2026-04-25 | Déploiement Dify v1.13.3 dans namespace `mindstudio-prod` — 7 composants dont `dify-plugin-daemon:0.5.3-local` (requis Dify v1.x) ; fix permissions storage (initContainer chown UID 1001) ; DB `dify_plugin` créée ; ingress `dify.neokube.local` uniquement |
+| 2026-04-26 | **Phase 0 sécurité agents** : suppression `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`) ; `agent-sre-role` restreint (secrets read-only, RBAC read-only) ; AgentSpec charlotte v2.5 ; AgentSpec leon v2.0 (Chef de Projet, `forbidden_actions`, `output_schema` ProjectSpec, RBAC read-only) |
