@@ -181,9 +181,32 @@ Brief (Slack #produit / Open WebUI)
 | Agent | ServiceAccount | ClusterRole effectif |
 |---|---|---|
 | Charlotte | `agent-sre-sa` (agent-system) | `agent-sre-role` — lecture + remédiation, secrets read-only |
-| Leon | `leon-sa` (agent-system) | RoleBinding non appliqué (pod à 0 réplicas) |
+| Leon | `leon-sa` (agent-system) | read-only `agent-system` (get/list/watch pods, services, deployments) |
 
 **Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
+
+### Connector-system — architecture (état 2026-04-26)
+
+Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lisent leurs credentials depuis **Vault** via le secret K8s `vault-root-token` (copié depuis `vault-init-keys` dans `security`).
+
+| Connector | Port | Vault path | Clés |
+|---|---|---|---|
+| `zoho-connector` | 8000 | `secret/neokube/infrastructure/zoho` | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNTS_SERVER`, `ZOHO_PORTAL_ID` |
+| `github-connector` | 8001 | `secret/neokube/infrastructure/github` | `GITHUB_TOKEN` |
+| `vercel-connector` | 8002 | `secret/neokube/infrastructure/vercel` | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` |
+| `neon-connector` | 8003 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` |
+
+**Endpoints exposés** :
+- Tous : `GET /health`, `POST /proxy {method, path, params?, body?/data?}`
+- neon-connector uniquement : `POST /query {project_id, sql, database?, role_name?}`
+- vercel-connector : injecte automatiquement `teamId` dans les params
+
+**Note** : `vault-root-token` doit exister dans `connector-system` — recréer si besoin :
+```bash
+kubectl create secret generic vault-root-token -n connector-system \
+  --from-literal=root-token=$(kubectl get secret vault-init-keys -n security \
+    -o jsonpath='{.data.root-token}' | base64 -d)
+```
 
 ### Roadmap sécurité agents
 
