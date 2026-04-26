@@ -218,6 +218,24 @@ kubectl create secret generic vault-root-token -n connector-system \
 | **Phase 2** | Sidecars `tool-validator` + `output-guard` sur Charlotte et Leon | ✅ Terminé 2026-04-26 |
 | **Phase 3** | `neon-connector` (proxy Neon API + endpoint `/query` asyncpg) ; Leon sans secrets Neon directs | ✅ Terminé 2026-04-26 |
 
+### Roadmap capacités agents (Phase 4+)
+
+> Vérification doublons effectuée le 2026-04-26 : `sre_provision_agent` et `sre_decommission_agent` sont implémentés
+> (`ProvisionAgentWorkflow` L2778 + `DecommissionAgentWorkflow` L2884 dans `configmap-sre-script.yaml`).
+> `ProjectSpec` est défini dans `apps/agent-catalog/leon.yaml` `output_schema` (11 champs).
+
+| Phase | Contenu | Prérequis | État |
+|---|---|---|---|
+| **Phase 4a** | DT-005 : gate `_qdrant_read_before_action()` dans `sre_apply_remediation` (Charlotte lit Qdrant avant d'agir) | — | ⬜ À faire |
+| **Phase 4b** | `sre_agent_health_matrix` — activité Charlotte : matrice santé multi-agents (CPU/RAM/probes/Temporal) | — | ⬜ À faire |
+| **Phase 4c** | Charlotte → zoho-connector : ajouter `ZOHO_CONNECTOR_URL` dans `deployment-charlotte.yaml` + allowlist tool-validator | — | ⬜ À faire |
+| **Phase 5** | Dispatcher `DevProjectWorkflow` : `LeonPlanActivity` → `AriaBuildActivity` + `NoxBuildActivity` (parallèle) → `VeraReviewActivity` → `DeployActivity` | Agents Aria/Nox/Vera définis + canal approbation humaine | ⬜ Bloqué |
+| **Phase 5 — prérequis** | Définir AgentSpec + K8s manifests pour Aria (frontend), Nox (backend), Vera (QA) — RBAC, ServiceAccount, connector access | Décision architecture dispatcher (pod dédié vs. Charlotte) | ⬜ À décider |
+| **Phase 5 — prérequis** | Canal approbation humaine pour `DeployActivity` (signal Temporal + webhook Slack ou Notion) | — | ⬜ À faire |
+| **Phase 5b** | Collections Qdrant : `pm-decisions` (Leon), `front-specs` (Aria), `api-contracts` (Nox), `qa-reports` (Vera) — 768 dims, `nomic-embed-text` | Agents Phase 5 déployés | ⬜ Bloqué |
+
+**Note R3 / max_tokens_per_run** : ces items sont introuvables dans le dépôt GitOps. S'ils proviennent d'un document Notion ou externe, les localiser avant d'implémenter.
+
 ---
 
 ## Dify v1.13.3 — Agent Builder Studio
@@ -343,3 +361,4 @@ datasets==4.8.4
 | 2026-04-26 | **Phase 1b** : `github-connector` v1.0 (proxy GitHub REST API, token `GITHUB_TOKEN` depuis `github-connector-secrets`) ; `vercel-connector` v1.0 (proxy Vercel API, `VERCEL_TOKEN` + `VERCEL_TEAM_ID` depuis `vercel-connector-secrets`, teamId injecté auto) ; Leon — toutes les activités Zoho/GitHub/Vercel migrées vers leurs connecteurs respectifs ; `leon_zoho_refresh_token` → no-op ; deployment Leon nettoyé (secrets Zoho/GitHub/Vercel directs supprimés, URLs connectors en env) |
 | 2026-04-26 | **Vault fix** : tous les connectors lisent depuis Vault (secret `vault-root-token` créé dans `connector-system`) ; `secret/neokube/infrastructure/{github,vercel,neon}` créés depuis les K8s secrets existants |
 | 2026-04-26 | **Phase 3** : `neon-connector` v1.0 (port 8003) — proxy Neon Management API (`/proxy`) + exécution SQL via asyncpg (`/query`) ; Leon — 5 activités Neon migrées ; secrets `leon-neon-secrets` directs supprimés du deployment |
+| 2026-04-26 | **Audit roadmap** : vérification doublons — `sre_provision_agent` + `sre_decommission_agent` déjà implémentés (ProvisionAgentWorkflow/DecommissionAgentWorkflow) ; ProjectSpec déjà défini dans leon.yaml ; agent-registry v1.3 (charlotte 2.5, leon 2.0) ; 4 collections Qdrant Phase 5 ajoutées (statut `planned`) ; charlotte.yaml : shared_secrets Zoho supprimés → connector déclaré ; leon.yaml : optional_keys nettoyés (Phase 1b/3 terminées) |
