@@ -88,7 +88,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
 | `penpot` | Penpot (design) |
-| `mindstudio-prod` | Dify v1.13.3 (agent builder studio) — accès `http://dify.neokube.local` |
+| `dify` | Dify v1.13.3 (agent builder studio) — accès `http://dify.neokube.local` |
 
 ### Politique LLM
 **100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
@@ -132,9 +132,9 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 |---|---|---|---|
 | `agent-temporal-pv` | 5 Gi | `/projets/temporal` | agent-system |
 | `charlotte-state-pv` | 1 Gi | — | agent-system |
-| `dify-postgres-pv` | 5 Gi | `/var/lib/dify/postgres` | mindstudio-prod |
-| `dify-storage-pv` | 10 Gi | `/var/lib/dify/storage` | mindstudio-prod |
-| `dify-plugins-pv` | 5 Gi | `/var/lib/dify/plugins` | mindstudio-prod |
+| `dify-postgres-pv` | 5 Gi | `/var/lib/dify/postgres` | dify |
+| `dify-storage-pv` | 10 Gi | `/var/lib/dify/storage` | dify |
+| `dify-plugins-pv` | 5 Gi | `/var/lib/dify/plugins` | dify |
 | `interfaces-data-pv` | 5 Gi | — | interfaces |
 | `langfuse-postgres-pv` | 5 Gi | — | cockpit |
 | `penpot-assets-pv` | 10 Gi | — | penpot |
@@ -160,8 +160,34 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 |---|---|---|---|---|
 | **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | `agent-sre-role` (restreint) | active v2.5 |
 | **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho | Temporal | read-only `agent-system` | active v2.0 |
-| **admin-sys** | Penpot sidecar (outil appelé par Charlotte) | FastAPI | read-only `open-webui` | deprecated v3.5 |
+| **admin-sys** | K8s executor — exécute les commandes kubectl déléguées par Charlotte | FastAPI | `admin-sys-executor` (mutations cluster) | active v4.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | active v1.0 |
+
+### Principe d'exécution K8s (Phase 7)
+
+```
+Toi (Slack / Open WebUI)
+        ↓ ordre admin
+  Charlotte SRE  (décide, planifie)
+        ↓ POST /execute ou /apply
+    admin-sys pod  (valide, exécute kubectl avec son propre SA)
+        ↓
+   Actions K8s / cluster
+```
+
+**Règle de fallback — Charlotte ne perd jamais la visibilité :**
+
+| Type de commande | admin-sys UP | admin-sys KO |
+|---|---|---|
+| `get`, `logs`, `describe`, `top`, `events` | via admin-sys | fallback local silencieux (warning dans logs) |
+| `patch`, `apply`, `delete`, `rollout`, `create` | via admin-sys | erreur explicite — Charlotte ne mute pas sans admin-sys |
+
+**admin-sys v4.0** (`interfaces` namespace, port 8000) :
+- `GET /health`
+- `POST /execute {args: [...], timeout?: int}` — exécute kubectl, FORBIDDEN: exec/cp/port-forward/proxy
+- `POST /apply {manifest: str, namespace?: str}` — kubectl apply -f -
+- ClusterRole `admin-sys-executor` : lecture universelle + mutations workloads/config/RBAC/batch
+- GitOps : `apps/interfaces/base/configmap-admin-sys-script.yaml` + `rbac-admin-sys-executor.yaml`
 
 ### Flux Leon → Charlotte (ProjectSpec)
 
@@ -176,14 +202,16 @@ Brief (Slack #produit / Open WebUI)
 
 **Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec (enforcement par tool-validator en Phase 2).
 
-### RBAC agents (état 2026-04-26)
+### RBAC agents (état 2026-04-27)
 
 | Agent | ServiceAccount | ClusterRole effectif |
 |---|---|---|
 | Charlotte | `agent-sre-sa` (agent-system) | `agent-sre-role` — lecture + remédiation, secrets read-only |
 | Leon | `leon-sa` (agent-system) | read-only `agent-system` (get/list/watch pods, services, deployments) |
+| admin-sys | `admin-sys-agent` (interfaces) | `admin-sys-executor` — lecture universelle + mutations workloads/config/RBAC/batch/namespaces |
 
 **Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
+**Ajouté le 2026-04-27** : `ClusterRole admin-sys-executor` + binding sur `admin-sys-agent` SA.
 
 ### Connector-system — architecture (état 2026-04-26)
 
@@ -229,10 +257,10 @@ kubectl create secret generic vault-root-token -n connector-system \
 | **Phase 4a** | DT-005 : gate `sre_qdrant_check_prior_remediation` avant `sre_apply_remediation` + `sre_vectorize_remediation_outcome` pour alimenter la mémoire | — | ✅ Terminé 2026-04-26 |
 | **Phase 4b** | `sre_agent_health_matrix` — snapshot pod/CPU/RAM/probe par agent actif (registre K8s) ; SREScanWorkflow étape 8 ; endpoint `GET /agents/health` | — | ✅ Terminé 2026-04-26 |
 | **Phase 4c** | Charlotte → zoho-connector : `ZOHO_CONNECTOR_URL` dans deployment + charlotte-config ; `known_tools` documenté dans agent-policies (`allowed=null` conservé) | — | ✅ Terminé 2026-04-26 |
-| **Phase 5** | Dispatcher `DevProjectWorkflow` : `LeonPlanActivity` → `AriaBuildActivity` + `NoxBuildActivity` (parallèle) → `VeraReviewActivity` → `DeployActivity` | Agents Aria/Nox/Vera définis + canal approbation humaine | ⬜ Bloqué |
-| **Phase 5 — prérequis** | Définir AgentSpec + K8s manifests pour Aria (frontend), Nox (backend), Vera (QA) — RBAC, ServiceAccount, connector access | Décision architecture dispatcher (pod dédié vs. Charlotte) | ⬜ À décider |
-| **Phase 5 — prérequis** | Canal approbation humaine pour `DeployActivity` (signal Temporal + webhook Slack ou Notion) | — | ⬜ À faire |
-| **Phase 5b** | Collections Qdrant : `pm-decisions` (Leon), `front-specs` (Aria), `api-contracts` (Nox), `qa-reports` (Vera) — 768 dims, `nomic-embed-text` | Agents Phase 5 déployés | ⬜ Bloqué |
+| **Phase 5** | Dispatcher `DevProjectWorkflow` : Leon→Aria+Nox (parallèle)→Vera→approbation humaine (24h)→deploy. Pod dédié `dispatcher` port 8484, Temporal namespace `dispatcher`. | — | ✅ Terminé 2026-04-27 |
+| **Phase 5b** | Collections Qdrant `pm-decisions`/`front-specs`/`api-contracts`/`qa-reports` — 768 dims, auto-créées par Dispatcher au démarrage | Phase 5 déployée | ✅ Terminé 2026-04-27 |
+| **Phase 6** | Pods dédiés Aria (8485/aria-queue), Nox (8486/nox-queue), Vera (8487/vera-queue) — scripts dédiés, ServiceAccounts, task_queue séparées dans DevProjectWorkflow | — | ✅ Terminé 2026-04-27 |
+| **Phase 7** | admin-sys promu K8s executor v4.0 ; Charlotte `_kubectl()` routée via `POST /execute` admin-sys ; fallback local read-only si admin-sys KO ; `ClusterRole admin-sys-executor` en GitOps | — | ✅ Terminé 2026-04-27 |
 
 **Note R3 / max_tokens_per_run** : ces items sont introuvables dans le dépôt GitOps. S'ils proviennent d'un document Notion ou externe, les localiser avant d'implémenter.
 
@@ -240,9 +268,9 @@ kubectl create secret generic vault-root-token -n connector-system \
 
 ## Dify v1.13.3 — Agent Builder Studio
 
-**Namespace** : `mindstudio-prod`
+**Namespace** : `dify`
 **Accès** : `http://dify.neokube.local`
-**GitOps** : `~/Kubinote-GitOps/apps/mindstudio-prod/base/`
+**GitOps** : `~/Kubinote-GitOps/apps/dify/base/`
 
 ### Composants (7 pods)
 | Déploiement | Image | Rôle |
@@ -354,7 +382,7 @@ datasets==4.8.4
 | 2026-04-25 | Migration Vault `vault` → namespace `security` (Helm + données Raft copiées) ; vault-unsealer mis à jour |
 | 2026-04-25 | Ajout ttyd (terminal web) dans namespace `interfaces` — `tsl0922/ttyd:1.7.7`, ingress `ttyd.neokube.local` |
 | 2026-04-25 | Migration embedding Ollama → HuggingFace : suppression Ollama (`-8Gi RAM requests`) ; LiteLLM `nomic-embed-text` → `paraphrase-multilingual-mpnet-base-v2` via HF router gratuit (768 dims, multilingue) ; `HUGGINGFACE_API_KEY` ajouté dans `cockpit-secrets` |
-| 2026-04-25 | Déploiement Dify v1.13.3 dans namespace `mindstudio-prod` — 7 composants dont `dify-plugin-daemon:0.5.3-local` (requis Dify v1.x) ; fix permissions storage (initContainer chown UID 1001) ; DB `dify_plugin` créée ; ingress `dify.neokube.local` uniquement |
+| 2026-04-25 | Déploiement Dify v1.13.3 dans namespace `dify` — 7 composants dont `dify-plugin-daemon:0.5.3-local` (requis Dify v1.x) ; fix permissions storage (initContainer chown UID 1001) ; DB `dify_plugin` créée ; ingress `dify.neokube.local` uniquement |
 | 2026-04-26 | **Phase 0** : suppression `ClusterRoleBinding agent-sre-cluster-admin` ; `agent-sre-role` restreint ; AgentSpec charlotte v2.5 ; AgentSpec leon v2.0 (Chef de Projet, `forbidden_actions`, `output_schema` ProjectSpec) |
 | 2026-04-26 | **Phase 2** : sidecars `tool-validator` (port 8090) + `output-guard` (port 8091) sur Charlotte et Leon ; `configmap-agent-policies` (allowlist 10 outils Leon, 26 forbidden) ; hooks dans `_execute_tool` + `run_agent` + `_mission_execute_tool` + `POST /mission` |
 | 2026-04-26 | **Phase 1** : namespace `connector-system` ; `zoho-connector` complet (OAuth2 Vault + proxy `/proxy`) ; stubs `github-connector` + `vercel-connector` ; Charlotte migrée (`_zoho_api` → zoho-connector) |
@@ -365,3 +393,10 @@ datasets==4.8.4
 | 2026-04-26 | **Phase 4b** : `sre_agent_health_matrix` — snapshot pod/CPU(top)/RAM/probe HTTP par agent actif du registre ; fallback GitOps si K8s indisponible ; SREScanWorkflow étape 8 (`agent_matrix` dans report) ; endpoint `GET /agents/health` ajouté |
 | 2026-04-26 | **Phase 4a — DT-005** : `sre_qdrant_check_prior_remediation` (scroll exact + sémantique sur `remediation_outcome`) gate le loop drifts dans `SREScanWorkflow` — action ESCALATE si `failed_before` ; `sre_vectorize_remediation_outcome` écrit chaque PATCH/PATCH_FAILED en retour dans Qdrant pour alimenter les cycles suivants |
 | 2026-04-26 | **Audit roadmap** : vérification doublons — `sre_provision_agent` + `sre_decommission_agent` déjà implémentés (ProvisionAgentWorkflow/DecommissionAgentWorkflow) ; ProjectSpec déjà défini dans leon.yaml ; agent-registry v1.3 (charlotte 2.5, leon 2.0) ; 4 collections Qdrant Phase 5 ajoutées (statut `planned`) ; charlotte.yaml : shared_secrets Zoho supprimés → connector déclaré ; leon.yaml : optional_keys nettoyés (Phase 1b/3 terminées) |
+| 2026-04-27 | **Phase 5** : Dispatcher v1.0 déployé — `configmap-dispatcher-script.yaml` (DevProjectWorkflow + 7 activités : validate/aria_build/nox_build/vera_review/notify_approval/deploy/write_pm_decisions) ; pod `dispatcher` port 8484, namespace Temporal `dispatcher` ; sidecars tool-validator + output-guard ; AgentSpecs Aria/Nox/Vera + dispatcher créées ; registre v1.4 ; 4 collections Qdrant `active` |
+| 2026-04-27 | **Phase 6** : Aria/Nox/Vera découplés en pods dédiés — scripts `configmap-aria-script.yaml` / `configmap-nox-script.yaml` / `configmap-vera-script.yaml` ; deployments + services + serviceaccounts dédiés (ports 8485/8486/8487) ; task_queues séparées (`aria-queue`/`nox-queue`/`vera-queue`) dans DevProjectWorkflow ; dispatcher-script.yaml mis à jour (ARIA/NOX/VERA_QUEUE env vars + task_queue dans execute_activity) ; policies Aria/Nox/Vera ajoutées ; registre v1.5 (health_url + task_queue par agent) ; bug fix deployment `dispatcher_agent.py` → `dispatcher.py` |
+| 2026-04-27 | **fix(leon)** : `dispatch_project` tool ajouté — Leon → `POST /trigger` Dispatcher avec ProjectSpec 11 champs ; `DISPATCHER_URL` dans leon-config + leon-script ; `new_project` marqué [LEGACY] ; pipeline Leon → Dispatcher désormais fonctionnel |
+| 2026-04-27 | **fix(backup)** : `dump-mongodb` init container supprimé — MongoDB retiré du cluster, le `set -e` bloquait tout le job nightly ; TIMESTAMP déplacé dans le container upload ; backup vérifié OK (Penpot+OpenWebUI+Qdrant+GitOps) |
+| 2026-04-27 | **fix(charlotte/git)** : `git_status` corrigé — fetch `origin/main` + `log origin/main..HEAD` pour exposer les commits non pushés (Charlotte disait "à jour" avec 23 commits locaux en attente) ; `_git_pull()` : `fetch --depth=20 + reset --hard` → `fetch + rebase` (préserve les commits locaux non pushés) ; 27 commits pushés vers `neomnia/Kubinote-GitOps` |
+| 2026-04-27 | **fix(namespaces)** : `open-webui` namespace vide supprimé (doublon de `interfaces`) + retiré de la kustomization pour éviter la recréation automatique ; PVs `dify-*` en état `Released` (claimRef `mindstudio-prod`) récupérés via patch + rebind vers namespace `dify` ; 7 pods Dify Running |
+| 2026-04-27 | **Phase 7** : admin-sys promu K8s executor v4.0 — nouveau script FastAPI (`/execute`, `/apply`) remplace `penpot-sidecar:v3.5` ; `ClusterRole admin-sys-executor` (lecture universelle + mutations workloads/config/RBAC/batch) ; Charlotte `_kubectl()` route via `POST admin-sys/execute` : mutations obligatoires via admin-sys, read-only avec fallback local si admin-sys KO ; `ADMIN_SYS_URL` dans charlotte-config |
