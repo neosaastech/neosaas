@@ -145,10 +145,25 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 ### CronJobs cluster
 | CronJob | Namespace | Schedule | Rôle |
 |---|---|---|---|
-| `cluster-bootstrap` | management | `*/5 * * * *` | Applique GitOps (idempotent) |
+| `cluster-bootstrap` | management | `*/5 * * * *` | Applique GitOps + s'assure que les 7 namespaces Temporal existent (idempotent) |
 | `neokube-nightly-backup` | management | `0 3 * * *` (Europe/Paris) | Sauvegarde nightly |
 | `llm-key-sync` | cockpit | `0 * * * *` | Sync clés LLM Vault → K8s secrets → restart LiteLLM/Langfuse si changement |
 | `llm-key-validation` | cockpit | `30 6 * * *` | Valide les clés LLM |
+| `dify-bootstrap` | dify | `0 4 1 1 *` | Bootstrap Dify annuel (migrations one-shot) |
+
+### Namespaces Temporal (état 2026-04-27)
+| Namespace | Agent | Retention |
+|---|---|---|
+| `sre-charlotte` | Charlotte SRE | 7j |
+| `zoho-integration` | zoho-observer | 7j |
+| `dispatcher` | Dispatcher, Aria, Nox, Vera | 7j |
+| `leon` | Leon | 7j |
+| `aria` | Aria (réservé — task_queue=aria-queue dans dispatcher ns) | 7j |
+| `nox` | Nox (réservé) | 7j |
+| `vera` | Vera (réservé) | 7j |
+| `default` | Temporal interne | — |
+| `agent-system` | Legacy | — |
+| `temporal-system` | Temporal interne | — |
 
 ---
 
@@ -236,10 +251,16 @@ ProjectSpec validé par Dispatcher
 |---|---|---|
 | Charlotte | `agent-sre-sa` (agent-system) | `agent-sre-role` — lecture + remédiation, secrets read-only |
 | Leon | `leon-sa` (agent-system) | read-only `agent-system` (get/list/watch pods, services, deployments) |
+| Dispatcher | `dispatcher-sa` (agent-system) | **aucun binding** — pas d'accès K8s |
+| Aria | `aria-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
+| Nox | `nox-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
+| Vera | `vera-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
 | admin-sys | `admin-sys-agent` (interfaces) | `admin-sys-executor` — lecture universelle + mutations workloads/config/RBAC/batch/namespaces |
 
 **Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
 **Ajouté le 2026-04-27** : `ClusterRole admin-sys-executor` + binding sur `admin-sys-agent` SA.
+
+**Posture sécurité Aria/Nox/Vera/Dispatcher** : pas de kubectl installé dans les pods, pas de ClusterRoleBinding, toutes les opérations infrastructure passent par les connectors (github/neon/vercel) via token Vault. Seule Charlotte peut agir sur le cluster, via admin-sys uniquement (token `X-Admin-Sys-Token`).
 
 ### Connector-system — architecture (état 2026-04-27)
 
@@ -269,6 +290,15 @@ Projets Neon disponibles (pg17, aws-eu-central-1) : NeoBridge, Neosaas-App, Cont
 kubectl create secret generic vault-root-token -n connector-system \
   --from-literal=root-token=$(kubectl get secret vault-init-keys -n security \
     -o jsonpath='{.data.root-token}' | base64 -d)
+```
+
+**Note** : `admin-sys-token` doit exister dans `interfaces` ET `agent-system` avec le même token — recréer si besoin (générer un nouveau token, redémarrer admin-sys + Charlotte) :
+```bash
+TOKEN=$(openssl rand -hex 32)
+kubectl create secret generic admin-sys-token -n interfaces --from-literal=token="$TOKEN" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic admin-sys-token -n agent-system --from-literal=token="$TOKEN" --dry-run=client -o yaml | kubectl apply -f -
+kubectl rollout restart deploy/admin-sys-agent -n interfaces
+kubectl rollout restart deploy/agent-charlotte -n agent-system
 ```
 
 ### Roadmap sécurité agents
