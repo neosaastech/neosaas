@@ -82,7 +82,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `kube-system` | Traefik, Headlamp (UI K8s), CoreDNS, metrics-server |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
-| `agent-system` | Charlotte SRE, Leon, Temporal, zoho-discovery, zoho-observer |
+| `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Temporal, zoho-discovery, zoho-observer |
 | `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
@@ -156,12 +156,16 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 
 ### Rôles et périmètres
 
-| Agent | Rôle | Runtime | RBAC | Status |
-|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | `agent-sre-role` (restreint) | active v2.5 |
-| **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho | Temporal | read-only `agent-system` | active v2.0 |
-| **admin-sys** | K8s executor — exécute les commandes kubectl déléguées par Charlotte | FastAPI | `admin-sys-executor` (mutations cluster) | active v4.0 |
-| **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | active v1.0 |
+| Agent | Rôle | Runtime | Port | Temporal NS | Status |
+|---|---|---|---|---|---|
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | 8383 | `sre-charlotte` | active v2.5 |
+| **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho, dispatch | Temporal | 8181 | `leon` | active v2.0 |
+| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox→Vera→approval→deploy | Temporal | 8484 | `dispatcher` | active v1.0 |
+| **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel project | Temporal | 8485 | `dispatcher` | active v1.0 |
+| **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
+| **Vera** | QA Reviewer — analyse spec + output Aria/Nox, rapport qualité | Temporal | 8487 | `dispatcher` | active v1.0 |
+| **admin-sys** | K8s executor — exécute les commandes kubectl déléguées par Charlotte | FastAPI | 8000 | — | active v4.0 |
+| **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
 ### Principe d'exécution K8s (Phase 7)
 
@@ -189,18 +193,41 @@ Toi (Slack / Open WebUI)
 - ClusterRole `admin-sys-executor` : lecture universelle + mutations workloads/config/RBAC/batch
 - GitOps : `apps/interfaces/base/configmap-admin-sys-script.yaml` + `rbac-admin-sys-executor.yaml`
 
-### Flux Leon → Charlotte (ProjectSpec)
+### DevProjectWorkflow — flux complet
 
 ```
 Brief (Slack #produit / Open WebUI)
   → Leon : dialogue de clarification (max 10 tours)
   → Leon : produit ProjectSpec JSON (11 champs validés)
-  → Signal Temporal "project_spec_received" → Charlotte
+  → Leon : dispatch_project → POST /trigger Dispatcher
   → Leon : crée tâches dans Zoho Projects
-  → Charlotte : déclenche SREProvisionWorkflow si infra requise
+  ──────────────────────────────────────────────────────
+  → Dispatcher : validate_spec (tous les champs obligatoires)
+  → Dispatcher : [PARALLEL]
+      Aria : GitHub repo (template-nextjs) + Vercel project
+      Nox  : GitHub repo (template-fastapi) + Neon branch (NeoBridge)
+  → Vera : vera_review (analyse spec + output Aria/Nox)
+  → Dispatcher : notify_approval (signal humain attendu 24h)
+  → [Approbation humaine]
+  → Dispatcher : deploy (rollout final)
+  → Dispatcher : write_pm_decisions (Qdrant pm-decisions)
 ```
 
-**Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec (enforcement par tool-validator en Phase 2).
+**Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec (enforcement par tool-validator, Phase 2).
+
+**GitHub templates utilisés** :
+- `neomnia/template-nextjs` — Next.js 15, TypeScript, Tailwind, App Router
+- `neomnia/template-fastapi` — FastAPI + asyncpg + Dockerfile + `.env.example`
+
+**Neon — contrainte org** : `POST /projects` bloqué (org managed by Vercel). Nox utilise le projet existant **NeoBridge** (`young-fog-76038471`) et crée une branche dédiée par projet (`POST /projects/{id}/branches`). Résultat : `neon_branch_id` + `neon_endpoint_host`.
+
+### Flux Leon → Charlotte (SRE)
+
+```
+ProjectSpec validé par Dispatcher
+  → Charlotte : reçoit signal "project_spec_received"
+  → Charlotte : déclenche SREProvisionWorkflow si infra requise
+```
 
 ### RBAC agents (état 2026-04-27)
 
@@ -213,7 +240,7 @@ Brief (Slack #produit / Open WebUI)
 **Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
 **Ajouté le 2026-04-27** : `ClusterRole admin-sys-executor` + binding sur `admin-sys-agent` SA.
 
-### Connector-system — architecture (état 2026-04-26)
+### Connector-system — architecture (état 2026-04-27)
 
 Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lisent leurs credentials depuis **Vault** via le secret K8s `vault-root-token` (copié depuis `vault-init-keys` dans `security`).
 
@@ -228,6 +255,13 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 - Tous : `GET /health`, `POST /proxy {method, path, params?, body?/data?}`
 - neon-connector uniquement : `POST /query {project_id, sql, database?, role_name?}`
 - vercel-connector : injecte automatiquement `teamId` dans les params
+
+**Contrainte Neon** : `POST /projects` est bloqué (organisation managed by Vercel). Le pattern utilisé par Nox est **branche-par-projet** sur le projet existant `NeoBridge` (`young-fog-76038471`) :
+```
+POST /projects/young-fog-76038471/branches
+  body: {"branch": {"name": "<slug>"}, "endpoints": [{"type": "read_write"}]}
+```
+Projets Neon disponibles (pg17, aws-eu-central-1) : NeoBridge, Neosaas-App, Content-Mania, Popurank-Production, neon-fuchsia-window, neosaas-website.
 
 **Note** : `vault-root-token` doit exister dans `connector-system` — recréer si besoin :
 ```bash
@@ -400,3 +434,5 @@ datasets==4.8.4
 | 2026-04-27 | **fix(charlotte/git)** : `git_status` corrigé — fetch `origin/main` + `log origin/main..HEAD` pour exposer les commits non pushés (Charlotte disait "à jour" avec 23 commits locaux en attente) ; `_git_pull()` : `fetch --depth=20 + reset --hard` → `fetch + rebase` (préserve les commits locaux non pushés) ; 27 commits pushés vers `neomnia/Kubinote-GitOps` |
 | 2026-04-27 | **fix(namespaces)** : `open-webui` namespace vide supprimé (doublon de `interfaces`) + retiré de la kustomization pour éviter la recréation automatique ; PVs `dify-*` en état `Released` (claimRef `mindstudio-prod`) récupérés via patch + rebind vers namespace `dify` ; 7 pods Dify Running |
 | 2026-04-27 | **Phase 7** : admin-sys promu K8s executor v4.0 — nouveau script FastAPI (`/execute`, `/apply`) remplace `penpot-sidecar:v3.5` ; `ClusterRole admin-sys-executor` (lecture universelle + mutations workloads/config/RBAC/batch) ; Charlotte `_kubectl()` route via `POST admin-sys/execute` : mutations obligatoires via admin-sys, read-only avec fallback local si admin-sys KO ; `ADMIN_SYS_URL` dans charlotte-config |
+| 2026-04-27 | **fix(nox/neon)** : `POST /projects` bloqué (org managed by Vercel) → pattern branche-par-projet : Nox crée une branche Neon sur le projet existant `NeoBridge` (`young-fog-76038471`) — `neon_branch_id` + `neon_endpoint_host` dans le résultat ; `NEON_BASE_PROJECT_ID` ajouté dans deployment-nox + configmap ; branche de test supprimée |
+| 2026-04-27 | **fix(leon/temporal)** : `TEMPORAL_NAMESPACE` de Leon corrigé `default` → `leon` dans `configmap-leon-config.yaml` (namespace Temporal `leon` créé en Phase 6) |
