@@ -186,10 +186,11 @@ Toi (Slack / Open WebUI)
 | `get`, `logs`, `describe`, `top`, `events` | via admin-sys | fallback local silencieux (warning dans logs) |
 | `patch`, `apply`, `delete`, `rollout`, `create` | via admin-sys | erreur explicite — Charlotte ne mute pas sans admin-sys |
 
-**admin-sys v4.0** (`interfaces` namespace, port 8000) :
-- `GET /health`
+**admin-sys v4.1** (`interfaces` namespace, port 8000) :
+- `GET /health` — libre (probes K8s)
 - `POST /execute {args: [...], timeout?: int}` — exécute kubectl, FORBIDDEN: exec/cp/port-forward/proxy
 - `POST /apply {manifest: str, namespace?: str}` — kubectl apply -f -
+- **Auth** : header `X-Admin-Sys-Token` obligatoire sur `/execute` et `/apply` (secret `admin-sys-token` dans namespaces `interfaces` + `agent-system`)
 - ClusterRole `admin-sys-executor` : lecture universelle + mutations workloads/config/RBAC/batch
 - GitOps : `apps/interfaces/base/configmap-admin-sys-script.yaml` + `rbac-admin-sys-executor.yaml`
 
@@ -436,3 +437,4 @@ datasets==4.8.4
 | 2026-04-27 | **Phase 7** : admin-sys promu K8s executor v4.0 — nouveau script FastAPI (`/execute`, `/apply`) remplace `penpot-sidecar:v3.5` ; `ClusterRole admin-sys-executor` (lecture universelle + mutations workloads/config/RBAC/batch) ; Charlotte `_kubectl()` route via `POST admin-sys/execute` : mutations obligatoires via admin-sys, read-only avec fallback local si admin-sys KO ; `ADMIN_SYS_URL` dans charlotte-config |
 | 2026-04-27 | **fix(nox/neon)** : `POST /projects` bloqué (org managed by Vercel) → pattern branche-par-projet : Nox crée une branche Neon sur le projet existant `NeoBridge` (`young-fog-76038471`) — `neon_branch_id` + `neon_endpoint_host` dans le résultat ; `NEON_BASE_PROJECT_ID` ajouté dans deployment-nox + configmap ; branche de test supprimée |
 | 2026-04-27 | **fix(leon/temporal)** : `TEMPORAL_NAMESPACE` de Leon corrigé `default` → `leon` dans `configmap-leon-config.yaml` (namespace Temporal `leon` créé en Phase 6) |
+| 2026-04-27 | **feat(admin-sys/auth)** : token `X-Admin-Sys-Token` ajouté sur `/execute` et `/apply` — secret `admin-sys-token` (64 hex) dans namespaces `interfaces` + `agent-system` ; `/health` reste libre (probes) ; Charlotte injecte le header dans `_kubectl()` et `_kubectl_apply_yaml()` (migré de kubectl local vers admin-sys `/apply`) ; validé 403 sans token, 200 avec token |
