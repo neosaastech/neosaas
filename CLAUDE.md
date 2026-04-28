@@ -82,8 +82,8 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `kube-system` | Traefik, Headlamp (UI K8s), CoreDNS, metrics-server |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
-| `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003) |
+| `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, Temporal, zoho-discovery, zoho-observer |
+| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -175,10 +175,11 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 |---|---|---|---|---|---|
 | **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | 8383 | `sre-charlotte` | active v2.5 |
 | **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho, dispatch | Temporal | 8181 | `leon` | active v2.0 |
-| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox→Vera→approval→deploy | Temporal | 8484 | `dispatcher` | active v1.0 |
+| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox+Penpot→Vera→approval→deploy | Temporal | 8484 | `dispatcher` | active v1.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel project | Temporal | 8485 | `dispatcher` | active v1.0 |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
-| **Vera** | QA Reviewer — analyse spec + output Aria/Nox, rapport qualité | Temporal | 8487 | `dispatcher` | active v1.0 |
+| **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot, rapport qualité | Temporal | 8487 | `dispatcher` | active v1.0 |
+| **Penpot** | Design Scaffolder — crée projet Penpot + duplique fichier template | Temporal | 8488 | `dispatcher` | active v1.0 |
 | **admin-sys** | K8s executor — exécute les commandes kubectl déléguées par Charlotte | FastAPI | 8000 | — | active v4.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
@@ -220,13 +221,15 @@ Brief (Slack #produit / Open WebUI)
   ──────────────────────────────────────────────────────
   → Dispatcher : validate_spec (tous les champs obligatoires)
   → Dispatcher : [PARALLEL]
-      Aria : GitHub repo (template-nextjs) + Vercel project
-      Nox  : GitHub repo (template-fastapi) + Neon branch (NeoBridge)
-  → Vera : vera_review (analyse spec + output Aria/Nox)
+      Aria   : GitHub repo (template-nextjs) + Vercel project
+      Nox    : GitHub repo (template-fastapi) + Neon branch (NeoBridge)
+      Penpot : projet Penpot + duplication fichier template
+  → Vera : vera_review (analyse spec + output Aria/Nox/Penpot)
   → Dispatcher : notify_approval (signal humain attendu 24h)
   → [Approbation humaine]
   → Dispatcher : deploy (rollout final)
-  → Dispatcher : write_pm_decisions (Qdrant pm-decisions)
+  → Dispatcher : write_pm_decisions (Qdrant pm-decisions, inclut penpot_url)
+  → Dispatcher : zoho_callback (commentaire tâche Zoho + lien Design Penpot)
 ```
 
 **Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec (enforcement par tool-validator, Phase 2).
@@ -255,14 +258,15 @@ ProjectSpec validé par Dispatcher
 | Aria | `aria-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
 | Nox | `nox-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
 | Vera | `vera-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
+| Penpot | `penpot-sa` (agent-system) | **aucun binding** — pas d'accès K8s, opérations via penpot-connector |
 | admin-sys | `admin-sys-agent` (interfaces) | `admin-sys-executor` — lecture universelle + mutations workloads/config/RBAC/batch/namespaces |
 
 **Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
 **Ajouté le 2026-04-27** : `ClusterRole admin-sys-executor` + binding sur `admin-sys-agent` SA.
 
-**Posture sécurité Aria/Nox/Vera/Dispatcher** : pas de kubectl installé dans les pods, pas de ClusterRoleBinding, toutes les opérations infrastructure passent par les connectors (github/neon/vercel) via token Vault. Seule Charlotte peut agir sur le cluster, via admin-sys uniquement (token `X-Admin-Sys-Token`).
+**Posture sécurité Aria/Nox/Vera/Penpot/Dispatcher** : pas de kubectl installé dans les pods, pas de ClusterRoleBinding, toutes les opérations infrastructure passent par les connectors (github/neon/vercel/penpot) via token Vault. Seule Charlotte peut agir sur le cluster, via admin-sys uniquement (token `X-Admin-Sys-Token`).
 
-### Connector-system — architecture (état 2026-04-27)
+### Connector-system — architecture (état 2026-04-28)
 
 Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lisent leurs credentials depuis **Vault** via le secret K8s `vault-root-token` (copié depuis `vault-init-keys` dans `security`).
 
@@ -272,11 +276,13 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `github-connector` | 8001 | `secret/neokube/infrastructure/github` | `GITHUB_TOKEN` |
 | `vercel-connector` | 8002 | `secret/neokube/infrastructure/vercel` | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` |
 | `neon-connector` | 8003 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` |
+| `penpot-connector` | 8004 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` |
 
 **Endpoints exposés** :
-- Tous : `GET /health`, `POST /proxy {method, path, params?, body?/data?}`
+- Tous : `GET /health`, `POST /proxy {method?, path, params?, body?}`
 - neon-connector uniquement : `POST /query {project_id, sql, database?, role_name?}`
 - vercel-connector : injecte automatiquement `teamId` dans les params
+- penpot-connector : `path` = nom de la commande RPC Penpot (ex. `create-project`) ; auth session cookie-based, re-login auto sur 401
 
 **Contrainte Neon** : `POST /projects` est bloqué (organisation managed by Vercel). Le pattern utilisé par Nox est **branche-par-projet** sur le projet existant `NeoBridge` (`young-fog-76038471`) :
 ```
@@ -284,6 +290,15 @@ POST /projects/young-fog-76038471/branches
   body: {"branch": {"name": "<slug>"}, "endpoints": [{"type": "read_write"}]}
 ```
 Projets Neon disponibles (pg17, aws-eu-central-1) : NeoBridge, Neosaas-App, Content-Mania, Popurank-Production, neon-fuchsia-window, neosaas-website.
+
+**Note penpot-connector** : créer le secret Vault avant le premier déploiement :
+```bash
+kubectl exec -n security vault-0 -- vault kv put \
+  secret/neokube/infrastructure/penpot \
+  PENPOT_EMAIL="admin@example.com" \
+  PENPOT_PASSWORD="xxx"
+```
+`PENPOT_TEMPLATE_FILE_ID` et `PENPOT_TEAM_ID` sont dans `deployment-penpot.yaml` (env vars, valeurs vides par défaut — à renseigner par l'utilisateur).
 
 **Note** : `vault-root-token` doit exister dans `connector-system` — recréer si besoin :
 ```bash
@@ -326,6 +341,7 @@ kubectl rollout restart deploy/agent-charlotte -n agent-system
 | **Phase 5b** | Collections Qdrant `pm-decisions`/`front-specs`/`api-contracts`/`qa-reports` — 768 dims, auto-créées par Dispatcher au démarrage | Phase 5 déployée | ✅ Terminé 2026-04-27 |
 | **Phase 6** | Pods dédiés Aria (8485/aria-queue), Nox (8486/nox-queue), Vera (8487/vera-queue) — scripts dédiés, ServiceAccounts, task_queue séparées dans DevProjectWorkflow | — | ✅ Terminé 2026-04-27 |
 | **Phase 7** | admin-sys promu K8s executor v4.0 ; Charlotte `_kubectl()` routée via `POST /execute` admin-sys ; fallback local read-only si admin-sys KO ; `ClusterRole admin-sys-executor` en GitOps | — | ✅ Terminé 2026-04-27 |
+| **Phase 10d** | `penpot-connector` v1.0 (port 8004) — proxy Penpot RPC API self-hosted, auth session cookie Vault ; agent `Penpot` v1.0 (port 8488, penpot-queue) — `penpot_create_design` : create-project + duplicate-file ; DevProjectWorkflow gather 2→3 (Aria+Nox+Penpot) ; Vera v1.1 + penpot check (non-bloquant) ; zoho_callback enrichi du lien Design ; registre v1.6 | — | ✅ Terminé 2026-04-28 |
 
 **Note R3 / max_tokens_per_run** : ces items sont introuvables dans le dépôt GitOps. S'ils proviennent d'un document Notion ou externe, les localiser avant d'implémenter.
 
@@ -468,3 +484,11 @@ datasets==4.8.4
 | 2026-04-27 | **fix(nox/neon)** : `POST /projects` bloqué (org managed by Vercel) → pattern branche-par-projet : Nox crée une branche Neon sur le projet existant `NeoBridge` (`young-fog-76038471`) — `neon_branch_id` + `neon_endpoint_host` dans le résultat ; `NEON_BASE_PROJECT_ID` ajouté dans deployment-nox + configmap ; branche de test supprimée |
 | 2026-04-27 | **fix(leon/temporal)** : `TEMPORAL_NAMESPACE` de Leon corrigé `default` → `leon` dans `configmap-leon-config.yaml` (namespace Temporal `leon` créé en Phase 6) |
 | 2026-04-27 | **feat(admin-sys/auth)** : token `X-Admin-Sys-Token` ajouté sur `/execute` et `/apply` — secret `admin-sys-token` (64 hex) dans namespaces `interfaces` + `agent-system` ; `/health` reste libre (probes) ; Charlotte injecte le header dans `_kubectl()` et `_kubectl_apply_yaml()` (migré de kubectl local vers admin-sys `/apply`) ; validé 403 sans token, 200 avec token |
+| 2026-04-27 | **fix(zoho-connector)** : HTTP methods corrigés — PUT/PATCH/DELETE utilisaient `c.post()` → méthodes httpx correctes ; Zoho erreur 6500 (soft) traitée comme non-fatale (ressource créée côté Zoho malgré HTTP 400) — retourne `{}` au lieu de lever exception |
+| 2026-04-27 | **fix(zoho-observer v2.0)** : `_zoho_proxy` — `"body"` → `"data"` (champ attendu par ProxyReq zoho-connector) ; import `timezone` ajouté ; champs `acceptance_criteria` + `emitted_at` ajoutés dans spec pour satisfaire `dispatcher_validate_spec` ; déduplication déléguée à Temporal (`WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY`) au lieu du set `_dispatched` volatile |
+| 2026-04-27 | **fix(dispatcher)** : workflow ID sans timestamp (`devproject-{project_id}`) + `WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY` + catch `WorkflowAlreadyStartedError` — idempotence garantie même après restart pod zoho-observer |
+| 2026-04-27 | **fix(aria/nox)** : `GET /git/refs/heads/main` retourne 409 sur repo template en cours d'init — erreur 409 ignorée silencieusement au lieu d'être ajoutée à `result["errors"]` |
+| 2026-04-27 | **fix(vera)** : check `nox_db` corrigé — `neon_project_id` (ancien champ) → `neon_branch_id` (sortie actuelle de Nox) ; même correction dans le prompt LLM |
+| 2026-04-27 | **feat(qdrant)** : collection `pm-experience` créée (768 dims, Cosine) — manquante, causait une boucle d'erreur dans le PM observer |
+| 2026-04-27 | **E2E pipeline validé** : test complet zoho-observer → Dispatcher → Aria+Nox (parallèle) → Vera (approved) → signal humain → deploy → COMPLETED en 44.86s (workflow `devproject-zoho-2114101000001568047`) ; idempotence vérifiée post-restart pod |
+| 2026-04-28 | **Phase 10d** : `penpot-connector` v1.0 (port 8004, connector-system) — proxy Penpot RPC API, auth session cookie depuis Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL/PASSWORD), re-login auto 401 ; agent `Penpot` v1.0 (port 8488, penpot-queue, agent-system) — activité `penpot_create_design` : create-project + duplicate-file template → retourne `penpot_url` (/design?project-id=X&file-id=Y) ; non-bloquant si PENPOT_TEMPLATE_FILE_ID/PENPOT_TEAM_ID vides ; DevProjectWorkflow : gather 2→3 (Aria+Nox+**Penpot** en parallèle) ; vera_review : 4ème param `penpot_result` (non-bloquant) ; dispatcher_zoho_callback : ligne "Design" ajoutée ; pm-decisions : penpot_url vectorisé ; registre agents v1.6 |
