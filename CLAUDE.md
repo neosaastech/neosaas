@@ -82,8 +82,8 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `kube-system` | Traefik, Headlamp (UI K8s), CoreDNS, metrics-server |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
-| `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004) |
+| `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
+| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004), openprovider-connector (registrar API, port 8005), cloudflare-connector (DNS/zones API, port 8006) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -180,6 +180,7 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot, rapport qualité | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique fichier template | Temporal | 8488 | `dispatcher` | active v1.0 |
+| **Domi** | Domain Infrastructure Manager — provision domaine + DNS + renouvellements | Temporal | 8489 | `dispatcher` | active v1.0 |
 | **admin-sys** | K8s executor — exécute les commandes kubectl déléguées par Charlotte | FastAPI | 8000 | — | active v4.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
@@ -224,11 +225,13 @@ Brief (Slack #produit / Open WebUI)
       Aria   : GitHub repo (template-nextjs) + Vercel project
       Nox    : GitHub repo (template-fastapi) + Neon branch (NeoBridge)
       Penpot : projet Penpot + duplication fichier template
+      Domi   : provision domaine (subdomain {slug}.neomnia.net ou achat Openprovider)
   → Vera : vera_review (analyse spec + output Aria/Nox/Penpot)
   → Dispatcher : notify_approval (signal humain attendu 24h)
   → [Approbation humaine]
   → Dispatcher : deploy (rollout final)
-  → Dispatcher : write_pm_decisions (Qdrant pm-decisions, inclut penpot_url)
+  → Domi       : domi_link_vercel_domain (lie le domaine au projet Vercel, post-deploy)
+  → Dispatcher : write_pm_decisions (Qdrant pm-decisions, inclut penpot_url + domain)
   → Dispatcher : zoho_callback (commentaire tâche Zoho + lien Design Penpot)
 ```
 
@@ -277,12 +280,20 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `vercel-connector` | 8002 | `secret/neokube/infrastructure/vercel` | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` |
 | `neon-connector` | 8003 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` |
 | `penpot-connector` | 8004 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` |
+| `openprovider-connector` | 8005 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` |
+| `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_API_TOKEN`, `CF_ACCOUNT_ID` (optionnel) |
 
 **Endpoints exposés** :
 - Tous : `GET /health`, `POST /proxy {method?, path, params?, body?}`
 - neon-connector uniquement : `POST /query {project_id, sql, database?, role_name?}`
 - vercel-connector : injecte automatiquement `teamId` dans les params
 - penpot-connector : `path` = nom de la commande RPC Penpot (ex. `create-project`) ; auth session cookie-based, re-login auto sur 401
+- openprovider-connector : auth JWT via login username/password, re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta`
+- cloudflare-connector : Bearer token statique ; endpoint bonus `GET /zones` ; API base `https://api.cloudflare.com/client/v4`
+
+**Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré directement par Openprovider (pas dans Cloudflare).
+
+**Zones Cloudflare** (19 actives, account_id=`822ba0e8c232e192475e6bd02ce36cb4`) : alloremorquage.fr, charles-vandendriessche.fr, content-mania.com, ecolinks.fr, espace-video.fr, iaa-temoins.fr, lapollo.fr, literie-de-france.com, locsoleil.fr, mission-croissance.fr, nellie.fr, **neomnia.net** (`8c1283e7c52c34a9d5112c0fb271af27`), neoprospect.fr, neosaas.tech, passion-animaux.fr, redaction-persuasive.fr, referencement-site.be, relation-client.be, sri-solutions.fr.
 
 **Contrainte Neon** : `POST /projects` est bloqué (organisation managed by Vercel). Le pattern utilisé par Nox est **branche-par-projet** sur le projet existant `NeoBridge` (`young-fog-76038471`) :
 ```
@@ -451,6 +462,97 @@ datasets==4.8.4
 
 ---
 
+## Pièges connus — Anti-patterns à éviter
+
+### 1. Vercel `gitSource.repoId` doit être un `int`
+
+L'API Vercel `/v13/deployments` exige que `repoId` soit un entier (`int`), pas une chaîne.
+Passer `str(link["repoId"])` produit l'erreur `incorrect_git_source_info` sans message clair.
+
+```python
+# FAUX
+body["gitSource"] = {"type": "github", "ref": ref, "repoId": str(link["repoId"])}
+# CORRECT
+body["gitSource"] = {"type": "github", "ref": ref, "repoId": int(link["repoId"])}
+```
+
+Fallback si `repoId` vaut 0 : utiliser `{"org": link["org"], "repo": link["repo"]}`.
+
+---
+
+### 2. `asyncio.gather` dans un workflow Temporal — toujours `return_exceptions=True` pour les activités non-critiques
+
+Sans ce flag, une exception dans **n'importe quelle** activité du gather fait échouer tout le workflow.
+Les activités optionnelles (Penpot, Domi) doivent retourner un `dict` vide en cas d'échec, pas lever.
+
+```python
+_results = await asyncio.gather(
+    workflow.execute_activity(aria_build_frontend, ...),  # critique
+    workflow.execute_activity(nox_build_backend,  ...),  # critique
+    workflow.execute_activity(penpot_create_design, ...), # optionnel
+    workflow.execute_activity(domi_provision_domain, ...), # optionnel
+    return_exceptions=True,
+)
+for _r in _results[:2]:           # re-raise si Aria ou Nox échouent
+    if isinstance(_r, BaseException):
+        raise _r
+penpot_result = _results[2] if not isinstance(_results[2], BaseException) else {}
+domi_result   = _results[3] if not isinstance(_results[3], BaseException) else {}
+```
+
+**Règle** : toute activité dont l'échec ne doit pas bloquer le workflow = activité optionnelle = `return_exceptions=True` + valeur de repli.
+
+---
+
+### 3. Ajouter un champ au ProjectSpec : 3 endroits à synchroniser
+
+Quand un nouveau champ est ajouté au `ProjectSpec` (ex: `domain_mode`, `domain_name`) :
+
+1. **`configmap-leon-script.yaml`** — schéma du tool `dispatch_project` (paramètres JSON Schema)
+2. **`configmap-leon-script.yaml`** — construction du dict `spec` dans `_execute_tool / dispatch_project`
+3. **`configmap-dispatcher-script.yaml`** — `dispatcher_validate_spec` : `spec.setdefault("champ", valeur_défaut)`
+
+Oublier l'un des trois provoque soit un champ absent de la spec (Leon ne l'envoie pas), soit une KeyError côté Dispatcher.
+
+---
+
+### 4. Toute variable `os.getenv()` utilisée en production doit être dans le ConfigMap
+
+Si un agent lit `os.getenv("MA_VAR", "")` pour un mode actif, la variable doit être déclarée dans son `configmap-<agent>-config.yaml`.
+Une valeur vide silencieuse est difficile à déboguer (pas d'erreur au démarrage, comportement incorrect à l'exécution).
+
+Exemple manquant corrigé : `CF_ACCOUNT_ID` dans `configmap-domi-config.yaml` (requis pour le mode `register`).
+
+**Checklist** à appliquer à chaque nouvel agent ou nouveau mode :
+- [ ] Lister tous les `os.getenv()` du script
+- [ ] Vérifier que chacun est présent dans le ConfigMap ou injecté depuis un Secret
+- [ ] Les variables non-optionnelles ne doivent pas avoir de valeur par défaut vide
+
+---
+
+### 5. Les pods ne rechargent pas les ConfigMaps automatiquement
+
+Kubernetes **ne redémarre pas** les pods quand un ConfigMap est modifié (sauf Reloader non installé ici).
+Après tout `kubectl apply` qui modifie un ConfigMap, relancer les pods concernés :
+
+```bash
+kubectl rollout restart deployment/<agent> -n agent-system
+```
+
+Pods à redémarrer systématiquement après modification de leurs scripts :
+| ConfigMap modifié | Deployment à redémarrer |
+|---|---|
+| `configmap-dispatcher-script` | `dispatcher` |
+| `configmap-leon-script` | `leon` |
+| `configmap-aria-script` | `aria` |
+| `configmap-nox-script` | `nox` |
+| `configmap-vera-script` | `vera` |
+| `configmap-domi-script` / `configmap-domi-config` | `domi` |
+| `configmap-penpot-script` | `penpot` |
+| `configmap-sre-script` / `configmap-charlotte-config` | `agent-charlotte` |
+
+---
+
 ## Historique des actions Claude
 
 | Date | Action |
@@ -491,4 +593,8 @@ datasets==4.8.4
 | 2026-04-27 | **fix(vera)** : check `nox_db` corrigé — `neon_project_id` (ancien champ) → `neon_branch_id` (sortie actuelle de Nox) ; même correction dans le prompt LLM |
 | 2026-04-27 | **feat(qdrant)** : collection `pm-experience` créée (768 dims, Cosine) — manquante, causait une boucle d'erreur dans le PM observer |
 | 2026-04-27 | **E2E pipeline validé** : test complet zoho-observer → Dispatcher → Aria+Nox (parallèle) → Vera (approved) → signal humain → deploy → COMPLETED en 44.86s (workflow `devproject-zoho-2114101000001568047`) ; idempotence vérifiée post-restart pod |
+| 2026-04-28 | **Stalwart Mail Server v0.11.8** : déployé dans namespace `stalwart` — StatefulSet (PVC 10Gi local-path), listeners SMTP/SMTPS/Submission/IMAP/IMAPS/Sieve/HTTP tous opérationnels ; ingress `mail.neokube.fr` (Traefik) ; LoadBalancer 192.168.1.28 ports mail ; fix config path (initContainer `/config/config.toml` ≠ `/config/etc/config.toml`), log tracer stdout, probe tcpSocket ; DKIM RSA 2048 selector `mail` stocké dans secret `stalwart-dkim` + Vault `secret/neokube/apps/stalwart` |
+| 2026-04-28 | **openprovider-connector v1.0** (port 8005) + **cloudflare-connector v1.0** (port 8006) : déployés et validés — Openprovider : 7 domaines accessibles (neokube.fr géré par Openprovider DNS), JWT re-login auto ; Cloudflare : 19 zones actives (neomnia.net zone_id=8c1283e7c52c34a9d5112c0fb271af27, account_id=822ba0e8c232e192475e6bd02ce36cb4), neokube.fr absent (DNS Openprovider direct) ; credentials dans Vault `secret/neokube/infrastructure/{openprovider,cloudflare}` |
+| 2026-04-28 | **Domi v1.0** — Domain Infrastructure Manager (port 8489, domi-queue, namespace dispatcher) : 4ème activité parallèle dans DevProjectWorkflow (gather 3→4) ; mode subdomain : CNAME {slug}.neomnia.net → cname.vercel-dns.com dans Cloudflare zone neomnia.net ; mode register : achat Openprovider + zone Cloudflare + NS update ; domi_link_vercel_domain post-deploy ; DomainRenewalScanWorkflow cron 09:00 UTC (auto-renew <30j, alerte Charlotte <60j) ; Vera v1.2 check domain_provisioned (non-bloquant) ; registre v1.7 |
 | 2026-04-28 | **Phase 10d** : `penpot-connector` v1.0 (port 8004, connector-system) — proxy Penpot RPC API, auth session cookie depuis Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL/PASSWORD), re-login auto 401 ; agent `Penpot` v1.0 (port 8488, penpot-queue, agent-system) — activité `penpot_create_design` : create-project + duplicate-file template → retourne `penpot_url` (/design?project-id=X&file-id=Y) ; non-bloquant si PENPOT_TEMPLATE_FILE_ID/PENPOT_TEAM_ID vides ; DevProjectWorkflow : gather 2→3 (Aria+Nox+**Penpot** en parallèle) ; vera_review : 4ème param `penpot_result` (non-bloquant) ; dispatcher_zoho_callback : ligne "Design" ajoutée ; pm-decisions : penpot_url vectorisé ; registre agents v1.6 |
+| 2026-04-28 | **fix(pipeline/audit)** : 5 bugs bloquants corrigés — (1) Vercel repoId `str→int` (`incorrect_git_source_info`) + fallback org/repo ; (2) `asyncio.gather return_exceptions=True` Penpot+Domi non-bloquants, Aria+Nox re-raise ; (3) Leon `dispatch_project` : `domain_mode`+`domain_name` ajoutés au schema tool et spec JSON ; (4) `CF_ACCOUNT_ID` ajouté dans `configmap-domi-config` (mode register) ; (5) restart Aria+Nox+Dispatcher+Leon après update configmaps ; section "Pièges connus" ajoutée dans CLAUDE.md |
