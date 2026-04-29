@@ -701,6 +701,16 @@ Credentials par agent dans Vault :
 | Vera | `secret/neokube/agents/vera` | `SMTP_PASSWORD` |
 | Domi | `secret/neokube/agents/domi` | `SMTP_PASSWORD` |
 
+**Gotcha `validate_certs=False`** : Stalwart utilise un certificat self-signed en interne → `aiosmtplib` lève `CERTIFICATE_VERIFY_FAILED` si `validate_certs` n'est pas `False`. Acceptable pour connexion intra-cluster.
+
+**Gotcha rôle `user`** : Les comptes Stalwart créés via API sans `roles` ne peuvent pas soumettre d'email (550 5.7.1). Tous les comptes agents doivent avoir `roles: ["user"]` :
+```bash
+# Patch via pod curl dans namespace stalwart
+curl -X PATCH http://stalwart-web.stalwart.svc.cluster.local:8080/api/principal/<account> \
+  -u "admin:ADMIN_PASSWORD" -H "Content-Type: application/json" \
+  -d '[{"action":"set","field":"roles","value":["user"]}]'
+```
+
 ---
 
 ### 7. LiteLLM + HuggingFace router — `_embed()` retourne des scalaires, pas un vecteur
@@ -777,3 +787,4 @@ Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatc
 | 2026-04-29 | **Penpot Vault** : credentials provisionnés dans Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL, PENPOT_PASSWORD, PENPOT_TEAM_ID=82052e4a-…) ; reset mot de passe Argon2id format custom Penpot (argon2id$hexsalt$m$t$p$hexhash) ; penpot-connector login 200 confirmé ; `PENPOT_TEAM_ID` mis à jour dans `deployment-penpot.yaml` |
 | 2026-04-29 | **E2E pipeline complet validé** : `devproject-e2e-test-b468b5b0` — Aria+Nox+Penpot+Domi (parallel) → Vera (approved) → deploy Vercel → pm-decisions → send_client_mail ; DomainRenewalScanWorkflow `domi-renewal-scan-daily` RUNNING dans Temporal |
 | 2026-04-29 | **fix(smtp+embed)** : (1) SMTP_HOST corrigé `stalwart-web` → `stalwart-mail` dans tous les agents (port 587 SMTP submission, `stalwart-web` = HTTP admin uniquement) ; (2) `_embed()` fix format HuggingFace — LiteLLM router retourne 768 scalaires séparés dans `data` au lieu d'un vecteur unique ; `data[0]["embedding"]` était un float causant HTTP 400 Qdrant ; fix dans dispatcher + charlotte-sre ; piège documenté dans CLAUDE.md §7 |
+| 2026-04-29 | **fix(smtp+dispatch)** : (3) `on_approved/on_rejected` signal handlers : ajout `reason: str = ""` — Temporal passe le payload signal en arg positionnel, `on_approved(self)` levait TypeError ; (4) `validate_certs=False` dans aiosmtplib.send (Stalwart self-signed cert) ; (5) rôle `"user"` ajouté sur 4 comptes Stalwart (leon/vera/domi/no-reply) — sans ce rôle Stalwart retourne 550 5.7.1 ; **pipeline E2E complet validé** : deploy Vercel + Qdrant pm-decisions HTTP 200 + email envoyé à chvandendriessche@neomnia.net |
