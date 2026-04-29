@@ -661,6 +661,69 @@ Pods à redémarrer systématiquement après modification de leurs scripts :
 | `configmap-penpot-script` | `penpot` |
 | `configmap-sre-script` / `configmap-charlotte-config` | `agent-charlotte` |
 
+### 6. SMTP via Stalwart — service `stalwart-mail`, pas `stalwart-web`
+
+Stalwart expose **deux services** dans le namespace `stalwart` :
+- `stalwart-web.stalwart.svc.cluster.local:8080` → API HTTP admin (stalwart-connector)
+- `stalwart-mail.stalwart.svc.cluster.local:587` → SMTP submission (aiosmtplib)
+
+Utiliser `stalwart-web` pour SMTP provoque un timeout aiosmtplib (`CancelledError` dans `asyncio.wait_for`) car le port 587 n'est pas exposé sur ce service.
+
+```python
+# FAUX — stalwart-web = HTTP admin uniquement
+SMTP_HOST = "stalwart-web.stalwart.svc.cluster.local"
+
+# CORRECT — stalwart-mail = ports SMTP 25/465/587
+SMTP_HOST = "stalwart-mail.stalwart.svc.cluster.local"
+```
+
+Pattern `aiosmtplib` STARTTLS utilisé dans les agents :
+```python
+import aiosmtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+password = await _load_stalwart_password()  # Vault secret/neokube/apps/stalwart.NOREPLY_PASSWORD
+msg = MIMEMultipart("alternative")
+msg["From"] = MAIL_FROM          # no-reply@neokube.fr, leon@neokube.fr, etc.
+msg["To"]   = recipient
+msg["Subject"] = subject
+msg.attach(MIMEText(body_html, "html"))
+await aiosmtplib.send(msg, hostname=SMTP_HOST, port=587, start_tls=True,
+                      username=MAIL_FROM, password=password)
+```
+
+Credentials par agent dans Vault :
+| Agent | Vault path | Clé |
+|---|---|---|
+| Dispatcher | `secret/neokube/apps/stalwart` | `NOREPLY_PASSWORD` |
+| Leon | `secret/neokube/agents/leon` | `SMTP_PASSWORD` |
+| Vera | `secret/neokube/agents/vera` | `SMTP_PASSWORD` |
+| Domi | `secret/neokube/agents/domi` | `SMTP_PASSWORD` |
+
+---
+
+### 7. LiteLLM + HuggingFace router — `_embed()` retourne des scalaires, pas un vecteur
+
+Quand LiteLLM proxifie `nomic-embed-text` vers HuggingFace (`paraphrase-multilingual-mpnet-base-v2`), la réponse `/v1/embeddings` est **non-standard** : le champ `data` contient 768 entrées séparées (une par dimension), chacune avec un `"embedding"` scalar — pas une seule entrée avec un vecteur complet.
+
+`data[0]["embedding"]` vaut donc un `float` (−0.206…), pas une `list[float]`.
+Upserter ce scalar dans Qdrant produit un **HTTP 400**.
+
+```python
+# FAUX — ne fonctionne qu'avec OpenAI/Mistral (format standard)
+return r.json()["data"][0]["embedding"]
+
+# CORRECT — détecte les deux formats
+data = r.json()["data"]
+first = data[0]["embedding"]
+if isinstance(first, list):
+    return first
+return [item["embedding"] for item in data]   # HuggingFace router
+```
+
+Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatcher, charlotte-sre, leon, etc.).
+
 ---
 
 ## Historique des actions Claude
@@ -711,3 +774,6 @@ Pods à redémarrer systématiquement après modification de leurs scripts :
 | 2026-04-28 | **Stalwart — calibration mail** : auto-ban `[server.fail2ban] rate="100/1d"` actif dans config.toml ; domaine `neokube.fr` + compte `admin@neokube.fr` créés via API REST ; DNS zone neokube.fr créée chez Openprovider (A/MX/SPF/DKIM/DMARC) via openprovider-connector (PUT zone — POST/PATCH non implémentés) ; `stalwart-connector` v1.0 (port 8007, connector-system) : auth Basic injectée auto, endpoints `/accounts`, `/accounts/create`, `/accounts/{account}` DELETE, `/proxy` ; Vault `secret/neokube/apps/stalwart` contient `ADMIN_PASSWORD` ; registre agents mis à jour (section connectors) ; section Stalwart gotchas ajoutée dans CLAUDE.md |
 | 2026-04-29 | **stalwart-connector déployé** : pod Running dans `connector-system` — GET /accounts, POST /accounts/create, DELETE /accounts/{account} validés ; Vault `ADMIN_PASSWORD` corrigé (`SU0ie4btcEWNmRq7RBb10Z8RimN3V` — correspond au hash `[authentication.fallback-admin]` dans config.toml) ; namespace `stalwart` ajouté dans CLAUDE.md ; merge remote Domi commits (96d616b → 8c68f68) résolu |
 | 2026-04-29 | **feat(mail): identités agents** — 4 comptes Stalwart créés : `leon@`, `vera@`, `domi@`, `no-reply@neokube.fr` ; credentials dans Vault `secret/neokube/agents/{leon,vera,domi}` + `apps/stalwart.NOREPLY_PASSWORD` ; STALWART_CONNECTOR_URL + MAIL_FROM + SMTP_HOST/PORT ajoutés dans configmaps Leon/Domi et deployment Vera ; **Dispatcher v1.1** : `dispatcher_send_client_mail` (aiosmtplib, SMTP Stalwart port 587, email HTML/texte post-deploy) ; `client_email` dans ProjectSpec (3 endroits : tool schema Leon + spec dict + validate_spec setdefault) ; step 9 workflow non-bloquant |
+| 2026-04-29 | **Penpot Vault** : credentials provisionnés dans Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL, PENPOT_PASSWORD, PENPOT_TEAM_ID=82052e4a-…) ; reset mot de passe Argon2id format custom Penpot (argon2id$hexsalt$m$t$p$hexhash) ; penpot-connector login 200 confirmé ; `PENPOT_TEAM_ID` mis à jour dans `deployment-penpot.yaml` |
+| 2026-04-29 | **E2E pipeline complet validé** : `devproject-e2e-test-b468b5b0` — Aria+Nox+Penpot+Domi (parallel) → Vera (approved) → deploy Vercel → pm-decisions → send_client_mail ; DomainRenewalScanWorkflow `domi-renewal-scan-daily` RUNNING dans Temporal |
+| 2026-04-29 | **fix(smtp+embed)** : (1) SMTP_HOST corrigé `stalwart-web` → `stalwart-mail` dans tous les agents (port 587 SMTP submission, `stalwart-web` = HTTP admin uniquement) ; (2) `_embed()` fix format HuggingFace — LiteLLM router retourne 768 scalaires séparés dans `data` au lieu d'un vecteur unique ; `data[0]["embedding"]` était un float causant HTTP 400 Qdrant ; fix dans dispatcher + charlotte-sre ; piège documenté dans CLAUDE.md §7 |
