@@ -337,8 +337,21 @@ kubectl rollout restart deploy/agent-charlotte -n agent-system
 **Namespace** : `stalwart`
 **GitOps** : `~/Kubinote-GitOps/apps/stalwart/base/`
 **Domaine** : `mail.neokube.fr` (Traefik ingress + LoadBalancer 192.168.1.28)
-**Vault** : `secret/neokube/apps/stalwart` — `ADMIN_PASSWORD`, `DKIM_SELECTOR`, `DKIM_PUBKEY_DNS`
+**Vault** : `secret/neokube/apps/stalwart` — `ADMIN_PASSWORD`, `DKIM_SELECTOR`, `DKIM_PUBKEY_DNS`, `NOREPLY_PASSWORD`
 **Connector** : `stalwart-connector` port 8007 (`http://stalwart-connector.connector-system.svc.cluster.local:8007`)
+
+### Comptes mail agents
+
+| Adresse | Agent | Vault path | Usage |
+|---|---|---|---|
+| `admin@neokube.fr` | admin (id=65) | `secret/neokube/apps/stalwart` `ADMIN_PASSWORD` | Compte admin Stalwart, alertes infra |
+| `leon@neokube.fr` | Leon | `secret/neokube/agents/leon` `MAIL_FROM`/`MAIL_PASSWORD` | Email de bienvenue client, résumé brief |
+| `vera@neokube.fr` | Vera | `secret/neokube/agents/vera` `MAIL_FROM`/`MAIL_PASSWORD` | Rapports QA, alertes blocantes |
+| `domi@neokube.fr` | Domi | `secret/neokube/agents/domi` `MAIL_FROM`/`MAIL_PASSWORD` | Alertes renouvellement domaine |
+| `no-reply@neokube.fr` | Dispatcher | `secret/neokube/apps/stalwart` `NOREPLY_PASSWORD` | Notifications workflow automatiques post-deploy |
+
+**SMTP interne** : `stalwart-web.stalwart.svc.cluster.local:587` (STARTTLS, auth PLAIN)
+**Activité Dispatcher** : `dispatcher_send_client_mail` — envoyée si `spec.client_email` présent, non-bloquante
 
 ### Gotchas config v0.11.8
 
@@ -696,3 +709,4 @@ Pods à redémarrer systématiquement après modification de leurs scripts :
 | 2026-04-28 | **fix(pipeline/audit)** : 5 bugs bloquants corrigés — (1) Vercel repoId `str→int` (`incorrect_git_source_info`) + fallback org/repo ; (2) `asyncio.gather return_exceptions=True` Penpot+Domi non-bloquants, Aria+Nox re-raise ; (3) Leon `dispatch_project` : `domain_mode`+`domain_name` ajoutés au schema tool et spec JSON ; (4) `CF_ACCOUNT_ID` ajouté dans `configmap-domi-config` (mode register) ; (5) restart Aria+Nox+Dispatcher+Leon après update configmaps ; section "Pièges connus" ajoutée dans CLAUDE.md |
 | 2026-04-28 | **Stalwart — calibration mail** : auto-ban `[server.fail2ban] rate="100/1d"` actif dans config.toml ; domaine `neokube.fr` + compte `admin@neokube.fr` créés via API REST ; DNS zone neokube.fr créée chez Openprovider (A/MX/SPF/DKIM/DMARC) via openprovider-connector (PUT zone — POST/PATCH non implémentés) ; `stalwart-connector` v1.0 (port 8007, connector-system) : auth Basic injectée auto, endpoints `/accounts`, `/accounts/create`, `/accounts/{account}` DELETE, `/proxy` ; Vault `secret/neokube/apps/stalwart` contient `ADMIN_PASSWORD` ; registre agents mis à jour (section connectors) ; section Stalwart gotchas ajoutée dans CLAUDE.md |
 | 2026-04-29 | **stalwart-connector déployé** : pod Running dans `connector-system` — GET /accounts, POST /accounts/create, DELETE /accounts/{account} validés ; Vault `ADMIN_PASSWORD` corrigé (`SU0ie4btcEWNmRq7RBb10Z8RimN3V` — correspond au hash `[authentication.fallback-admin]` dans config.toml) ; namespace `stalwart` ajouté dans CLAUDE.md ; merge remote Domi commits (96d616b → 8c68f68) résolu |
+| 2026-04-29 | **feat(mail): identités agents** — 4 comptes Stalwart créés : `leon@`, `vera@`, `domi@`, `no-reply@neokube.fr` ; credentials dans Vault `secret/neokube/agents/{leon,vera,domi}` + `apps/stalwart.NOREPLY_PASSWORD` ; STALWART_CONNECTOR_URL + MAIL_FROM + SMTP_HOST/PORT ajoutés dans configmaps Leon/Domi et deployment Vera ; **Dispatcher v1.1** : `dispatcher_send_client_mail` (aiosmtplib, SMTP Stalwart port 587, email HTML/texte post-deploy) ; `client_email` dans ProjectSpec (3 endroits : tool schema Leon + spec dict + validate_spec setdefault) ; step 9 workflow non-bloquant |
