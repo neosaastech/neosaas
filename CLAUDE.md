@@ -176,7 +176,7 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 |---|---|---|---|---|---|
 | **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | 8383 | `sre-charlotte` | active v2.5 |
 | **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho, dispatch | Temporal | 8181 | `leon` | active v2.0 |
-| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox+Penpot→Vera→approval→deploy | Temporal | 8484 | `dispatcher` | active v1.0 |
+| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox+Penpot→Vera→approval→deploy→mail | Temporal | 8484 | `dispatcher` | active v1.1 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel project | Temporal | 8485 | `dispatcher` | active v1.0 |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot, rapport qualité | Temporal | 8487 | `dispatcher` | active v1.0 |
@@ -217,7 +217,7 @@ Toi (Slack / Open WebUI)
 ```
 Brief (Slack #produit / Open WebUI)
   → Leon : dialogue de clarification (max 10 tours)
-  → Leon : produit ProjectSpec JSON (11 champs validés)
+  → Leon : produit ProjectSpec JSON (12 champs validés)
   → Leon : dispatch_project → POST /trigger Dispatcher
   → Leon : crée tâches dans Zoho Projects
   ──────────────────────────────────────────────────────
@@ -234,6 +234,7 @@ Brief (Slack #produit / Open WebUI)
   → Domi       : domi_link_vercel_domain (lie le domaine au projet Vercel, post-deploy)
   → Dispatcher : write_pm_decisions (Qdrant pm-decisions, inclut penpot_url + domain)
   → Dispatcher : zoho_callback (commentaire tâche Zoho + lien Design Penpot)
+  → Dispatcher : send_client_mail (email post-deploy → spec.client_email, non-bloquant)
 ```
 
 **Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec (enforcement par tool-validator, Phase 2).
@@ -450,7 +451,7 @@ PUT /dns/zones/neokube.fr  body: {"records": [...]}
 
 > Vérification doublons effectuée le 2026-04-26 : `sre_provision_agent` et `sre_decommission_agent` sont implémentés
 > (`ProvisionAgentWorkflow` L2778 + `DecommissionAgentWorkflow` L2884 dans `configmap-sre-script.yaml`).
-> `ProjectSpec` est défini dans `apps/agent-catalog/leon.yaml` `output_schema` (11 champs).
+> `ProjectSpec` est défini dans `apps/agent-catalog/leon.yaml` `output_schema` (12 champs — `client_email` ajouté 2026-04-29).
 
 | Phase | Contenu | Prérequis | État |
 |---|---|---|---|
