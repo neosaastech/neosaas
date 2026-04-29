@@ -83,7 +83,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
 | `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004), openprovider-connector (registrar API, port 8005), cloudflare-connector (DNS/zones API, port 8006) |
+| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004), openprovider-connector (registrar API, port 8005), cloudflare-connector (DNS/zones API, port 8006), **stalwart-connector** (admin mail API, port 8007) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -282,6 +282,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `penpot-connector` | 8004 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` |
 | `openprovider-connector` | 8005 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` |
 | `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_API_TOKEN`, `CF_ACCOUNT_ID` (optionnel) |
+| `stalwart-connector` | 8007 | `secret/neokube/apps/stalwart` | `ADMIN_PASSWORD` |
 
 **Endpoints exposés** :
 - Tous : `GET /health`, `POST /proxy {method?, path, params?, body?}`
@@ -290,6 +291,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 - penpot-connector : `path` = nom de la commande RPC Penpot (ex. `create-project`) ; auth session cookie-based, re-login auto sur 401
 - openprovider-connector : auth JWT via login username/password, re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta`
 - cloudflare-connector : Bearer token statique ; endpoint bonus `GET /zones` ; API base `https://api.cloudflare.com/client/v4`
+- stalwart-connector : auth Basic `admin:ADMIN_PASSWORD` injectée auto ; endpoints bonus `GET /accounts`, `POST /accounts/create {name, password, display_name?, quota?}`, `DELETE /accounts/{account}` ; cible `http://stalwart-web.stalwart.svc.cluster.local:8080`
 
 **Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré directement par Openprovider (pas dans Cloudflare).
 
@@ -326,6 +328,99 @@ kubectl create secret generic admin-sys-token -n agent-system --from-literal=tok
 kubectl rollout restart deploy/admin-sys-agent -n interfaces
 kubectl rollout restart deploy/agent-charlotte -n agent-system
 ```
+
+---
+
+## Stalwart Mail Server v0.11.8
+
+**Namespace** : `stalwart`
+**GitOps** : `~/Kubinote-GitOps/apps/stalwart/base/`
+**Domaine** : `mail.neokube.fr` (Traefik ingress + LoadBalancer 192.168.1.28)
+**Vault** : `secret/neokube/apps/stalwart` — `ADMIN_PASSWORD`, `DKIM_SELECTOR`, `DKIM_PUBKEY_DNS`
+**Connector** : `stalwart-connector` port 8007 (`http://stalwart-connector.connector-system.svc.cluster.local:8007`)
+
+### Gotchas config v0.11.8
+
+> Ces points ont causé des heures de debug — les noter impérativement.
+
+**1. Section admin fallback — tiret obligatoire**
+```toml
+# CORRECT v0.11.8
+[authentication.fallback-admin]
+user = "admin"
+secret = "$6$..."   # SHA-512 crypt
+
+# FAUX (section ignorée silencieusement)
+[authentication.fallback.credentials]
+```
+
+**2. Secret = hash SHA-512 crypt, pas plaintext**
+```bash
+# Générer un hash SHA-512 (format $6$salt$hash)
+python3 -c "import crypt; print(crypt.crypt('monpassword', crypt.mksalt(crypt.METHOD_SHA512)))"
+# ou
+openssl passwd -6 "monpassword"
+```
+
+**3. Path RocksDB sans sous-dossier `/db`**
+```toml
+[store.rocksdb]
+path = "/opt/stalwart-mail/data"   # CORRECT — stalwart --init crée ici
+# path = "/opt/stalwart-mail/data/db"  # FAUX — causait "No such file or directory"
+```
+
+**4. `[authentication.fallback-admin]` ne fonctionne que si la DB est vide**
+Si des principals existent déjà dans RocksDB, le fallback est ignoré. Pour réinitialiser :
+```bash
+kubectl scale statefulset stalwart -n stalwart --replicas=0
+# attendre termination complète
+kubectl run -it --rm cleanup --image=busybox --restart=Never -- \
+  sh -c "rm -rf /data/*"  # avec volumeMount vers le PVC stalwart
+kubectl scale statefulset stalwart -n stalwart --replicas=1
+```
+
+**5. API REST Stalwart — endpoints utiles**
+```bash
+# Base URL interne : http://stalwart-web.stalwart.svc.cluster.local:8080
+# Auth : Basic admin:ADMIN_PASSWORD
+
+# Lister les domaines
+GET /api/principal?types=domain
+
+# Lister les comptes
+GET /api/principal?types=individual
+
+# Créer un compte mail
+POST /api/principal
+{"name":"user@domain.fr","type":"individual","quota":0,"secrets":["password"],"emails":["user@domain.fr"]}
+
+# Supprimer un compte
+DELETE /api/principal/user@domain.fr
+```
+
+**6. Auto-ban (`fail2ban`) — config dans `config.toml` uniquement**
+```toml
+[server.fail2ban]
+rate = "100/1d"   # bannit après 100 erreurs d'auth en 24h
+```
+L'endpoint `POST /api/settings/{key}` retourne 404 — seul `config.toml` fonctionne pour cette directive.
+
+### DNS neokube.fr (Openprovider)
+
+Les enregistrements mail de `neokube.fr` sont gérés par **Openprovider DNS** (pas Cloudflare) :
+- `MX` : `mail.neokube.fr` priorité 10
+- `A` : `mail.neokube.fr` → IP publique
+- `TXT` : SPF `v=spf1 mx ~all`
+- `TXT` : DKIM `mail._domainkey` → clé RSA 2048 du secret `stalwart-dkim`
+- `TXT` : DMARC `_dmarc` → `v=DMARC1; p=none; rua=mailto:postmaster@neokube.fr`
+
+Mise à jour DNS via openprovider-connector :
+```bash
+# PUT (remplace toute la zone) — POST/PATCH retournent "Method is not implemented"
+PUT /dns/zones/neokube.fr  body: {"records": [...]}
+```
+
+---
 
 ### Roadmap sécurité agents
 
@@ -598,3 +693,4 @@ Pods à redémarrer systématiquement après modification de leurs scripts :
 | 2026-04-28 | **Domi v1.0** — Domain Infrastructure Manager (port 8489, domi-queue, namespace dispatcher) : 4ème activité parallèle dans DevProjectWorkflow (gather 3→4) ; mode subdomain : CNAME {slug}.neomnia.net → cname.vercel-dns.com dans Cloudflare zone neomnia.net ; mode register : achat Openprovider + zone Cloudflare + NS update ; domi_link_vercel_domain post-deploy ; DomainRenewalScanWorkflow cron 09:00 UTC (auto-renew <30j, alerte Charlotte <60j) ; Vera v1.2 check domain_provisioned (non-bloquant) ; registre v1.7 |
 | 2026-04-28 | **Phase 10d** : `penpot-connector` v1.0 (port 8004, connector-system) — proxy Penpot RPC API, auth session cookie depuis Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL/PASSWORD), re-login auto 401 ; agent `Penpot` v1.0 (port 8488, penpot-queue, agent-system) — activité `penpot_create_design` : create-project + duplicate-file template → retourne `penpot_url` (/design?project-id=X&file-id=Y) ; non-bloquant si PENPOT_TEMPLATE_FILE_ID/PENPOT_TEAM_ID vides ; DevProjectWorkflow : gather 2→3 (Aria+Nox+**Penpot** en parallèle) ; vera_review : 4ème param `penpot_result` (non-bloquant) ; dispatcher_zoho_callback : ligne "Design" ajoutée ; pm-decisions : penpot_url vectorisé ; registre agents v1.6 |
 | 2026-04-28 | **fix(pipeline/audit)** : 5 bugs bloquants corrigés — (1) Vercel repoId `str→int` (`incorrect_git_source_info`) + fallback org/repo ; (2) `asyncio.gather return_exceptions=True` Penpot+Domi non-bloquants, Aria+Nox re-raise ; (3) Leon `dispatch_project` : `domain_mode`+`domain_name` ajoutés au schema tool et spec JSON ; (4) `CF_ACCOUNT_ID` ajouté dans `configmap-domi-config` (mode register) ; (5) restart Aria+Nox+Dispatcher+Leon après update configmaps ; section "Pièges connus" ajoutée dans CLAUDE.md |
+| 2026-04-28 | **Stalwart — calibration mail** : auto-ban `[server.fail2ban] rate="100/1d"` actif dans config.toml ; domaine `neokube.fr` + compte `admin@neokube.fr` créés via API REST ; DNS zone neokube.fr créée chez Openprovider (A/MX/SPF/DKIM/DMARC) via openprovider-connector (PUT zone — POST/PATCH non implémentés) ; `stalwart-connector` v1.0 (port 8007, connector-system) : auth Basic injectée auto, endpoints `/accounts`, `/accounts/create`, `/accounts/{account}` DELETE, `/proxy` ; Vault `secret/neokube/apps/stalwart` contient `ADMIN_PASSWORD` ; registre agents mis à jour (section connectors) ; section Stalwart gotchas ajoutée dans CLAUDE.md |
