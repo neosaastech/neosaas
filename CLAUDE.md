@@ -351,7 +351,7 @@ kubectl rollout restart deploy/agent-charlotte -n agent-system
 | `domi@neokube.fr` | Domi | `secret/neokube/agents/domi` `MAIL_FROM`/`MAIL_PASSWORD` | Alertes renouvellement domaine |
 | `no-reply@neokube.fr` | Dispatcher | `secret/neokube/apps/stalwart` `NOREPLY_PASSWORD` | Notifications workflow automatiques post-deploy |
 
-**SMTP interne** : `stalwart-web.stalwart.svc.cluster.local:587` (STARTTLS, auth PLAIN)
+**SMTP interne** : `stalwart-mail.stalwart.svc.cluster.local:587` (STARTTLS, auth PLAIN)
 **Activité Dispatcher** : `dispatcher_send_client_mail` — envoyée si `spec.client_email` présent, non-bloquante
 
 ### Gotchas config v0.11.8
@@ -788,3 +788,6 @@ Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatc
 | 2026-04-29 | **E2E pipeline complet validé** : `devproject-e2e-test-b468b5b0` — Aria+Nox+Penpot+Domi (parallel) → Vera (approved) → deploy Vercel → pm-decisions → send_client_mail ; DomainRenewalScanWorkflow `domi-renewal-scan-daily` RUNNING dans Temporal |
 | 2026-04-29 | **fix(smtp+embed)** : (1) SMTP_HOST corrigé `stalwart-web` → `stalwart-mail` dans tous les agents (port 587 SMTP submission, `stalwart-web` = HTTP admin uniquement) ; (2) `_embed()` fix format HuggingFace — LiteLLM router retourne 768 scalaires séparés dans `data` au lieu d'un vecteur unique ; `data[0]["embedding"]` était un float causant HTTP 400 Qdrant ; fix dans dispatcher + charlotte-sre ; piège documenté dans CLAUDE.md §7 |
 | 2026-04-29 | **fix(smtp+dispatch)** : (3) `on_approved/on_rejected` signal handlers : ajout `reason: str = ""` — Temporal passe le payload signal en arg positionnel, `on_approved(self)` levait TypeError ; (4) `validate_certs=False` dans aiosmtplib.send (Stalwart self-signed cert) ; (5) rôle `"user"` ajouté sur 4 comptes Stalwart (leon/vera/domi/no-reply) — sans ce rôle Stalwart retourne 550 5.7.1 ; **pipeline E2E complet validé** : deploy Vercel + Qdrant pm-decisions HTTP 200 + email envoyé à chvandendriessche@neomnia.net |
+| 2026-04-29 | **fix(penpot)** : `PENPOT_TEMPLATE_FILE_ID` provisionnée — fichier `template-maquette-base` créé dans Penpot Drafts (id=`32796cdf-d506-81b0-8007-f19045833782`) ; `deployment-penpot.yaml` mis à jour + Vault `secret/neokube/infrastructure/penpot` ; `penpot_url` non-null désormais dans les runs pipeline |
+| 2026-04-29 | **fix(dispatcher/charlotte)** : timeout `dispatcher_notify_approval` Charlotte 10s → 60s (LLM call sur `/mission` dépassait le timeout) |
+| 2026-04-29 | **cleanup** : 16 repos test GitHub (neomnia org) supprimés + 9 projets Vercel associés supprimés |
