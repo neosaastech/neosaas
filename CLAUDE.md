@@ -215,12 +215,19 @@ Toi (Slack / Open WebUI)
 ### DevProjectWorkflow — flux complet
 
 ```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PLANIFICATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Brief (Slack #produit / Open WebUI)
+  → Charlotte : project_health_check → bilan Zoho/GitHub/Vercel/Penpot/Notion
   → Leon : dialogue de clarification (max 10 tours)
   → Leon : produit ProjectSpec JSON (12 champs validés)
-  → Leon : dispatch_project → POST /trigger Dispatcher
-  → Leon : crée tâches dans Zoho Projects
-  ──────────────────────────────────────────────────────
+  → Leon : crée tâches + jalons dans Zoho Projects
+  → Charlotte : project_health_check(update_docs=True) → croise les liens
+  ─────────────────── POINT DE DÉCLENCHEMENT PRODUCTION ─────────────────────
+  [ACTUEL]  Leon : dispatch_project → POST /trigger Dispatcher
+  [CIBLE]   Zoho project status → "Prêt pour production" (action humaine)
+            → zoho-observer lit les champs Zoho → construit ProjectSpec
+            → POST /trigger Dispatcher
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PRODUCTION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   → Dispatcher : validate_spec (tous les champs obligatoires)
   → Dispatcher : [PARALLEL]
       Aria   : GitHub repo (template-nextjs) + Vercel project
@@ -330,6 +337,173 @@ kubectl create secret generic admin-sys-token -n agent-system --from-literal=tok
 kubectl rollout restart deploy/admin-sys-agent -n interfaces
 kubectl rollout restart deploy/agent-charlotte -n agent-system
 ```
+
+---
+
+## Cycle de vie d'un projet — Planification → Production
+
+Cette section est la référence pour comprendre à quel moment un projet passe de la planification à la production, quels agents interviennent à chaque phase, et ce qui manque pour atteindre le flux cible (Zoho-driven).
+
+---
+
+### Phase 1 — Exploration
+
+**Quand** : L'utilisateur mentionne un projet dans Open WebUI, sans savoir encore s'il existe.
+
+**Agent principal** : Charlotte
+
+| Action | Outil | Résultat |
+|---|---|---|
+| Vérifier l'existence du projet dans tous les systèmes | `project_health_check(project_name)` | Tableau ✅/❌/⚠️ — Zoho, GitHub, Vercel, Penpot, Notion |
+| Si tout est ✅ | — | Projet déjà en place, passer directement à la Phase 3 si souhaité |
+| Si ❌ dans Zoho | → Phase 2 (Leon) | Le projet n'est pas encore structuré |
+
+**Exemple de déclencheur** : *"Vérifie l'état du projet neomnia.net"*, *"Est-ce que tout est en place pour lancer la refonte ?"*
+
+---
+
+### Phase 2 — Planification
+
+**Quand** : Le projet n'existe pas encore (ou est incomplet) — Leon structure le brief.
+
+**Agents principaux** : Leon, Charlotte
+
+| Étape | Agent | Action |
+|---|---|---|
+| 1 | Leon | Dialogue de clarification (max 10 tours) — extrait title, objective, contraintes, client_email... |
+| 2 | Leon | Émet le ProjectSpec JSON (12 champs validés) |
+| 3 | Leon | Crée le projet Zoho avec jalons + tasklists + tâches |
+| 4 | Charlotte | `project_health_check(update_docs=True)` — croise les liens Zoho ↔ Notion ↔ autres systèmes |
+
+**Sorties** :
+- Projet Zoho structuré (jalons, listes, tâches, description avec liens croisés)
+- Page Notion créée ou mise à jour avec section "Liens projet"
+- ProjectSpec JSON prêt (stocké dans Leon, déclenche la production si `dispatch_project` appelé)
+
+**Conditions de fin de phase** — l'une ou l'autre :
+
+```
+[ACTUEL]  Leon appelle dispatch_project() dès que le ProjectSpec est complet
+          → passage immédiat en production, sans validation humaine du plan Zoho
+
+[CIBLE]   L'utilisateur revoit le plan dans Zoho PM (jalons, tâches, description)
+          → marque le projet "Prêt pour production" (statut custom Zoho)
+          → zoho-observer détecte ce statut → construit ProjectSpec → déclenche Dispatcher
+```
+
+> **Gap actuel** : dans le flux cible, l'humain a une fenêtre de relecture dans Zoho avant que la production ne démarre. Dans le flux actuel, Leon déclenche immédiatement sans ce cran d'arrêt.
+
+---
+
+### Phase 3 — Production
+
+**Quand** : `POST /trigger` reçu par Dispatcher (depuis Leon, Charlotte, ou zoho-observer).
+
+**Agent principal** : Dispatcher + Aria + Nox + Penpot + Domi + Vera
+
+| Étape | Agent | Action | Durée max | Bloquant |
+|---|---|---|---|---|
+| 1 | Dispatcher | `validate_spec` — vérifie les 12 champs obligatoires | 30 s | Oui |
+| 2 | Aria | GitHub repo frontend (template-nextjs) + Vercel project | 300 s | **Oui** |
+| 2 | Nox | GitHub repo backend (template-fastapi) + Neon branch | 300 s | **Oui** |
+| 2 | Penpot | Projet Penpot + duplication fichier template | 300 s | Non |
+| 2 | Domi | Provision domaine (subdomain `{slug}.neomnia.net` ou achat) | 300 s | Non |
+| 3 | Vera | QA review — acceptance criteria + artefacts Aria/Nox/Penpot | 120 s | **Oui** |
+| 4 | Charlotte | Notification approbation humaine (Temporal signal) | 30 s | — |
+| 5 | — | Approbation humaine (24h max) | 24 h | **Oui** |
+| 6 | Dispatcher | Deploy Vercel + `domi_link_vercel_domain` | 120 s | Oui |
+| 7 | Dispatcher | `write_pm_decisions` + `zoho_callback` + `send_client_mail` | 30 s | Non |
+
+**Sorties garanties en fin de workflow** :
+
+| Système | Résultat |
+|---|---|
+| GitHub | 2 repos créés : `neomnia/{slug}-frontend` + `neomnia/{slug}-backend` |
+| Vercel | Projet déployé, domaine `{slug}.neomnia.net` lié |
+| Neon | Branche créée sur NeoBridge (`neon_branch_id` + `neon_endpoint_host`) |
+| Penpot | Projet design initialisé (template dupliqué) |
+| Email | Envoyé à `spec.client_email` avec liens GitHub/Vercel/Penpot |
+| Zoho | Commentaire sur la tâche + lien Penpot |
+| Qdrant | Décision archivée dans `pm-decisions` (768-dim, recherche sémantique) |
+
+---
+
+### Gaps — Ce qui manque pour le flux cible (2026-05-02)
+
+#### Gap 1 — Trigger "Zoho status → production" `[priorité haute]`
+
+**Problème** : zoho-observer surveille uniquement les projets créés *par Leon* via l'API. Il ne détecte pas les changements de statut sur un projet existant, qu'il ait été créé par Leon ou manuellement.
+
+**Impact** : impossible de lancer la production depuis Zoho PM sans passer par Leon en mode chatbot.
+
+**Solution envisagée** :
+```python
+# Dans zoho-observer — nouveau poll périodique (ex: toutes les 5 min)
+projects = GET /projects/?status=active
+for p in projects:
+    if p["custom_status_name"] == "Prêt pour production":
+        if not already_dispatched(p["id"]):
+            spec = zoho_to_project_spec(p)   # → Gap 2
+            POST dispatcher/trigger, body=spec
+            mark_dispatched(p["id"])          # évite le double-déclenchement
+```
+
+---
+
+#### Gap 2 — Mapper "Zoho project → ProjectSpec" `[priorité haute]`
+
+**Problème** : Le ProjectSpec est aujourd'hui construit *uniquement* par Leon via dialogue. Il n'existe pas de fonction qui lit un projet Zoho existant et produit un ProjectSpec valide.
+
+**Impact** : même si Gap 1 est résolu, il n'y a rien pour extraire les 12 champs du projet Zoho.
+
+**Mapping envisagé** :
+
+| Champ ProjectSpec | Source Zoho | Fallback |
+|---|---|---|
+| `project_id` | `project.id_string` | — |
+| `title` | `project.name` | — |
+| `objective` | `project.description` (1ère ligne) | `"Voir projet Zoho"` |
+| `client_email` | `project.description` (pattern `email:...`) | `""` (non-bloquant) |
+| `project_type` | `project.description` (pattern `type:...`) | `"webapp"` |
+| `domain_mode` | `project.description` (pattern `domain:...`) | `"subdomain"` |
+| `domain_name` | `project.description` (pattern `domain_name:...`) | `""` |
+| `acceptance_criteria` | noms des milestones | `[]` |
+| `zoho_project_id` | `project.id_string` | — |
+| `emitted_at` | timestamp du trigger | — |
+
+> Convention proposée : stocker les champs structurés dans la description Zoho sous forme `champ: valeur` (une par ligne), lisibles par un humain et parsables par le mapper.
+
+---
+
+#### Gap 3 — Email de rapport étape par étape `[priorité basse]`
+
+**Problème** : Un seul email est envoyé en fin de workflow (étape 7). L'utilisateur ne sait pas ce qui s'est passé pendant les 5-10 minutes de build.
+
+**Impact** : aucune visibilité en temps réel sur l'avancement (Aria ✅ ? Vera ❌ ?).
+
+**Solution envisagée** : Email récapitulatif enrichi à l'étape 7 qui liste toutes les étapes franchies avec leur statut, construit à partir du Temporal workflow history ou d'un dict d'étapes accumulé dans le workflow context. Pas d'emails intermédiaires (spam) — un seul email complet.
+
+```
+Objet : ✅ Projet {title} — déploiement terminé
+
+Étapes franchies :
+  ✅ Aria  — repo frontend créé : github.com/neomnia/{slug}-frontend
+  ✅ Nox   — repo backend + branche Neon : {endpoint_host}
+  ✅ Penpot — design initialisé : {penpot_url}
+  ✅ Domi  — domaine provisionné : {slug}.neomnia.net
+  ✅ Vera  — QA approuvée (0 issue bloquante)
+  ✅ Deploy — URL live : https://{slug}.neomnia.net
+```
+
+---
+
+### Résumé des priorités (2026-05-02)
+
+| Item | Effort | Valeur | Priorité |
+|---|---|---|---|
+| Gap 1 — Trigger Zoho status | Moyen (zoho-observer + poll) | Haute — enlève la dépendance au chatbot Leon | **P1** |
+| Gap 2 — Mapper Zoho → ProjectSpec | Moyen (fonction pure, testable) | Haute — condition sine qua non du Gap 1 | **P1** |
+| Gap 3 — Email enrichi | Faible (Dispatcher étape 7) | Moyenne — meilleure UX mais non bloquant | **P3** |
 
 ---
 
@@ -736,6 +910,82 @@ Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatc
 
 ---
 
+### 8. URLs externes : construire côté connector, jamais côté agent
+
+**Symptôme** : Charlotte et Leon généraient des URLs Zoho incorrectes (ex: `#zp/dashboard/{id}`, `/projects/{id}/` sans `#`) parce que chaque agent avait sa propre implémentation de construction d'URL — certaines inventées, toutes désynchronisées.
+
+**Cause racine** : les connectors avaient été conçus comme proxies HTTP fins (Phase 1). La logique de présentation (URLs, labels) s'est accumulée dans les agents au lieu de rester au niveau du connector.
+
+**Règle** : **Toute enrichissement de la réponse d'une API externe appartient au connector, pas à l'agent.**
+
+```python
+# FAUX — chaque agent construit sa propre URL (désynchronisation garantie)
+# configmap-leon-script.yaml
+url = f"https://projects.zoho.com/portal/neomniadotnet#zp/projects/{p['id']}/"
+
+# configmap-sre-script.yaml
+url = f"https://projects.zoho.com/portal/{ZOHO_PORTAL_NAME}#zp/projects/{pid}/"
+
+# CORRECT — le connector injecte web_url dans chaque réponse
+# configmap-zoho-connector.yaml  ← un seul endroit
+p["web_url"] = f"{WEB_BASE}#zp/projects/{pid}/"
+
+# Les agents lisent simplement :
+url = p.get("web_url", "")
+```
+
+**Pattern à appliquer à tout nouveau connector :**
+
+```python
+def _inject_web_urls(path: str, body: dict) -> dict:
+    """Post-processing centralisé : enrichit les réponses avec web_url."""
+    if "projects" in body:
+        for p in body["projects"]:
+            p["web_url"] = f"{WEB_BASE}#zp/projects/{p['id']}/"
+    if "tasks" in body:
+        for t in body["tasks"]:
+            t["web_url"] = t.get("link", {}).get("web", {}).get("url", "")
+    # ... autres ressources
+    return body
+
+# Appelé une seule fois dans /proxy, avant return :
+return _inject_web_urls(req.path, r.json())
+```
+
+**Checklist pour chaque nouveau connector :**
+- [ ] Identifier toutes les URLs web consultables par un humain dans l'API (projets, tâches, tickets, fichiers…)
+- [ ] Ajouter un `_inject_web_urls()` dans le connector dès la v1.0
+- [ ] Les agents ne doivent **jamais** construire d'URL vers l'API externe — ils lisent `item["web_url"]`
+- [ ] Documenter le format d'URL validé dans `CLAUDE.md` et dans la memory `reference_<api>_api.md`
+
+**URLs Zoho validées (2026-05-02) :**
+| Ressource | Format |
+|---|---|
+| Projet | `https://projects.zoho.com/portal/neomniadotnet#zp/projects/{id}/` |
+| Tâche | retournée par l'API dans `link.web.url` (format `#zp/task-detail/{id}`) |
+| Milestone | `#zp/projects/{project_id}/milestones/` |
+| Tasklist | `#zp/projects/{project_id}/tasks/` |
+
+---
+
+## Règles de conception connector-system
+
+> Ces règles s'appliquent à tout nouveau connector ajouté dans `connector-system`.
+
+**R1 — Un connector = source de vérité unique pour son API**
+Credentials, URL de base, headers obligatoires, post-processing des réponses : tout appartient au connector. Un agent ne doit jamais lire un secret d'API directement ni construire une URL vers l'API externe.
+
+**R2 — Enrichir à la sortie, pas dans les agents**
+Toute normalisation de réponse (renommage de champs, injection d'URLs web, casting de types) se fait dans le connector avant le `return`. Voir `_inject_web_urls()` dans `zoho-connector` v1.1 comme référence.
+
+**R3 — Toujours exposer `/health` et `/proxy`**
+`/health` doit être libre (probes K8s). `/proxy` reçoit `{method, path, data?}` et redirige vers l'API externe. Endpoints spécialisés en bonus si nécessaire (`/query` pour neon-connector, `/accounts` pour stalwart-connector).
+
+**R4 — Valider les URLs avec le navigateur avant de les coder**
+Toute URL construite manuellement doit être testée dans un vrai navigateur avant d'être codée dans un connector ou documentée. Ne jamais supposer le format depuis la doc officielle ou d'autres patterns Zoho — le SPA Zoho utilise des routes `#fragment` non documentées.
+
+---
+
 ## Historique des actions Claude
 
 | Date | Action |
@@ -791,3 +1041,8 @@ Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatc
 | 2026-04-29 | **fix(penpot)** : `PENPOT_TEMPLATE_FILE_ID` provisionnée — fichier `template-maquette-base` créé dans Penpot Drafts (id=`32796cdf-d506-81b0-8007-f19045833782`) ; `deployment-penpot.yaml` mis à jour + Vault `secret/neokube/infrastructure/penpot` ; `penpot_url` non-null désormais dans les runs pipeline |
 | 2026-04-29 | **fix(dispatcher/charlotte)** : timeout `dispatcher_notify_approval` Charlotte 10s → 60s (LLM call sur `/mission` dépassait le timeout) |
 | 2026-04-29 | **cleanup** : 16 repos test GitHub (neomnia org) supprimés + 9 projets Vercel associés supprimés |
+| 2026-05-02 | **fix(cluster-bootstrap)** : image `temporalio/temporal:1.30.2` inexistante sur Docker Hub → `latest` ; CronJob débloqué (`concurrencyPolicy: Forbid` bloquait tous les runs suivants) |
+| 2026-05-02 | **fix(zoho URLs)** : URLs projets/tâches incorrectes dans Charlotte et Leon (format `#zp/dashboard/{id}` inventé) → URL validée `#zp/projects/{id}/` (SPA fragment) |
+| 2026-05-02 | **feat(zoho-connector v1.1)** : `_inject_web_urls()` centralisé — enrichit chaque réponse proxy avec `web_url` pour projets/tâches/milestones/tasklists ; Charlotte + Leon migrent de la construction locale vers `item["web_url"]` ; section "Règles de conception connector-system" + piège §8 ajoutés dans CLAUDE.md |
+| 2026-05-02 | **feat(charlotte): `project_health_check`** — bilan cross-systèmes Zoho+GitHub+Vercel+Penpot+Notion en un appel parallèle ; `update_docs=True` croise les liens dans Zoho description + page Notion ; règle 11 dans le prompt (pas de `zoho_list_projects` pour les demandes "vérifier/checker/rassure-moi") |
+| 2026-05-02 | **doc: cycle de vie projet** — section "Planification → Production" ajoutée dans CLAUDE.md : 3 phases (Exploration/Planification/Production), frontière de déclenchement annotée dans le diagramme DevProjectWorkflow, 3 gaps documentés (trigger Zoho status P1, mapper Zoho→ProjectSpec P1, email enrichi P3) |
