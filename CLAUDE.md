@@ -298,11 +298,11 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 - neon-connector uniquement : `POST /query {project_id, sql, database?, role_name?}`
 - vercel-connector : injecte automatiquement `teamId` dans les params
 - penpot-connector : `path` = nom de la commande RPC Penpot (ex. `create-project`) ; auth session cookie-based, re-login auto sur 401
-- openprovider-connector : auth JWT via login username/password, re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta`
+- openprovider-connector v1.1 : auth JWT via login username/password, re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta` ; endpoints bonus `POST /dns/records/add {zone, records}` et `POST /dns/records/remove {zone, records}` (voir §DNS neokube.fr pour le format correct)
 - cloudflare-connector : Bearer token statique ; endpoint bonus `GET /zones` ; API base `https://api.cloudflare.com/client/v4`
 - stalwart-connector : auth Basic `admin:ADMIN_PASSWORD` injectée auto ; endpoints bonus `GET /accounts`, `POST /accounts/create {name, password, display_name?, quota?}`, `DELETE /accounts/{account}` ; cible `http://stalwart-web.stalwart.svc.cluster.local:8080`
 
-**Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré directement par Openprovider (pas dans Cloudflare).
+**Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré par **Openprovider DNS** (NS `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`, zone_id=14798687). Enregistrements mail actifs depuis 2026-05-02 (A/MX/SPF/DKIM/DMARC).
 
 **Zones Cloudflare** (19 actives, account_id=`822ba0e8c232e192475e6bd02ce36cb4`) : alloremorquage.fr, charles-vandendriessche.fr, content-mania.com, ecolinks.fr, espace-video.fr, iaa-temoins.fr, lapollo.fr, literie-de-france.com, locsoleil.fr, mission-croissance.fr, nellie.fr, **neomnia.net** (`8c1283e7c52c34a9d5112c0fb271af27`), neoprospect.fr, neosaas.tech, passion-animaux.fr, redaction-persuasive.fr, referencement-site.be, relation-client.be, sri-solutions.fr.
 
@@ -596,18 +596,45 @@ L'endpoint `POST /api/settings/{key}` retourne 404 — seul `config.toml` foncti
 
 ### DNS neokube.fr (Openprovider)
 
-Les enregistrements mail de `neokube.fr` sont gérés par **Openprovider DNS** (pas Cloudflare) :
-- `MX` : `mail.neokube.fr` priorité 10
-- `A` : `mail.neokube.fr` → IP publique
-- `TXT` : SPF `v=spf1 mx ~all`
-- `TXT` : DKIM `mail._domainkey` → clé RSA 2048 du secret `stalwart-dkim`
-- `TXT` : DMARC `_dmarc` → `v=DMARC1; p=none; rua=mailto:postmaster@neokube.fr`
+**Nameservers actifs** : `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`
 
-Mise à jour DNS via openprovider-connector :
+> Attention : le domaine avait été migré temporairement vers Cloudflare NS (`david.ns.cloudflare.com` / `abby.ns.cloudflare.com`) mais il n'y avait aucune zone Cloudflare correspondante → SERVFAIL. Corrigé le 2026-05-02 via `PUT /v1beta/domains/29414839` pour revenir sur Openprovider DNS.
+
+**Enregistrements actifs** (zone_id=14798687, SOA serial 2026050205) :
+| Type | Nom | Valeur | TTL |
+|---|---|---|---|
+| `A` | `mail.neokube.fr` | `45.130.81.100` (IP Orange dynamique) | 600 |
+| `MX` | `neokube.fr` | `mail.neokube.fr` prio=10 | 3600 |
+| `TXT` | `neokube.fr` | `v=spf1 mx ~all` | 3600 |
+| `TXT` | `mail._domainkey.neokube.fr` | Clé DKIM RSA 2048 Stalwart | 3600 |
+| `TXT` | `_dmarc.neokube.fr` | `v=DMARC1; p=none; rua=mailto:admin@neokube.fr` | 3600 |
+
+> IP Orange est dynamique — à mettre à jour manuellement ou via DynDNS si elle change.
+
+**Mise à jour DNS via openprovider-connector v1.1** :
 ```bash
-# PUT (remplace toute la zone) — POST/PATCH retournent "Method is not implemented"
-PUT /dns/zones/neokube.fr  body: {"records": [...]}
+# Ajouter des enregistrements (format correct — records.add avec zone id)
+POST /dns/records/add
+{
+  "zone": "neokube.fr",
+  "records": [
+    {"name": "mail", "type": "A", "value": "1.2.3.4", "ttl": 600},
+    {"name": "", "type": "MX", "value": "mail.neokube.fr", "prio": 10, "ttl": 3600}
+  ]
+}
+
+# Supprimer des enregistrements
+POST /dns/records/remove
+{"zone": "neokube.fr", "records": [{"type": "A", "name": "mail", "value": "45.130.81.100"}]}
 ```
+
+**Gotcha API Openprovider DNS (découvert 2026-05-02)** :
+- L'ancien format `PUT /dns/zones/{name}` avec `{"zone": {"records": [...]}}` retournait `success:true` mais ne modifiait rien (bug silencieux)
+- Format correct : `{"id": <zone_id>, "name": "<zone>", "records": {"add": [...]}}`
+- TTL minimum : **600 secondes** (sinon error 815)
+- `POST/PATCH/DELETE` sur `/dns/zones/{name}/records` retournent "Method is not implemented"
+- `GET /dns/zones/{name}/records` — endpoint correct pour lister les enregistrements
+- `GET /dns/zones/{name}?with_records=1` — retourne code 80 "Invalid request" (paramètre non supporté)
 
 ---
 
@@ -639,6 +666,82 @@ PUT /dns/zones/neokube.fr  body: {"records": [...]}
 | **Phase 10d** | `penpot-connector` v1.0 (port 8004) — proxy Penpot RPC API self-hosted, auth session cookie Vault ; agent `Penpot` v1.0 (port 8488, penpot-queue) — `penpot_create_design` : create-project + duplicate-file ; DevProjectWorkflow gather 2→3 (Aria+Nox+Penpot) ; Vera v1.1 + penpot check (non-bloquant) ; zoho_callback enrichi du lien Design ; registre v1.6 | — | ✅ Terminé 2026-04-28 |
 
 **Note R3 / max_tokens_per_run** : ces items sont introuvables dans le dépôt GitOps. S'ils proviennent d'un document Notion ou externe, les localiser avant d'implémenter.
+
+---
+
+## Scaleway Transactional Email (TEM)
+
+**Objectif** : relay SMTP sortant pour Stalwart (Orange ISP bloque le port 25 sortant).
+**Architecture** : Stalwart → smarthost Scaleway TEM → Internet (email transactionnel et relationnel)
+
+**Vault** : `secret/neokube/infrastructure/scaleway`
+| Clé Vault | Description |
+|---|---|
+| `SCW_ACCESS_KEY` | Access key Scaleway |
+| `SCW_SECRET_KEY` | Secret key Scaleway |
+| `SCW_DEFAULT_PROJECT_ID` | `473a0ce6-ecd8-4374-8f49-9a6e347d0c8d` |
+| `SCW_DEFAULT_REGION` | `fr-par` |
+| `SCW_DEFAULT_ZONE` | `fr-par-1` |
+| `SCW_TEM_SMTP_HOST` | `smtp.tem.scaleway.com` |
+| `SCW_TEM_SMTP_PORT` | `587` |
+| `SCW_TEM_SMTP_USERNAME` | ID du projet Scaleway (= `SCW_DEFAULT_PROJECT_ID`) |
+| `SCW_TEM_SMTP_PASSWORD` | Secret key TEM (= `SCW_SECRET_KEY`) |
+
+### Activation TEM (étape manuelle requise)
+
+> **BLOQUEUR** : L'offre TEM doit être souscrite manuellement dans la console Scaleway avant de pouvoir créer un domaine via API.
+> URL : `https://console.scaleway.com/transactional-email/`
+> Projet : `473a0ce6-ecd8-4374-8f49-9a6e347d0c8d`
+
+### Étapes post-activation
+
+1. **Créer le domaine `neokube.fr`** dans Scaleway TEM
+   ```bash
+   curl -s -X POST "https://api.scaleway.com/transactional-email/v1alpha1/regions/fr-par/domains" \
+     -H "X-Auth-Token: $SCW_SECRET_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"project_id": "473a0ce6-ecd8-4374-8f49-9a6e347d0c8d", "domain_name": "neokube.fr"}'
+   ```
+
+2. **Récupérer les enregistrements DNS TEM** (DKIM selector Scaleway)
+   ```bash
+   curl -s "https://api.scaleway.com/transactional-email/v1alpha1/regions/fr-par/domains/{id}" \
+     -H "X-Auth-Token: $SCW_SECRET_KEY" | python3 -m json.tool
+   ```
+   → Récupérer `dkim_config.dkim_public_key` et `dkim_config.selector`
+
+3. **Ajouter les enregistrements DNS TEM** dans la zone Openprovider :
+   - TXT `{selector}._domainkey.neokube.fr` → clé DKIM TEM (différent du selector Stalwart `mail._domainkey`)
+   - TXT `neokube.fr` SPF : mettre à jour → `v=spf1 mx include:_spf.tem.scaleway.com ~all`
+
+4. **Configurer le smarthost Stalwart** dans `configmap-stalwart-config.yaml` :
+   ```toml
+   [remote.smtp-relay]
+   address = "smtp.tem.scaleway.com"
+   port = 587
+   protocol = "smtp"
+   tls.implicit = false
+   tls.allow-invalid-certs = false
+   auth.enable = true
+   auth.user = "473a0ce6-ecd8-4374-8f49-9a6e347d0c8d"
+   auth.secret = "<SCW_SECRET_KEY>"
+
+   [queue.outbound]
+   next-hop = [{name="default", remote=[{name="smtp-relay"}]}]
+   ```
+
+### État actuel (2026-05-02)
+
+| Composant | État |
+|---|---|
+| Vault `secret/neokube/infrastructure/scaleway` | ✅ Provisionné |
+| Souscription TEM Scaleway | **⚠️ Manuelle requise** |
+| Domaine `neokube.fr` dans TEM | Bloqué par souscription |
+| Smarthost Stalwart | En attente TEM |
+
+### Pourquoi Scaleway TEM et pas Stalwart direct
+
+Orange (FAI) bloque le port 25 sortant — vérifiable par timeout systématique vers Exchange Online et autres MX. Stalwart reste opérationnel en interne (IMAP, soumission intra-cluster), mais le relay sortant vers Internet requiert un SMTP relay de confiance.
 
 ---
 
@@ -1046,3 +1149,4 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-02 | **feat(zoho-connector v1.1)** : `_inject_web_urls()` centralisé — enrichit chaque réponse proxy avec `web_url` pour projets/tâches/milestones/tasklists ; Charlotte + Leon migrent de la construction locale vers `item["web_url"]` ; section "Règles de conception connector-system" + piège §8 ajoutés dans CLAUDE.md |
 | 2026-05-02 | **feat(charlotte): `project_health_check`** — bilan cross-systèmes Zoho+GitHub+Vercel+Penpot+Notion en un appel parallèle ; `update_docs=True` croise les liens dans Zoho description + page Notion ; règle 11 dans le prompt (pas de `zoho_list_projects` pour les demandes "vérifier/checker/rassure-moi") |
 | 2026-05-02 | **doc: cycle de vie projet** — section "Planification → Production" ajoutée dans CLAUDE.md : 3 phases (Exploration/Planification/Production), frontière de déclenchement annotée dans le diagramme DevProjectWorkflow, 3 gaps documentés (trigger Zoho status P1, mapper Zoho→ProjectSpec P1, email enrichi P3) |
+| 2026-05-02 | **fix(dns/neokube.fr)** : DNS zone opérationnelle — (1) bug Openprovider API identifié : `{"zone":{"records":[...]}}` retournait success:true silencieusement sans appliquer les records ; format correct = `{"id":zone_id, "name":"zone", "records":{"add":[...]}}` + TTL min 600s ; (2) domaine délégué vers Cloudflare NS sans zone CF → SERVFAIL ; NS remis sur Openprovider via `PUT /domains/29414839` ; (3) 5 records ajoutés : A mail→45.130.81.100, MX prio=10, SPF, DKIM Stalwart, DMARC ; (4) openprovider-connector v1.1 : endpoints `/dns/records/add` + `/dns/records/remove` ; (5) section Scaleway TEM + Penpot SMTP ajoutées dans CLAUDE.md |
