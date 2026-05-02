@@ -509,11 +509,16 @@ Objet : ✅ Projet {title} — déploiement terminé
 
 ## Stalwart Mail Server v0.11.8
 
-**Namespace** : `stalwart`
-**GitOps** : `~/Kubinote-GitOps/apps/stalwart/base/`
-**Domaine** : `mail.neokube.fr` (Traefik ingress + LoadBalancer 192.168.1.28)
+**Instance** : Docker sur Scaleway fr-par-1, IP `51.15.253.114` (DEV1-S)
+**Namespace K8s** : `stalwart` — Services ClusterIP + Endpoints manuels → 51.15.253.114
+**GitOps** : `~/Kubinote-GitOps/apps/stalwart/base/` (StatefulSet/PVC supprimés — instance externe)
+**Domaine** : `mail.neokube.fr` → `51.15.253.114` (Scaleway, pas l'IP Orange)
+**Config** : `/opt/stalwart-mail/etc/config.toml` sur l'instance Scaleway
+**SSH** : `ssh -i ~/.ssh/id_ed25519_neokube root@51.15.253.114`
 **Vault** : `secret/neokube/apps/stalwart` — `ADMIN_PASSWORD`, `DKIM_SELECTOR`, `DKIM_PUBKEY_DNS`, `NOREPLY_PASSWORD`
 **Connector** : `stalwart-connector` port 8007 (`http://stalwart-connector.connector-system.svc.cluster.local:8007`)
+
+> **Pourquoi Scaleway ?** Le nœud kubinote est derrière Orange ISP qui bloque TLS sortant sur les ports SMTP (25, 465, 587). Stalwart est externalisé sur Scaleway fr-par-1 pour que le relay TEM fonctionne. Les agents K8s se connectent via `stalwart-mail.stalwart.svc.cluster.local:587` (ClusterIP → Endpoint → 51.15.253.114) en **plaintext** (pas de STARTTLS).
 
 ### Comptes mail agents
 
@@ -525,7 +530,7 @@ Objet : ✅ Projet {title} — déploiement terminé
 | `domi@neokube.fr` | Domi | `secret/neokube/agents/domi` `MAIL_FROM`/`MAIL_PASSWORD` | Alertes renouvellement domaine |
 | `no-reply@neokube.fr` | Dispatcher | `secret/neokube/apps/stalwart` `NOREPLY_PASSWORD` | Notifications workflow automatiques post-deploy |
 
-**SMTP interne** : `stalwart-mail.stalwart.svc.cluster.local:587` (STARTTLS, auth PLAIN)
+**SMTP interne** : `stalwart-mail.stalwart.svc.cluster.local:587` (plaintext, pas de TLS — `start_tls=False`)
 **Activité Dispatcher** : `dispatcher_send_client_mail` — envoyée si `spec.client_email` présent, non-bloquante
 
 ### Gotchas config v0.11.8
@@ -594,6 +599,35 @@ rate = "100/1d"   # bannit après 100 erreurs d'auth en 24h
 ```
 L'endpoint `POST /api/settings/{key}` retourne 404 — seul `config.toml` fonctionne pour cette directive.
 
+**7. `session.auth.mechanisms` — syntaxe expression string, PAS tableau TOML**
+
+En v0.11.8, la config des mécanismes utilise la **syntaxe expression Stalwart** (chaîne entre `[...]`), **pas** un tableau TOML.
+
+```toml
+# CORRECT — syntaxe expression string (contourne le bug tri alphabétique RocksDB)
+[session.auth]
+require-tls = false
+mechanisms = "[plain, login, oauthbearer]"
+
+# FAUX — tableau TOML → stocké comme .0000="plain" → "Invalid property found in 'if' block"
+[session.auth]
+mechanisms = ["plain", "login", "oauthbearer"]
+
+# FAUX — format conditionnel [[...]] → bug else<if alphabétiquement dans RocksDB
+[[session.auth.mechanisms]]
+if = "!is_empty(remote_ip)"
+then = ["plain", "login", "oauthbearer"]
+else = ["oauthbearer"]
+```
+
+**Pourquoi** : Stalwart v0.11.8 stocke les configs en BTreeMap (clés triées alphabétiquement). Le format conditionnel `[[array]]` génère des sous-clés `.else`, `.if`, `.then` — or `else < if` alphabétiquement, ce qui lève "Found 'else' before 'if'" au démarrage. Le format tableau TOML `["plain"]` génère `.0000 = "plain"` que le parseur refuse car il attend `.0000.if`. La **string expression** `"[plain, login, oauthbearer]"` stocke une seule clé `session.auth.mechanisms` et emprunte le fast-path du parseur qui bypass le bloc if/then/else.
+
+**API format correct** pour modification via API (`POST /api/settings`) :
+```json
+[{"insert": [["session.auth.mechanisms", "[plain, login, oauthbearer]"]]}]
+```
+Variants supportés : `delete`, `clear`, `insert`.
+
 ### DNS neokube.fr (Openprovider)
 
 **Nameservers actifs** : `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`
@@ -603,11 +637,13 @@ L'endpoint `POST /api/settings/{key}` retourne 404 — seul `config.toml` foncti
 **Enregistrements actifs** (zone_id=14798687, SOA serial 2026050205) :
 | Type | Nom | Valeur | TTL |
 |---|---|---|---|
-| `A` | `mail.neokube.fr` | `45.130.81.100` (IP Orange dynamique) | 600 |
+| `A` | `mail.neokube.fr` | `51.15.253.114` (Scaleway fr-par-1, instance fixe) | 600 |
 | `MX` | `neokube.fr` | `mail.neokube.fr` prio=10 | 3600 |
 | `TXT` | `neokube.fr` | `v=spf1 mx ~all` | 3600 |
 | `TXT` | `mail._domainkey.neokube.fr` | Clé DKIM RSA 2048 Stalwart | 3600 |
 | `TXT` | `_dmarc.neokube.fr` | `v=DMARC1; p=none; rua=mailto:admin@neokube.fr` | 3600 |
+
+> **Note** : l'enregistrement A `mail.neokube.fr` a été mis à jour de `45.130.81.100` (ancienne IP Orange dynamique) à `51.15.253.114` (IP Scaleway fixe) lors de la migration vers l'instance externe.
 
 > IP Orange est dynamique — à mettre à jour manuellement ou via DynDNS si elle change.
 
@@ -1150,3 +1186,4 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-02 | **feat(charlotte): `project_health_check`** — bilan cross-systèmes Zoho+GitHub+Vercel+Penpot+Notion en un appel parallèle ; `update_docs=True` croise les liens dans Zoho description + page Notion ; règle 11 dans le prompt (pas de `zoho_list_projects` pour les demandes "vérifier/checker/rassure-moi") |
 | 2026-05-02 | **doc: cycle de vie projet** — section "Planification → Production" ajoutée dans CLAUDE.md : 3 phases (Exploration/Planification/Production), frontière de déclenchement annotée dans le diagramme DevProjectWorkflow, 3 gaps documentés (trigger Zoho status P1, mapper Zoho→ProjectSpec P1, email enrichi P3) |
 | 2026-05-02 | **fix(dns/neokube.fr)** : DNS zone opérationnelle — (1) bug Openprovider API identifié : `{"zone":{"records":[...]}}` retournait success:true silencieusement sans appliquer les records ; format correct = `{"id":zone_id, "name":"zone", "records":{"add":[...]}}` + TTL min 600s ; (2) domaine délégué vers Cloudflare NS sans zone CF → SERVFAIL ; NS remis sur Openprovider via `PUT /domains/29414839` ; (3) 5 records ajoutés : A mail→45.130.81.100, MX prio=10, SPF, DKIM Stalwart, DMARC ; (4) openprovider-connector v1.1 : endpoints `/dns/records/add` + `/dns/records/remove` ; (5) section Scaleway TEM + Penpot SMTP ajoutées dans CLAUDE.md |
+| 2026-05-02 | **feat(stalwart): migration Scaleway + fix AUTH PLAIN** — Stalwart déplacé du StatefulSet K8s vers instance Docker DEV1-S Scaleway fr-par-1 (`51.15.253.114`) ; accès SSH permanent (`id_ed25519_neokube`) ; K8s : StatefulSet+PVC supprimés, Services ClusterIP + Endpoints manuels ajoutés (stalwart-mail + stalwart-web → 51.15.253.114) ; dispatcher configmap : `start_tls=True → False` ; **fix AUTH** : bug Stalwart v0.11.8 — `session.auth.mechanisms` doit être une **string expression** `"[plain, login, oauthbearer]"` (pas un tableau TOML, pas le format conditionnel `[[array]]` — tous deux échouent silencieusement ou crashent à cause du tri alphabétique BTreeMap RocksDB) ; `tls.enable = false` sur listener submission ; DNS A `mail.neokube.fr` mis à jour `45.130.81.100 → 51.15.253.114` ; E2E validé : aiosmtplib `start_tls=False` depuis K8s → Stalwart Scaleway → email reçu |
