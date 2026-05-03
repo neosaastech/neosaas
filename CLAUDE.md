@@ -707,77 +707,70 @@ POST /dns/records/remove
 
 ## Scaleway Transactional Email (TEM)
 
-**Objectif** : relay SMTP sortant pour Stalwart (Orange ISP bloque le port 25 sortant).
-**Architecture** : Stalwart → smarthost Scaleway TEM → Internet (email transactionnel et relationnel)
+**Objectif** : relay SMTP sortant pour Stalwart (Orange ISP bloque le port 25 sortant, Scaleway bloque aussi les ports SMTP outbound 25/465/587 par défaut).
+**Architecture réelle (2026-05-03)** : Stalwart → `smtp-tem-proxy` (localhost:1025) → Scaleway TEM HTTP API (HTTPS:443) → Internet
+
+> **Pourquoi un proxy ?** Scaleway bloque les ports SMTP outbound (25, 465, 587) depuis les instances DEV1-S. Le port 443 (HTTPS) est libre. Le proxy `smtp-tem-proxy` écoute sur port 1025, reçoit le SMTP de Stalwart, et relaye via l'API HTTP TEM de Scaleway.
+
+### smtp-tem-proxy
+
+**Service systemd** : `smtp-tem-proxy` sur l'instance Scaleway (`51.15.253.114`)
+**Script** : `/opt/smtp-tem-proxy/proxy.py`
+**Écoute** : `0.0.0.0:1025`
+**Commandes** :
+```bash
+ssh -i ~/.ssh/id_ed25519_neokube root@51.15.253.114
+systemctl status smtp-tem-proxy
+journalctl -u smtp-tem-proxy -n 30
+```
+
+### Config Stalwart pour le relay (config.toml sur Scaleway)
+
+```toml
+[remote."scaleway-tem"]
+address = "mail.neokube.fr"   # DNS réel → 51.15.253.114 (Stalwart resolve via DNS, pas /etc/hosts)
+port = 1025
+protocol = "smtp"
+tls.implicit = false
+tls.enable = false
+auth.enable = false
+
+[queue.outbound]
+next-hop = "'scaleway-tem'"
+
+[queue.outbound.tls]
+starttls = "optional"         # évite l'abort Stalwart si STARTTLS non annoncé
+allow-invalid-certs = true
+```
+
+> **Gotchas Stalwart v0.11.8 relay** :
+> - Utiliser un vrai hostname DNS pour le relay (pas IP, pas `/etc/hosts` — Stalwart utilise son propre resolver async)
+> - `[queue.outbound.tls] starttls = "optional"` obligatoire sinon Stalwart avorte après EHLO si pas de STARTTLS
+> - MAIL FROM parsing : `re.search(r'<([^>]+)>', cmd)` — `.strip("<>")` laisse un `>` résiduel si le cmd a des paramètres après (ex: `SIZE=523`)
+
+### État actuel (2026-05-03)
+
+| Composant | État |
+|---|---|
+| Vault `secret/neokube/infrastructure/scaleway` | ✅ Provisionné |
+| Souscription TEM Scaleway | ✅ Active |
+| Domaine `neokube.fr` dans TEM | ✅ `checked` (vérifié 2026-05-02) |
+| smtp-tem-proxy (systemd) | ✅ Running sur 51.15.253.114:1025 |
+| Relay Stalwart → TEM | ✅ E2E validé (email reçu chvandendriessche@neomnia.net) |
+| Penpot recovery mail | ✅ Fonctionnel (SMTP_TLS=false) |
+| UI Stalwart admin | ✅ `http://mail-admin.neokube.local` (Traefik) ou `http://51.15.253.114:8080` |
 
 **Vault** : `secret/neokube/infrastructure/scaleway`
 | Clé Vault | Description |
 |---|---|
 | `SCW_ACCESS_KEY` | Access key Scaleway |
-| `SCW_SECRET_KEY` | Secret key Scaleway |
+| `SCW_SECRET_KEY` | Secret key Scaleway (= mot de passe TEM SMTP) |
 | `SCW_DEFAULT_PROJECT_ID` | `473a0ce6-ecd8-4374-8f49-9a6e347d0c8d` |
 | `SCW_DEFAULT_REGION` | `fr-par` |
-| `SCW_DEFAULT_ZONE` | `fr-par-1` |
-| `SCW_TEM_SMTP_HOST` | `smtp.tem.scaleway.com` |
-| `SCW_TEM_SMTP_PORT` | `587` |
-| `SCW_TEM_SMTP_USERNAME` | ID du projet Scaleway (= `SCW_DEFAULT_PROJECT_ID`) |
-| `SCW_TEM_SMTP_PASSWORD` | Secret key TEM (= `SCW_SECRET_KEY`) |
-
-### Activation TEM (étape manuelle requise)
-
-> **BLOQUEUR** : L'offre TEM doit être souscrite manuellement dans la console Scaleway avant de pouvoir créer un domaine via API.
-> URL : `https://console.scaleway.com/transactional-email/`
-> Projet : `473a0ce6-ecd8-4374-8f49-9a6e347d0c8d`
-
-### Étapes post-activation
-
-1. **Créer le domaine `neokube.fr`** dans Scaleway TEM
-   ```bash
-   curl -s -X POST "https://api.scaleway.com/transactional-email/v1alpha1/regions/fr-par/domains" \
-     -H "X-Auth-Token: $SCW_SECRET_KEY" \
-     -H "Content-Type: application/json" \
-     -d '{"project_id": "473a0ce6-ecd8-4374-8f49-9a6e347d0c8d", "domain_name": "neokube.fr"}'
-   ```
-
-2. **Récupérer les enregistrements DNS TEM** (DKIM selector Scaleway)
-   ```bash
-   curl -s "https://api.scaleway.com/transactional-email/v1alpha1/regions/fr-par/domains/{id}" \
-     -H "X-Auth-Token: $SCW_SECRET_KEY" | python3 -m json.tool
-   ```
-   → Récupérer `dkim_config.dkim_public_key` et `dkim_config.selector`
-
-3. **Ajouter les enregistrements DNS TEM** dans la zone Openprovider :
-   - TXT `{selector}._domainkey.neokube.fr` → clé DKIM TEM (différent du selector Stalwart `mail._domainkey`)
-   - TXT `neokube.fr` SPF : mettre à jour → `v=spf1 mx include:_spf.tem.scaleway.com ~all`
-
-4. **Configurer le smarthost Stalwart** dans `configmap-stalwart-config.yaml` :
-   ```toml
-   [remote.smtp-relay]
-   address = "smtp.tem.scaleway.com"
-   port = 587
-   protocol = "smtp"
-   tls.implicit = false
-   tls.allow-invalid-certs = false
-   auth.enable = true
-   auth.user = "473a0ce6-ecd8-4374-8f49-9a6e347d0c8d"
-   auth.secret = "<SCW_SECRET_KEY>"
-
-   [queue.outbound]
-   next-hop = [{name="default", remote=[{name="smtp-relay"}]}]
-   ```
-
-### État actuel (2026-05-02)
-
-| Composant | État |
-|---|---|
-| Vault `secret/neokube/infrastructure/scaleway` | ✅ Provisionné |
-| Souscription TEM Scaleway | **⚠️ Manuelle requise** |
-| Domaine `neokube.fr` dans TEM | Bloqué par souscription |
-| Smarthost Stalwart | En attente TEM |
 
 ### Pourquoi Scaleway TEM et pas Stalwart direct
 
-Orange (FAI) bloque le port 25 sortant — vérifiable par timeout systématique vers Exchange Online et autres MX. Stalwart reste opérationnel en interne (IMAP, soumission intra-cluster), mais le relay sortant vers Internet requiert un SMTP relay de confiance.
+Orange (FAI) bloque le port 25 sortant. Scaleway bloque aussi les ports SMTP sortants (25, 465, 587) depuis les instances. Le relay passe donc par l'API HTTP TEM de Scaleway via HTTPS (port 443 non bloqué).
 
 ---
 
@@ -1187,3 +1180,4 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-02 | **doc: cycle de vie projet** — section "Planification → Production" ajoutée dans CLAUDE.md : 3 phases (Exploration/Planification/Production), frontière de déclenchement annotée dans le diagramme DevProjectWorkflow, 3 gaps documentés (trigger Zoho status P1, mapper Zoho→ProjectSpec P1, email enrichi P3) |
 | 2026-05-02 | **fix(dns/neokube.fr)** : DNS zone opérationnelle — (1) bug Openprovider API identifié : `{"zone":{"records":[...]}}` retournait success:true silencieusement sans appliquer les records ; format correct = `{"id":zone_id, "name":"zone", "records":{"add":[...]}}` + TTL min 600s ; (2) domaine délégué vers Cloudflare NS sans zone CF → SERVFAIL ; NS remis sur Openprovider via `PUT /domains/29414839` ; (3) 5 records ajoutés : A mail→45.130.81.100, MX prio=10, SPF, DKIM Stalwart, DMARC ; (4) openprovider-connector v1.1 : endpoints `/dns/records/add` + `/dns/records/remove` ; (5) section Scaleway TEM + Penpot SMTP ajoutées dans CLAUDE.md |
 | 2026-05-02 | **feat(stalwart): migration Scaleway + fix AUTH PLAIN** — Stalwart déplacé du StatefulSet K8s vers instance Docker DEV1-S Scaleway fr-par-1 (`51.15.253.114`) ; accès SSH permanent (`id_ed25519_neokube`) ; K8s : StatefulSet+PVC supprimés, Services ClusterIP + Endpoints manuels ajoutés (stalwart-mail + stalwart-web → 51.15.253.114) ; dispatcher configmap : `start_tls=True → False` ; **fix AUTH** : bug Stalwart v0.11.8 — `session.auth.mechanisms` doit être une **string expression** `"[plain, login, oauthbearer]"` (pas un tableau TOML, pas le format conditionnel `[[array]]` — tous deux échouent silencieusement ou crashent à cause du tri alphabétique BTreeMap RocksDB) ; `tls.enable = false` sur listener submission ; DNS A `mail.neokube.fr` mis à jour `45.130.81.100 → 51.15.253.114` ; E2E validé : aiosmtplib `start_tls=False` depuis K8s → Stalwart Scaleway → email reçu |
+| 2026-05-03 | **fix(stalwart/relay): smtp-tem-proxy** — Scaleway bloque ports SMTP outbound (25/465/587) depuis instances DEV1-S ; proxy Python `smtp-tem-proxy` (systemd, port 1025) créé sur l'instance : accepte SMTP de Stalwart et relaye via API HTTP TEM Scaleway (HTTPS:443) ; 3 bugs corrigés : (1) Stalwart DNS resolver async bypass `/etc/hosts` → utiliser hostname DNS réel `mail.neokube.fr` comme adresse relay ; (2) Stalwart avorte après EHLO sans STARTTLS même avec `tls.enable=false` → `[queue.outbound.tls] starttls="optional"` ; (3) `MAIL FROM:<email> SIZE=...` → `.strip("<>")` laissait `email>` → fix regex `re.search(r'<([^>]+)>', cmd)` ; fix(penpot) SMTP_TLS=false + JAVA_TOOL_OPTIONS vide ; fix(ingress) stalwart-web → `mail-admin.neokube.local` ; E2E validé : Penpot recovery mail reçu + `http://mail-admin.neokube.local` opérationnel |
