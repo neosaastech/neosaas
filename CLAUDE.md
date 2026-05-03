@@ -1158,6 +1158,29 @@ Fix : memory limit → 1.5Gi dans `deployment-surfsense-zero-cache.yaml`.
 `CF_DNS_TOKEN` n'a que les droits DNS:Edit → 401 sur les endpoints `/cfd_tunnel/*/configurations`.
 Toujours utiliser `CF_API_TOKEN` pour modifier les règles d'ingress du tunnel.
 
+**6. Table `user` absente de la publication zero-cache → instabilité totale du frontend**
+Après le premier démarrage, la publication PostgreSQL `zero_publication` (créée par Alembic) n'inclut pas la table `user`. rocicorp/zero rejette toutes les connexions WebSocket avec `SchemaVersionNotSupported: "user" table does not exist or is not one of the replicated tables`. Le frontend paraît instable/inutilisable (déconnexion immédiate).
+
+Fix — à appliquer après chaque installation fraîche :
+```bash
+kubectl exec -n surfsense deploy/surfsense-postgres -- \
+  psql -U surfsense -d surfsense -c 'ALTER PUBLICATION zero_publication ADD TABLE "user";'
+kubectl rollout restart deploy/surfsense-zero-cache -n surfsense
+```
+Ce changement est persistant dans le PVC PostgreSQL. Il ne survivrait pas à une suppression complète du PVC.
+
+**7. Mémoire — backend et celery chargent le modèle sentence-transformers (~460MB) chacun**
+Avec une limite à 2Gi, les deux pods atteignent ~1.4-1.7Gi et OOMKillent fréquemment sous charge.
+Fix : limites backend et celery à 4Gi (`deployment-surfsense-backend.yaml` et `deployment-surfsense-celery.yaml`).
+
+**8. LLM preferences par défaut sur AUTO (cloud SurfSense) — aucun prompt ne fonctionne en self-hosted**
+À la création d'un espace, `agent_llm_id=0` (mode AUTO cloud). Doit être configuré sur un LLM local/LiteLLM :
+```bash
+curl -X PUT "http://surfsense-api.neokube.local/api/v1/search-spaces/{id}/llm-preferences" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"agent_llm_id": 1, "document_summary_llm_id": 1, "image_generation_config_id": 0, "vision_llm_config_id": 0}'
+```
+
 ### Intégrations stack NeoKube
 | Intégration | Config | Notes |
 |---|---|---|
