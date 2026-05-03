@@ -127,6 +127,8 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `http://qdrant.neokube.local` | Qdrant (API vectorielle) |
 | `http://leon.neokube.local` | Leon (agent) |
 | `http://api.neokube.local` | admin-sys-agent |
+| `http://mail-admin.neokube.local` | Stalwart Mail Admin (Traefik → 51.15.253.114:8080) |
+| `http://webmail.neokube.local` | Roundcube webmail (IMAP → stalwart-mail:143, SMTP → stalwart-mail:587) |
 
 ### Volumes persistants (hostPath, `storageClassName: ""`)
 | PV | Taille | Chemin hôte | Namespace |
@@ -628,6 +630,57 @@ else = ["oauthbearer"]
 ```
 Variants supportés : `delete`, `clear`, `insert`.
 
+**8. Webadmin — version épinglée à v0.1.23 (`auto-update = false`)**
+
+Le binaire `stalwartlabs/mail-server:v0.11.8` embarque un webadmin bundlé qui nécessite Stalwart ≥ 0.13.0 ("Unsupported server version"). Solution : pingler manuellement sur le webadmin v0.1.23 (dernier compatible v0.11.8).
+
+Config dans `/opt/stalwart-mail/etc/config.toml` :
+```toml
+webadmin.auto-update = false
+webadmin.path = "/opt/stalwart-mail/etc/webadmin"
+webadmin.resource = "https://github.com/stalwartlabs/webadmin/releases/download/v0.1.23/webadmin.zip"
+```
+> **Important** : `auto-update = false` obligatoire — sinon Stalwart retélécharge le webadmin le plus récent au prochain restart et le problème revient.
+> Créer le dossier si besoin : `mkdir -p /opt/stalwart-mail/etc/webadmin`
+
+**Connexion webadmin v0.1.23** (formulaire Leptos 3 champs) :
+- **Login** : `admin`
+- **Password** : depuis Vault `secret/neokube/apps/stalwart` clé `ADMIN_PASSWORD`
+- **Base URL** : `http://mail-admin.neokube.local` (ou `http://51.15.253.114:8080` en direct)
+
+**9. Créer un compte administrateur supplémentaire**
+
+Pour donner un accès webadmin à un autre utilisateur, utiliser `type: "superuser"` (pas `individual`) :
+
+```bash
+# Via stalwart-connector depuis K8s
+curl -s http://stalwart-connector.connector-system.svc.cluster.local:8007/proxy \
+  -H "Content-Type: application/json" \
+  -d '{"method":"POST","path":"/api/principal","body":{"name":"charles","type":"superuser","secrets":["MON_MOT_DE_PASSE"],"description":"Charles Vandendriessche"}}'
+
+# Ou directement sur l'instance Scaleway
+curl -X POST http://51.15.253.114:8080/api/principal \
+  -u "admin:ADMIN_PASSWORD" -H "Content-Type: application/json" \
+  -d '{"name":"charles","type":"superuser","secrets":["MON_MOT_DE_PASSE"],"description":"Charles Vandendriessche"}'
+```
+
+> `type: "superuser"` = accès complet webadmin. `type: "individual"` = compte mail uniquement (pas d'accès webadmin). Les comptes superuser ne reçoivent pas de mail — ce sont des identités d'administration pure.
+
+**10. Accès aux boîtes mail des comptes actifs**
+
+Le webadmin v0.1.23 est une interface de **gestion uniquement** — il ne permet pas de lire les emails. Pour lire les boîtes des comptes agents :
+
+**Roundcube webmail** ✅ déployé — `http://webmail.neokube.local`
+- **Login** : adresse mail complète (`leon@neokube.fr`, `admin@neokube.fr`, etc.)
+- **Mot de passe** : depuis Vault (chemin par compte, voir §"Comptes mail agents")
+- **GitOps** : `apps/stalwart/base/deployment-roundcube.yaml` (image `roundcubemail:latest-apache`)
+- IMAP → `stalwart-mail.stalwart.svc.cluster.local:143` (plaintext intra-cluster)
+- SMTP → `stalwart-mail.stalwart.svc.cluster.local:587` (credentials = login Roundcube, `%u`/`%p`)
+- SQLite PVC 1Gi (`local-path`, namespace `stalwart`)
+
+**Client IMAP direct** (alternative) — Thunderbird etc.
+- Serveur : `51.15.253.114`, port `143` (IMAP) ou `993` (IMAPS, cert self-signed)
+
 ### DNS neokube.fr (Openprovider)
 
 **Nameservers actifs** : `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`
@@ -759,6 +812,7 @@ allow-invalid-certs = true
 | Relay Stalwart → TEM | ✅ E2E validé (email reçu chvandendriessche@neomnia.net) |
 | Penpot recovery mail | ✅ Fonctionnel (SMTP_TLS=false) |
 | UI Stalwart admin | ✅ `http://mail-admin.neokube.local` (Traefik) ou `http://51.15.253.114:8080` |
+| Roundcube webmail | ✅ `http://webmail.neokube.local` (IMAP stalwart-mail:143) |
 
 **Vault** : `secret/neokube/infrastructure/scaleway`
 | Clé Vault | Description |
@@ -1180,4 +1234,7 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-02 | **doc: cycle de vie projet** — section "Planification → Production" ajoutée dans CLAUDE.md : 3 phases (Exploration/Planification/Production), frontière de déclenchement annotée dans le diagramme DevProjectWorkflow, 3 gaps documentés (trigger Zoho status P1, mapper Zoho→ProjectSpec P1, email enrichi P3) |
 | 2026-05-02 | **fix(dns/neokube.fr)** : DNS zone opérationnelle — (1) bug Openprovider API identifié : `{"zone":{"records":[...]}}` retournait success:true silencieusement sans appliquer les records ; format correct = `{"id":zone_id, "name":"zone", "records":{"add":[...]}}` + TTL min 600s ; (2) domaine délégué vers Cloudflare NS sans zone CF → SERVFAIL ; NS remis sur Openprovider via `PUT /domains/29414839` ; (3) 5 records ajoutés : A mail→45.130.81.100, MX prio=10, SPF, DKIM Stalwart, DMARC ; (4) openprovider-connector v1.1 : endpoints `/dns/records/add` + `/dns/records/remove` ; (5) section Scaleway TEM + Penpot SMTP ajoutées dans CLAUDE.md |
 | 2026-05-02 | **feat(stalwart): migration Scaleway + fix AUTH PLAIN** — Stalwart déplacé du StatefulSet K8s vers instance Docker DEV1-S Scaleway fr-par-1 (`51.15.253.114`) ; accès SSH permanent (`id_ed25519_neokube`) ; K8s : StatefulSet+PVC supprimés, Services ClusterIP + Endpoints manuels ajoutés (stalwart-mail + stalwart-web → 51.15.253.114) ; dispatcher configmap : `start_tls=True → False` ; **fix AUTH** : bug Stalwart v0.11.8 — `session.auth.mechanisms` doit être une **string expression** `"[plain, login, oauthbearer]"` (pas un tableau TOML, pas le format conditionnel `[[array]]` — tous deux échouent silencieusement ou crashent à cause du tri alphabétique BTreeMap RocksDB) ; `tls.enable = false` sur listener submission ; DNS A `mail.neokube.fr` mis à jour `45.130.81.100 → 51.15.253.114` ; E2E validé : aiosmtplib `start_tls=False` depuis K8s → Stalwart Scaleway → email reçu |
-| 2026-05-03 | **fix(stalwart/relay): smtp-tem-proxy** — Scaleway bloque ports SMTP outbound (25/465/587) depuis instances DEV1-S ; proxy Python `smtp-tem-proxy` (systemd, port 1025) créé sur l'instance : accepte SMTP de Stalwart et relaye via API HTTP TEM Scaleway (HTTPS:443) ; 3 bugs corrigés : (1) Stalwart DNS resolver async bypass `/etc/hosts` → utiliser hostname DNS réel `mail.neokube.fr` comme adresse relay ; (2) Stalwart avorte après EHLO sans STARTTLS même avec `tls.enable=false` → `[queue.outbound.tls] starttls="optional"` ; (3) `MAIL FROM:<email> SIZE=...` → `.strip("<>")` laissait `email>` → fix regex `re.search(r'<([^>]+)>', cmd)` ; fix(penpot) SMTP_TLS=false + JAVA_TOOL_OPTIONS vide ; fix(ingress) stalwart-web → `mail-admin.neokube.local` ; E2E validé : Penpot recovery mail reçu + `http://mail-admin.neokube.local` opérationnel |
+| 2026-05-03 | **fix(stalwart/relay): smtp-tem-proxy** — Scaleway bloque ports SMTP outbound (25/465/587) depuis instances DEV1-S ; proxy Python `smtp-tem-proxy` (systemd, port 1025) créé sur l'instance : accepte SMTP de Stalwart et relaye via API HTTP TEM Scaleway (HTTPS:443) ; 3 bugs corrigés : (1) Stalwart DNS resolver async bypass `/etc/hosts` → utiliser hostname DNS réel `mail.neokube.fr` comme adresse relay ; (2) Stalwart avorte après EHLO sans STARTTLS même avec `tls.enable=false` → `[queue.outbound.tls] starttls="optional"` ; (3) `MAIL FROM:<email> SIZE=...` → `.strip("<>")` laissait `email>` → fix regex `re.search(r'<([^>]+)>', cmd)` ; fix(penpot) SMTP_TLS=false + JAVA_TOOL_OPTIONS vide ; fix(ingress) stalwart-web → `mail-admin.neokube.local` ; E2E validé : Penpot recovery mail reçu |
+| 2026-05-03 | **fix(hosts): mail-admin.neokube.local** — ajout `192.168.1.28 mail-admin.neokube.local` dans `/etc/hosts` neokube-beta (manquant → page blanche dans le navigateur) ; à ajouter aussi sur la machine client |
+| 2026-05-03 | **fix(stalwart/webadmin): version épinglée v0.1.23** — binaire v0.11.8 embarque un webadmin nécessitant Stalwart ≥ 0.13.0 ("Unsupported server version") ; pinglage sur webadmin v0.1.23 (dernier compatible v0.11.8) via `webadmin.resource` + `webadmin.auto-update = false` + `webadmin.path = /opt/stalwart-mail/etc/webadmin` dans config.toml ; login webadmin opérationnel |
+| 2026-05-03 | **feat(stalwart): Roundcube webmail** — déployé dans namespace `stalwart` (`roundcubemail:latest-apache`) ; IMAP → stalwart-mail:143, SMTP → stalwart-mail:587 (credentials `%u`/`%p`) ; sqlite PVC 1Gi local-path ; ingress `webmail.neokube.local` (Traefik) ; `/etc/hosts` neokube-beta mis à jour ; opérationnel HTTP 200 |
