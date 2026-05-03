@@ -90,6 +90,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `penpot` | Penpot (design) |
 | `stalwart` | Stalwart Mail Server v0.11.8 — SMTP/IMAP/Sieve, domaine `mail.neokube.fr` |
 | `dify` | Dify v1.13.3 (agent builder studio) — accès `http://dify.neokube.local` |
+| `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (Cloudflare Tunnel, 2 replicas) |
 
 ### Politique LLM
 **100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
@@ -129,6 +130,44 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `http://api.neokube.local` | admin-sys-agent |
 | `http://mail-admin.neokube.local` | Stalwart Mail Admin (Traefik → 51.15.253.114:8080) |
 | `http://webmail.neokube.local` | Roundcube webmail (IMAP → stalwart-mail:143, SMTP → stalwart-mail:587) |
+
+### Accès distant — Cloudflare Tunnel (neomnia.net)
+
+**Tunnel** : `neokube-tunnel` — ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`
+**GitOps** : `apps/cloudflare-tunnel/base/` (deployment cloudflared, 2 replicas, kube-system)
+**Secret K8s** : `cloudflare-tunnel-token` dans `kube-system` (Vault : `CF_TUNNEL_TOKEN` dans `secret/neokube/infrastructure/cloudflare`)
+**Connexions actives** : 8 connexions QUIC vers datacenter CF Paris (cdg01/07/09/12/13/14/17)
+
+| URL publique | Service interne | Notes |
+|---|---|---|
+| `https://chat.neomnia.net` | Open WebUI | Interface AI (auth interne) |
+| `https://headlamp.neomnia.net` | Headlamp | Dashboard K8s |
+| `https://temporal.neomnia.net` | Temporal UI | Orchestration workflows |
+| `https://langfuse.neomnia.net` | Langfuse | Observabilité LLM |
+| `https://webmail.neomnia.net` | Roundcube | Webmail |
+| `https://mailhub.neomnia.net` | Stalwart Admin | Admin mail |
+| `https://design.neomnia.net` | Penpot | Design |
+| `https://dify.neomnia.net` | Dify | Agent builder |
+
+**Routing** : Cloudflare → cloudflared (pod K8s) → Traefik (kube-system:80) avec Host override → service interne
+
+**CNAMEs DNS** (à créer dans Cloudflare dashboard, zone `neomnia.net`) :
+> Le CF_API_TOKEN actuel n'a pas Zone DNS:Edit — CNAMEs à créer manuellement ou après mise à jour du token.
+> Cible CNAME : `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com` (proxied=true)
+> Noms : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`
+
+**Commande de création des CNAMEs** (après mise à jour du token CF avec Zone DNS:Edit) :
+```bash
+CF_TOKEN=$(kubectl exec -n security vault-0 -- vault kv get -field=CF_API_TOKEN secret/neokube/infrastructure/cloudflare)
+ZONE_ID="8c1283e7c52c34a9d5112c0fb271af27"
+CNAME="94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com"
+for SUB in chat headlamp temporal langfuse webmail mailhub design dify; do
+  curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+    -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
+    -d "{\"type\":\"CNAME\",\"name\":\"$SUB\",\"content\":\"$CNAME\",\"proxied\":true,\"ttl\":1}" \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print('$SUB:', 'OK' if d['success'] else d.get('errors'))"
+done
+```
 
 ### Volumes persistants (hostPath, `storageClassName: ""`)
 | PV | Taille | Chemin hôte | Namespace |
@@ -1238,3 +1277,4 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-03 | **fix(hosts): mail-admin.neokube.local** — ajout `192.168.1.28 mail-admin.neokube.local` dans `/etc/hosts` neokube-beta (manquant → page blanche dans le navigateur) ; à ajouter aussi sur la machine client |
 | 2026-05-03 | **fix(stalwart/webadmin): version épinglée v0.1.23** — binaire v0.11.8 embarque un webadmin nécessitant Stalwart ≥ 0.13.0 ("Unsupported server version") ; pinglage sur webadmin v0.1.23 (dernier compatible v0.11.8) via `webadmin.resource` + `webadmin.auto-update = false` + `webadmin.path = /opt/stalwart-mail/etc/webadmin` dans config.toml ; login webadmin opérationnel |
 | 2026-05-03 | **feat(stalwart): Roundcube webmail** — déployé dans namespace `stalwart` (`roundcubemail:latest-apache`) ; IMAP → stalwart-mail:143, SMTP → stalwart-mail:587 (credentials `%u`/`%p`) ; sqlite PVC 1Gi local-path ; ingress `webmail.neokube.local` (Traefik) ; `/etc/hosts` neokube-beta mis à jour ; opérationnel HTTP 200 |
+| 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; CNAMEs neomnia.net en attente (CF token manque Zone DNS:Edit) |
