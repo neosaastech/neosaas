@@ -70,6 +70,65 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 ---
 
+## Architecture des noms de domaine
+
+### Règle fondamentale — tout ce qui est Neokube-beta est sous `neokube.*`
+
+| Périmètre | Domaine | Usage |
+|---|---|---|
+| Cluster K8s (accès public via tunnel) | `neomnia.net` | Cloudflare-managed, tunnel CF, services web |
+| Cluster K8s (accès LAN) | `neokube.local` | DNS interne, résolution `/etc/hosts` |
+| Mail & infra Scaleway | `neokube.fr` | Openprovider DNS, SMTP/IMAP Stalwart |
+
+**neomnia.net est l'alias public de neokube** — c'est le même système, deux noms de domaine.
+
+### Process Cloudflare — interface entre les applications et les registrars
+
+Cloudflare est le **seul** point d'entrée DNS pour les services exposés publiquement. Les domaines sont enregistrés chez Openprovider (ou autre registrar), mais leur DNS est **toujours géré dans Cloudflare**.
+
+```
+Registrar (Openprovider)       Cloudflare                    Cluster K8s
+  neomnia.net ───── NS ──────→  zone CF active    ──────────→ Tunnel → Traefik
+  neokube.fr  ──── NS Openprovider (exception actuelle — mail uniquement)
+```
+
+> **neokube.fr est une exception** : il reste sur les NS Openprovider car il n'est utilisé que pour le mail (`mail.neokube.fr` → Scaleway). Pour y exposer des services web, il faudrait d'abord le migrer dans Cloudflare (ajouter la zone CF, changer les NS sur Openprovider).
+
+### Ajouter un nouveau service public — process complet
+
+```
+1. Le domaine est-il déjà dans Cloudflare ?
+   OUI → passer à l'étape 3
+   NON → ajouter la zone dans Cloudflare dashboard, changer les NS chez le registrar
+
+2. Attendre propagation NS (0–24h, TTL Openprovider min 600s)
+
+3. Ajouter un CNAME proxied=true dans la zone Cloudflare :
+   sous-domaine.neomnia.net → 94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com
+   (via cloudflare-connector ou dashboard CF)
+
+4. Ajouter la règle dans le Cloudflare Tunnel (CF_API_TOKEN, pas CF_DNS_TOKEN) :
+   hostname: sous-domaine.neomnia.net
+   service:  http://traefik.kube-system.svc.cluster.local:80
+   originRequest.httpHostHeader: service.neokube.local
+
+5. Vérifier que Traefik a un Ingress pour service.neokube.local
+   (le tunnel envoie ce host à Traefik via httpHostHeader override)
+
+6. Tester : curl -I https://sous-domaine.neomnia.net
+```
+
+> **Anti-pattern à éviter** : ajouter des CNAME sur un domaine géré par Openprovider (neokube.fr) pointant vers `cfargotunnel.com`. Les CNAME Openprovider ne sont pas proxiés par Cloudflare → TLS échoue, connexion refusée. Seul le proxying Cloudflare (domaine dans une zone CF active) permet au tunnel de fonctionner.
+
+### Tokens Cloudflare — usage strict
+
+| Token | Variable Vault | Scope | Usage |
+|---|---|---|---|
+| `Neomnia-account` | `CF_API_TOKEN` | Compte complet | Tunnel rules, analytics — **requis pour le tunnel** |
+| `Neomnia-domains` | `CF_DNS_TOKEN` | Zone DNS:Edit all | Ajout/modif CNAME et records DNS uniquement |
+
+---
+
 ## Architecture cluster Kubernetes
 
 **Cluster** : `kubinote` (single-node, 12 CPU, 32 GB RAM)
@@ -1434,6 +1493,9 @@ Toute normalisation de réponse (renommage de champs, injection d'URLs web, cast
 **R4 — Valider les URLs avec le navigateur avant de les coder**
 Toute URL construite manuellement doit être testée dans un vrai navigateur avant d'être codée dans un connector ou documentée. Ne jamais supposer le format depuis la doc officielle ou d'autres patterns Zoho — le SPA Zoho utilise des routes `#fragment` non documentées.
 
+**R5 — Domaines publics = neomnia.net uniquement (Cloudflare-managed)**
+Tout service exposé publiquement via le cluster Neokube utilise un sous-domaine `*.neomnia.net`. Ne jamais tenter de configurer `*.neokube.fr` comme URL publique de service — `neokube.fr` est sur NS Openprovider (non-Cloudflare) et les CNAME vers `cfargotunnel.com` sans proxy CF ne fonctionnent pas (TLS échoue). Si `neokube.fr` doit un jour exposer des services, migrer d'abord son DNS dans Cloudflare. Voir la section "Architecture des noms de domaine".
+
 ---
 
 ## Historique des actions Claude
@@ -1505,4 +1567,7 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; GitOps `apps/cloudflare-tunnel/base/` |
 | 2026-05-03 | **feat(cloudflare): two-token architecture + CNAMEs** — séparation `Neomnia-account` (CF_API_TOKEN, compte complet) / `Neomnia-domains` (CF_DNS_TOKEN, Zone DNS:Edit all zones) ; cloudflare-connector v1.1 : `CF_DNS_TOKEN` prioritaire, fallback `CF_API_TOKEN` ; Vault `secret/neokube/infrastructure/cloudflare` version 4 (CF_DNS_TOKEN ajouté) ; 8 CNAMEs neomnia.net créés (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify → tunnel) ; tunnel opérationnel : HTTP 200 vérifié sur chat.neomnia.net + headlamp.neomnia.net |
 | 2026-05-03 | **feat(surfsense): déploiement SurfSense v1.0** — moteur RAG open-source (alternatif Perplexity) dans namespace `surfsense` ; 7 composants K8s : postgres (pgvector/pg17, 10Gi, wal_level=logical), redis, searxng, backend FastAPI, celery worker, zero-cache (rocicorp/zero:0.26.2, 1.5Gi RAM), frontend Next.js ; embedding `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` local 384-dim (chonkie v1.6 ignore base_url openai → pas de LiteLLM pour les embeddings) ; Langfuse (LangSmith-compat), Notion OAuth ; 3 ingresses dual-host (neokube.local + neomnia.net) ; 3 CNAMEs + 3 règles tunnel Cloudflare ajoutées (surfsense/surfsense-api/surfsense-zero) ; HTTP 200 validé sur surfsense.neomnia.net + surfsense-api.neomnia.net/health |
+| 2026-05-03 | **fix(litellm): OOMKill** — memory limit 512Mi → 2Gi ; LiteLLM crashait en boucle (exit 137) depuis 8j (7 restarts), causait l'échec de tous les appels LLM SurfSense et autres agents ; fix GitOps `deployment-litellm.yaml` |
+| 2026-05-03 | **fix(surfsense): LLM preferences + prompts** — l'espace "Neomnia Studio" était configuré sur AUTO (mode cloud SurfSense) au lieu de GPT-4o via LiteLLM ; switché sur `agent_llm_id=1` (GPT-4o) via `PUT /api/v1/search-spaces/1/llm-preferences` ; 7 configs LLM créées (GPT-4o, Mistral, Codestral via API + Gemini Flash/Pro/Claude Sonnet/Opus via INSERT SQL direct car validation SurfSense échoue sur quota/billing) ; prompts E2E validés |
+| 2026-05-03 | **doc: architecture domaines + process CF** — section "Architecture des noms de domaine" ajoutée dans CLAUDE.md : règle fondamentale neomnia.net=public/neokube.local=LAN/neokube.fr=mail, process complet "ajouter un service public", anti-pattern CNAME Openprovider→cfargotunnel sans proxy CF, règle R5 connector-system |
 | 2026-05-03 | **feat(scraping): google-discovery-connector v1.0 + crawlee-service v1.0** — deux microservices scraping dans `connector-system` ; `google-discovery-connector` (port 8008, Python FastAPI) : `POST /search` → Google Custom Search API, credentials Vault `secret/neokube/infrastructure/google` (GOOGLE_SEARCH_API_KEY + GOOGLE_CX_ID), 100 req/j gratuites ; `crawlee-service` (port 8009, Node.js, image `mcr.microsoft.com/playwright:v1.49.0-noble`) : `POST /crawl`, `POST /batch` (max 10 URLs, concurrence 3), `POST /screenshot` → PNG base64, mutex interne pour sérialiser les sessions Chromium ; startup ~2min (npm install crawlee@3 + playwright install chromium) ; GitOps `apps/connector-system/base/` mis à jour |
