@@ -151,22 +151,34 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 
 **Routing** : Cloudflare → cloudflared (pod K8s) → Traefik (kube-system:80) avec Host override → service interne
 
-**CNAMEs DNS** (à créer dans Cloudflare dashboard, zone `neomnia.net`) :
-> Le CF_API_TOKEN actuel n'a pas Zone DNS:Edit — CNAMEs à créer manuellement ou après mise à jour du token.
-> Cible CNAME : `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com` (proxied=true)
+**Prérequis token CF** : `CF_API_TOKEN` doit avoir les permissions suivantes dans le dashboard Cloudflare :
+- `Cloudflare Tunnel : Edit` (account level) — pour créer/gérer les tunnels
+- `Zone DNS : Edit` restreint à la zone `neomnia.net` — pour créer les CNAMEs
+> Si la permission DNS manque → erreur `10000 Authentication error` sur `/zones/{id}/dns_records`
+> Mettre à jour via : dash.cloudflare.com → My Profile → API Tokens → éditer `cfat_5fJKhRR...` → ajouter Zone > DNS > Edit (neomnia.net)
+> Le token en Vault **ne change pas** (même valeur, seules les permissions Cloudflare changent)
+
+**CNAMEs DNS** (zone `neomnia.net`, cible `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com`, proxied=true) :
 > Noms : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`
 
-**Commande de création des CNAMEs** (après mise à jour du token CF avec Zone DNS:Edit) :
+**Commande de création des CNAMEs** (depuis le pod connector-system) :
 ```bash
-CF_TOKEN=$(kubectl exec -n security vault-0 -- vault kv get -field=CF_API_TOKEN secret/neokube/infrastructure/cloudflare)
-ZONE_ID="8c1283e7c52c34a9d5112c0fb271af27"
-CNAME="94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com"
-for SUB in chat headlamp temporal langfuse webmail mailhub design dify; do
-  curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
-    -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" \
-    -d "{\"type\":\"CNAME\",\"name\":\"$SUB\",\"content\":\"$CNAME\",\"proxied\":true,\"ttl\":1}" \
-    | python3 -c "import json,sys; d=json.load(sys.stdin); print('$SUB:', 'OK' if d['success'] else d.get('errors'))"
-done
+# Depuis le pod cloudflare-connector (token Vault chargé automatiquement)
+CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n connector-system $CF_POD -- python3 -c "
+import httpx, os
+VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
+r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
+CF_TOKEN = r.json()['data']['data']['CF_API_TOKEN']
+headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
+ZONE_ID = '8c1283e7c52c34a9d5112c0fb271af27'
+CNAME = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com'
+for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design','dify']:
+    resp = httpx.post(f'https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records',
+        headers=headers, json={'type':'CNAME','name':sub,'content':CNAME,'proxied':True,'ttl':1})
+    d = resp.json()
+    print(sub+':', 'OK' if d.get('success') else d.get('errors'))
+"
 ```
 
 ### Volumes persistants (hostPath, `storageClassName: ""`)
