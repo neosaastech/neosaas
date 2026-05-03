@@ -151,25 +151,29 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 
 **Routing** : Cloudflare → cloudflared (pod K8s) → Traefik (kube-system:80) avec Host override → service interne
 
-**Prérequis token CF** : `CF_API_TOKEN` doit avoir les permissions suivantes dans le dashboard Cloudflare :
-- `Cloudflare Tunnel : Edit` (account level) — pour créer/gérer les tunnels
-- `Zone DNS : Edit` restreint à la zone `neomnia.net` — pour créer les CNAMEs
-> Si la permission DNS manque → erreur `10000 Authentication error` sur `/zones/{id}/dns_records`
-> Mettre à jour via : dash.cloudflare.com → My Profile → API Tokens → éditer `cfat_5fJKhRR...` → ajouter Zone > DNS > Edit (neomnia.net)
-> Le token en Vault **ne change pas** (même valeur, seules les permissions Cloudflare changent)
+**Architecture tokens Cloudflare** (deux tokens séparés, principe moindre privilège) :
+
+| Nom CF | Variable Vault | Permissions | Usage |
+|---|---|---|---|
+| `Neomnia-account` | `CF_API_TOKEN` | Compte complet (Tunnel:Edit, Analytics, Logs…) | cloudflared tunnel auth, opérations compte |
+| `Neomnia-domains` | `CF_DNS_TOKEN` | Zone DNS:Edit — All zones | cloudflare-connector (DNS CRUD, CNAMEs) |
+
+> **Renouvellement** : aucune règle automatique — tokens CF n'expirent pas par défaut. Si révoqué, recréer dans dash.cloudflare.com → My Profile → API Tokens et mettre à jour Vault.
+> `kubectl exec -n security vault-0 -- vault kv patch secret/neokube/infrastructure/cloudflare CF_DNS_TOKEN="<nouveau>"`
 
 **CNAMEs DNS** (zone `neomnia.net`, cible `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com`, proxied=true) :
-> Noms : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`
+> ✅ **Créés le 2026-05-03** : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`
+> Tunnel opérationnel — HTTP 200 vérifié sur chat.neomnia.net et headlamp.neomnia.net
 
-**Commande de création des CNAMEs** (depuis le pod connector-system) :
+**Recréer les CNAMEs si besoin** (depuis le pod connector-system) :
 ```bash
-# Depuis le pod cloudflare-connector (token Vault chargé automatiquement)
 CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
 kubectl exec -n connector-system $CF_POD -- python3 -c "
 import httpx, os
 VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
 r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
-CF_TOKEN = r.json()['data']['data']['CF_API_TOKEN']
+d = r.json()['data']['data']
+CF_TOKEN = d.get('CF_DNS_TOKEN') or d['CF_API_TOKEN']
 headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
 ZONE_ID = '8c1283e7c52c34a9d5112c0fb271af27'
 CNAME = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com'
@@ -343,7 +347,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `neon-connector` | 8003 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` |
 | `penpot-connector` | 8004 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` |
 | `openprovider-connector` | 8005 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` |
-| `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_API_TOKEN`, `CF_ACCOUNT_ID` (optionnel) |
+| `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_DNS_TOKEN` (prioritaire, Zone DNS:Edit), `CF_API_TOKEN` (fallback, compte complet), `CF_ACCOUNT_ID` (optionnel) |
 | `stalwart-connector` | 8007 | `secret/neokube/apps/stalwart` | `ADMIN_PASSWORD` |
 
 **Endpoints exposés** :
@@ -352,7 +356,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 - vercel-connector : injecte automatiquement `teamId` dans les params
 - penpot-connector : `path` = nom de la commande RPC Penpot (ex. `create-project`) ; auth session cookie-based, re-login auto sur 401
 - openprovider-connector v1.1 : auth JWT via login username/password, re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta` ; endpoints bonus `POST /dns/records/add {zone, records}` et `POST /dns/records/remove {zone, records}` (voir §DNS neokube.fr pour le format correct)
-- cloudflare-connector : Bearer token statique ; endpoint bonus `GET /zones` ; API base `https://api.cloudflare.com/client/v4`
+- cloudflare-connector : Bearer token statique — utilise `CF_DNS_TOKEN` (Neomnia-domains, Zone DNS:Edit) en priorité, fallback sur `CF_API_TOKEN` (Neomnia-account, compte complet) ; endpoint bonus `GET /zones` ; API base `https://api.cloudflare.com/client/v4`
 - stalwart-connector : auth Basic `admin:ADMIN_PASSWORD` injectée auto ; endpoints bonus `GET /accounts`, `POST /accounts/create {name, password, display_name?, quota?}`, `DELETE /accounts/{account}` ; cible `http://stalwart-web.stalwart.svc.cluster.local:8080`
 
 **Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré par **Openprovider DNS** (NS `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`, zone_id=14798687). Enregistrements mail actifs depuis 2026-05-02 (A/MX/SPF/DKIM/DMARC).
@@ -1289,4 +1293,5 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-03 | **fix(hosts): mail-admin.neokube.local** — ajout `192.168.1.28 mail-admin.neokube.local` dans `/etc/hosts` neokube-beta (manquant → page blanche dans le navigateur) ; à ajouter aussi sur la machine client |
 | 2026-05-03 | **fix(stalwart/webadmin): version épinglée v0.1.23** — binaire v0.11.8 embarque un webadmin nécessitant Stalwart ≥ 0.13.0 ("Unsupported server version") ; pinglage sur webadmin v0.1.23 (dernier compatible v0.11.8) via `webadmin.resource` + `webadmin.auto-update = false` + `webadmin.path = /opt/stalwart-mail/etc/webadmin` dans config.toml ; login webadmin opérationnel |
 | 2026-05-03 | **feat(stalwart): Roundcube webmail** — déployé dans namespace `stalwart` (`roundcubemail:latest-apache`) ; IMAP → stalwart-mail:143, SMTP → stalwart-mail:587 (credentials `%u`/`%p`) ; sqlite PVC 1Gi local-path ; ingress `webmail.neokube.local` (Traefik) ; `/etc/hosts` neokube-beta mis à jour ; opérationnel HTTP 200 |
-| 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; CNAMEs neomnia.net en attente (CF token manque Zone DNS:Edit) |
+| 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; GitOps `apps/cloudflare-tunnel/base/` |
+| 2026-05-03 | **feat(cloudflare): two-token architecture + CNAMEs** — séparation `Neomnia-account` (CF_API_TOKEN, compte complet) / `Neomnia-domains` (CF_DNS_TOKEN, Zone DNS:Edit all zones) ; cloudflare-connector v1.1 : `CF_DNS_TOKEN` prioritaire, fallback `CF_API_TOKEN` ; Vault `secret/neokube/infrastructure/cloudflare` version 4 (CF_DNS_TOKEN ajouté) ; 8 CNAMEs neomnia.net créés (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify → tunnel) ; tunnel opérationnel : HTTP 200 vérifié sur chat.neomnia.net + headlamp.neomnia.net |
