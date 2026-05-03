@@ -83,13 +83,14 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd |
 | `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004), openprovider-connector (registrar API, port 8005), cloudflare-connector (DNS/zones API, port 8006), **stalwart-connector** (admin mail API, port 8007) |
+| `connector-system` | zoho-connector (OAuth2+proxy, port 8000), github-connector (proxy GitHub API, port 8001), vercel-connector (proxy Vercel API, port 8002), neon-connector (proxy Neon API + SQL, port 8003), penpot-connector (proxy Penpot RPC API, port 8004), openprovider-connector (registrar API, port 8005), cloudflare-connector (DNS/zones API, port 8006), **stalwart-connector** (admin mail API, port 8007), **google-discovery-connector** (Google Custom Search, port 8008), **crawlee-service** (scraping Crawlee+Playwright, port 8009) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
 | `penpot` | Penpot (design) |
 | `stalwart` | Stalwart Mail Server v0.11.8 — SMTP/IMAP/Sieve, domaine `mail.neokube.fr` |
 | `dify` | Dify v1.13.3 (agent builder studio) — accès `http://dify.neokube.local` |
+| `surfsense` | SurfSense (moteur recherche RAG open-source, alternatif Perplexity) — 7 composants : postgres+pgvector, redis, searxng, backend, celery, zero-cache, frontend |
 | `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (Cloudflare Tunnel, 2 replicas) |
 
 ### Politique LLM
@@ -148,6 +149,9 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `https://mailhub.neomnia.net` | Stalwart Admin | Admin mail |
 | `https://design.neomnia.net` | Penpot | Design |
 | `https://dify.neomnia.net` | Dify | Agent builder |
+| `https://surfsense.neomnia.net` | SurfSense frontend | Moteur RAG |
+| `https://surfsense-api.neomnia.net` | SurfSense backend API | FastAPI |
+| `https://surfsense-zero.neomnia.net` | SurfSense zero-cache | Sync RT WebSocket |
 
 **Routing** : Cloudflare → cloudflared (pod K8s) → Traefik (kube-system:80) avec Host override → service interne
 
@@ -163,6 +167,7 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 
 **CNAMEs DNS** (zone `neomnia.net`, cible `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com`, proxied=true) :
 > ✅ **Créés le 2026-05-03** : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`
+> ✅ **Créés le 2026-05-03** : `surfsense`, `surfsense-api`, `surfsense-zero`
 > Tunnel opérationnel — HTTP 200 vérifié sur chat.neomnia.net et headlamp.neomnia.net
 
 **Recréer les CNAMEs si besoin** (depuis le pod connector-system) :
@@ -231,9 +236,9 @@ for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design'
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | 8383 | `sre-charlotte` | active v2.5 |
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | 8383 | `sre-charlotte` | active v3.0 |
 | **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho, dispatch | Temporal | 8181 | `leon` | active v2.0 |
-| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox+Penpot→Vera→approval→deploy→mail | Temporal | 8484 | `dispatcher` | active v1.1 |
+| **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox+Penpot→Vera→approval→deploy→mail | Temporal | 8484 | `dispatcher` | active v1.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel project | Temporal | 8485 | `dispatcher` | active v1.0 |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot, rapport qualité | Temporal | 8487 | `dispatcher` | active v1.0 |
@@ -349,6 +354,17 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `openprovider-connector` | 8005 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` |
 | `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_DNS_TOKEN` (prioritaire, Zone DNS:Edit), `CF_API_TOKEN` (fallback, compte complet), `CF_ACCOUNT_ID` (optionnel) |
 | `stalwart-connector` | 8007 | `secret/neokube/apps/stalwart` | `ADMIN_PASSWORD` |
+| `google-discovery-connector` | 8008 | `secret/neokube/infrastructure/google` | `GOOGLE_SEARCH_API_KEY`, `GOOGLE_CX_ID` |
+| `crawlee-service` | 8009 | — (pas de credentials) | — service utility |
+
+**Provisionner les credentials Google** (une seule fois) :
+```bash
+kubectl exec -n security vault-0 -- vault kv put \
+  secret/neokube/infrastructure/google \
+  GOOGLE_SEARCH_API_KEY="<clé-cloud-console>" \
+  GOOGLE_CX_ID="<cx-id-programmable-search>"
+```
+> Obtenir sur [programmablesearchengine.google.com](https://programmablesearchengine.google.com) (cx ID) + Google Cloud Console (API key, activer "Custom Search API"). Quota : 100 req/jour gratuites.
 
 **Endpoints exposés** :
 - Tous : `GET /health`, `POST /proxy {method?, path, params?, body?}`
@@ -358,6 +374,8 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 - openprovider-connector v1.1 : auth JWT via login username/password, re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta` ; endpoints bonus `POST /dns/records/add {zone, records}` et `POST /dns/records/remove {zone, records}` (voir §DNS neokube.fr pour le format correct)
 - cloudflare-connector : Bearer token statique — utilise `CF_DNS_TOKEN` (Neomnia-domains, Zone DNS:Edit) en priorité, fallback sur `CF_API_TOKEN` (Neomnia-account, compte complet) ; endpoint bonus `GET /zones` ; API base `https://api.cloudflare.com/client/v4`
 - stalwart-connector : auth Basic `admin:ADMIN_PASSWORD` injectée auto ; endpoints bonus `GET /accounts`, `POST /accounts/create {name, password, display_name?, quota?}`, `DELETE /accounts/{account}` ; cible `http://stalwart-web.stalwart.svc.cluster.local:8080`
+- google-discovery-connector : `POST /search {query, num_results?, site_restrict?, date_restrict?, start?, language?}` → `{items[], total_results, search_query, count}` ; credentials depuis Vault auto
+- crawlee-service : `POST /crawl {url, selectors?, extract_text?, wait_for?, timeout?}`, `POST /batch {urls[], selectors?, extract_text?, timeout?}` (max 10), `POST /screenshot {url, full_page?, timeout?}` → `{screenshot_base64}` ; pas de Vault ; mutex interne (un crawl à la fois)
 
 **Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré par **Openprovider DNS** (NS `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`, zone_id=14798687). Enregistrements mail actifs depuis 2026-05-02 (A/MX/SPF/DKIM/DMARC).
 
@@ -928,6 +946,197 @@ Orange (FAI) bloque le port 25 sortant. Scaleway bloque aussi les ports SMTP sor
 
 ---
 
+## SurfSense — Moteur de recherche RAG (alternatif Perplexity)
+
+**Repo** : `https://github.com/MODSetter/SurfSense`
+**Namespace** : `surfsense`
+**GitOps** : `~/Kubinote-GitOps/apps/surfsense/base/`
+**Version** : `latest` (images `ghcr.io/modsetter/surfsense-backend` + `surfsense-web`)
+
+### Composants (7 pods)
+| Déploiement | Image | Rôle |
+|---|---|---|
+| `surfsense-postgres` | `pgvector/pgvector:pg17` | Base de données principale + vecteurs (pgvector) |
+| `surfsense-redis` | `redis:8-alpine` | Broker Celery + cache app |
+| `surfsense-searxng` | `searxng/searxng:2026.3.13-3c1f68c59` | Moteur de recherche web multi-sources (stateless) |
+| `surfsense-backend` | `ghcr.io/modsetter/surfsense-backend:latest` | API FastAPI (mode `api`), migrations Alembic |
+| `surfsense-celery` | `ghcr.io/modsetter/surfsense-backend:latest` | Worker Celery asynchrone (mode `worker`) |
+| `surfsense-zero-cache` | `rocicorp/zero:0.26.2` | Sync temps réel frontend↔postgres (WebSocket/SSE) |
+| `surfsense-frontend` | `ghcr.io/modsetter/surfsense-web:latest` | Frontend Next.js |
+
+### Interfaces web
+| URL locale | URL publique | Service |
+|---|---|---|
+| `http://surfsense.neokube.local` | `https://surfsense.neomnia.net` | Frontend |
+| `http://surfsense-api.neokube.local` | `https://surfsense-api.neomnia.net` | Backend API |
+| `http://surfsense-zero.neokube.local` | `https://surfsense-zero.neomnia.net` | Zero-cache (WebSocket) |
+
+### Stockage
+| PV/PVC | Taille | Chemin hôte | Usage |
+|---|---|---|---|
+| `surfsense-postgres-pv/pvc` | 10 Gi | `/var/lib/surfsense/postgres` | Données PostgreSQL + vecteurs pgvector |
+| `surfsense-shared-tmp-pv/pvc` | 5 Gi | `/var/lib/surfsense/shared-tmp` | Fichiers temporaires partagés backend↔celery (ReadWriteMany) |
+| `surfsense-zero-cache-pvc` | 2 Gi | local-path | `zero.db` (réplique SQLite pour sync temps réel) |
+
+### Secrets — Vault `secret/neokube/apps/surfsense`
+| Clé Vault | Description |
+|---|---|
+| `SECRET_KEY` | Clé JWT/Flask (`openssl rand -base64 32`) |
+| `DB_PASSWORD` | Mot de passe PostgreSQL |
+| `ZERO_ADMIN_PASSWORD` | Mot de passe admin zero-cache |
+| `SEARXNG_SECRET` | Secret SearXNG (`openssl rand -hex 32`) |
+| `NOTION_CLIENT_ID` | OAuth Notion (créer sur notion.so/my-integrations) |
+| `NOTION_CLIENT_SECRET` | OAuth Notion |
+| `LANGSMITH_API_KEY` | Clé Langfuse (format `pk-xxx` pour observabilité) |
+
+> `OPENAI_API_KEY` est lu depuis `secret/neokube/apps/litellm` → `LITELLM_MASTER_KEY` (utilisé pour les LLM calls, pas pour les embeddings — voir gotcha ci-dessous)
+
+### Premier déploiement — ordre d'opérations
+
+```bash
+# 1. Provisionner les secrets dans Vault
+kubectl exec -n security vault-0 -- vault kv put secret/neokube/apps/surfsense \
+  SECRET_KEY="$(openssl rand -base64 32)" \
+  DB_PASSWORD="$(openssl rand -hex 16)" \
+  ZERO_ADMIN_PASSWORD="$(openssl rand -hex 16)" \
+  SEARXNG_SECRET="$(openssl rand -hex 32)" \
+  NOTION_CLIENT_ID="" \
+  NOTION_CLIENT_SECRET="" \
+  LANGSMITH_API_KEY=""
+
+# 2. Créer le namespace (ou attendre le prochain cluster-bootstrap)
+kubectl apply -f ~/Kubinote-GitOps/infrastructure/namespaces/surfsense.yaml
+
+# 3. Créer le K8s secret depuis Vault (script idempotent)
+bash ~/Kubinote-GitOps/apps/surfsense/setup-surfsense-secrets.sh
+
+# 4. Appliquer le GitOps
+kubectl apply -k ~/Kubinote-GitOps/apps/surfsense/base/
+
+# 5. Ajouter les 3 règles dans le tunnel Cloudflare (CF_API_TOKEN requis — pas CF_DNS_TOKEN)
+# + les 3 CNAMEs DNS (déjà créés le 2026-05-03)
+```
+
+### Tunnel Cloudflare — règles d'ingress (CF_API_TOKEN)
+Les règles tunnel utilisent `CF_API_TOKEN` (pas `CF_DNS_TOKEN` qui est DNS-only).
+```bash
+CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n connector-system $CF_POD -- python3 -c "
+import httpx, os, json
+VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
+r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
+d = r.json()['data']['data']
+CF_TOKEN = d['CF_API_TOKEN']  # IMPORTANT: tunnel management requiert CF_API_TOKEN
+ACCOUNT_ID = '822ba0e8c232e192475e6bd02ce36cb4'
+TUNNEL_ID = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb'
+headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
+resp = httpx.get(f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/cfd_tunnel/{TUNNEL_ID}/configurations', headers=headers)
+current = resp.json()['result']['config']['ingress']
+# Ajouter les nouvelles règles avant le catch-all
+new_rules = [r for r in current if r.get('hostname')]
+new_rules += [
+    {'hostname': 'surfsense.neomnia.net',      'service': 'http://traefik.kube-system.svc.cluster.local:80'},
+    {'hostname': 'surfsense-api.neomnia.net',  'service': 'http://traefik.kube-system.svc.cluster.local:80'},
+    {'hostname': 'surfsense-zero.neomnia.net', 'service': 'http://traefik.kube-system.svc.cluster.local:80'},
+]
+new_rules += [{'service': 'http_status:404'}]
+result = httpx.put(f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/cfd_tunnel/{TUNNEL_ID}/configurations',
+    headers=headers, json={'config': {'ingress': new_rules}}).json()
+print('OK' if result.get('success') else result.get('errors'))
+"
+```
+
+### CNAMEs Cloudflare (zone neomnia.net, déjà créés 2026-05-03)
+```bash
+CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n connector-system $CF_POD -- python3 -c "
+import httpx, os
+VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
+r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
+d = r.json()['data']['data']
+CF_TOKEN = d.get('CF_DNS_TOKEN') or d['CF_API_TOKEN']
+headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
+ZONE_ID = '8c1283e7c52c34a9d5112c0fb271af27'
+CNAME = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com'
+for sub in ['surfsense','surfsense-api','surfsense-zero']:
+    resp = httpx.post(f'https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records',
+        headers=headers, json={'type':'CNAME','name':sub,'content':CNAME,'proxied':True,'ttl':1})
+    d = resp.json()
+    print(sub+':', 'OK' if d.get('success') else d.get('errors'))
+"
+```
+
+> Ajouter aussi dans `/etc/hosts` neokube-beta :
+> `192.168.1.28 surfsense.neokube.local surfsense-api.neokube.local surfsense-zero.neokube.local`
+
+### Gotchas SurfSense (découverts 2026-05-03)
+
+**1. chonkie v1.6 ignore `base_url` pour OpenAI embeddings**
+`EMBEDDING_MODEL=openai://nomic-embed-text` avec `OPENAI_BASE_URL=http://litellm...` ne fonctionne pas :
+chonkie utilise la bibliothèque `catsu` en interne qui se connecte directement à `api.openai.com`
+et ignore `OPENAI_BASE_URL`. La propriété `.dimension` appelle `embed("test")` au démarrage → 401 OpenAI → crash.
+
+**Fix** : utiliser un modèle `sentence-transformers` local :
+```
+EMBEDDING_MODEL: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+```
+384 dims, multilingual FR/EN, ~470MB téléchargé au premier démarrage, inference locale dans le pod.
+
+**2. asyncpg incompatible avec `?sslmode=disable`**
+`DATABASE_URL=postgresql+asyncpg://...?sslmode=disable` → `TypeError: connect() got unexpected argument 'sslmode'`
+Fix dans `setup-surfsense-secrets.sh` : ne pas inclure `?sslmode=disable` dans le DATABASE_URL asyncpg.
+Les URLs `ZERO_*` (psycopg2) peuvent conserver `?sslmode=disable`.
+
+**3. PostgreSQL `wal_level=logical` requis par zero-cache**
+rocicorp/zero utilise la réplication logique → postgres doit démarrer avec `-c wal_level=logical`.
+Fix dans `deployment-surfsense-postgres.yaml` : `args: ["-c", "wal_level=logical"]`.
+
+**4. zero-cache OOMKill à 512Mi**
+rocicorp/zero charge le schéma complet (tables + indices) en mémoire → exit 137 (SIGKILL) avec 512Mi.
+Fix : memory limit → 1.5Gi dans `deployment-surfsense-zero-cache.yaml`.
+
+**5. Tunnel Cloudflare — gestion via CF_API_TOKEN uniquement**
+`CF_DNS_TOKEN` n'a que les droits DNS:Edit → 401 sur les endpoints `/cfd_tunnel/*/configurations`.
+Toujours utiliser `CF_API_TOKEN` pour modifier les règles d'ingress du tunnel.
+
+### Intégrations stack NeoKube
+| Intégration | Config | Notes |
+|---|---|---|
+| **Embedding** | `EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Modèle local 384-dim, multilingual. chonkie v1.6 ignore base_url OpenAI → pas de LiteLLM pour les embeddings |
+| **LLM providers** | Configurés dans l'UI SurfSense (Settings > LLM Providers) | Ajouter notre LiteLLM comme provider OpenAI-compatible : `http://litellm.cockpit.svc.cluster.local/v1` |
+| **Observabilité** | LangSmith-compat → Langfuse self-hosted | `LANGSMITH_ENDPOINT=http://langfuse.cockpit.svc.cluster.local` |
+| **Notion** | OAuth natif SurfSense | Créer integration sur `notion.so/my-integrations`, redirect URI = `https://surfsense-api.neomnia.net/api/v1/auth/notion/connector/callback` |
+| **Qdrant** | Non utilisé par SurfSense (pgvector natif) | SurfSense embarque son propre vector store dans PostgreSQL (pgvector). Les agents peuvent interroger SurfSense via son API REST. |
+
+### Séparation métier / expérience de travail (Search Spaces)
+SurfSense organise les documents en **Search Spaces** distincts. À créer dans l'UI après déploiement :
+
+| Search Space | Contenu | Connecteurs suggérés |
+|---|---|---|
+| **Métier NeoKube** | Processus, architecture cluster, runbooks SRE, conventions GitOps | Crawlee (docs techniques), fichiers locaux |
+| **Expérience de travail** | Projets clients, briefs Zoho, décisions PM, historique Penpot | Notion, Zoho (via crawlee-service ou upload manuel) |
+
+> Les agents peuvent interroger SurfSense via `POST /api/v1/chat` avec un `search_space_id` pour cibler le bon contexte.
+
+### Appel depuis les agents (API SurfSense)
+```python
+# Depuis un agent Temporal ou un connector, recherche documentaire
+import httpx
+
+SURFSENSE_URL = "http://surfsense-backend.surfsense.svc.cluster.local:8000"
+
+async def surfsense_search(query: str, search_space_id: int, token: str) -> dict:
+    async with httpx.AsyncClient(timeout=30.0) as c:
+        r = await c.post(
+            f"{SURFSENSE_URL}/api/v1/chat",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"query": query, "search_space_id": search_space_id}
+        )
+    return r.json()
+```
+
+---
+
 ## Évaluation RAG — RAGAS + Langfuse
 
 ### Présentation
@@ -1295,3 +1504,5 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 | 2026-05-03 | **feat(stalwart): Roundcube webmail** — déployé dans namespace `stalwart` (`roundcubemail:latest-apache`) ; IMAP → stalwart-mail:143, SMTP → stalwart-mail:587 (credentials `%u`/`%p`) ; sqlite PVC 1Gi local-path ; ingress `webmail.neokube.local` (Traefik) ; `/etc/hosts` neokube-beta mis à jour ; opérationnel HTTP 200 |
 | 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; GitOps `apps/cloudflare-tunnel/base/` |
 | 2026-05-03 | **feat(cloudflare): two-token architecture + CNAMEs** — séparation `Neomnia-account` (CF_API_TOKEN, compte complet) / `Neomnia-domains` (CF_DNS_TOKEN, Zone DNS:Edit all zones) ; cloudflare-connector v1.1 : `CF_DNS_TOKEN` prioritaire, fallback `CF_API_TOKEN` ; Vault `secret/neokube/infrastructure/cloudflare` version 4 (CF_DNS_TOKEN ajouté) ; 8 CNAMEs neomnia.net créés (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify → tunnel) ; tunnel opérationnel : HTTP 200 vérifié sur chat.neomnia.net + headlamp.neomnia.net |
+| 2026-05-03 | **feat(surfsense): déploiement SurfSense v1.0** — moteur RAG open-source (alternatif Perplexity) dans namespace `surfsense` ; 7 composants K8s : postgres (pgvector/pg17, 10Gi, wal_level=logical), redis, searxng, backend FastAPI, celery worker, zero-cache (rocicorp/zero:0.26.2, 1.5Gi RAM), frontend Next.js ; embedding `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` local 384-dim (chonkie v1.6 ignore base_url openai → pas de LiteLLM pour les embeddings) ; Langfuse (LangSmith-compat), Notion OAuth ; 3 ingresses dual-host (neokube.local + neomnia.net) ; 3 CNAMEs + 3 règles tunnel Cloudflare ajoutées (surfsense/surfsense-api/surfsense-zero) ; HTTP 200 validé sur surfsense.neomnia.net + surfsense-api.neomnia.net/health |
+| 2026-05-03 | **feat(scraping): google-discovery-connector v1.0 + crawlee-service v1.0** — deux microservices scraping dans `connector-system` ; `google-discovery-connector` (port 8008, Python FastAPI) : `POST /search` → Google Custom Search API, credentials Vault `secret/neokube/infrastructure/google` (GOOGLE_SEARCH_API_KEY + GOOGLE_CX_ID), 100 req/j gratuites ; `crawlee-service` (port 8009, Node.js, image `mcr.microsoft.com/playwright:v1.49.0-noble`) : `POST /crawl`, `POST /batch` (max 10 URLs, concurrence 3), `POST /screenshot` → PNG base64, mutex interne pour sérialiser les sessions Chromium ; startup ~2min (npm install crawlee@3 + playwright install chromium) ; GitOps `apps/connector-system/base/` mis à jour |
