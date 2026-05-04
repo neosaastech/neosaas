@@ -430,6 +430,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `stalwart-connector` | 8007 | `secret/neokube/apps/stalwart` | `ADMIN_PASSWORD` |
 | `google-discovery-connector` | 8008 | `secret/neokube/infrastructure/google` | `GOOGLE_SEARCH_API_KEY`, `GOOGLE_CX_ID` |
 | `crawlee-service` | 8009 | — (pas de credentials) | — service utility |
+| `dataforseo-connector` | 8010 | `secret/neokube/infrastructure/dataforseo` | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`, `DATAFORSEO_API_KEY` (base64) |
 
 **Provisionner les credentials Google** (une seule fois) :
 ```bash
@@ -450,6 +451,7 @@ kubectl exec -n security vault-0 -- vault kv put \
 - stalwart-connector : auth Basic `admin:ADMIN_PASSWORD` injectée auto ; endpoints bonus `GET /accounts`, `POST /accounts/create {name, password, display_name?, quota?}`, `DELETE /accounts/{account}` ; cible `http://stalwart-web.stalwart.svc.cluster.local:8080`
 - google-discovery-connector : `POST /search {query, num_results?, site_restrict?, date_restrict?, start?, language?}` → `{items[], total_results, search_query, count}` ; credentials depuis Vault auto
 - crawlee-service : `POST /crawl {url, selectors?, extract_text?, wait_for?, timeout?}`, `POST /batch {urls[], selectors?, extract_text?, timeout?}` (max 10), `POST /screenshot {url, full_page?, timeout?}` → `{screenshot_base64}` ; pas de Vault ; mutex interne (un crawl à la fois)
+- dataforseo-connector : `POST /search {query, num_results?, language?, location_code?, engine?}` → `{items[], query, total, provider}` ; fallback auto DataForSEO → SearXNG (surfsense-searxng) ; `POST /proxy {endpoint, body}` → accès direct DataForSEO v3 API ; credentials depuis Vault auto
 
 **Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`.
 - `neokube.fr` : NS **Cloudflare** (`abby.ns.cloudflare.com` / `david.ns.cloudflare.com`) depuis 2026-05-03 — zone CF `891229575324408767bf4a0293e5adcc`
@@ -1312,6 +1314,123 @@ datasets==4.8.4
 
 ---
 
+## Penpot — Gestion des projets et fichiers (agent penpot-agent v3.x)
+
+**Instance** : `penpot` namespace — backend `penpot-backend.penpot.svc.cluster.local:6060`
+**Connector** : `penpot-connector` port 8004 — proxy RPC API, auth session cookie (Vault `secret/neokube/infrastructure/penpot`)
+**Team de référence** : `Neomnia Studio` — ID `82052e4a-914a-8123-8007-d697aa5fd265`
+**URL publique** : `https://design.neokube.fr` (Cloudflare Tunnel → Traefik → penpot-frontend)
+**URL locale** : `http://penpot.neokube.local` (réseau LAN uniquement — ne jamais utiliser dans les liens livrés)
+
+### Structure de projets — Convention
+
+| Projet | Équipe | Usage |
+|---|---|---|
+| `Neomnia.net Refonte — Design` | Neomnia Studio | Un projet par client/refonte — créé par l'agent penpot |
+| `Drafts` | Neomnia Studio | Brouillons manuels — ne pas toucher |
+| `Drafts` | Default | Brouillons personnels — ne pas toucher |
+
+**Règle** : un seul projet actif par client dans "Neomnia Studio". L'agent ne crée un nouveau projet que si aucun projet actif pour ce `zoho_project_id` n'existe déjà.
+
+### URL de livraison — format correct
+
+```
+https://design.neokube.fr/workspace?project-id={project_id}&file-id={file_id}
+```
+
+**Prérequis** : l'utilisateur doit être connecté à Penpot (`https://design.neokube.fr`) avant d'ouvrir ce lien. Le SPA affiche une "404" si la session est absente — ce n'est pas un bug d'URL, c'est une exigence d'authentification.
+
+> `PENPOT_FRONTEND_URL=https://design.neokube.fr` dans `deployment-penpot.yaml` — ne jamais utiliser `penpot.neokube.local` pour les URLs de livraison.
+
+### Vérifier qu'un fichier existe (avant de livrer l'URL)
+
+```python
+async def _verify_penpot_url(project_id: str, file_id: str) -> bool:
+    r = await httpx.AsyncClient(timeout=10).post(
+        f"{PENPOT_CONNECTOR_URL}/proxy",
+        json={"path": "get-project-files", "body": {"project-id": project_id}}
+    )
+    if r.status_code != 200: return False
+    files = r.json()
+    return isinstance(files, list) and any(f.get("id") == file_id for f in files)
+```
+
+### Lister les projets d'une équipe
+
+```python
+# get-projects retourne TOUS les projets y compris les soft-deleted — filtrer côté client
+r = await c.post(f"{PENPOT_CONNECTOR_URL}/proxy",
+    json={"path": "get-projects", "body": {"team-id": PENPOT_TEAM_ID}})
+projects = [p for p in r.json() if isinstance(p, dict)]
+```
+
+### Gotchas penpot-connector
+
+**1. `delete-project` = soft-delete, pas hard-delete**
+
+`delete-project` pose `deleted_at = now() + 7 jours`. Le projet reste visible dans `get-projects` pendant 7 jours (Penpot n'a pas de filtrage côté API — c'est le frontend qui masque les projets supprimés). Pour un hard-delete immédiat, aller en SQL :
+
+```bash
+kubectl exec -n penpot penpot-postgres-<pod> -- psql -U penpot -d penpot -c "
+SET rules.deletion_protection TO off;
+DO \$\$
+DECLARE file_ids UUID[];
+BEGIN
+  SELECT ARRAY_AGG(f.id) INTO file_ids
+  FROM file f JOIN project p ON f.project_id = p.id
+  WHERE p.id = '<project_id>';
+
+  DELETE FROM file_tagged_object_thumbnail WHERE file_id = ANY(file_ids);
+  DELETE FROM file_object_thumbnail         WHERE file_id = ANY(file_ids);
+  DELETE FROM file_thumbnail                WHERE file_id = ANY(file_ids);
+  DELETE FROM file_change                   WHERE file_id = ANY(file_ids);
+  DELETE FROM file_media_object             WHERE file_id = ANY(file_ids);
+  DELETE FROM file_data                     WHERE file_id = ANY(file_ids);
+  -- file_data_00 à file_data_15 si nécessaire
+  DELETE FROM file WHERE id = ANY(file_ids);
+  DELETE FROM project WHERE id = '<project_id>';
+END \$\$;
+"
+```
+
+Tables avec FK CASCADE (supprimées automatiquement quand le fichier est supprimé) : `comment_thread`, `file_library_rel`, `file_profile_rel`, `file_data_fragment`, `share_link`, `usage_quote`, `presence`.
+
+Tables NO ACTION (à supprimer manuellement avant le fichier) : `file_data`, `file_data_00..15`, `file_change`, `file_media_object`, `file_thumbnail`, `file_object_thumbnail`, `file_tagged_object_thumbnail`.
+
+**2. Réponse 204 du connecteur — bug cosmétique**
+
+Quand Penpot répond `204 No Content` (ex: `delete-project`), le connecteur tente de retourner `JSONResponse(204, {"text": ""})` → `RuntimeError: Response content longer than Content-Length` dans uvicorn. Ce crash est **cosmétique** : le client reçoit quand même le `204`, et l'opération Penpot s'est bien exécutée.
+
+**3. `get-project-files` utilise `path=`, pas `command=`**
+
+```python
+# CORRECT
+json={"path": "get-project-files", "body": {"project-id": project_id}}
+
+# FAUX — retourne 422
+json={"command": "get-project-files", "body": {"project-id": project_id}}
+```
+
+**4. Idempotence — vérifier avant de créer**
+
+Avant de créer un nouveau projet Penpot pour un `zoho_project_id`, vérifier si un projet actif existe déjà :
+
+```python
+existing = [p for p in projects if p.get("name", "").startswith(spec["title"]) and not p.get("deletedAt")]
+if existing:
+    return existing[0]["id"]  # réutiliser
+```
+
+### RAG design — collection `zoho-tasks`
+
+L'agent Penpot indexe ses briefs design dans Qdrant collection `zoho-tasks` (768 dims, Cosine) :
+- 1 point global par projet (`{zoho_project_id}__global`)
+- 1 point par page du site (`{zoho_project_id}_{page_key}`)
+- IDs stables via `md5(key)[:15]` — un deuxième run remplace les points existants (idempotent)
+- Payload : `type`, `page_key`, `page_title`, `zoho_task_id`, `sections`, `acceptance_criteria`, `contenu`, `penpot_url`, `indexed_at`, `source="penpot-agent-v3.3"`
+
+---
+
 ## Pièges connus — Anti-patterns à éviter
 
 ### 1. Vercel `gitSource.repoId` doit être un `int`
@@ -1634,3 +1753,12 @@ Tout nouveau service exposé publiquement via le cluster Neokube utilise un sous
 | 2026-05-03 | **feat(surfsense): connecteur Notion** — token legacy `[NOTION_TOKEN_REDACTED]` ; connecteur inséré directement en DB (id=1, space=1, `NOTION_INTEGRATION_TOKEN`) ; 444 pages Notion accessibles via l'intégration ; indexation déclenchée via Celery `index_notion_pages` sur queue `surfsense.connectors` ; `enable_summary=false` pour éviter 444 appels LLM ; indexation périodique toutes les 24h activée |
 | 2026-05-04 | **feat(penpot): v3.0 — Zoho + Notion + wireframes multi-pages** — agent Penpot lit les tâches/jalons Zoho (via Vault creds + refresh token direct), lit la doc Notion (token `ntn_...` dans Vault `secret/neokube/apps/notion`), poste commentaire Zoho sur les tâches design après création (HTTP 201 validé) ; wireframes v3 : une frame Penpot par page du site extraite des tâches Zoho (Home/Services/À propos/Contact) + layouts spécifiques + frame jalons ; deployment-penpot mis à jour (VAULT_ADDR, VAULT_TOKEN, ZOHO_PORTAL_ID) ; fix Vault KV v2 path (`secret/neokube/...` → `/v1/secret/data/neokube/...`) |
 | 2026-05-04 | **feat(spec): ProjectSpec 13 champs — ajout `notion_page_id`** — `notion_page_id` ajouté aux 3 endroits (règle anti-pattern 3) : schema JSON Schema Leon (`dispatch_project`), dict spec `_execute_tool`, `dispatcher_validate_spec` setdefault ; optionnel (None par défaut, option 2 validée) ; si présent → Penpot agent charge la page Notion avant de générer les wireframes |
+| 2026-05-04 | **feat(penpot): v3.3 — wireframes dual desktop+mobile 9 pages + RAG** — frames desktop 1440px + mobile 375px côte à côte ; hauteurs calculées au contenu (DH/MH exacts) ; footer enrichi (adresse Paris, contact@neomnia.studio) ; _verify_penpot_url (get-project-files) ; brief design complet sur les tâches Zoho (statut/avancement/priorité/durée) ; indexation RAG 10 points dans collection `zoho-tasks` (1 global + 9 pages) ; auth LiteLLM LITELLM_API_KEY dans deployment-penpot ; brand color #32AFB1 extrait de neomnia.net |
+| 2026-05-04 | **feat(connector): dataforseo-connector v1.0** — port 8010, connector-system ; credentials Vault `secret/neokube/infrastructure/dataforseo` (DATAFORSEO_LOGIN/PASSWORD/API_KEY) ; `POST /search` fallback auto DataForSEO → SearXNG (surfsense-searxng self-hosted) ; `POST /proxy` accès direct DataForSEO v3 ; E2E validé provider=dataforseo 5 résultats Penpot SaaS UI kit
+| 2026-05-04 | **fix(penpot): PENPOT_FRONTEND_URL → design.neokube.fr** — URL de livraison corrigée : `http://penpot.neokube.local` → `https://design.neokube.fr` (URL publique Cloudflare Tunnel) ; liens Zoho/email/pm-decisions pointent désormais vers l'URL publique accessible |
+| 2026-05-04 | **doc(penpot): gestion projets/fichiers** — section "Penpot — Gestion des projets" ajoutée dans CLAUDE.md : soft-delete (deleted_at+7j visible dans get-projects), hard-delete SQL procédure complète (tables NO ACTION vs CASCADE), bug 204 connecteur cosmétique, URL livraison, vérification fichier, idempotence, RAG zoho-tasks |
+| 2026-05-04 | **cleanup(penpot): purge 10 anciens projets** — 9 doublons "Neomnia.net Refonte — Design" + 1 "Neomnia.net — Refonte" (Default team) supprimés via SQL hard-delete ; Penpot.neokube.local ne retourne plus que 3 projets : 2 Drafts + 1 actif |
+| 2026-05-04 | **feat(penpot): wireframes v4 — design system v2 + composants nav 4 états + hero dashboard** — `_img_placeholder()` helper remplace les rectangles gris plats (crosshair + badge PRIMARY + dimensions) ; hero desktop : dark shell UI avec topbar, 4 KPI cards, 7-bar chart, agent status sidebar ; hero mobile : compact dark dashboard ; `_build_design_system()` v2 : 5 sections (colors usage, typo 6 variants, grid+spacing, motion tokens, image variants) ; `_build_components()` v2 : 4 sections (6 boutons×2états, nav 4 états+annotations transition, 7 badges, 4 états formulaire) |
+| 2026-05-04 | **feat(indexer): design-knowledge-indexer v1.0** — CronJob dimanche 4h Europe/Paris, namespace management ; pipeline DataForSEO SERP → crawlee-service scraping → LiteLLM embed → Qdrant collection design-knowledge (768 dims, Cosine) ; 17 requêtes / 9 catégories + 10 URLs statiques ; enrichissement agent penpot (_query_design_knowledge + _build_inspiration_frame à Y=18000) ; fix crawlee-service : playwright@1.49.0 explicite + PLAYWRIGHT_BROWSERS_PATH=/ms-playwright (MCR image pré-installé, startup 60s vs 3min) ; secret cluster-manager-secrets (LITELLM_MASTER_KEY=sk-neokube-litellm-master) à créer dans namespace management au bootstrap |
+| 2026-05-04 | **feat(indexer): crawlee-service v2 — réécriture Playwright direct** — remplacement de la couche Crawlee par Playwright direct (`chromium.launch()` + pool de 2 pages partagées) ; root cause : Crawlee cacheait `CRAWLEE_STORAGE_DIR` à l'import (singleton Configuration) ignorant les modifications runtime ; bug AutoscaledPool : sous-lecture cgroup (768MB au lieu de 3Gi) → throttle total ; résultats : startup ~60s, `/crawl`, `/batch`, `/screenshot` opérationnels ; memory limit 512Mi → 3Gi ; 53 points indexés dans `design-knowledge` |
+| 2026-05-04 | **feat(indexer): penpot-template-indexer v1.0** — crawl Penpot Hub (libraries-templates + 7 URLs catégorie + community) ; classification 15 types de projet (wireframe/icon-set/design-system/ui-kit/dashboard/landing-page/mobile-app/ecommerce/blog/portfolio/saas-webapp/planning/ux-research/presentation/framework-kit) ; 226 templates indexés dans Qdrant collection `penpot-templates` (768 dims, Cosine) ; CronJob annuel (manuel) ; gotcha : LITELLM_URL doit inclure `:4000` (port non-standard) |
