@@ -76,11 +76,13 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 | Périmètre | Domaine | Usage |
 |---|---|---|
-| Cluster K8s (accès public via tunnel) | `neomnia.net` | Cloudflare-managed, tunnel CF, services web |
+| Cluster K8s (accès public via tunnel) | `neokube.fr` | **Domaine de référence** — Cloudflare-managed, tunnel CF, tous les services web |
 | Cluster K8s (accès LAN) | `neokube.local` | DNS interne, résolution `/etc/hosts` |
-| Mail & infra Scaleway | `neokube.fr` | Openprovider DNS, SMTP/IMAP Stalwart |
+| Mail & infra Scaleway | `neokube.fr` | Mail (`mail.neokube.fr` → Stalwart Scaleway) — même domaine |
+| Domaine secondaire (préexistant) | `neomnia.net` | Aussi dans CF, tunnel actif — mais `neokube.fr` est la référence |
 
-**neomnia.net est l'alias public de neokube** — c'est le même système, deux noms de domaine.
+**neokube.fr est la référence publique de neokube** — migré dans Cloudflare le 2026-05-03.
+`neomnia.net` reste dans CF/tunnel mais ne doit plus être utilisé pour les nouveaux services.
 
 ### Process Cloudflare — interface entre les applications et les registrars
 
@@ -89,43 +91,49 @@ Cloudflare est le **seul** point d'entrée DNS pour les services exposés publiq
 ```
 Registrar (Openprovider)       Cloudflare                    Cluster K8s
   neomnia.net ───── NS ──────→  zone CF active    ──────────→ Tunnel → Traefik
-  neokube.fr  ──── NS Openprovider (exception actuelle — mail uniquement)
+  neokube.fr  ───── NS ──────→  zone CF active    ──────────→ Tunnel → Traefik  ← référence
 ```
 
-> **neokube.fr est une exception** : il reste sur les NS Openprovider car il n'est utilisé que pour le mail (`mail.neokube.fr` → Scaleway). Pour y exposer des services web, il faudrait d'abord le migrer dans Cloudflare (ajouter la zone CF, changer les NS sur Openprovider).
+> **neokube.fr est maintenant dans Cloudflare** (depuis 2026-05-03) : zone CF créée + NS Openprovider changés vers `abby.ns.cloudflare.com` / `david.ns.cloudflare.com`. Propagation immédiate. Les records mail (A/MX/SPF/DKIM/DMARC) ont été recréés dans la zone CF. `mail.neokube.fr` = DNS-only (non proxié, pointe vers 51.15.253.114).
 
 ### Ajouter un nouveau service public — process complet
 
 ```
 1. Le domaine est-il déjà dans Cloudflare ?
    OUI → passer à l'étape 3
-   NON → ajouter la zone dans Cloudflare dashboard, changer les NS chez le registrar
+   NON → ajouter la zone dans Cloudflare dashboard (via cloudflare-connector + CF_GLOBAL_KEY),
+         changer les NS chez le registrar (via openprovider-connector)
 
 2. Attendre propagation NS (0–24h, TTL Openprovider min 600s)
+   Note : recréer les records DNS existants dans la zone CF avant de changer les NS
 
 3. Ajouter un CNAME proxied=true dans la zone Cloudflare :
-   sous-domaine.neomnia.net → 94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com
-   (via cloudflare-connector ou dashboard CF)
+   sous-domaine.neokube.fr → 94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com
+   (via cloudflare-connector, zone ID 891229575324408767bf4a0293e5adcc)
 
 4. Ajouter la règle dans le Cloudflare Tunnel (CF_API_TOKEN, pas CF_DNS_TOKEN) :
-   hostname: sous-domaine.neomnia.net
+   hostname: sous-domaine.neokube.fr
    service:  http://traefik.kube-system.svc.cluster.local:80
    originRequest.httpHostHeader: service.neokube.local
 
 5. Vérifier que Traefik a un Ingress pour service.neokube.local
    (le tunnel envoie ce host à Traefik via httpHostHeader override)
 
-6. Tester : curl -I https://sous-domaine.neomnia.net
+6. Tester : curl -I https://sous-domaine.neokube.fr
 ```
 
-> **Anti-pattern à éviter** : ajouter des CNAME sur un domaine géré par Openprovider (neokube.fr) pointant vers `cfargotunnel.com`. Les CNAME Openprovider ne sont pas proxiés par Cloudflare → TLS échoue, connexion refusée. Seul le proxying Cloudflare (domaine dans une zone CF active) permet au tunnel de fonctionner.
+> **Pourquoi CF_GLOBAL_KEY pour créer une zone** : les tokens scoped (`cfat_`, `cfut_`) requièrent la permission `com.cloudflare.api.account.zone.create` qui n'est pas assignable aux tokens API scoped dans l'UI CF. Seule la **Global API Key** a cette capacité. Après création, utiliser les tokens scoped pour les opérations DNS courantes.
 
 ### Tokens Cloudflare — usage strict
 
-| Token | Variable Vault | Scope | Usage |
+| Token/Clé | Variable Vault | Scope | Usage |
 |---|---|---|---|
-| `Neomnia-account` | `CF_API_TOKEN` | Compte complet | Tunnel rules, analytics — **requis pour le tunnel** |
-| `Neomnia-domains` | `CF_DNS_TOKEN` | Zone DNS:Edit all | Ajout/modif CNAME et records DNS uniquement |
+| Global API Key | `CF_GLOBAL_KEY` + `CF_ACCOUNT_EMAIL` | Compte complet (toutes permissions) | Création de zones — **prioritaire dans cloudflare-connector v1.2** |
+| `Neomnia-account` | `CF_API_TOKEN` | Compte complet (Tunnel:Edit, Analytics…) | Tunnel rules, analytics |
+| `Neomnia-domains` | `CF_DNS_TOKEN` | Zone DNS:Edit — All zones | Ajout/modif CNAME et records DNS |
+
+> **CF_ACCOUNT_EMAIL** = `informatique@neomnia.net` (requis avec la Global API Key)
+> **cloudflare-connector v1.2** : priorité Global Key → fallback CF_DNS_TOKEN → fallback CF_API_TOKEN
 
 ---
 
@@ -191,7 +199,7 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `http://mail-admin.neokube.local` | Stalwart Mail Admin (Traefik → 51.15.253.114:8080) |
 | `http://webmail.neokube.local` | Roundcube webmail (IMAP → stalwart-mail:143, SMTP → stalwart-mail:587) |
 
-### Accès distant — Cloudflare Tunnel (neomnia.net)
+### Accès distant — Cloudflare Tunnel (neokube.fr)
 
 **Tunnel** : `neokube-tunnel` — ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`
 **GitOps** : `apps/cloudflare-tunnel/base/` (deployment cloudflared, 2 replicas, kube-system)
@@ -200,34 +208,36 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 
 | URL publique | Service interne | Notes |
 |---|---|---|
-| `https://chat.neomnia.net` | Open WebUI | Interface AI (auth interne) |
-| `https://headlamp.neomnia.net` | Headlamp | Dashboard K8s |
-| `https://temporal.neomnia.net` | Temporal UI | Orchestration workflows |
-| `https://langfuse.neomnia.net` | Langfuse | Observabilité LLM |
-| `https://webmail.neomnia.net` | Roundcube | Webmail |
-| `https://mailhub.neomnia.net` | Stalwart Admin | Admin mail |
-| `https://design.neomnia.net` | Penpot | Design |
-| `https://dify.neomnia.net` | Dify | Agent builder |
-| `https://surfsense.neomnia.net` | SurfSense frontend | Moteur RAG |
-| `https://surfsense-api.neomnia.net` | SurfSense backend API | FastAPI |
-| `https://surfsense-zero.neomnia.net` | SurfSense zero-cache | Sync RT WebSocket |
+| `https://chat.neokube.fr` | Open WebUI | Interface AI (auth interne) |
+| `https://headlamp.neokube.fr` | Headlamp | Dashboard K8s |
+| `https://temporal.neokube.fr` | Temporal UI | Orchestration workflows |
+| `https://langfuse.neokube.fr` | Langfuse | Observabilité LLM |
+| `https://webmail.neokube.fr` | Roundcube | Webmail |
+| `https://mailhub.neokube.fr` | Stalwart Admin | Admin mail |
+| `https://design.neokube.fr` | Penpot | Design |
+| `https://dify.neokube.fr` | Dify | Agent builder |
+| `https://surfsense.neokube.fr` | SurfSense frontend | Moteur RAG |
+| `https://surfsense-api.neokube.fr` | SurfSense backend API | FastAPI |
+| `https://surfsense-zero.neokube.fr` | SurfSense zero-cache | Sync RT WebSocket |
 
 **Routing** : Cloudflare → cloudflared (pod K8s) → Traefik (kube-system:80) avec Host override → service interne
 
-**Architecture tokens Cloudflare** (deux tokens séparés, principe moindre privilège) :
+**Architecture tokens Cloudflare** (trois credentials, principe moindre privilège) :
 
 | Nom CF | Variable Vault | Permissions | Usage |
 |---|---|---|---|
-| `Neomnia-account` | `CF_API_TOKEN` | Compte complet (Tunnel:Edit, Analytics, Logs…) | cloudflared tunnel auth, opérations compte |
-| `Neomnia-domains` | `CF_DNS_TOKEN` | Zone DNS:Edit — All zones | cloudflare-connector (DNS CRUD, CNAMEs) |
+| Global API Key | `CF_GLOBAL_KEY` + `CF_ACCOUNT_EMAIL` | Compte complet (toutes permissions) | Création de zones CF — cloudflare-connector v1.2 prioritaire |
+| `Neomnia-account` | `CF_API_TOKEN` | Compte complet (Tunnel:Edit, Analytics, Logs…) | cloudflared tunnel auth, op��rations compte |
+| `Neomnia-domains` | `CF_DNS_TOKEN` | Zone DNS:Edit — All zones | cloudflare-connector (DNS CRUD, CNAMEs) — fallback |
 
-> **Renouvellement** : aucune règle automatique — tokens CF n'expirent pas par défaut. Si révoqué, recréer dans dash.cloudflare.com → My Profile → API Tokens et mettre à jour Vault.
+> **CF_ACCOUNT_EMAIL** = `informatique@neomnia.net` (email du compte CF, requis avec la Global API Key)
+> **Renouvellement** : Global API Key n'expire pas. Tokens API (`cfat_`) n'expirent pas par défaut mais peuvent être révoqués. Si révoqué, recréer dans dash.cloudflare.com → My Profile → API Tokens.
 > `kubectl exec -n security vault-0 -- vault kv patch secret/neokube/infrastructure/cloudflare CF_DNS_TOKEN="<nouveau>"`
 
-**CNAMEs DNS** (zone `neomnia.net`, cible `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com`, proxied=true) :
-> ✅ **Créés le 2026-05-03** : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`
-> ✅ **Créés le 2026-05-03** : `surfsense`, `surfsense-api`, `surfsense-zero`
-> Tunnel opérationnel — HTTP 200 vérifié sur chat.neomnia.net et headlamp.neomnia.net
+**CNAMEs DNS** (zone `neokube.fr` ID=`891229575324408767bf4a0293e5adcc`, cible tunnel, proxied=true) :
+> ✅ **Créés le 2026-05-03** : `chat`, `headlamp`, `temporal`, `langfuse`, `webmail`, `mailhub`, `design`, `dify`, `surfsense`, `surfsense-api`, `surfsense-zero`
+> `mail.neokube.fr` = DNS-only (A record, proxied=false → 51.15.253.114)
+> Tunnel opérationnel — HTTP 200 vérifié sur tous les 11 services `.neokube.fr`
 
 **Recréer les CNAMEs si besoin** (depuis le pod connector-system) :
 ```bash
@@ -237,15 +247,20 @@ import httpx, os
 VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
 r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
 d = r.json()['data']['data']
-CF_TOKEN = d.get('CF_DNS_TOKEN') or d['CF_API_TOKEN']
-headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
-ZONE_ID = '8c1283e7c52c34a9d5112c0fb271af27'
+# Global API Key prioritaire pour les opérations DNS
+CF_EMAIL = d.get('CF_ACCOUNT_EMAIL', '')
+CF_GKEY = d.get('CF_GLOBAL_KEY', '')
+if CF_GKEY and CF_EMAIL:
+    headers = {'X-Auth-Email': CF_EMAIL, 'X-Auth-Key': CF_GKEY, 'Content-Type': 'application/json'}
+else:
+    headers = {'Authorization': 'Bearer ' + (d.get('CF_DNS_TOKEN') or d['CF_API_TOKEN']), 'Content-Type': 'application/json'}
+ZONE_ID = '891229575324408767bf4a0293e5adcc'  # neokube.fr
 CNAME = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com'
-for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design','dify']:
+for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design','dify','surfsense','surfsense-api','surfsense-zero']:
     resp = httpx.post(f'https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records',
         headers=headers, json={'type':'CNAME','name':sub,'content':CNAME,'proxied':True,'ttl':1})
-    d = resp.json()
-    print(sub+':', 'OK' if d.get('success') else d.get('errors'))
+    r2 = resp.json()
+    print(sub+':', 'OK' if r2.get('success') else r2.get('errors'))
 "
 ```
 
@@ -436,9 +451,14 @@ kubectl exec -n security vault-0 -- vault kv put \
 - google-discovery-connector : `POST /search {query, num_results?, site_restrict?, date_restrict?, start?, language?}` → `{items[], total_results, search_query, count}` ; credentials depuis Vault auto
 - crawlee-service : `POST /crawl {url, selectors?, extract_text?, wait_for?, timeout?}`, `POST /batch {urls[], selectors?, extract_text?, timeout?}` (max 10), `POST /screenshot {url, full_page?, timeout?}` → `{screenshot_base64}` ; pas de Vault ; mutex interne (un crawl à la fois)
 
-**Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`. DNS de `neokube.fr` géré par **Openprovider DNS** (NS `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`, zone_id=14798687). Enregistrements mail actifs depuis 2026-05-02 (A/MX/SPF/DKIM/DMARC).
+**Domaines Openprovider** (7 actifs) : `neokube.fr`, `neomnia.net`, `popurank.com`, `datapublishhub.com`, `redaction-persuasive.fr`, `mission-croissance.fr`, `referencement-site.be`.
+- `neokube.fr` : NS **Cloudflare** (`abby.ns.cloudflare.com` / `david.ns.cloudflare.com`) depuis 2026-05-03 — zone CF `891229575324408767bf4a0293e5adcc`
+- `neomnia.net` : NS Cloudflare — zone CF `8c1283e7c52c34a9d5112c0fb271af27`
+- Autres domaines : NS Openprovider standard
 
-**Zones Cloudflare** (19 actives, account_id=`822ba0e8c232e192475e6bd02ce36cb4`) : alloremorquage.fr, charles-vandendriessche.fr, content-mania.com, ecolinks.fr, espace-video.fr, iaa-temoins.fr, lapollo.fr, literie-de-france.com, locsoleil.fr, mission-croissance.fr, nellie.fr, **neomnia.net** (`8c1283e7c52c34a9d5112c0fb271af27`), neoprospect.fr, neosaas.tech, passion-animaux.fr, redaction-persuasive.fr, referencement-site.be, relation-client.be, sri-solutions.fr.
+> `neokube.fr` zone_id Openprovider = 14798687 (pour modifications DNS via API si NS Openprovider actif, inutilisé depuis migration CF)
+
+**Zones Cloudflare** (20 actives, account_id=`822ba0e8c232e192475e6bd02ce36cb4`) : alloremorquage.fr, charles-vandendriessche.fr, content-mania.com, ecolinks.fr, espace-video.fr, iaa-temoins.fr, lapollo.fr, literie-de-france.com, locsoleil.fr, mission-croissance.fr, nellie.fr, **neokube.fr** (`891229575324408767bf4a0293e5adcc`) ← **domaine de référence**, **neomnia.net** (`8c1283e7c52c34a9d5112c0fb271af27`), neoprospect.fr, neosaas.tech, passion-animaux.fr, redaction-persuasive.fr, referencement-site.be, relation-client.be, sri-solutions.fr.
 
 **Contrainte Neon** : `POST /projects` est bloqué (organisation managed by Vercel). Le pattern utilisé par Nox est **branche-par-projet** sur le projet existant `NeoBridge` (`young-fog-76038471`) :
 ```
@@ -813,40 +833,46 @@ Le webadmin v0.1.23 est une interface de **gestion uniquement** — il ne permet
 **Client IMAP direct** (alternative) — Thunderbird etc.
 - Serveur : `51.15.253.114`, port `143` (IMAP) ou `993` (IMAPS, cert self-signed)
 
-### DNS neokube.fr (Openprovider)
+### DNS neokube.fr (Cloudflare — depuis 2026-05-03)
 
-**Nameservers actifs** : `ns1.openprovider.nl` / `ns2.openprovider.be` / `ns3.openprovider.eu`
+**Nameservers actifs** : `abby.ns.cloudflare.com` / `david.ns.cloudflare.com`
+**Zone Cloudflare** : `891229575324408767bf4a0293e5adcc`
 
-> Attention : le domaine avait été migré temporairement vers Cloudflare NS (`david.ns.cloudflare.com` / `abby.ns.cloudflare.com`) mais il n'y avait aucune zone Cloudflare correspondante → SERVFAIL. Corrigé le 2026-05-02 via `PUT /v1beta/domains/29414839` pour revenir sur Openprovider DNS.
+> **Migration 2026-05-03** : zone CF créée (avec CF_GLOBAL_KEY) + records mail recréés dans CF + NS Openprovider changés vers CF NS. Propagation immédiate. La zone Openprovider (id=14798687) reste en place mais est inactive (NS CF actifs).
 
-**Enregistrements actifs** (zone_id=14798687, SOA serial 2026050205) :
-| Type | Nom | Valeur | TTL |
-|---|---|---|---|
-| `A` | `mail.neokube.fr` | `51.15.253.114` (Scaleway fr-par-1, instance fixe) | 600 |
-| `MX` | `neokube.fr` | `mail.neokube.fr` prio=10 | 3600 |
-| `TXT` | `neokube.fr` | `v=spf1 mx ~all` | 3600 |
-| `TXT` | `mail._domainkey.neokube.fr` | Clé DKIM RSA 2048 Stalwart | 3600 |
-| `TXT` | `_dmarc.neokube.fr` | `v=DMARC1; p=none; rua=mailto:admin@neokube.fr` | 3600 |
+> Historique : 2026-05-02 : SERVFAIL après tentative migration sans zone CF → NS remis Openprovider. 2026-05-03 : migration correcte (zone CF créée en premier).
 
-> **Note** : l'enregistrement A `mail.neokube.fr` a été mis à jour de `45.130.81.100` (ancienne IP Orange dynamique) à `51.15.253.114` (IP Scaleway fixe) lors de la migration vers l'instance externe.
+**Enregistrements actifs dans la zone CF** :
+| Type | Nom | Valeur | Proxied | TTL |
+|---|---|---|---|---|
+| `A` | `mail.neokube.fr` | `51.15.253.114` (Scaleway fr-par-1, instance fixe) | **Non** (DNS-only) | auto |
+| `CNAME` | `*.neokube.fr` (11 sous-domaines) | `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com` | **Oui** (proxied) | auto |
+| `MX` | `neokube.fr` | `mail.neokube.fr` prio=10 | Non | auto |
+| `TXT` | `neokube.fr` | `v=spf1 mx ~all` | Non | auto |
+| `TXT` | `mail._domainkey.neokube.fr` | Clé DKIM RSA 2048 Stalwart | Non | auto |
+| `TXT` | `_dmarc.neokube.fr` | `v=DMARC1; p=none; rua=mailto:admin@neokube.fr` | Non | auto |
 
-> IP Orange est dynamique — à mettre à jour manuellement ou via DynDNS si elle change.
+> **Important** : `mail.neokube.fr` doit rester DNS-only (proxied=false) — si proxié, Cloudflare intercepte SMTP et le relay TEM échoue.
 
-**Mise à jour DNS via openprovider-connector v1.1** :
+**Mise à jour DNS via cloudflare-connector** (maintenant la bonne façon pour neokube.fr) :
 ```bash
-# Ajouter des enregistrements (format correct — records.add avec zone id)
-POST /dns/records/add
-{
-  "zone": "neokube.fr",
-  "records": [
-    {"name": "mail", "type": "A", "value": "1.2.3.4", "ttl": 600},
-    {"name": "", "type": "MX", "value": "mail.neokube.fr", "prio": 10, "ttl": 3600}
-  ]
-}
+# Via cloudflare-connector /proxy — les credentails Global Key sont auto-injectés
+CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n connector-system $CF_POD -- python3 -c "
+import httpx, json
+r = httpx.post('http://localhost:8006/proxy', json={
+    'method': 'POST',
+    'path': 'zones/891229575324408767bf4a0293e5adcc/dns_records',
+    'body': {'type': 'A', 'name': 'mail', 'content': '51.15.253.114', 'proxied': False}
+})
+print(r.json())
+"
+```
 
-# Supprimer des enregistrements
-POST /dns/records/remove
-{"zone": "neokube.fr", "records": [{"type": "A", "name": "mail", "value": "45.130.81.100"}]}
+**Ancienne méthode openprovider-connector v1.1** (ne plus utiliser pour neokube.fr — NS CF actifs) :
+```
+POST /dns/records/add → {"zone": "neokube.fr", "records": [...]}
+(maintenant inutile — CF est autoritaire pour neokube.fr)
 ```
 
 **Gotcha API Openprovider DNS (découvert 2026-05-02)** :
@@ -1026,9 +1052,9 @@ Orange (FAI) bloque le port 25 sortant. Scaleway bloque aussi les ports SMTP sor
 ### Interfaces web
 | URL locale | URL publique | Service |
 |---|---|---|
-| `http://surfsense.neokube.local` | `https://surfsense.neomnia.net` | Frontend |
-| `http://surfsense-api.neokube.local` | `https://surfsense-api.neomnia.net` | Backend API |
-| `http://surfsense-zero.neokube.local` | `https://surfsense-zero.neomnia.net` | Zero-cache (WebSocket) |
+| `http://surfsense.neokube.local` | `https://surfsense.neokube.fr` | Frontend |
+| `http://surfsense-api.neokube.local` | `https://surfsense-api.neokube.fr` | Backend API |
+| `http://surfsense-zero.neokube.local` | `https://surfsense-zero.neokube.fr` | Zero-cache (WebSocket) |
 
 ### Stockage
 | PV/PVC | Taille | Chemin hôte | Usage |
@@ -1094,9 +1120,9 @@ current = resp.json()['result']['config']['ingress']
 # Ajouter les nouvelles règles avant le catch-all
 new_rules = [r for r in current if r.get('hostname')]
 new_rules += [
-    {'hostname': 'surfsense.neomnia.net',      'service': 'http://traefik.kube-system.svc.cluster.local:80'},
-    {'hostname': 'surfsense-api.neomnia.net',  'service': 'http://traefik.kube-system.svc.cluster.local:80'},
-    {'hostname': 'surfsense-zero.neomnia.net', 'service': 'http://traefik.kube-system.svc.cluster.local:80'},
+    {'hostname': 'surfsense.neokube.fr',      'service': 'http://traefik.kube-system.svc.cluster.local:80'},
+    {'hostname': 'surfsense-api.neokube.fr',  'service': 'http://traefik.kube-system.svc.cluster.local:80'},
+    {'hostname': 'surfsense-zero.neokube.fr', 'service': 'http://traefik.kube-system.svc.cluster.local:80'},
 ]
 new_rules += [{'service': 'http_status:404'}]
 result = httpx.put(f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/cfd_tunnel/{TUNNEL_ID}/configurations',
@@ -1105,7 +1131,7 @@ print('OK' if result.get('success') else result.get('errors'))
 "
 ```
 
-### CNAMEs Cloudflare (zone neomnia.net, déjà créés 2026-05-03)
+### CNAMEs Cloudflare (zone neokube.fr, déjà créés 2026-05-03)
 ```bash
 CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
 kubectl exec -n connector-system $CF_POD -- python3 -c "
@@ -1113,15 +1139,16 @@ import httpx, os
 VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
 r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
 d = r.json()['data']['data']
-CF_TOKEN = d.get('CF_DNS_TOKEN') or d['CF_API_TOKEN']
-headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
-ZONE_ID = '8c1283e7c52c34a9d5112c0fb271af27'
+CF_EMAIL = d.get('CF_ACCOUNT_EMAIL', '')
+CF_GKEY = d.get('CF_GLOBAL_KEY', '')
+headers = {'X-Auth-Email': CF_EMAIL, 'X-Auth-Key': CF_GKEY, 'Content-Type': 'application/json'}
+ZONE_ID = '891229575324408767bf4a0293e5adcc'  # neokube.fr
 CNAME = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com'
 for sub in ['surfsense','surfsense-api','surfsense-zero']:
     resp = httpx.post(f'https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records',
         headers=headers, json={'type':'CNAME','name':sub,'content':CNAME,'proxied':True,'ttl':1})
-    d = resp.json()
-    print(sub+':', 'OK' if d.get('success') else d.get('errors'))
+    r2 = resp.json()
+    print(sub+':', 'OK' if r2.get('success') else r2.get('errors'))
 "
 ```
 
@@ -1181,13 +1208,20 @@ curl -X PUT "http://surfsense-api.neokube.local/api/v1/search-spaces/{id}/llm-pr
   -d '{"agent_llm_id": 1, "document_summary_llm_id": 1, "image_generation_config_id": 0, "vision_llm_config_id": 0}'
 ```
 
+**9. SurfSense inaccessible via `http://surfsense.neokube.local` — CORS bloqué**
+Le backend CORS n'autorise que `NEXT_FRONTEND_URL = https://surfsense.neokube.fr`. Accéder via l'URL locale `http://surfsense.neokube.local` provoque un échec CORS : `fetch()` lève `TypeError` → "Unable to connect to the server. Check your internet connection and try again."
+
+Cause : `Origin: http://surfsense.neokube.local` est absent de la whitelist. Le backend n'expose aucune env var pour ajouter des origines supplémentaires — seul `NEXT_FRONTEND_URL` est lu.
+
+**Règle** : SurfSense s'utilise **exclusivement** via `https://surfsense.neokube.fr`. Le CNAME et le tunnel Cloudflare sont configurés pour ça. L'ingress Traefik `surfsense.neokube.local` reste utile pour accès direct backend (API curl, healthchecks), pas pour l'utilisation navigateur.
+
 ### Intégrations stack NeoKube
 | Intégration | Config | Notes |
 |---|---|---|
 | **Embedding** | `EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Modèle local 384-dim, multilingual. chonkie v1.6 ignore base_url OpenAI → pas de LiteLLM pour les embeddings |
 | **LLM providers** | Configurés dans l'UI SurfSense (Settings > LLM Providers) | Ajouter notre LiteLLM comme provider OpenAI-compatible : `http://litellm.cockpit.svc.cluster.local/v1` |
 | **Observabilité** | LangSmith-compat → Langfuse self-hosted | `LANGSMITH_ENDPOINT=http://langfuse.cockpit.svc.cluster.local` |
-| **Notion** | OAuth natif SurfSense | Créer integration sur `notion.so/my-integrations`, redirect URI = `https://surfsense-api.neomnia.net/api/v1/auth/notion/connector/callback` |
+| **Notion** | Legacy token (actif) | Token `[NOTION_TOKEN_REDACTED]` inséré directement en DB (connecteur id=1, space=1) — 444 pages accessibles, indexation périodique 24h. Découvert dans `notion_history.py` : champ `NOTION_INTEGRATION_TOKEN` dans config JSON supporté nativement. OAuth possible via redirect `https://surfsense-api.neokube.fr/api/v1/auth/notion/connector/callback` |
 | **Qdrant** | Non utilisé par SurfSense (pgvector natif) | SurfSense embarque son propre vector store dans PostgreSQL (pgvector). Les agents peuvent interroger SurfSense via son API REST. |
 
 ### Séparation métier / expérience de travail (Search Spaces)
@@ -1516,8 +1550,8 @@ Toute normalisation de réponse (renommage de champs, injection d'URLs web, cast
 **R4 — Valider les URLs avec le navigateur avant de les coder**
 Toute URL construite manuellement doit être testée dans un vrai navigateur avant d'être codée dans un connector ou documentée. Ne jamais supposer le format depuis la doc officielle ou d'autres patterns Zoho — le SPA Zoho utilise des routes `#fragment` non documentées.
 
-**R5 — Domaines publics = neomnia.net uniquement (Cloudflare-managed)**
-Tout service exposé publiquement via le cluster Neokube utilise un sous-domaine `*.neomnia.net`. Ne jamais tenter de configurer `*.neokube.fr` comme URL publique de service — `neokube.fr` est sur NS Openprovider (non-Cloudflare) et les CNAME vers `cfargotunnel.com` sans proxy CF ne fonctionnent pas (TLS échoue). Si `neokube.fr` doit un jour exposer des services, migrer d'abord son DNS dans Cloudflare. Voir la section "Architecture des noms de domaine".
+**R5 — Domaines publics = neokube.fr (Cloudflare-managed) — domaine de référence depuis 2026-05-03**
+Tout nouveau service exposé publiquement via le cluster Neokube utilise un sous-domaine `*.neokube.fr`. `neokube.fr` est désormais dans Cloudflare (NS CF actifs) — les CNAME proxied vers `cfargotunnel.com` fonctionnent. `neomnia.net` reste actif dans CF/tunnel mais `neokube.fr` est la référence. Ne jamais exposer de services sur un domaine dont le DNS n'est PAS géré par Cloudflare — le proxy CF est requis pour que le tunnel fonctionne (TLS).
 
 ---
 
@@ -1589,8 +1623,14 @@ Tout service exposé publiquement via le cluster Neokube utilise un sous-domaine
 | 2026-05-03 | **feat(stalwart): Roundcube webmail** — déployé dans namespace `stalwart` (`roundcubemail:latest-apache`) ; IMAP → stalwart-mail:143, SMTP → stalwart-mail:587 (credentials `%u`/`%p`) ; sqlite PVC 1Gi local-path ; ingress `webmail.neokube.local` (Traefik) ; `/etc/hosts` neokube-beta mis à jour ; opérationnel HTTP 200 |
 | 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; GitOps `apps/cloudflare-tunnel/base/` |
 | 2026-05-03 | **feat(cloudflare): two-token architecture + CNAMEs** — séparation `Neomnia-account` (CF_API_TOKEN, compte complet) / `Neomnia-domains` (CF_DNS_TOKEN, Zone DNS:Edit all zones) ; cloudflare-connector v1.1 : `CF_DNS_TOKEN` prioritaire, fallback `CF_API_TOKEN` ; Vault `secret/neokube/infrastructure/cloudflare` version 4 (CF_DNS_TOKEN ajouté) ; 8 CNAMEs neomnia.net créés (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify → tunnel) ; tunnel opérationnel : HTTP 200 vérifié sur chat.neomnia.net + headlamp.neomnia.net |
-| 2026-05-03 | **feat(surfsense): déploiement SurfSense v1.0** — moteur RAG open-source (alternatif Perplexity) dans namespace `surfsense` ; 7 composants K8s : postgres (pgvector/pg17, 10Gi, wal_level=logical), redis, searxng, backend FastAPI, celery worker, zero-cache (rocicorp/zero:0.26.2, 1.5Gi RAM), frontend Next.js ; embedding `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` local 384-dim (chonkie v1.6 ignore base_url openai → pas de LiteLLM pour les embeddings) ; Langfuse (LangSmith-compat), Notion OAuth ; 3 ingresses dual-host (neokube.local + neomnia.net) ; 3 CNAMEs + 3 règles tunnel Cloudflare ajoutées (surfsense/surfsense-api/surfsense-zero) ; HTTP 200 validé sur surfsense.neomnia.net + surfsense-api.neomnia.net/health |
+| 2026-05-03 | **feat(surfsense): déploiement SurfSense v1.0** — moteur RAG open-source (alternatif Perplexity) dans namespace `surfsense` ; 7 composants K8s : postgres (pgvector/pg17, 10Gi, wal_level=logical), redis, searxng, backend FastAPI, celery worker, zero-cache (rocicorp/zero:0.26.2, 1.5Gi RAM), frontend Next.js ; embedding `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` local 384-dim (chonkie v1.6 ignore base_url openai → pas de LiteLLM pour les embeddings) ; Langfuse (LangSmith-compat), Notion OAuth ; 3 ingresses dual-host (neokube.local + neomnia.net) ; 3 CNAMEs + 3 règles tunnel Cloudflare ajoutées (surfsense/surfsense-api/surfsense-zero) ; HTTP 200 validé sur surfsense.neokube.fr + surfsense-api.neokube.fr/health |
 | 2026-05-03 | **fix(litellm): OOMKill** — memory limit 512Mi → 2Gi ; LiteLLM crashait en boucle (exit 137) depuis 8j (7 restarts), causait l'échec de tous les appels LLM SurfSense et autres agents ; fix GitOps `deployment-litellm.yaml` |
 | 2026-05-03 | **fix(surfsense): LLM preferences + prompts** — l'espace "Neomnia Studio" était configuré sur AUTO (mode cloud SurfSense) au lieu de GPT-4o via LiteLLM ; switché sur `agent_llm_id=1` (GPT-4o) via `PUT /api/v1/search-spaces/1/llm-preferences` ; 7 configs LLM créées (GPT-4o, Mistral, Codestral via API + Gemini Flash/Pro/Claude Sonnet/Opus via INSERT SQL direct car validation SurfSense échoue sur quota/billing) ; prompts E2E validés |
 | 2026-05-03 | **doc: architecture domaines + process CF** — section "Architecture des noms de domaine" ajoutée dans CLAUDE.md : règle fondamentale neomnia.net=public/neokube.local=LAN/neokube.fr=mail, process complet "ajouter un service public", anti-pattern CNAME Openprovider→cfargotunnel sans proxy CF, règle R5 connector-system |
 | 2026-05-03 | **feat(scraping): google-discovery-connector v1.0 + crawlee-service v1.0** — deux microservices scraping dans `connector-system` ; `google-discovery-connector` (port 8008, Python FastAPI) : `POST /search` → Google Custom Search API, credentials Vault `secret/neokube/infrastructure/google` (GOOGLE_SEARCH_API_KEY + GOOGLE_CX_ID), 100 req/j gratuites ; `crawlee-service` (port 8009, Node.js, image `mcr.microsoft.com/playwright:v1.49.0-noble`) : `POST /crawl`, `POST /batch` (max 10 URLs, concurrence 3), `POST /screenshot` → PNG base64, mutex interne pour sérialiser les sessions Chromium ; startup ~2min (npm install crawlee@3 + playwright install chromium) ; GitOps `apps/connector-system/base/` mis à jour |
+| 2026-05-03 | **feat(infra): migration neokube.fr → Cloudflare + domaine de référence** — zone CF `neokube.fr` créée via CF_GLOBAL_KEY (`c58eafb1b5550...`, `informatique@neomnia.net`) ; NS Openprovider → `abby.ns.cloudflare.com`/`david.ns.cloudflare.com` (propagation immédiate) ; records mail recréés dans CF (A/MX/SPF/DKIM/DMARC, `mail.neokube.fr` DNS-only) ; 11 CNAMEs tunnel créés dans zone neokube.fr ; tunnel rules reset vers neokube.fr uniquement (11 règles propres) ; `neokube.fr` devient le domaine de référence NeoKube (remplace neomnia.net pour tous les nouveaux services) ; Vault `CF_GLOBAL_KEY`+`CF_ACCOUNT_EMAIL`+`CF_NEOKUBE_ZONE_ID`+`CF_NEOKUBE_DOMAIN` provisionnés |
+| 2026-05-03 | **fix(cloudflare-connector v1.2): Global API Key prioritaire** — cloudflare-connector v1.2 : priorité d'auth Global Key (`X-Auth-Email`+`X-Auth-Key`) > CF_DNS_TOKEN > CF_API_TOKEN ; résout l'impossibilité de créer des zones CF avec les tokens scoped (permission `zone.create` non accordable sur tokens `cfat_`) |
+| 2026-05-03 | **fix(surfsense): CORS + migration neokube.fr** — root cause "Unable to connect to the server" : frontend `http://surfsense.neokube.local` appelait `https://surfsense-api.neomnia.net` → CORS 400 (origin non whitelistée) ; fix : `NEXT_FRONTEND_URL=https://surfsense.neokube.fr` dans configmap, 3 ingresses mis à jour (neomnia.net → neokube.fr), Domi configmap domain_ref migré, dispatcher fallback migré ; HTTP 200 sur surfsense.neokube.fr |
+| 2026-05-03 | **feat(surfsense): connecteur Notion** — token legacy `[NOTION_TOKEN_REDACTED]` ; connecteur inséré directement en DB (id=1, space=1, `NOTION_INTEGRATION_TOKEN`) ; 444 pages Notion accessibles via l'intégration ; indexation déclenchée via Celery `index_notion_pages` sur queue `surfsense.connectors` ; `enable_summary=false` pour éviter 444 appels LLM ; indexation périodique toutes les 24h activée |
+| 2026-05-04 | **feat(penpot): v3.0 — Zoho + Notion + wireframes multi-pages** — agent Penpot lit les tâches/jalons Zoho (via Vault creds + refresh token direct), lit la doc Notion (token `ntn_...` dans Vault `secret/neokube/apps/notion`), poste commentaire Zoho sur les tâches design après création (HTTP 201 validé) ; wireframes v3 : une frame Penpot par page du site extraite des tâches Zoho (Home/Services/À propos/Contact) + layouts spécifiques + frame jalons ; deployment-penpot mis à jour (VAULT_ADDR, VAULT_TOKEN, ZOHO_PORTAL_ID) ; fix Vault KV v2 path (`secret/neokube/...` → `/v1/secret/data/neokube/...`) |
+| 2026-05-04 | **feat(spec): ProjectSpec 13 champs — ajout `notion_page_id`** — `notion_page_id` ajouté aux 3 endroits (règle anti-pattern 3) : schema JSON Schema Leon (`dispatch_project`), dict spec `_execute_tool`, `dispatcher_validate_spec` setdefault ; optionnel (None par défaut, option 2 validée) ; si présent → Penpot agent charge la page Notion avant de générer les wireframes |
