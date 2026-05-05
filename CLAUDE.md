@@ -158,6 +158,8 @@ Registrar (Openprovider)       Cloudflare                    Cluster K8s
 | `stalwart` | Stalwart Mail Server v0.11.8 — SMTP/IMAP/Sieve, domaine `mail.neokube.fr` |
 | `dify` | Dify v1.13.3 (agent builder studio) — accès `http://dify.neokube.local` |
 | `surfsense` | SurfSense (moteur recherche RAG open-source, alternatif Perplexity) — 7 composants : postgres+pgvector, redis, searxng, backend, celery, zero-cache, frontend |
+| `monitoring` | **Grafana** (dashboards) + **Loki** (log aggregation, 30j rétention) + **Promtail** (DaemonSet, collecte tous les pods) — `grafana.neokube.fr` / `grafana.neokube.local` |
+| `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (notifications push v2.11.0) |
 | `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (Cloudflare Tunnel, 2 replicas) |
 
 ### Politique LLM
@@ -198,6 +200,8 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `http://api.neokube.local` | admin-sys-agent |
 | `http://mail-admin.neokube.local` | Stalwart Mail Admin (Traefik → 51.15.253.114:8080) |
 | `http://webmail.neokube.local` | Roundcube webmail (IMAP → stalwart-mail:143, SMTP → stalwart-mail:587) |
+| `http://grafana.neokube.local` | Grafana — logs cluster (Loki + Promtail) |
+| `http://ntfy.neokube.local` | ntfy — serveur de notifications push |
 
 ### Accès distant — Cloudflare Tunnel (neokube.fr)
 
@@ -219,6 +223,8 @@ Les futurs modèles locaux seront hébergés sur machines externes et exposés v
 | `https://surfsense.neokube.fr` | SurfSense frontend | Moteur RAG |
 | `https://surfsense-api.neokube.fr` | SurfSense backend API | FastAPI |
 | `https://surfsense-zero.neokube.fr` | SurfSense zero-cache | Sync RT WebSocket |
+| `https://grafana.neokube.fr` | Grafana | Logs CronJobs, RAG, agents |
+| `https://ntfy.neokube.fr` | ntfy | Notifications push (topic neokube-alerts) |
 
 **Routing** : Cloudflare → cloudflared (pod K8s) → Traefik (kube-system:80) avec Host override → service interne
 
@@ -660,6 +666,91 @@ Objet : ✅ Projet {title} — déploiement terminé
 | Gap 1 — Trigger Zoho status | Moyen (zoho-observer + poll) | Haute — enlève la dépendance au chatbot Leon | **P1** |
 | Gap 2 — Mapper Zoho → ProjectSpec | Moyen (fonction pure, testable) | Haute — condition sine qua non du Gap 1 | **P1** |
 | Gap 3 — Email enrichi | Faible (Dispatcher étape 7) | Moyenne — meilleure UX mais non bloquant | **P3** |
+
+---
+
+## Système de notifications — ntfy
+
+**Service** : ntfy v2.11.0, namespace `interfaces`
+**GitOps** : `apps/ntfy/base/` (deployment, service, ingress, PVCs)
+**URL locale** : `http://ntfy.neokube.local`
+**URL publique** : `https://ntfy.neokube.fr` (Cloudflare Tunnel → Traefik → interfaces)
+**Topic principal** : `neokube-alerts`
+**Vault** : `secret/neokube/apps/ntfy` — `NTFY_ADMIN_PASSWORD`, `NTFY_AGENT_PASSWORD`
+
+### Comptes
+
+| Compte | Rôle | Accès |
+|---|---|---|
+| `admin` | Admin humain | read-write, accès webUI ntfy |
+| `agent` | Agents K8s (Charlotte, Dispatcher, CronJobs) | write-only sur `neokube-alerts` |
+
+**Credentials** :
+- Admin : `admin` / `Neomnia2026!` (Vault `NTFY_ADMIN_PASSWORD`)
+- Agent : `agent` / `NtfyAgent2026!` (Vault `NTFY_AGENT_PASSWORD`)
+
+### Setup app mobile
+
+1. Télécharger l'app ntfy (iOS App Store / Google Play)
+2. "Add subscription" → URL : `https://ntfy.neokube.fr`, Topic : `neokube-alerts`
+3. Connexion avec `admin` / `Neomnia2026!`
+
+### Sources d'alertes branchées
+
+| Source | Déclencheur | Priorité | Tags |
+|---|---|---|---|
+| `llm-key-validation` (CronJob, cockpit) | Quota épuisé / erreur API LLM — toutes les 6h | `urgent`/`high` | warning, robot |
+| Grafana Loki (monitoring) | Règles alerting `severity=error\|warning` | default | — |
+| Charlotte SRE (agent-system) | OOMKill, CrashLoopBackOff, severity critical/warning | `urgent`/`high` | charlotte, sre |
+| Dispatcher (agent-system) | QA bloqué, approval timeout, deploy failed/success | `urgent`/`high`/`low` | dispatcher |
+
+### Pattern d'appel depuis les agents K8s
+
+```python
+# URL interne (depuis les pods K8s)
+NTFY_URL  = "http://ntfy.interfaces.svc.cluster.local/neokube-alerts"
+NTFY_USER = "agent"
+
+# Password lu depuis Vault à l'exécution (pattern standard des agents NeoKube)
+# secret/neokube/apps/ntfy → NTFY_AGENT_PASSWORD
+
+# Appel minimal
+async with httpx.AsyncClient(timeout=5) as c:
+    await c.post(
+        NTFY_URL,
+        content="Message de notification".encode("utf-8"),
+        headers={"Title": "Titre", "Priority": "high", "Tags": "warning"},
+        auth=(NTFY_USER, ntfy_pass),
+    )
+```
+
+**Priorités ntfy** : `min` < `low` < `default` < `high` < `urgent`
+**Tags courants** : `warning`, `sos`, `white_check_mark`, `rocket`, `charlotte`, `sre`, `dispatcher`, `clock1`
+
+### Config ntfy (env vars déploiement)
+
+```yaml
+NTFY_BASE_URL: "https://ntfy.neokube.fr"          # URL publique pour le relay push iOS
+NTFY_CACHE_FILE: "/var/cache/ntfy/cache.db"        # Persistance messages (PVC 1Gi)
+NTFY_AUTH_FILE: "/var/lib/ntfy/auth.db"            # Comptes + permissions (PVC 500Mi)
+NTFY_AUTH_DEFAULT_ACCESS: "deny-all"               # Tout accès requiert authentification
+NTFY_BEHIND_PROXY: "true"                          # Traefik devant ntfy
+NTFY_UPSTREAM_BASE_URL: "https://ntfy.sh"          # Relay pour push natif iOS/Android
+```
+
+> **NTFY_UPSTREAM_BASE_URL** est obligatoire pour que les notifications push iOS/Android arrivent en dehors de l'app ouverte. ntfy self-hosted délègue le push natif à ntfy.sh comme relay gratuit.
+
+### Recréer les comptes si PVC supprimé
+
+```bash
+# Le auth.db est dans le PVC ntfy-data-pvc. Si recréé :
+kubectl exec -n interfaces deploy/ntfy -- sh -c \
+  'NTFY_PASSWORD="Neomnia2026!" ntfy user add --role=admin admin'
+kubectl exec -n interfaces deploy/ntfy -- sh -c \
+  'NTFY_PASSWORD="NtfyAgent2026!" ntfy user add agent'
+kubectl exec -n interfaces deploy/ntfy -- ntfy access admin neokube-alerts read-write
+kubectl exec -n interfaces deploy/ntfy -- ntfy access agent neokube-alerts write-only
+```
 
 ---
 
@@ -1762,3 +1853,9 @@ Tout nouveau service exposé publiquement via le cluster Neokube utilise un sous
 | 2026-05-04 | **feat(indexer): design-knowledge-indexer v1.0** — CronJob dimanche 4h Europe/Paris, namespace management ; pipeline DataForSEO SERP → crawlee-service scraping → LiteLLM embed → Qdrant collection design-knowledge (768 dims, Cosine) ; 17 requêtes / 9 catégories + 10 URLs statiques ; enrichissement agent penpot (_query_design_knowledge + _build_inspiration_frame à Y=18000) ; fix crawlee-service : playwright@1.49.0 explicite + PLAYWRIGHT_BROWSERS_PATH=/ms-playwright (MCR image pré-installé, startup 60s vs 3min) ; secret cluster-manager-secrets (LITELLM_MASTER_KEY=sk-neokube-litellm-master) à créer dans namespace management au bootstrap |
 | 2026-05-04 | **feat(indexer): crawlee-service v2 — réécriture Playwright direct** — remplacement de la couche Crawlee par Playwright direct (`chromium.launch()` + pool de 2 pages partagées) ; root cause : Crawlee cacheait `CRAWLEE_STORAGE_DIR` à l'import (singleton Configuration) ignorant les modifications runtime ; bug AutoscaledPool : sous-lecture cgroup (768MB au lieu de 3Gi) → throttle total ; résultats : startup ~60s, `/crawl`, `/batch`, `/screenshot` opérationnels ; memory limit 512Mi → 3Gi ; 53 points indexés dans `design-knowledge` |
 | 2026-05-04 | **feat(indexer): penpot-template-indexer v1.0** — crawl Penpot Hub (libraries-templates + 7 URLs catégorie + community) ; classification 15 types de projet (wireframe/icon-set/design-system/ui-kit/dashboard/landing-page/mobile-app/ecommerce/blog/portfolio/saas-webapp/planning/ux-research/presentation/framework-kit) ; 226 templates indexés dans Qdrant collection `penpot-templates` (768 dims, Cosine) ; CronJob annuel (manuel) ; gotcha : LITELLM_URL doit inclure `:4000` (port non-standard) |
+| 2026-05-04 | **feat(surfsense): SharePoint upload** — script `~/scripts/sharepoint_to_surfsense.py` ; upload 1 995 fichiers depuis `~/SharePoint/` (8 sites prioritaires) via `POST /api/v1/documents/fileupload` ; filtres venv/~$ ; JWT token dans `SURFSENSE_URL=http://surfsense-api.neokube.local` ; connecteur OneDrive personnel créé (ID 2, `chvandendriessche@neomnia.net`) via Azure App Registration `SurfSense-Neokube` (CLIENT_ID dans Vault `secret/neokube/apps/surfsense`) |
+| 2026-05-04 | **feat(monitoring): Grafana + Loki + Promtail** — namespace `monitoring` ; Loki 2.9.8 (log aggregation, 30j rétention, hostPath `/var/lib/loki` 10Gi) ; Promtail 2.9.8 (DaemonSet, collecte tous les pods via `/var/log/pods`, labels namespace/app/pod/container/job_name) ; Grafana 10.4.3 (dashboard pré-provisionné "NeoKube — CronJobs & Batch" : 4 panels CronJobs/RAG/erreurs/agents) ; Vault `secret/neokube/apps/monitoring` (GRAFANA_ADMIN_PASSWORD) ; `grafana.neokube.local` + `grafana.neokube.fr` (CNAME + règle tunnel CF) ; fix inotify : `fs.inotify.max_user_instances=512` dans `/etc/sysctl.d/99-inotify.conf` |
+| 2026-05-04 | **feat(monitoring/smtp): smtp-relay pod** — Go's smtp.PlainAuth refuse les credentials en clair sur connexion non-TLS (hostname ≠ localhost) → déploiement d'un relay Python (aiosmtpd+aiosmtplib) dans namespace monitoring ; Grafana → smtp-relay:25 (plaintext, sans auth) → stalwart-mail:587 (avec credentials no-reply) → TEM → chvandendriessche@neomnia.net ; 3 règles d'alerte Loki provisionnées : CronJob ERROR, backup TERMINÉ, indexer TERMINÉ ; **gotcha : `admin@neokube.fr` ne peut pas recevoir de mails** — conflit avec `authentication.fallback-admin.user="admin"` dans config.toml Stalwart (SMTP lookup du local-part "admin" trouve le superuser système, pas le compte individual) ; utiliser `chvandendriessche@neomnia.net` pour les alertes monitoring |
+| 2026-05-05 | **fix(surfsense): celery OOMKill + DB migrations** — surfsense-celery crash 128 restarts (exit 137) : autoscale max=10 workers × 460MB sentence-transformers = OOMKill ; memory limit 4Gi → 8Gi ; migrations Alembic désynchronisées (alembic_version=116, schema=~140) : table agent_action_log hors Alembic bloquait migration 130 — renamed + DROP CASCADE index orphelins, stamp 140, alembic upgrade head applique 141+142 ; SurfSense pleinement fonctionnel |
+| 2026-05-05 | **fix(surfsense): JWT + dédup + LLM quota** — token expiré (2026-05-04 20:50 UTC) → nouveau token PyJWT exp 2027-05-05 ; `GET /documents/search/titles` format changé (list → `{items, has_more}`) → fix parse + page_size=50000 ; tous les LLM API quotas épuisés simultanément (OpenAI/Anthropic/Gemini) → mistral-large-latest comme provider de secours ; 2 629 fichiers SharePoint (9 sites dont Management) re-indexés |
+| 2026-05-05 | **feat(alerting): ntfy v2.11.0 + système de notifications push** — ntfy déployé dans namespace `interfaces` (NTFY_AUTH_DEFAULT_ACCESS=deny-all, upstream ntfy.sh pour relay iOS/Android push) ; CNAME `ntfy.neokube.fr` + règle tunnel Cloudflare ; Vault `secret/neokube/apps/ntfy` (NTFY_ADMIN_PASSWORD + NTFY_AGENT_PASSWORD) ; `llm-key-validation` v2 : schedule 6h→*/6h, vrais appels complétion 1 token (détecte quota épuisé), notification ntfy priorité urgent/high selon providers KO ; Grafana : contact point ntfy-neokube webhook (POST auth Basic, routes severity=error\|warning) ; Charlotte SRE : activity `sre_ntfy_notify` — OOMKill/CrashLoop/severity critical|warning → urgent/high ; Dispatcher : activity `dispatcher_ntfy_notify` — blocked_vera/approval_timeout/deploy_failed/deployed ; helper `_ntfy_notify` + NTFY_URL/NTFY_USER/VAULT_NTFY_PATH ajoutés dans configs Charlotte et Dispatcher |
