@@ -291,8 +291,9 @@ for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design'
 | `cluster-bootstrap` | management | `*/5 * * * *` | Applique GitOps + s'assure que les 7 namespaces Temporal existent (idempotent) |
 | `neokube-nightly-backup` | management | `0 3 * * *` (Europe/Paris) | Sauvegarde nightly |
 | `llm-key-sync` | cockpit | `0 * * * *` | Sync clés LLM Vault → K8s secrets → restart LiteLLM/Langfuse si changement |
-| `llm-key-validation` | cockpit | `30 6 * * *` | Valide les clés LLM |
+| `llm-key-validation` | cockpit | `30 6 * * *` | Valide les clés LLM, ntfy si quota épuisé |
 | `dify-bootstrap` | dify | `0 4 1 1 *` | Bootstrap Dify annuel (migrations one-shot) |
+| `agent-eval-nightly` | agent-system | `0 2 * * *` (Europe/Paris) | Évalue les 9 agents (LLM-as-judge, 3 scénarios chacun), score Langfuse + alerte ntfy si avg < 7.5 |
 
 ### Namespaces Temporal (état 2026-04-27)
 | Namespace | Agent | Retention |
@@ -825,28 +826,25 @@ Dans Langfuse UI : **Traces** → filtre par `Tags contains "project:xxx"` → t
 - Dispatcher envoie déjà des notifs ntfy (deployed / blocked / failed) via `dispatcher_ntfy_notify`
 - `agent_eval.py` envoie des scores LLM-as-judge ponctuels (manuel)
 
-**À implémenter (P2) — CronJob eval automatique :**
-```yaml
-# CronJob agent-eval-nightly — management namespace, schedule 0 2 * * *
-# Lance python3 ~/scripts/agent_eval.py sur tous les agents
-# Si score moyen < 7.5 → alerte ntfy priority=urgent + tag "degradation"
-```
+**✅ CronJob `agent-eval-nightly` (agent-system, 2h Paris) :**
+- `configmap-agent-eval-cron.yaml` + `cronjob-agent-eval.yaml` — GitOps agent-system/base
+- Virtual key dédiée `eval-judge` (mistral, budget 10€/mois) dans `litellm-agent-keys`
+- 3 scénarios par agent, prompts depuis Langfuse (fallback inline)
+- Score `eval_avg` posté dans Langfuse, alerte ntfy si avg < `EVAL_THRESHOLD` (défaut=7.5)
+- Creds 100% env vars depuis K8s secrets (cluster-manager-secrets + litellm-agent-keys + vault-root-token)
 
-**À implémenter (P2) — Workflow eval score dans Dispatcher :**
+**✅ Charlotte `sre_check_eval_scores` (Bloc E, SREScanWorkflow étape 10) :**
+- Poll Langfuse (rolling avg sur 3 derniers runs par agent)
+- Alerte ntfy priority=high si agent < 7.0/10
+- Intervention automatique : déclenche `llm-key-sync` via admin-sys si dégradation détectée
+- Fréquence : 1 fois tous les `EVAL_WATCH_EVERY_N` cycles (défaut=6, soit ~30min à 300s/cycle)
+
+**À implémenter (P3) — Score workflow Dispatcher :**
 ```python
-# En fin de DevProjectWorkflow : envoyer un score global basé sur les résultats
+# En fin de DevProjectWorkflow : score basé sur les résultats effectifs
 workflow_score = 1.0 if not errors else (0.5 if partial else 0.0)
 await workflow.execute_activity(sre_push_langfuse_score, ...)
 ```
-
-**À implémenter (P2) — Charlotte intervention automatique :**
-Charlotte reçoit déjà des signaux sur la santé du cluster. On peut ajouter :
-1. Charlotte poll Langfuse `/api/public/scores?name=agent_eval&limit=50`
-2. Si score d'un agent < 7.0 sur les 3 dernières exécutions → analyse + ntfy urgent
-3. Si la cause est un problème de modèle LLM (quota épuisé) → Charlotte déclenche `llm-key-sync` via admin-sys
-4. Si la cause est un prompt dégradé → Charlotte alerte Charles avec le contexte Langfuse
-
-Voir §Architecture agents → Charlotte pour le pattern d'intervention.
 
 ---
 
