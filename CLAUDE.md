@@ -504,170 +504,15 @@ kubectl rollout restart deploy/agent-charlotte -n agent-system
 
 ## Cycle de vie d'un projet — Planification → Production
 
-Cette section est la référence pour comprendre à quel moment un projet passe de la planification à la production, quels agents interviennent à chaque phase, et ce qui manque pour atteindre le flux cible (Zoho-driven).
+> Détail complet (phases, flux, gaps P1/P3) : **[CLAUDE-pipeline.md](CLAUDE-pipeline.md)**
 
----
-
-### Phase 1 — Exploration
-
-**Quand** : L'utilisateur mentionne un projet dans Open WebUI, sans savoir encore s'il existe.
-
-**Agent principal** : Charlotte
-
-| Action | Outil | Résultat |
-|---|---|---|
-| Vérifier l'existence du projet dans tous les systèmes | `project_health_check(project_name)` | Tableau ✅/❌/⚠️ — Zoho, GitHub, Vercel, Penpot, Notion |
-| Si tout est ✅ | — | Projet déjà en place, passer directement à la Phase 3 si souhaité |
-| Si ❌ dans Zoho | → Phase 2 (Leon) | Le projet n'est pas encore structuré |
-
-**Exemple de déclencheur** : *"Vérifie l'état du projet neomnia.net"*, *"Est-ce que tout est en place pour lancer la refonte ?"*
-
----
-
-### Phase 2 — Planification
-
-**Quand** : Le projet n'existe pas encore (ou est incomplet) — Leon structure le brief.
-
-**Agents principaux** : Leon, Charlotte
-
-| Étape | Agent | Action |
-|---|---|---|
-| 1 | Leon | Dialogue de clarification (max 10 tours) — extrait title, objective, contraintes, client_email... |
-| 2 | Leon | Émet le ProjectSpec JSON (12 champs validés) |
-| 3 | Leon | Crée le projet Zoho avec jalons + tasklists + tâches |
-| 4 | Charlotte | `project_health_check(update_docs=True)` — croise les liens Zoho ↔ Notion ↔ autres systèmes |
-
-**Sorties** :
-- Projet Zoho structuré (jalons, listes, tâches, description avec liens croisés)
-- Page Notion créée ou mise à jour avec section "Liens projet"
-- ProjectSpec JSON prêt (stocké dans Leon, déclenche la production si `dispatch_project` appelé)
-
-**Conditions de fin de phase** — l'une ou l'autre :
-
-```
-[ACTUEL]  Leon appelle dispatch_project() dès que le ProjectSpec est complet
-          → passage immédiat en production, sans validation humaine du plan Zoho
-
-[CIBLE]   L'utilisateur revoit le plan dans Zoho PM (jalons, tâches, description)
-          → marque le projet "Prêt pour production" (statut custom Zoho)
-          → zoho-observer détecte ce statut → construit ProjectSpec → déclenche Dispatcher
-```
-
-> **Gap actuel** : dans le flux cible, l'humain a une fenêtre de relecture dans Zoho avant que la production ne démarre. Dans le flux actuel, Leon déclenche immédiatement sans ce cran d'arrêt.
-
----
-
-### Phase 3 — Production
-
-**Quand** : `POST /trigger` reçu par Dispatcher (depuis Leon, Charlotte, ou zoho-observer).
-
-**Agent principal** : Dispatcher + Aria + Nox + Penpot + Domi + Vera
-
-| Étape | Agent | Action | Durée max | Bloquant |
-|---|---|---|---|---|
-| 1 | Dispatcher | `validate_spec` — vérifie les 12 champs obligatoires | 30 s | Oui |
-| 2 | Aria | GitHub repo frontend (template-nextjs) + Vercel project | 300 s | **Oui** |
-| 2 | Nox | GitHub repo backend (template-fastapi) + Neon branch | 300 s | **Oui** |
-| 2 | Penpot | Projet Penpot + duplication fichier template | 300 s | Non |
-| 2 | Domi | Provision domaine (subdomain `{slug}.neomnia.net` ou achat) | 300 s | Non |
-| 3 | Vera | QA review — acceptance criteria + artefacts Aria/Nox/Penpot | 120 s | **Oui** |
-| 4 | Charlotte | Notification approbation humaine (Temporal signal) | 30 s | — |
-| 5 | — | Approbation humaine (24h max) | 24 h | **Oui** |
-| 6 | Dispatcher | Deploy Vercel + `domi_link_vercel_domain` | 120 s | Oui |
-| 7 | Dispatcher | `write_pm_decisions` + `zoho_callback` + `send_client_mail` | 30 s | Non |
-
-**Sorties garanties en fin de workflow** :
-
-| Système | Résultat |
-|---|---|
-| GitHub | 2 repos créés : `neomnia/{slug}-frontend` + `neomnia/{slug}-backend` |
-| Vercel | Projet déployé, domaine `{slug}.neomnia.net` lié |
-| Neon | Branche créée sur NeoBridge (`neon_branch_id` + `neon_endpoint_host`) |
-| Penpot | Projet design initialisé (template dupliqué) |
-| Email | Envoyé à `spec.client_email` avec liens GitHub/Vercel/Penpot |
-| Zoho | Commentaire sur la tâche + lien Penpot |
-| Qdrant | Décision archivée dans `pm-decisions` (768-dim, recherche sémantique) |
-
----
-
-### Gaps — Ce qui manque pour le flux cible (2026-05-02)
-
-#### Gap 1 — Trigger "Zoho status → production" `[priorité haute]`
-
-**Problème** : zoho-observer surveille uniquement les projets créés *par Leon* via l'API. Il ne détecte pas les changements de statut sur un projet existant, qu'il ait été créé par Leon ou manuellement.
-
-**Impact** : impossible de lancer la production depuis Zoho PM sans passer par Leon en mode chatbot.
-
-**Solution envisagée** :
-```python
-# Dans zoho-observer — nouveau poll périodique (ex: toutes les 5 min)
-projects = GET /projects/?status=active
-for p in projects:
-    if p["custom_status_name"] == "Prêt pour production":
-        if not already_dispatched(p["id"]):
-            spec = zoho_to_project_spec(p)   # → Gap 2
-            POST dispatcher/trigger, body=spec
-            mark_dispatched(p["id"])          # évite le double-déclenchement
-```
-
----
-
-#### Gap 2 — Mapper "Zoho project → ProjectSpec" `[priorité haute]`
-
-**Problème** : Le ProjectSpec est aujourd'hui construit *uniquement* par Leon via dialogue. Il n'existe pas de fonction qui lit un projet Zoho existant et produit un ProjectSpec valide.
-
-**Impact** : même si Gap 1 est résolu, il n'y a rien pour extraire les 12 champs du projet Zoho.
-
-**Mapping envisagé** :
-
-| Champ ProjectSpec | Source Zoho | Fallback |
-|---|---|---|
-| `project_id` | `project.id_string` | — |
-| `title` | `project.name` | — |
-| `objective` | `project.description` (1ère ligne) | `"Voir projet Zoho"` |
-| `client_email` | `project.description` (pattern `email:...`) | `""` (non-bloquant) |
-| `project_type` | `project.description` (pattern `type:...`) | `"webapp"` |
-| `domain_mode` | `project.description` (pattern `domain:...`) | `"subdomain"` |
-| `domain_name` | `project.description` (pattern `domain_name:...`) | `""` |
-| `acceptance_criteria` | noms des milestones | `[]` |
-| `zoho_project_id` | `project.id_string` | — |
-| `emitted_at` | timestamp du trigger | — |
-
-> Convention proposée : stocker les champs structurés dans la description Zoho sous forme `champ: valeur` (une par ligne), lisibles par un humain et parsables par le mapper.
-
----
-
-#### Gap 3 — Email de rapport étape par étape `[priorité basse]`
-
-**Problème** : Un seul email est envoyé en fin de workflow (étape 7). L'utilisateur ne sait pas ce qui s'est passé pendant les 5-10 minutes de build.
-
-**Impact** : aucune visibilité en temps réel sur l'avancement (Aria ✅ ? Vera ❌ ?).
-
-**Solution envisagée** : Email récapitulatif enrichi à l'étape 7 qui liste toutes les étapes franchies avec leur statut, construit à partir du Temporal workflow history ou d'un dict d'étapes accumulé dans le workflow context. Pas d'emails intermédiaires (spam) — un seul email complet.
-
-```
-Objet : ✅ Projet {title} — déploiement terminé
-
-Étapes franchies :
-  ✅ Aria  — repo frontend créé : github.com/neomnia/{slug}-frontend
-  ✅ Nox   — repo backend + branche Neon : {endpoint_host}
-  ✅ Penpot — design initialisé : {penpot_url}
-  ✅ Domi  — domaine provisionné : {slug}.neomnia.net
-  ✅ Vera  — QA approuvée (0 issue bloquante)
-  ✅ Deploy — URL live : https://{slug}.neomnia.net
-```
-
----
-
-### Résumé des priorités (2026-05-02)
-
-| Item | Effort | Valeur | Priorité |
+| Phase | Agent | Déclencheur | Sortie |
 |---|---|---|---|
-| Gap 1 — Trigger Zoho status | Moyen (zoho-observer + poll) | Haute — enlève la dépendance au chatbot Leon | **P1** |
-| Gap 2 — Mapper Zoho → ProjectSpec | Moyen (fonction pure, testable) | Haute — condition sine qua non du Gap 1 | **P1** |
-| Gap 3 — Email enrichi | Faible (Dispatcher étape 7) | Moyenne — meilleure UX mais non bloquant | **P3** |
+| **Exploration** | Charlotte | Mention projet → `project_health_check` | Bilan ✅/❌ Zoho/GitHub/Vercel/Penpot/Notion |
+| **Planification** | Leon | Brief → dialogue 10 tours → `dispatch_project` | ProjectSpec 13 champs + projet Zoho structuré |
+| **Production** | Dispatcher+Aria+Nox+Penpot+Domi+Vera | `POST /trigger` | 2 repos GitHub, Vercel deploy, Neon branch, Penpot design, domaine |
 
----
+**Gaps ouverts** : trigger Zoho status → production **(P1)** · mapper Zoho→ProjectSpec **(P1)** · email enrichi étape par étape **(P3)**
 
 ## Système de notifications — ntfy
 
@@ -756,328 +601,21 @@ kubectl exec -n interfaces deploy/ntfy -- ntfy access agent neokube-alerts write
 
 ## Stalwart Mail Server v0.11.8
 
-**Instance** : Docker sur Scaleway fr-par-1, IP `51.15.253.114` (DEV1-S)
-**Namespace K8s** : `stalwart` — Services ClusterIP + Endpoints manuels → 51.15.253.114
-**GitOps** : `~/Kubinote-GitOps/apps/stalwart/base/` (StatefulSet/PVC supprimés — instance externe)
-**Domaine** : `mail.neokube.fr` → `51.15.253.114` (Scaleway, pas l'IP Orange)
-**Config** : `/opt/stalwart-mail/etc/config.toml` sur l'instance Scaleway
+> Documentation complète (10 gotchas config, DNS neokube.fr, Scaleway TEM relay) : **[CLAUDE-stalwart.md](CLAUDE-stalwart.md)**
+
+**Instance** : Docker Scaleway fr-par-1 —  (DEV1-S)
 **SSH** : `ssh -i ~/.ssh/id_ed25519_neokube root@51.15.253.114`
-**Vault** : `secret/neokube/apps/stalwart` — `ADMIN_PASSWORD`, `DKIM_SELECTOR`, `DKIM_PUBKEY_DNS`, `NOREPLY_PASSWORD`
-**Connector** : `stalwart-connector` port 8007 (`http://stalwart-connector.connector-system.svc.cluster.local:8007`)
+**Vault** : `secret/neokube/apps/stalwart` — `ADMIN_PASSWORD`, `NOREPLY_PASSWORD`
+**Webadmin** : `http://mail-admin.neokube.local` — login `admin` / Vault `ADMIN_PASSWORD` (webadmin épinglé v0.1.23)
+**Webmail** : `http://webmail.neokube.local` (Roundcube, IMAP stalwart-mail:143)
+**SMTP interne** : `stalwart-mail.stalwart.svc.cluster.local:587` — plaintext, `start_tls=False`, `validate_certs=False`
+**Relay sortant** : Stalwart → smtp-tem-proxy (port 1025 local) → Scaleway TEM HTTP API — Vault `secret/neokube/infrastructure/scaleway`
+
+**Comptes agents** : `no-reply@` (Dispatcher), `leon@`, `vera@`, `domi@neokube.fr`
+**Tous les comptes doivent avoir `roles: ["user"]`** sinon Stalwart retourne 550 5.7.1.
+**`session.auth.mechanisms`** : utiliser la string expression `"[plain, login, oauthbearer]"` — PAS un tableau TOML.
+**`admin@neokube.fr` ne peut pas recevoir de mails** (conflit fallback-admin) — utiliser `chvandendriessche@neomnia.net` pour les alertes.
 
-> **Pourquoi Scaleway ?** Le nœud kubinote est derrière Orange ISP qui bloque TLS sortant sur les ports SMTP (25, 465, 587). Stalwart est externalisé sur Scaleway fr-par-1 pour que le relay TEM fonctionne. Les agents K8s se connectent via `stalwart-mail.stalwart.svc.cluster.local:587` (ClusterIP → Endpoint → 51.15.253.114) en **plaintext** (pas de STARTTLS).
-
-### Comptes mail agents
-
-| Adresse | Agent | Vault path | Usage |
-|---|---|---|---|
-| `admin@neokube.fr` | admin (id=65) | `secret/neokube/apps/stalwart` `ADMIN_PASSWORD` | Compte admin Stalwart, alertes infra |
-| `leon@neokube.fr` | Leon | `secret/neokube/agents/leon` `MAIL_FROM`/`MAIL_PASSWORD` | Email de bienvenue client, résumé brief |
-| `vera@neokube.fr` | Vera | `secret/neokube/agents/vera` `MAIL_FROM`/`MAIL_PASSWORD` | Rapports QA, alertes blocantes |
-| `domi@neokube.fr` | Domi | `secret/neokube/agents/domi` `MAIL_FROM`/`MAIL_PASSWORD` | Alertes renouvellement domaine |
-| `no-reply@neokube.fr` | Dispatcher | `secret/neokube/apps/stalwart` `NOREPLY_PASSWORD` | Notifications workflow automatiques post-deploy |
-
-**SMTP interne** : `stalwart-mail.stalwart.svc.cluster.local:587` (plaintext, pas de TLS — `start_tls=False`)
-**Activité Dispatcher** : `dispatcher_send_client_mail` — envoyée si `spec.client_email` présent, non-bloquante
-
-### Gotchas config v0.11.8
-
-> Ces points ont causé des heures de debug — les noter impérativement.
-
-**1. Section admin fallback — tiret obligatoire**
-```toml
-# CORRECT v0.11.8
-[authentication.fallback-admin]
-user = "admin"
-secret = "$6$..."   # SHA-512 crypt
-
-# FAUX (section ignorée silencieusement)
-[authentication.fallback.credentials]
-```
-
-**2. Secret = hash SHA-512 crypt, pas plaintext**
-```bash
-# Générer un hash SHA-512 (format $6$salt$hash)
-python3 -c "import crypt; print(crypt.crypt('monpassword', crypt.mksalt(crypt.METHOD_SHA512)))"
-# ou
-openssl passwd -6 "monpassword"
-```
-
-**3. Path RocksDB sans sous-dossier `/db`**
-```toml
-[store.rocksdb]
-path = "/opt/stalwart-mail/data"   # CORRECT — stalwart --init crée ici
-# path = "/opt/stalwart-mail/data/db"  # FAUX — causait "No such file or directory"
-```
-
-**4. `[authentication.fallback-admin]` ne fonctionne que si la DB est vide**
-Si des principals existent déjà dans RocksDB, le fallback est ignoré. Pour réinitialiser :
-```bash
-kubectl scale statefulset stalwart -n stalwart --replicas=0
-# attendre termination complète
-kubectl run -it --rm cleanup --image=busybox --restart=Never -- \
-  sh -c "rm -rf /data/*"  # avec volumeMount vers le PVC stalwart
-kubectl scale statefulset stalwart -n stalwart --replicas=1
-```
-
-**5. API REST Stalwart — endpoints utiles**
-```bash
-# Base URL interne : http://stalwart-web.stalwart.svc.cluster.local:8080
-# Auth : Basic admin:ADMIN_PASSWORD
-
-# Lister les domaines
-GET /api/principal?types=domain
-
-# Lister les comptes
-GET /api/principal?types=individual
-
-# Créer un compte mail
-POST /api/principal
-{"name":"user@domain.fr","type":"individual","quota":0,"secrets":["password"],"emails":["user@domain.fr"]}
-
-# Supprimer un compte
-DELETE /api/principal/user@domain.fr
-```
-
-**6. Auto-ban (`fail2ban`) — config dans `config.toml` uniquement**
-```toml
-[server.fail2ban]
-rate = "100/1d"   # bannit après 100 erreurs d'auth en 24h
-```
-L'endpoint `POST /api/settings/{key}` retourne 404 — seul `config.toml` fonctionne pour cette directive.
-
-**7. `session.auth.mechanisms` — syntaxe expression string, PAS tableau TOML**
-
-En v0.11.8, la config des mécanismes utilise la **syntaxe expression Stalwart** (chaîne entre `[...]`), **pas** un tableau TOML.
-
-```toml
-# CORRECT — syntaxe expression string (contourne le bug tri alphabétique RocksDB)
-[session.auth]
-require-tls = false
-mechanisms = "[plain, login, oauthbearer]"
-
-# FAUX — tableau TOML → stocké comme .0000="plain" → "Invalid property found in 'if' block"
-[session.auth]
-mechanisms = ["plain", "login", "oauthbearer"]
-
-# FAUX — format conditionnel [[...]] → bug else<if alphabétiquement dans RocksDB
-[[session.auth.mechanisms]]
-if = "!is_empty(remote_ip)"
-then = ["plain", "login", "oauthbearer"]
-else = ["oauthbearer"]
-```
-
-**Pourquoi** : Stalwart v0.11.8 stocke les configs en BTreeMap (clés triées alphabétiquement). Le format conditionnel `[[array]]` génère des sous-clés `.else`, `.if`, `.then` — or `else < if` alphabétiquement, ce qui lève "Found 'else' before 'if'" au démarrage. Le format tableau TOML `["plain"]` génère `.0000 = "plain"` que le parseur refuse car il attend `.0000.if`. La **string expression** `"[plain, login, oauthbearer]"` stocke une seule clé `session.auth.mechanisms` et emprunte le fast-path du parseur qui bypass le bloc if/then/else.
-
-**API format correct** pour modification via API (`POST /api/settings`) :
-```json
-[{"insert": [["session.auth.mechanisms", "[plain, login, oauthbearer]"]]}]
-```
-Variants supportés : `delete`, `clear`, `insert`.
-
-**8. Webadmin — version épinglée à v0.1.23 (`auto-update = false`)**
-
-Le binaire `stalwartlabs/mail-server:v0.11.8` embarque un webadmin bundlé qui nécessite Stalwart ≥ 0.13.0 ("Unsupported server version"). Solution : pingler manuellement sur le webadmin v0.1.23 (dernier compatible v0.11.8).
-
-Config dans `/opt/stalwart-mail/etc/config.toml` :
-```toml
-webadmin.auto-update = false
-webadmin.path = "/opt/stalwart-mail/etc/webadmin"
-webadmin.resource = "https://github.com/stalwartlabs/webadmin/releases/download/v0.1.23/webadmin.zip"
-```
-> **Important** : `auto-update = false` obligatoire — sinon Stalwart retélécharge le webadmin le plus récent au prochain restart et le problème revient.
-> Créer le dossier si besoin : `mkdir -p /opt/stalwart-mail/etc/webadmin`
-
-**Connexion webadmin v0.1.23** (formulaire Leptos 3 champs) :
-- **Login** : `admin`
-- **Password** : depuis Vault `secret/neokube/apps/stalwart` clé `ADMIN_PASSWORD`
-- **Base URL** : `http://mail-admin.neokube.local` (ou `http://51.15.253.114:8080` en direct)
-
-**9. Créer un compte administrateur supplémentaire**
-
-Pour donner un accès webadmin à un autre utilisateur, utiliser `type: "superuser"` (pas `individual`) :
-
-```bash
-# Via stalwart-connector depuis K8s
-curl -s http://stalwart-connector.connector-system.svc.cluster.local:8007/proxy \
-  -H "Content-Type: application/json" \
-  -d '{"method":"POST","path":"/api/principal","body":{"name":"charles","type":"superuser","secrets":["MON_MOT_DE_PASSE"],"description":"Charles Vandendriessche"}}'
-
-# Ou directement sur l'instance Scaleway
-curl -X POST http://51.15.253.114:8080/api/principal \
-  -u "admin:ADMIN_PASSWORD" -H "Content-Type: application/json" \
-  -d '{"name":"charles","type":"superuser","secrets":["MON_MOT_DE_PASSE"],"description":"Charles Vandendriessche"}'
-```
-
-> `type: "superuser"` = accès complet webadmin. `type: "individual"` = compte mail uniquement (pas d'accès webadmin). Les comptes superuser ne reçoivent pas de mail — ce sont des identités d'administration pure.
-
-**10. Accès aux boîtes mail des comptes actifs**
-
-Le webadmin v0.1.23 est une interface de **gestion uniquement** — il ne permet pas de lire les emails. Pour lire les boîtes des comptes agents :
-
-**Roundcube webmail** ✅ déployé — `http://webmail.neokube.local`
-- **Login** : adresse mail complète (`leon@neokube.fr`, `admin@neokube.fr`, etc.)
-- **Mot de passe** : depuis Vault (chemin par compte, voir §"Comptes mail agents")
-- **GitOps** : `apps/stalwart/base/deployment-roundcube.yaml` (image `roundcubemail:latest-apache`)
-- IMAP → `stalwart-mail.stalwart.svc.cluster.local:143` (plaintext intra-cluster)
-- SMTP → `stalwart-mail.stalwart.svc.cluster.local:587` (credentials = login Roundcube, `%u`/`%p`)
-- SQLite PVC 1Gi (`local-path`, namespace `stalwart`)
-
-**Client IMAP direct** (alternative) — Thunderbird etc.
-- Serveur : `51.15.253.114`, port `143` (IMAP) ou `993` (IMAPS, cert self-signed)
-
-### DNS neokube.fr (Cloudflare — depuis 2026-05-03)
-
-**Nameservers actifs** : `abby.ns.cloudflare.com` / `david.ns.cloudflare.com`
-**Zone Cloudflare** : `891229575324408767bf4a0293e5adcc`
-
-> **Migration 2026-05-03** : zone CF créée (avec CF_GLOBAL_KEY) + records mail recréés dans CF + NS Openprovider changés vers CF NS. Propagation immédiate. La zone Openprovider (id=14798687) reste en place mais est inactive (NS CF actifs).
-
-> Historique : 2026-05-02 : SERVFAIL après tentative migration sans zone CF → NS remis Openprovider. 2026-05-03 : migration correcte (zone CF créée en premier).
-
-**Enregistrements actifs dans la zone CF** :
-| Type | Nom | Valeur | Proxied | TTL |
-|---|---|---|---|---|
-| `A` | `mail.neokube.fr` | `51.15.253.114` (Scaleway fr-par-1, instance fixe) | **Non** (DNS-only) | auto |
-| `CNAME` | `*.neokube.fr` (11 sous-domaines) | `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com` | **Oui** (proxied) | auto |
-| `MX` | `neokube.fr` | `mail.neokube.fr` prio=10 | Non | auto |
-| `TXT` | `neokube.fr` | `v=spf1 mx ~all` | Non | auto |
-| `TXT` | `mail._domainkey.neokube.fr` | Clé DKIM RSA 2048 Stalwart | Non | auto |
-| `TXT` | `_dmarc.neokube.fr` | `v=DMARC1; p=none; rua=mailto:admin@neokube.fr` | Non | auto |
-
-> **Important** : `mail.neokube.fr` doit rester DNS-only (proxied=false) — si proxié, Cloudflare intercepte SMTP et le relay TEM échoue.
-
-**Mise à jour DNS via cloudflare-connector** (maintenant la bonne façon pour neokube.fr) :
-```bash
-# Via cloudflare-connector /proxy — les credentails Global Key sont auto-injectés
-CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -n connector-system $CF_POD -- python3 -c "
-import httpx, json
-r = httpx.post('http://localhost:8006/proxy', json={
-    'method': 'POST',
-    'path': 'zones/891229575324408767bf4a0293e5adcc/dns_records',
-    'body': {'type': 'A', 'name': 'mail', 'content': '51.15.253.114', 'proxied': False}
-})
-print(r.json())
-"
-```
-
-**Ancienne méthode openprovider-connector v1.1** (ne plus utiliser pour neokube.fr — NS CF actifs) :
-```
-POST /dns/records/add → {"zone": "neokube.fr", "records": [...]}
-(maintenant inutile — CF est autoritaire pour neokube.fr)
-```
-
-**Gotcha API Openprovider DNS (découvert 2026-05-02)** :
-- L'ancien format `PUT /dns/zones/{name}` avec `{"zone": {"records": [...]}}` retournait `success:true` mais ne modifiait rien (bug silencieux)
-- Format correct : `{"id": <zone_id>, "name": "<zone>", "records": {"add": [...]}}`
-- TTL minimum : **600 secondes** (sinon error 815)
-- `POST/PATCH/DELETE` sur `/dns/zones/{name}/records` retournent "Method is not implemented"
-- `GET /dns/zones/{name}/records` — endpoint correct pour lister les enregistrements
-- `GET /dns/zones/{name}?with_records=1` — retourne code 80 "Invalid request" (paramètre non supporté)
-
----
-
-### Roadmap sécurité agents
-
-| Phase | Contenu | État |
-|---|---|---|
-| **Phase 0** | RBAC Charlotte réduit, AgentSpec Leon v2.0 | ✅ Terminé 2026-04-26 |
-| **Phase 1** | Namespace `connector-system` + zoho-connector (complet) + stubs github/vercel | ✅ Terminé 2026-04-26 |
-| **Phase 1b** | Leon : migration activités Temporal Zoho → zoho-connector ; github-connector + vercel-connector complets ; Leon sans secrets directs Zoho/GitHub/Vercel | ✅ Terminé 2026-04-26 |
-| **Phase 2** | Sidecars `tool-validator` + `output-guard` sur Charlotte et Leon | ✅ Terminé 2026-04-26 |
-| **Phase 3** | `neon-connector` (proxy Neon API + endpoint `/query` asyncpg) ; Leon sans secrets Neon directs | ✅ Terminé 2026-04-26 |
-
-### Roadmap capacités agents (Phase 4+)
-
-> Vérification doublons effectuée le 2026-04-26 : `sre_provision_agent` et `sre_decommission_agent` sont implémentés
-> (`ProvisionAgentWorkflow` L2778 + `DecommissionAgentWorkflow` L2884 dans `configmap-sre-script.yaml`).
-> `ProjectSpec` est défini dans `apps/agent-catalog/leon.yaml` `output_schema` (12 champs — `client_email` ajouté 2026-04-29).
-
-| Phase | Contenu | Prérequis | État |
-|---|---|---|---|
-| **Phase 4a** | DT-005 : gate `sre_qdrant_check_prior_remediation` avant `sre_apply_remediation` + `sre_vectorize_remediation_outcome` pour alimenter la mémoire | — | ✅ Terminé 2026-04-26 |
-| **Phase 4b** | `sre_agent_health_matrix` — snapshot pod/CPU/RAM/probe par agent actif (registre K8s) ; SREScanWorkflow étape 8 ; endpoint `GET /agents/health` | — | ✅ Terminé 2026-04-26 |
-| **Phase 4c** | Charlotte → zoho-connector : `ZOHO_CONNECTOR_URL` dans deployment + charlotte-config ; `known_tools` documenté dans agent-policies (`allowed=null` conservé) | — | ✅ Terminé 2026-04-26 |
-| **Phase 5** | Dispatcher `DevProjectWorkflow` : Leon→Aria+Nox (parallèle)→Vera→approbation humaine (24h)→deploy. Pod dédié `dispatcher` port 8484, Temporal namespace `dispatcher`. | — | ✅ Terminé 2026-04-27 |
-| **Phase 5b** | Collections Qdrant `pm-decisions`/`front-specs`/`api-contracts`/`qa-reports` — 768 dims, auto-créées par Dispatcher au démarrage | Phase 5 déployée | ✅ Terminé 2026-04-27 |
-| **Phase 6** | Pods dédiés Aria (8485/aria-queue), Nox (8486/nox-queue), Vera (8487/vera-queue) — scripts dédiés, ServiceAccounts, task_queue séparées dans DevProjectWorkflow | — | ✅ Terminé 2026-04-27 |
-| **Phase 7** | admin-sys promu K8s executor v4.0 ; Charlotte `_kubectl()` routée via `POST /execute` admin-sys ; fallback local read-only si admin-sys KO ; `ClusterRole admin-sys-executor` en GitOps | — | ✅ Terminé 2026-04-27 |
-| **Phase 10d** | `penpot-connector` v1.0 (port 8004) — proxy Penpot RPC API self-hosted, auth session cookie Vault ; agent `Penpot` v1.0 (port 8488, penpot-queue) — `penpot_create_design` : create-project + duplicate-file ; DevProjectWorkflow gather 2→3 (Aria+Nox+Penpot) ; Vera v1.1 + penpot check (non-bloquant) ; zoho_callback enrichi du lien Design ; registre v1.6 | — | ✅ Terminé 2026-04-28 |
-
-**Note R3 / max_tokens_per_run** : ces items sont introuvables dans le dépôt GitOps. S'ils proviennent d'un document Notion ou externe, les localiser avant d'implémenter.
-
----
-
-## Scaleway Transactional Email (TEM)
-
-**Objectif** : relay SMTP sortant pour Stalwart (Orange ISP bloque le port 25 sortant, Scaleway bloque aussi les ports SMTP outbound 25/465/587 par défaut).
-**Architecture réelle (2026-05-03)** : Stalwart → `smtp-tem-proxy` (localhost:1025) → Scaleway TEM HTTP API (HTTPS:443) → Internet
-
-> **Pourquoi un proxy ?** Scaleway bloque les ports SMTP outbound (25, 465, 587) depuis les instances DEV1-S. Le port 443 (HTTPS) est libre. Le proxy `smtp-tem-proxy` écoute sur port 1025, reçoit le SMTP de Stalwart, et relaye via l'API HTTP TEM de Scaleway.
-
-### smtp-tem-proxy
-
-**Service systemd** : `smtp-tem-proxy` sur l'instance Scaleway (`51.15.253.114`)
-**Script** : `/opt/smtp-tem-proxy/proxy.py`
-**Écoute** : `0.0.0.0:1025`
-**Commandes** :
-```bash
-ssh -i ~/.ssh/id_ed25519_neokube root@51.15.253.114
-systemctl status smtp-tem-proxy
-journalctl -u smtp-tem-proxy -n 30
-```
-
-### Config Stalwart pour le relay (config.toml sur Scaleway)
-
-```toml
-[remote."scaleway-tem"]
-address = "mail.neokube.fr"   # DNS réel → 51.15.253.114 (Stalwart resolve via DNS, pas /etc/hosts)
-port = 1025
-protocol = "smtp"
-tls.implicit = false
-tls.enable = false
-auth.enable = false
-
-[queue.outbound]
-next-hop = "'scaleway-tem'"
-
-[queue.outbound.tls]
-starttls = "optional"         # évite l'abort Stalwart si STARTTLS non annoncé
-allow-invalid-certs = true
-```
-
-> **Gotchas Stalwart v0.11.8 relay** :
-> - Utiliser un vrai hostname DNS pour le relay (pas IP, pas `/etc/hosts` — Stalwart utilise son propre resolver async)
-> - `[queue.outbound.tls] starttls = "optional"` obligatoire sinon Stalwart avorte après EHLO si pas de STARTTLS
-> - MAIL FROM parsing : `re.search(r'<([^>]+)>', cmd)` — `.strip("<>")` laisse un `>` résiduel si le cmd a des paramètres après (ex: `SIZE=523`)
-
-### État actuel (2026-05-03)
-
-| Composant | État |
-|---|---|
-| Vault `secret/neokube/infrastructure/scaleway` | ✅ Provisionné |
-| Souscription TEM Scaleway | ✅ Active |
-| Domaine `neokube.fr` dans TEM | ✅ `checked` (vérifié 2026-05-02) |
-| smtp-tem-proxy (systemd) | ✅ Running sur 51.15.253.114:1025 |
-| Relay Stalwart → TEM | ✅ E2E validé (email reçu chvandendriessche@neomnia.net) |
-| Penpot recovery mail | ✅ Fonctionnel (SMTP_TLS=false) |
-| UI Stalwart admin | ✅ `http://mail-admin.neokube.local` (Traefik) ou `http://51.15.253.114:8080` |
-| Roundcube webmail | ✅ `http://webmail.neokube.local` (IMAP stalwart-mail:143) |
-
-**Vault** : `secret/neokube/infrastructure/scaleway`
-| Clé Vault | Description |
-|---|---|
-| `SCW_ACCESS_KEY` | Access key Scaleway |
-| `SCW_SECRET_KEY` | Secret key Scaleway (= mot de passe TEM SMTP) |
-| `SCW_DEFAULT_PROJECT_ID` | `473a0ce6-ecd8-4374-8f49-9a6e347d0c8d` |
-| `SCW_DEFAULT_REGION` | `fr-par` |
-
-### Pourquoi Scaleway TEM et pas Stalwart direct
-
-Orange (FAI) bloque le port 25 sortant. Scaleway bloque aussi les ports SMTP sortants (25, 465, 587) depuis les instances. Le relay passe donc par l'API HTTP TEM de Scaleway via HTTPS (port 443 non bloqué).
-
----
 
 ## Dify v1.13.3 — Agent Builder Studio
 
@@ -1126,223 +664,18 @@ Orange (FAI) bloque le port 25 sortant. Scaleway bloque aussi les ports SMTP sor
 
 ## SurfSense — Moteur de recherche RAG (alternatif Perplexity)
 
-**Repo** : `https://github.com/MODSetter/SurfSense`
-**Namespace** : `surfsense`
-**GitOps** : `~/Kubinote-GitOps/apps/surfsense/base/`
-**Version** : `latest` (images `ghcr.io/modsetter/surfsense-backend` + `surfsense-web`)
+> Documentation complète (composants, stockage, déploiement, 9 gotchas) : **[CLAUDE-surfsense.md](CLAUDE-surfsense.md)**
 
-### Composants (7 pods)
-| Déploiement | Image | Rôle |
-|---|---|---|
-| `surfsense-postgres` | `pgvector/pgvector:pg17` | Base de données principale + vecteurs (pgvector) |
-| `surfsense-redis` | `redis:8-alpine` | Broker Celery + cache app |
-| `surfsense-searxng` | `searxng/searxng:2026.3.13-3c1f68c59` | Moteur de recherche web multi-sources (stateless) |
-| `surfsense-backend` | `ghcr.io/modsetter/surfsense-backend:latest` | API FastAPI (mode `api`), migrations Alembic |
-| `surfsense-celery` | `ghcr.io/modsetter/surfsense-backend:latest` | Worker Celery asynchrone (mode `worker`) |
-| `surfsense-zero-cache` | `rocicorp/zero:0.26.2` | Sync temps réel frontend↔postgres (WebSocket/SSE) |
-| `surfsense-frontend` | `ghcr.io/modsetter/surfsense-web:latest` | Frontend Next.js |
+**Namespace** : `surfsense` — **GitOps** : `~/Kubinote-GitOps/apps/surfsense/base/`
+**URLs** : `https://surfsense.neokube.fr` (frontend) · `https://surfsense-api.neokube.fr` (API) · `https://surfsense-zero.neokube.fr` (zero-cache)
+**Vault** : `secret/neokube/apps/surfsense` — `SECRET_KEY`, `DB_PASSWORD`, `ZERO_ADMIN_PASSWORD`, `SEARXNG_SECRET`
+**Embedding** : `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (local, 384-dim) — chonkie ignore `base_url` OpenAI
+**API interne** : `POST http://surfsense-backend.surfsense.svc.cluster.local:8000/api/v1/chat`
 
-### Interfaces web
-| URL locale | URL publique | Service |
-|---|---|---|
-| `http://surfsense.neokube.local` | `https://surfsense.neokube.fr` | Frontend |
-| `http://surfsense-api.neokube.local` | `https://surfsense-api.neokube.fr` | Backend API |
-| `http://surfsense-zero.neokube.local` | `https://surfsense-zero.neokube.fr` | Zero-cache (WebSocket) |
-
-### Stockage
-| PV/PVC | Taille | Chemin hôte | Usage |
-|---|---|---|---|
-| `surfsense-postgres-pv/pvc` | 10 Gi | `/var/lib/surfsense/postgres` | Données PostgreSQL + vecteurs pgvector |
-| `surfsense-shared-tmp-pv/pvc` | 5 Gi | `/var/lib/surfsense/shared-tmp` | Fichiers temporaires partagés backend↔celery (ReadWriteMany) |
-| `surfsense-zero-cache-pvc` | 2 Gi | local-path | `zero.db` (réplique SQLite pour sync temps réel) |
-
-### Secrets — Vault `secret/neokube/apps/surfsense`
-| Clé Vault | Description |
-|---|---|
-| `SECRET_KEY` | Clé JWT/Flask (`openssl rand -base64 32`) |
-| `DB_PASSWORD` | Mot de passe PostgreSQL |
-| `ZERO_ADMIN_PASSWORD` | Mot de passe admin zero-cache |
-| `SEARXNG_SECRET` | Secret SearXNG (`openssl rand -hex 32`) |
-| `NOTION_CLIENT_ID` | OAuth Notion (créer sur notion.so/my-integrations) |
-| `NOTION_CLIENT_SECRET` | OAuth Notion |
-| `LANGSMITH_API_KEY` | Clé Langfuse (format `pk-xxx` pour observabilité) |
-
-> `OPENAI_API_KEY` est lu depuis `secret/neokube/apps/litellm` → `LITELLM_MASTER_KEY` (utilisé pour les LLM calls, pas pour les embeddings — voir gotcha ci-dessous)
-
-### Premier déploiement — ordre d'opérations
-
-```bash
-# 1. Provisionner les secrets dans Vault
-kubectl exec -n security vault-0 -- vault kv put secret/neokube/apps/surfsense \
-  SECRET_KEY="$(openssl rand -base64 32)" \
-  DB_PASSWORD="$(openssl rand -hex 16)" \
-  ZERO_ADMIN_PASSWORD="$(openssl rand -hex 16)" \
-  SEARXNG_SECRET="$(openssl rand -hex 32)" \
-  NOTION_CLIENT_ID="" \
-  NOTION_CLIENT_SECRET="" \
-  LANGSMITH_API_KEY=""
-
-# 2. Créer le namespace (ou attendre le prochain cluster-bootstrap)
-kubectl apply -f ~/Kubinote-GitOps/infrastructure/namespaces/surfsense.yaml
-
-# 3. Créer le K8s secret depuis Vault (script idempotent)
-bash ~/Kubinote-GitOps/apps/surfsense/setup-surfsense-secrets.sh
-
-# 4. Appliquer le GitOps
-kubectl apply -k ~/Kubinote-GitOps/apps/surfsense/base/
-
-# 5. Ajouter les 3 règles dans le tunnel Cloudflare (CF_API_TOKEN requis — pas CF_DNS_TOKEN)
-# + les 3 CNAMEs DNS (déjà créés le 2026-05-03)
-```
-
-### Tunnel Cloudflare — règles d'ingress (CF_API_TOKEN)
-Les règles tunnel utilisent `CF_API_TOKEN` (pas `CF_DNS_TOKEN` qui est DNS-only).
-```bash
-CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -n connector-system $CF_POD -- python3 -c "
-import httpx, os, json
-VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
-r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
-d = r.json()['data']['data']
-CF_TOKEN = d['CF_API_TOKEN']  # IMPORTANT: tunnel management requiert CF_API_TOKEN
-ACCOUNT_ID = '822ba0e8c232e192475e6bd02ce36cb4'
-TUNNEL_ID = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb'
-headers = {'Authorization': 'Bearer '+CF_TOKEN, 'Content-Type': 'application/json'}
-resp = httpx.get(f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/cfd_tunnel/{TUNNEL_ID}/configurations', headers=headers)
-current = resp.json()['result']['config']['ingress']
-# Ajouter les nouvelles règles avant le catch-all
-new_rules = [r for r in current if r.get('hostname')]
-new_rules += [
-    {'hostname': 'surfsense.neokube.fr',      'service': 'http://traefik.kube-system.svc.cluster.local:80'},
-    {'hostname': 'surfsense-api.neokube.fr',  'service': 'http://traefik.kube-system.svc.cluster.local:80'},
-    {'hostname': 'surfsense-zero.neokube.fr', 'service': 'http://traefik.kube-system.svc.cluster.local:80'},
-]
-new_rules += [{'service': 'http_status:404'}]
-result = httpx.put(f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/cfd_tunnel/{TUNNEL_ID}/configurations',
-    headers=headers, json={'config': {'ingress': new_rules}}).json()
-print('OK' if result.get('success') else result.get('errors'))
-"
-```
-
-### CNAMEs Cloudflare (zone neokube.fr, déjà créés 2026-05-03)
-```bash
-CF_POD=$(kubectl get pod -n connector-system -l app=cloudflare-connector -o jsonpath='{.items[0].metadata.name}')
-kubectl exec -n connector-system $CF_POD -- python3 -c "
-import httpx, os
-VAULT_ADDR = os.getenv('VAULT_ADDR'); VAULT_TOKEN = os.getenv('VAULT_TOKEN')
-r = httpx.get(VAULT_ADDR+'/v1/secret/data/neokube/infrastructure/cloudflare', headers={'X-Vault-Token': VAULT_TOKEN})
-d = r.json()['data']['data']
-CF_EMAIL = d.get('CF_ACCOUNT_EMAIL', '')
-CF_GKEY = d.get('CF_GLOBAL_KEY', '')
-headers = {'X-Auth-Email': CF_EMAIL, 'X-Auth-Key': CF_GKEY, 'Content-Type': 'application/json'}
-ZONE_ID = '891229575324408767bf4a0293e5adcc'  # neokube.fr
-CNAME = '94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb.cfargotunnel.com'
-for sub in ['surfsense','surfsense-api','surfsense-zero']:
-    resp = httpx.post(f'https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records',
-        headers=headers, json={'type':'CNAME','name':sub,'content':CNAME,'proxied':True,'ttl':1})
-    r2 = resp.json()
-    print(sub+':', 'OK' if r2.get('success') else r2.get('errors'))
-"
-```
-
-> Ajouter aussi dans `/etc/hosts` neokube-beta :
-> `192.168.1.28 surfsense.neokube.local surfsense-api.neokube.local surfsense-zero.neokube.local`
-
-### Gotchas SurfSense (découverts 2026-05-03)
-
-**1. chonkie v1.6 ignore `base_url` pour OpenAI embeddings**
-`EMBEDDING_MODEL=openai://nomic-embed-text` avec `OPENAI_BASE_URL=http://litellm...` ne fonctionne pas :
-chonkie utilise la bibliothèque `catsu` en interne qui se connecte directement à `api.openai.com`
-et ignore `OPENAI_BASE_URL`. La propriété `.dimension` appelle `embed("test")` au démarrage → 401 OpenAI → crash.
-
-**Fix** : utiliser un modèle `sentence-transformers` local :
-```
-EMBEDDING_MODEL: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-```
-384 dims, multilingual FR/EN, ~470MB téléchargé au premier démarrage, inference locale dans le pod.
-
-**2. asyncpg incompatible avec `?sslmode=disable`**
-`DATABASE_URL=postgresql+asyncpg://...?sslmode=disable` → `TypeError: connect() got unexpected argument 'sslmode'`
-Fix dans `setup-surfsense-secrets.sh` : ne pas inclure `?sslmode=disable` dans le DATABASE_URL asyncpg.
-Les URLs `ZERO_*` (psycopg2) peuvent conserver `?sslmode=disable`.
-
-**3. PostgreSQL `wal_level=logical` requis par zero-cache**
-rocicorp/zero utilise la réplication logique → postgres doit démarrer avec `-c wal_level=logical`.
-Fix dans `deployment-surfsense-postgres.yaml` : `args: ["-c", "wal_level=logical"]`.
-
-**4. zero-cache OOMKill à 512Mi**
-rocicorp/zero charge le schéma complet (tables + indices) en mémoire → exit 137 (SIGKILL) avec 512Mi.
-Fix : memory limit → 1.5Gi dans `deployment-surfsense-zero-cache.yaml`.
-
-**5. Tunnel Cloudflare — gestion via CF_API_TOKEN uniquement**
-`CF_DNS_TOKEN` n'a que les droits DNS:Edit → 401 sur les endpoints `/cfd_tunnel/*/configurations`.
-Toujours utiliser `CF_API_TOKEN` pour modifier les règles d'ingress du tunnel.
-
-**6. Table `user` absente de la publication zero-cache → instabilité totale du frontend**
-Après le premier démarrage, la publication PostgreSQL `zero_publication` (créée par Alembic) n'inclut pas la table `user`. rocicorp/zero rejette toutes les connexions WebSocket avec `SchemaVersionNotSupported: "user" table does not exist or is not one of the replicated tables`. Le frontend paraît instable/inutilisable (déconnexion immédiate).
-
-Fix — à appliquer après chaque installation fraîche :
-```bash
-kubectl exec -n surfsense deploy/surfsense-postgres -- \
-  psql -U surfsense -d surfsense -c 'ALTER PUBLICATION zero_publication ADD TABLE "user";'
-kubectl rollout restart deploy/surfsense-zero-cache -n surfsense
-```
-Ce changement est persistant dans le PVC PostgreSQL. Il ne survivrait pas à une suppression complète du PVC.
-
-**7. Mémoire — backend et celery chargent le modèle sentence-transformers (~460MB) chacun**
-Avec une limite à 2Gi, les deux pods atteignent ~1.4-1.7Gi et OOMKillent fréquemment sous charge.
-Fix : limites backend et celery à 4Gi (`deployment-surfsense-backend.yaml` et `deployment-surfsense-celery.yaml`).
-
-**8. LLM preferences par défaut sur AUTO (cloud SurfSense) — aucun prompt ne fonctionne en self-hosted**
-À la création d'un espace, `agent_llm_id=0` (mode AUTO cloud). Doit être configuré sur un LLM local/LiteLLM :
-```bash
-curl -X PUT "http://surfsense-api.neokube.local/api/v1/search-spaces/{id}/llm-preferences" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"agent_llm_id": 1, "document_summary_llm_id": 1, "image_generation_config_id": 0, "vision_llm_config_id": 0}'
-```
-
-**9. SurfSense inaccessible via `http://surfsense.neokube.local` — CORS bloqué**
-Le backend CORS n'autorise que `NEXT_FRONTEND_URL = https://surfsense.neokube.fr`. Accéder via l'URL locale `http://surfsense.neokube.local` provoque un échec CORS : `fetch()` lève `TypeError` → "Unable to connect to the server. Check your internet connection and try again."
-
-Cause : `Origin: http://surfsense.neokube.local` est absent de la whitelist. Le backend n'expose aucune env var pour ajouter des origines supplémentaires — seul `NEXT_FRONTEND_URL` est lu.
-
-**Règle** : SurfSense s'utilise **exclusivement** via `https://surfsense.neokube.fr`. Le CNAME et le tunnel Cloudflare sont configurés pour ça. L'ingress Traefik `surfsense.neokube.local` reste utile pour accès direct backend (API curl, healthchecks), pas pour l'utilisation navigateur.
-
-### Intégrations stack NeoKube
-| Intégration | Config | Notes |
-|---|---|---|
-| **Embedding** | `EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Modèle local 384-dim, multilingual. chonkie v1.6 ignore base_url OpenAI → pas de LiteLLM pour les embeddings |
-| **LLM providers** | Configurés dans l'UI SurfSense (Settings > LLM Providers) | Ajouter notre LiteLLM comme provider OpenAI-compatible : `http://litellm.cockpit.svc.cluster.local/v1` |
-| **Observabilité** | LangSmith-compat → Langfuse self-hosted | `LANGSMITH_ENDPOINT=http://langfuse.cockpit.svc.cluster.local` |
-| **Notion** | Legacy token (actif) | Token `[NOTION_TOKEN_REDACTED]` inséré directement en DB (connecteur id=1, space=1) — 444 pages accessibles, indexation périodique 24h. Découvert dans `notion_history.py` : champ `NOTION_INTEGRATION_TOKEN` dans config JSON supporté nativement. OAuth possible via redirect `https://surfsense-api.neokube.fr/api/v1/auth/notion/connector/callback` |
-| **Qdrant** | Non utilisé par SurfSense (pgvector natif) | SurfSense embarque son propre vector store dans PostgreSQL (pgvector). Les agents peuvent interroger SurfSense via son API REST. |
-
-### Séparation métier / expérience de travail (Search Spaces)
-SurfSense organise les documents en **Search Spaces** distincts. À créer dans l'UI après déploiement :
-
-| Search Space | Contenu | Connecteurs suggérés |
-|---|---|---|
-| **Métier NeoKube** | Processus, architecture cluster, runbooks SRE, conventions GitOps | Crawlee (docs techniques), fichiers locaux |
-| **Expérience de travail** | Projets clients, briefs Zoho, décisions PM, historique Penpot | Notion, Zoho (via crawlee-service ou upload manuel) |
-
-> Les agents peuvent interroger SurfSense via `POST /api/v1/chat` avec un `search_space_id` pour cibler le bon contexte.
-
-### Appel depuis les agents (API SurfSense)
-```python
-# Depuis un agent Temporal ou un connector, recherche documentaire
-import httpx
-
-SURFSENSE_URL = "http://surfsense-backend.surfsense.svc.cluster.local:8000"
-
-async def surfsense_search(query: str, search_space_id: int, token: str) -> dict:
-    async with httpx.AsyncClient(timeout=30.0) as c:
-        r = await c.post(
-            f"{SURFSENSE_URL}/api/v1/chat",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"query": query, "search_space_id": search_space_id}
-        )
-    return r.json()
-```
+**Points critiques** :
+- Toujours accéder via `https://surfsense.neokube.fr` — CORS bloqué sur l'URL `.neokube.local`
+- Après installation fraîche : `ALTER PUBLICATION zero_publication ADD TABLE "user"` + restart zero-cache (sinon frontend instable)
+- Nouvel espace créé → configurer `agent_llm_id` sur un LLM réel (défaut=0 = cloud SurfSense → rien ne fonctionne en self-hosted)
 
 ---
 
@@ -1524,225 +857,18 @@ L'agent Penpot indexe ses briefs design dans Qdrant collection `zoho-tasks` (768
 
 ## Pièges connus — Anti-patterns à éviter
 
-### 1. Vercel `gitSource.repoId` doit être un `int`
+> Code + exemples complets : **[CLAUDE-antipatterns.md](CLAUDE-antipatterns.md)**
 
-L'API Vercel `/v13/deployments` exige que `repoId` soit un entier (`int`), pas une chaîne.
-Passer `str(link["repoId"])` produit l'erreur `incorrect_git_source_info` sans message clair.
-
-```python
-# FAUX
-body["gitSource"] = {"type": "github", "ref": ref, "repoId": str(link["repoId"])}
-# CORRECT
-body["gitSource"] = {"type": "github", "ref": ref, "repoId": int(link["repoId"])}
-```
-
-Fallback si `repoId` vaut 0 : utiliser `{"org": link["org"], "repo": link["repo"]}`.
-
----
-
-### 2. `asyncio.gather` dans un workflow Temporal — toujours `return_exceptions=True` pour les activités non-critiques
-
-Sans ce flag, une exception dans **n'importe quelle** activité du gather fait échouer tout le workflow.
-Les activités optionnelles (Penpot, Domi) doivent retourner un `dict` vide en cas d'échec, pas lever.
-
-```python
-_results = await asyncio.gather(
-    workflow.execute_activity(aria_build_frontend, ...),  # critique
-    workflow.execute_activity(nox_build_backend,  ...),  # critique
-    workflow.execute_activity(penpot_create_design, ...), # optionnel
-    workflow.execute_activity(domi_provision_domain, ...), # optionnel
-    return_exceptions=True,
-)
-for _r in _results[:2]:           # re-raise si Aria ou Nox échouent
-    if isinstance(_r, BaseException):
-        raise _r
-penpot_result = _results[2] if not isinstance(_results[2], BaseException) else {}
-domi_result   = _results[3] if not isinstance(_results[3], BaseException) else {}
-```
-
-**Règle** : toute activité dont l'échec ne doit pas bloquer le workflow = activité optionnelle = `return_exceptions=True` + valeur de repli.
-
----
-
-### 3. Ajouter un champ au ProjectSpec : 3 endroits à synchroniser
-
-Quand un nouveau champ est ajouté au `ProjectSpec` (ex: `domain_mode`, `domain_name`) :
-
-1. **`configmap-leon-script.yaml`** — schéma du tool `dispatch_project` (paramètres JSON Schema)
-2. **`configmap-leon-script.yaml`** — construction du dict `spec` dans `_execute_tool / dispatch_project`
-3. **`configmap-dispatcher-script.yaml`** — `dispatcher_validate_spec` : `spec.setdefault("champ", valeur_défaut)`
-
-Oublier l'un des trois provoque soit un champ absent de la spec (Leon ne l'envoie pas), soit une KeyError côté Dispatcher.
-
----
-
-### 4. Toute variable `os.getenv()` utilisée en production doit être dans le ConfigMap
-
-Si un agent lit `os.getenv("MA_VAR", "")` pour un mode actif, la variable doit être déclarée dans son `configmap-<agent>-config.yaml`.
-Une valeur vide silencieuse est difficile à déboguer (pas d'erreur au démarrage, comportement incorrect à l'exécution).
-
-Exemple manquant corrigé : `CF_ACCOUNT_ID` dans `configmap-domi-config.yaml` (requis pour le mode `register`).
-
-**Checklist** à appliquer à chaque nouvel agent ou nouveau mode :
-- [ ] Lister tous les `os.getenv()` du script
-- [ ] Vérifier que chacun est présent dans le ConfigMap ou injecté depuis un Secret
-- [ ] Les variables non-optionnelles ne doivent pas avoir de valeur par défaut vide
-
----
-
-### 5. Les pods ne rechargent pas les ConfigMaps automatiquement
-
-Kubernetes **ne redémarre pas** les pods quand un ConfigMap est modifié (sauf Reloader non installé ici).
-Après tout `kubectl apply` qui modifie un ConfigMap, relancer les pods concernés :
-
-```bash
-kubectl rollout restart deployment/<agent> -n agent-system
-```
-
-Pods à redémarrer systématiquement après modification de leurs scripts :
-| ConfigMap modifié | Deployment à redémarrer |
-|---|---|
-| `configmap-dispatcher-script` | `dispatcher` |
-| `configmap-leon-script` | `leon` |
-| `configmap-aria-script` | `aria` |
-| `configmap-nox-script` | `nox` |
-| `configmap-vera-script` | `vera` |
-| `configmap-domi-script` / `configmap-domi-config` | `domi` |
-| `configmap-penpot-script` | `penpot` |
-| `configmap-sre-script` / `configmap-charlotte-config` | `agent-charlotte` |
-
-### 6. SMTP via Stalwart — service `stalwart-mail`, pas `stalwart-web`
-
-Stalwart expose **deux services** dans le namespace `stalwart` :
-- `stalwart-web.stalwart.svc.cluster.local:8080` → API HTTP admin (stalwart-connector)
-- `stalwart-mail.stalwart.svc.cluster.local:587` → SMTP submission (aiosmtplib)
-
-Utiliser `stalwart-web` pour SMTP provoque un timeout aiosmtplib (`CancelledError` dans `asyncio.wait_for`) car le port 587 n'est pas exposé sur ce service.
-
-```python
-# FAUX — stalwart-web = HTTP admin uniquement
-SMTP_HOST = "stalwart-web.stalwart.svc.cluster.local"
-
-# CORRECT — stalwart-mail = ports SMTP 25/465/587
-SMTP_HOST = "stalwart-mail.stalwart.svc.cluster.local"
-```
-
-Pattern `aiosmtplib` STARTTLS utilisé dans les agents :
-```python
-import aiosmtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-
-password = await _load_stalwart_password()  # Vault secret/neokube/apps/stalwart.NOREPLY_PASSWORD
-msg = MIMEMultipart("alternative")
-msg["From"] = MAIL_FROM          # no-reply@neokube.fr, leon@neokube.fr, etc.
-msg["To"]   = recipient
-msg["Subject"] = subject
-msg.attach(MIMEText(body_html, "html"))
-await aiosmtplib.send(msg, hostname=SMTP_HOST, port=587, start_tls=True,
-                      username=MAIL_FROM, password=password)
-```
-
-Credentials par agent dans Vault :
-| Agent | Vault path | Clé |
+| # | Piège | Règle |
 |---|---|---|
-| Dispatcher | `secret/neokube/apps/stalwart` | `NOREPLY_PASSWORD` |
-| Leon | `secret/neokube/agents/leon` | `SMTP_PASSWORD` |
-| Vera | `secret/neokube/agents/vera` | `SMTP_PASSWORD` |
-| Domi | `secret/neokube/agents/domi` | `SMTP_PASSWORD` |
-
-**Gotcha `validate_certs=False`** : Stalwart utilise un certificat self-signed en interne → `aiosmtplib` lève `CERTIFICATE_VERIFY_FAILED` si `validate_certs` n'est pas `False`. Acceptable pour connexion intra-cluster.
-
-**Gotcha rôle `user`** : Les comptes Stalwart créés via API sans `roles` ne peuvent pas soumettre d'email (550 5.7.1). Tous les comptes agents doivent avoir `roles: ["user"]` :
-```bash
-# Patch via pod curl dans namespace stalwart
-curl -X PATCH http://stalwart-web.stalwart.svc.cluster.local:8080/api/principal/<account> \
-  -u "admin:ADMIN_PASSWORD" -H "Content-Type: application/json" \
-  -d '[{"action":"set","field":"roles","value":["user"]}]'
-```
-
----
-
-### 7. LiteLLM + HuggingFace router — `_embed()` retourne des scalaires, pas un vecteur
-
-Quand LiteLLM proxifie `nomic-embed-text` vers HuggingFace (`paraphrase-multilingual-mpnet-base-v2`), la réponse `/v1/embeddings` est **non-standard** : le champ `data` contient 768 entrées séparées (une par dimension), chacune avec un `"embedding"` scalar — pas une seule entrée avec un vecteur complet.
-
-`data[0]["embedding"]` vaut donc un `float` (−0.206…), pas une `list[float]`.
-Upserter ce scalar dans Qdrant produit un **HTTP 400**.
-
-```python
-# FAUX — ne fonctionne qu'avec OpenAI/Mistral (format standard)
-return r.json()["data"][0]["embedding"]
-
-# CORRECT — détecte les deux formats
-data = r.json()["data"]
-first = data[0]["embedding"]
-if isinstance(first, list):
-    return first
-return [item["embedding"] for item in data]   # HuggingFace router
-```
-
-Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatcher, charlotte-sre, leon, etc.).
-
----
-
-### 8. URLs externes : construire côté connector, jamais côté agent
-
-**Symptôme** : Charlotte et Leon généraient des URLs Zoho incorrectes (ex: `#zp/dashboard/{id}`, `/projects/{id}/` sans `#`) parce que chaque agent avait sa propre implémentation de construction d'URL — certaines inventées, toutes désynchronisées.
-
-**Cause racine** : les connectors avaient été conçus comme proxies HTTP fins (Phase 1). La logique de présentation (URLs, labels) s'est accumulée dans les agents au lieu de rester au niveau du connector.
-
-**Règle** : **Toute enrichissement de la réponse d'une API externe appartient au connector, pas à l'agent.**
-
-```python
-# FAUX — chaque agent construit sa propre URL (désynchronisation garantie)
-# configmap-leon-script.yaml
-url = f"https://projects.zoho.com/portal/neomniadotnet#zp/projects/{p['id']}/"
-
-# configmap-sre-script.yaml
-url = f"https://projects.zoho.com/portal/{ZOHO_PORTAL_NAME}#zp/projects/{pid}/"
-
-# CORRECT — le connector injecte web_url dans chaque réponse
-# configmap-zoho-connector.yaml  ← un seul endroit
-p["web_url"] = f"{WEB_BASE}#zp/projects/{pid}/"
-
-# Les agents lisent simplement :
-url = p.get("web_url", "")
-```
-
-**Pattern à appliquer à tout nouveau connector :**
-
-```python
-def _inject_web_urls(path: str, body: dict) -> dict:
-    """Post-processing centralisé : enrichit les réponses avec web_url."""
-    if "projects" in body:
-        for p in body["projects"]:
-            p["web_url"] = f"{WEB_BASE}#zp/projects/{p['id']}/"
-    if "tasks" in body:
-        for t in body["tasks"]:
-            t["web_url"] = t.get("link", {}).get("web", {}).get("url", "")
-    # ... autres ressources
-    return body
-
-# Appelé une seule fois dans /proxy, avant return :
-return _inject_web_urls(req.path, r.json())
-```
-
-**Checklist pour chaque nouveau connector :**
-- [ ] Identifier toutes les URLs web consultables par un humain dans l'API (projets, tâches, tickets, fichiers…)
-- [ ] Ajouter un `_inject_web_urls()` dans le connector dès la v1.0
-- [ ] Les agents ne doivent **jamais** construire d'URL vers l'API externe — ils lisent `item["web_url"]`
-- [ ] Documenter le format d'URL validé dans `CLAUDE.md` et dans la memory `reference_<api>_api.md`
-
-**URLs Zoho validées (2026-05-02) :**
-| Ressource | Format |
-|---|---|
-| Projet | `https://projects.zoho.com/portal/neomniadotnet#zp/projects/{id}/` |
-| Tâche | retournée par l'API dans `link.web.url` (format `#zp/task-detail/{id}`) |
-| Milestone | `#zp/projects/{project_id}/milestones/` |
-| Tasklist | `#zp/projects/{project_id}/tasks/` |
-
----
+| 1 | Vercel `repoId` | `int`, pas `str` — sinon `incorrect_git_source_info` |
+| 2 | `asyncio.gather` Temporal | `return_exceptions=True` pour activités optionnelles (Penpot, Domi) |
+| 3 | ProjectSpec nouveau champ | 3 endroits : schema Leon + dict spec + `validate_spec setdefault` |
+| 4 | `os.getenv()` en production | Toute variable active doit être dans le ConfigMap, pas juste dans le code |
+| 5 | ConfigMap modifié | `kubectl rollout restart` obligatoire — K8s ne recharge pas automatiquement |
+| 6 | SMTP Stalwart | `stalwart-mail:587` (SMTP), PAS `stalwart-web` (HTTP admin) |
+| 7 | `_embed()` HuggingFace | Retourne 768 scalaires séparés, pas un vecteur — détecter avec `isinstance(first, list)` |
+| 8 | URLs externes | Construire dans le connector (`_inject_web_urls`), jamais dans l'agent |
 
 ## Règles de conception connector-system
 
@@ -1765,97 +891,66 @@ Tout nouveau service exposé publiquement via le cluster Neokube utilise un sous
 
 ---
 
+## Règle R9 — Gouvernance LLM par agent (verrouillé 2026-05-06)
+
+> Cette règle s'applique à tout agent dans `agent-system` et tout nouveau agent NeoKube.
+
+### Principe
+
+Chaque agent a son propre profil LLM, configuré dans son deployment K8s. **Jamais de modèle hardcodé dans le code Python** — toujours lu depuis les variables d'environnement.
+
+### Profils LLM actifs (état 2026-05-06)
+
+| Agent | `LLM_MODEL` | `LLM_MODEL_REASONING` | `LLM_FALLBACK` | Justification |
+|---|---|---|---|---|
+| **Charlotte** SRE | `claude-sonnet` | — | — | Décisions critiques cluster, meilleur raisonnement |
+| **Leon** Chef de Projet | `mistral-large-2407` | `mistral-large-2407` | — | Dialogue client, multi-LLM natif selon complexité |
+| **Dispatcher** | `gemini-flash` | — | — | Orchestration pure, pas de génération lourde |
+| **Aria** Frontend | `codestral` | — | — | Génération de code optimisée |
+| **Nox** Backend | `codestral` | — | — | Génération de code optimisée |
+| **Vera** QA | `mistral-large-2407` | — | — | Analyse qualité et raisonnement |
+| **Penpot** Design | `gemini-flash` | — | — | Scaffolding léger |
+| **Domi** Domain Infra | `gemini-flash` | — | — | Opérations déterministes |
+| **Neo** Assistant | `mistral-large-2407` | — | `gemini-flash` | Assistant démo client, fine-tuning futur |
+
+### Règles strictes
+
+**R9.1 — `LLM_MODEL` obligatoire dans chaque deployment**
+Tout deployment agent-system DOIT avoir `LLM_MODEL` comme variable d'environnement explicite. Le défaut dans le code est une valeur de secours de développement, pas une config de production.
+
+**R9.2 — Le modèle global `mistral` ne change pas sans validation**
+L'alias `mistral` dans LiteLLM est verrouillé sur `mistral-large-2407`. Changer la version impacte tous les agents qui l'utilisent — nécessite revue de tous les profils du tableau ci-dessus.
+
+**R9.3 — Neo est isolé des autres agents**
+Neo est l'assistant démo client. Son modèle (`mistral-large-2407`, futur fine-tuné) est indépendant des agents de production (Charlotte, Leon, Dispatcher…). Modifier le modèle de Neo ne modifie pas les autres agents, et vice-versa.
+
+**R9.4 — Multi-LLM dans un workflow = variables séparées**
+Si un agent utilise plusieurs LLM dans son process (ex: Leon `LLM_MODEL` + `LLM_MODEL_REASONING`), chaque rôle a sa propre variable d'environnement dans le deployment. Jamais de switch de modèle par logique conditionnelle hardcodée dans le code.
+
+**R9.5 — Virtual keys LiteLLM (à activer quand PostgreSQL ajouté à LiteLLM)**
+Dès qu'un PostgreSQL est branché à LiteLLM, créer une virtual key par agent avec budget mensuel. Stocker dans Vault à `secret/neokube/agents/{name}/litellm_key`. Remplacer `LITELLM_MASTER_KEY` par la virtual key dans chaque deployment. Budget cible : Charlotte 30€, Neo 20€, Leon 10€, autres 5€/mois.
+
+### Pattern d'appel LLM correct dans le code agent
+
+```python
+LLM_MODEL = os.getenv("LLM_MODEL", "mistral-large-2407")  # défaut = valeur de dev seulement
+LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "http://litellm.cockpit.svc.cluster.local:4000")
+
+# Appel avec metadata agent obligatoire (traçabilité Langfuse)
+response = await httpx.AsyncClient().post(
+    f"{LITELLM_BASE_URL}/v1/chat/completions",
+    headers={"Authorization": f"Bearer {LITELLM_API_KEY}"},
+    json={
+        "model": LLM_MODEL,
+        "messages": messages,
+        "metadata": {"agent": "nom-agent", "workflow": "nom-workflow"}
+    }
+)
+```
+
+---
+
 ## Historique des actions Claude
 
-| Date | Action |
-|---|---|
-| 2026-03-15 | Reprise de la synchronisation `Production-clients` via `rclone bisync` |
-| 2026-03-15 | Création de ce fichier `CLAUDE.md` |
-| 2026-04-21 | Intégration RAGAS 0.4 + Langfuse — script `rag_eval.py` |
-| 2026-04-25 | Fix post-restart : recréation namespaces Temporal `sre-charlotte` + `zoho-integration` ; fix `llm-key-sync` (`python3` → `jq`) persisté en GitOps |
-| 2026-04-25 | Architecture persistence cluster : Temporal emptyDir → PVC `/projets/temporal` (5Gi) + namespaces dans flags `start-dev` ; namespace `management` formalisé dans GitOps ; CronJob `cluster-bootstrap` (*/5 min, idempotent) dans `apps/management/base/` ; règle P8 ajoutée au carnet de processus |
-| 2026-04-25 | Migration Vault `vault` → namespace `security` (Helm + données Raft copiées) ; vault-unsealer mis à jour |
-| 2026-04-25 | Ajout ttyd (terminal web) dans namespace `interfaces` — `tsl0922/ttyd:1.7.7`, ingress `ttyd.neokube.local` |
-| 2026-04-25 | Migration embedding Ollama → HuggingFace : suppression Ollama (`-8Gi RAM requests`) ; LiteLLM `nomic-embed-text` → `paraphrase-multilingual-mpnet-base-v2` via HF router gratuit (768 dims, multilingue) ; `HUGGINGFACE_API_KEY` ajouté dans `cockpit-secrets` |
-| 2026-04-25 | Déploiement Dify v1.13.3 dans namespace `dify` — 7 composants dont `dify-plugin-daemon:0.5.3-local` (requis Dify v1.x) ; fix permissions storage (initContainer chown UID 1001) ; DB `dify_plugin` créée ; ingress `dify.neokube.local` uniquement |
-| 2026-04-26 | **Phase 0** : suppression `ClusterRoleBinding agent-sre-cluster-admin` ; `agent-sre-role` restreint ; AgentSpec charlotte v2.5 ; AgentSpec leon v2.0 (Chef de Projet, `forbidden_actions`, `output_schema` ProjectSpec) |
-| 2026-04-26 | **Phase 2** : sidecars `tool-validator` (port 8090) + `output-guard` (port 8091) sur Charlotte et Leon ; `configmap-agent-policies` (allowlist 10 outils Leon, 26 forbidden) ; hooks dans `_execute_tool` + `run_agent` + `_mission_execute_tool` + `POST /mission` |
-| 2026-04-26 | **Phase 1** : namespace `connector-system` ; `zoho-connector` complet (OAuth2 Vault + proxy `/proxy`) ; stubs `github-connector` + `vercel-connector` ; Charlotte migrée (`_zoho_api` → zoho-connector) |
-| 2026-04-26 | **Phase 1b** : `github-connector` v1.0 (proxy GitHub REST API, token `GITHUB_TOKEN` depuis `github-connector-secrets`) ; `vercel-connector` v1.0 (proxy Vercel API, `VERCEL_TOKEN` + `VERCEL_TEAM_ID` depuis `vercel-connector-secrets`, teamId injecté auto) ; Leon — toutes les activités Zoho/GitHub/Vercel migrées vers leurs connecteurs respectifs ; `leon_zoho_refresh_token` → no-op ; deployment Leon nettoyé (secrets Zoho/GitHub/Vercel directs supprimés, URLs connectors en env) |
-| 2026-04-26 | **Vault fix** : tous les connectors lisent depuis Vault (secret `vault-root-token` créé dans `connector-system`) ; `secret/neokube/infrastructure/{github,vercel,neon}` créés depuis les K8s secrets existants |
-| 2026-04-26 | **Phase 3** : `neon-connector` v1.0 (port 8003) — proxy Neon Management API (`/proxy`) + exécution SQL via asyncpg (`/query`) ; Leon — 5 activités Neon migrées ; secrets `leon-neon-secrets` directs supprimés du deployment |
-| 2026-04-26 | **Phase 4c** : Charlotte → zoho-connector câblé — `ZOHO_CONNECTOR_URL` dans deployment-charlotte.yaml + charlotte-config ; `known_tools` documenté dans agent-policies |
-| 2026-04-26 | **Phase 4b** : `sre_agent_health_matrix` — snapshot pod/CPU(top)/RAM/probe HTTP par agent actif du registre ; fallback GitOps si K8s indisponible ; SREScanWorkflow étape 8 (`agent_matrix` dans report) ; endpoint `GET /agents/health` ajouté |
-| 2026-04-26 | **Phase 4a — DT-005** : `sre_qdrant_check_prior_remediation` (scroll exact + sémantique sur `remediation_outcome`) gate le loop drifts dans `SREScanWorkflow` — action ESCALATE si `failed_before` ; `sre_vectorize_remediation_outcome` écrit chaque PATCH/PATCH_FAILED en retour dans Qdrant pour alimenter les cycles suivants |
-| 2026-04-26 | **Audit roadmap** : vérification doublons — `sre_provision_agent` + `sre_decommission_agent` déjà implémentés (ProvisionAgentWorkflow/DecommissionAgentWorkflow) ; ProjectSpec déjà défini dans leon.yaml ; agent-registry v1.3 (charlotte 2.5, leon 2.0) ; 4 collections Qdrant Phase 5 ajoutées (statut `planned`) ; charlotte.yaml : shared_secrets Zoho supprimés → connector déclaré ; leon.yaml : optional_keys nettoyés (Phase 1b/3 terminées) |
-| 2026-04-27 | **Phase 5** : Dispatcher v1.0 déployé — `configmap-dispatcher-script.yaml` (DevProjectWorkflow + 7 activités : validate/aria_build/nox_build/vera_review/notify_approval/deploy/write_pm_decisions) ; pod `dispatcher` port 8484, namespace Temporal `dispatcher` ; sidecars tool-validator + output-guard ; AgentSpecs Aria/Nox/Vera + dispatcher créées ; registre v1.4 ; 4 collections Qdrant `active` |
-| 2026-04-27 | **Phase 6** : Aria/Nox/Vera découplés en pods dédiés — scripts `configmap-aria-script.yaml` / `configmap-nox-script.yaml` / `configmap-vera-script.yaml` ; deployments + services + serviceaccounts dédiés (ports 8485/8486/8487) ; task_queues séparées (`aria-queue`/`nox-queue`/`vera-queue`) dans DevProjectWorkflow ; dispatcher-script.yaml mis à jour (ARIA/NOX/VERA_QUEUE env vars + task_queue dans execute_activity) ; policies Aria/Nox/Vera ajoutées ; registre v1.5 (health_url + task_queue par agent) ; bug fix deployment `dispatcher_agent.py` → `dispatcher.py` |
-| 2026-04-27 | **fix(leon)** : `dispatch_project` tool ajouté — Leon → `POST /trigger` Dispatcher avec ProjectSpec 11 champs ; `DISPATCHER_URL` dans leon-config + leon-script ; `new_project` marqué [LEGACY] ; pipeline Leon → Dispatcher désormais fonctionnel |
-| 2026-04-27 | **fix(backup)** : `dump-mongodb` init container supprimé — MongoDB retiré du cluster, le `set -e` bloquait tout le job nightly ; TIMESTAMP déplacé dans le container upload ; backup vérifié OK (Penpot+OpenWebUI+Qdrant+GitOps) |
-| 2026-04-27 | **fix(charlotte/git)** : `git_status` corrigé — fetch `origin/main` + `log origin/main..HEAD` pour exposer les commits non pushés (Charlotte disait "à jour" avec 23 commits locaux en attente) ; `_git_pull()` : `fetch --depth=20 + reset --hard` → `fetch + rebase` (préserve les commits locaux non pushés) ; 27 commits pushés vers `neomnia/Kubinote-GitOps` |
-| 2026-04-27 | **fix(namespaces)** : `open-webui` namespace vide supprimé (doublon de `interfaces`) + retiré de la kustomization pour éviter la recréation automatique ; PVs `dify-*` en état `Released` (claimRef `mindstudio-prod`) récupérés via patch + rebind vers namespace `dify` ; 7 pods Dify Running |
-| 2026-04-27 | **Phase 7** : admin-sys promu K8s executor v4.0 — nouveau script FastAPI (`/execute`, `/apply`) remplace `penpot-sidecar:v3.5` ; `ClusterRole admin-sys-executor` (lecture universelle + mutations workloads/config/RBAC/batch) ; Charlotte `_kubectl()` route via `POST admin-sys/execute` : mutations obligatoires via admin-sys, read-only avec fallback local si admin-sys KO ; `ADMIN_SYS_URL` dans charlotte-config |
-| 2026-04-27 | **fix(nox/neon)** : `POST /projects` bloqué (org managed by Vercel) → pattern branche-par-projet : Nox crée une branche Neon sur le projet existant `NeoBridge` (`young-fog-76038471`) — `neon_branch_id` + `neon_endpoint_host` dans le résultat ; `NEON_BASE_PROJECT_ID` ajouté dans deployment-nox + configmap ; branche de test supprimée |
-| 2026-04-27 | **fix(leon/temporal)** : `TEMPORAL_NAMESPACE` de Leon corrigé `default` → `leon` dans `configmap-leon-config.yaml` (namespace Temporal `leon` créé en Phase 6) |
-| 2026-04-27 | **feat(admin-sys/auth)** : token `X-Admin-Sys-Token` ajouté sur `/execute` et `/apply` — secret `admin-sys-token` (64 hex) dans namespaces `interfaces` + `agent-system` ; `/health` reste libre (probes) ; Charlotte injecte le header dans `_kubectl()` et `_kubectl_apply_yaml()` (migré de kubectl local vers admin-sys `/apply`) ; validé 403 sans token, 200 avec token |
-| 2026-04-27 | **fix(zoho-connector)** : HTTP methods corrigés — PUT/PATCH/DELETE utilisaient `c.post()` → méthodes httpx correctes ; Zoho erreur 6500 (soft) traitée comme non-fatale (ressource créée côté Zoho malgré HTTP 400) — retourne `{}` au lieu de lever exception |
-| 2026-04-27 | **fix(zoho-observer v2.0)** : `_zoho_proxy` — `"body"` → `"data"` (champ attendu par ProxyReq zoho-connector) ; import `timezone` ajouté ; champs `acceptance_criteria` + `emitted_at` ajoutés dans spec pour satisfaire `dispatcher_validate_spec` ; déduplication déléguée à Temporal (`WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY`) au lieu du set `_dispatched` volatile |
-| 2026-04-27 | **fix(dispatcher)** : workflow ID sans timestamp (`devproject-{project_id}`) + `WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY` + catch `WorkflowAlreadyStartedError` — idempotence garantie même après restart pod zoho-observer |
-| 2026-04-27 | **fix(aria/nox)** : `GET /git/refs/heads/main` retourne 409 sur repo template en cours d'init — erreur 409 ignorée silencieusement au lieu d'être ajoutée à `result["errors"]` |
-| 2026-04-27 | **fix(vera)** : check `nox_db` corrigé — `neon_project_id` (ancien champ) → `neon_branch_id` (sortie actuelle de Nox) ; même correction dans le prompt LLM |
-| 2026-04-27 | **feat(qdrant)** : collection `pm-experience` créée (768 dims, Cosine) — manquante, causait une boucle d'erreur dans le PM observer |
-| 2026-04-27 | **E2E pipeline validé** : test complet zoho-observer → Dispatcher → Aria+Nox (parallèle) → Vera (approved) → signal humain → deploy → COMPLETED en 44.86s (workflow `devproject-zoho-2114101000001568047`) ; idempotence vérifiée post-restart pod |
-| 2026-04-28 | **Stalwart Mail Server v0.11.8** : déployé dans namespace `stalwart` — StatefulSet (PVC 10Gi local-path), listeners SMTP/SMTPS/Submission/IMAP/IMAPS/Sieve/HTTP tous opérationnels ; ingress `mail.neokube.fr` (Traefik) ; LoadBalancer 192.168.1.28 ports mail ; fix config path (initContainer `/config/config.toml` ≠ `/config/etc/config.toml`), log tracer stdout, probe tcpSocket ; DKIM RSA 2048 selector `mail` stocké dans secret `stalwart-dkim` + Vault `secret/neokube/apps/stalwart` |
-| 2026-04-28 | **openprovider-connector v1.0** (port 8005) + **cloudflare-connector v1.0** (port 8006) : déployés et validés — Openprovider : 7 domaines accessibles (neokube.fr géré par Openprovider DNS), JWT re-login auto ; Cloudflare : 19 zones actives (neomnia.net zone_id=8c1283e7c52c34a9d5112c0fb271af27, account_id=822ba0e8c232e192475e6bd02ce36cb4), neokube.fr absent (DNS Openprovider direct) ; credentials dans Vault `secret/neokube/infrastructure/{openprovider,cloudflare}` |
-| 2026-04-28 | **Domi v1.0** — Domain Infrastructure Manager (port 8489, domi-queue, namespace dispatcher) : 4ème activité parallèle dans DevProjectWorkflow (gather 3→4) ; mode subdomain : CNAME {slug}.neomnia.net → cname.vercel-dns.com dans Cloudflare zone neomnia.net ; mode register : achat Openprovider + zone Cloudflare + NS update ; domi_link_vercel_domain post-deploy ; DomainRenewalScanWorkflow cron 09:00 UTC (auto-renew <30j, alerte Charlotte <60j) ; Vera v1.2 check domain_provisioned (non-bloquant) ; registre v1.7 |
-| 2026-04-28 | **Phase 10d** : `penpot-connector` v1.0 (port 8004, connector-system) — proxy Penpot RPC API, auth session cookie depuis Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL/PASSWORD), re-login auto 401 ; agent `Penpot` v1.0 (port 8488, penpot-queue, agent-system) — activité `penpot_create_design` : create-project + duplicate-file template → retourne `penpot_url` (/design?project-id=X&file-id=Y) ; non-bloquant si PENPOT_TEMPLATE_FILE_ID/PENPOT_TEAM_ID vides ; DevProjectWorkflow : gather 2→3 (Aria+Nox+**Penpot** en parallèle) ; vera_review : 4ème param `penpot_result` (non-bloquant) ; dispatcher_zoho_callback : ligne "Design" ajoutée ; pm-decisions : penpot_url vectorisé ; registre agents v1.6 |
-| 2026-04-28 | **fix(pipeline/audit)** : 5 bugs bloquants corrigés — (1) Vercel repoId `str→int` (`incorrect_git_source_info`) + fallback org/repo ; (2) `asyncio.gather return_exceptions=True` Penpot+Domi non-bloquants, Aria+Nox re-raise ; (3) Leon `dispatch_project` : `domain_mode`+`domain_name` ajoutés au schema tool et spec JSON ; (4) `CF_ACCOUNT_ID` ajouté dans `configmap-domi-config` (mode register) ; (5) restart Aria+Nox+Dispatcher+Leon après update configmaps ; section "Pièges connus" ajoutée dans CLAUDE.md |
-| 2026-04-28 | **Stalwart — calibration mail** : auto-ban `[server.fail2ban] rate="100/1d"` actif dans config.toml ; domaine `neokube.fr` + compte `admin@neokube.fr` créés via API REST ; DNS zone neokube.fr créée chez Openprovider (A/MX/SPF/DKIM/DMARC) via openprovider-connector (PUT zone — POST/PATCH non implémentés) ; `stalwart-connector` v1.0 (port 8007, connector-system) : auth Basic injectée auto, endpoints `/accounts`, `/accounts/create`, `/accounts/{account}` DELETE, `/proxy` ; Vault `secret/neokube/apps/stalwart` contient `ADMIN_PASSWORD` ; registre agents mis à jour (section connectors) ; section Stalwart gotchas ajoutée dans CLAUDE.md |
-| 2026-04-29 | **stalwart-connector déployé** : pod Running dans `connector-system` — GET /accounts, POST /accounts/create, DELETE /accounts/{account} validés ; Vault `ADMIN_PASSWORD` corrigé (`SU0ie4btcEWNmRq7RBb10Z8RimN3V` — correspond au hash `[authentication.fallback-admin]` dans config.toml) ; namespace `stalwart` ajouté dans CLAUDE.md ; merge remote Domi commits (96d616b → 8c68f68) résolu |
-| 2026-04-29 | **feat(mail): identités agents** — 4 comptes Stalwart créés : `leon@`, `vera@`, `domi@`, `no-reply@neokube.fr` ; credentials dans Vault `secret/neokube/agents/{leon,vera,domi}` + `apps/stalwart.NOREPLY_PASSWORD` ; STALWART_CONNECTOR_URL + MAIL_FROM + SMTP_HOST/PORT ajoutés dans configmaps Leon/Domi et deployment Vera ; **Dispatcher v1.1** : `dispatcher_send_client_mail` (aiosmtplib, SMTP Stalwart port 587, email HTML/texte post-deploy) ; `client_email` dans ProjectSpec (3 endroits : tool schema Leon + spec dict + validate_spec setdefault) ; step 9 workflow non-bloquant |
-| 2026-04-29 | **Penpot Vault** : credentials provisionnés dans Vault `secret/neokube/infrastructure/penpot` (PENPOT_EMAIL, PENPOT_PASSWORD, PENPOT_TEAM_ID=82052e4a-…) ; reset mot de passe Argon2id format custom Penpot (argon2id$hexsalt$m$t$p$hexhash) ; penpot-connector login 200 confirmé ; `PENPOT_TEAM_ID` mis à jour dans `deployment-penpot.yaml` |
-| 2026-04-29 | **E2E pipeline complet validé** : `devproject-e2e-test-b468b5b0` — Aria+Nox+Penpot+Domi (parallel) → Vera (approved) → deploy Vercel → pm-decisions → send_client_mail ; DomainRenewalScanWorkflow `domi-renewal-scan-daily` RUNNING dans Temporal |
-| 2026-04-29 | **fix(smtp+embed)** : (1) SMTP_HOST corrigé `stalwart-web` → `stalwart-mail` dans tous les agents (port 587 SMTP submission, `stalwart-web` = HTTP admin uniquement) ; (2) `_embed()` fix format HuggingFace — LiteLLM router retourne 768 scalaires séparés dans `data` au lieu d'un vecteur unique ; `data[0]["embedding"]` était un float causant HTTP 400 Qdrant ; fix dans dispatcher + charlotte-sre ; piège documenté dans CLAUDE.md §7 |
-| 2026-04-29 | **fix(smtp+dispatch)** : (3) `on_approved/on_rejected` signal handlers : ajout `reason: str = ""` — Temporal passe le payload signal en arg positionnel, `on_approved(self)` levait TypeError ; (4) `validate_certs=False` dans aiosmtplib.send (Stalwart self-signed cert) ; (5) rôle `"user"` ajouté sur 4 comptes Stalwart (leon/vera/domi/no-reply) — sans ce rôle Stalwart retourne 550 5.7.1 ; **pipeline E2E complet validé** : deploy Vercel + Qdrant pm-decisions HTTP 200 + email envoyé à chvandendriessche@neomnia.net |
-| 2026-04-29 | **fix(penpot)** : `PENPOT_TEMPLATE_FILE_ID` provisionnée — fichier `template-maquette-base` créé dans Penpot Drafts (id=`32796cdf-d506-81b0-8007-f19045833782`) ; `deployment-penpot.yaml` mis à jour + Vault `secret/neokube/infrastructure/penpot` ; `penpot_url` non-null désormais dans les runs pipeline |
-| 2026-04-29 | **fix(dispatcher/charlotte)** : timeout `dispatcher_notify_approval` Charlotte 10s → 60s (LLM call sur `/mission` dépassait le timeout) |
-| 2026-04-29 | **cleanup** : 16 repos test GitHub (neomnia org) supprimés + 9 projets Vercel associés supprimés |
-| 2026-05-02 | **fix(cluster-bootstrap)** : image `temporalio/temporal:1.30.2` inexistante sur Docker Hub → `latest` ; CronJob débloqué (`concurrencyPolicy: Forbid` bloquait tous les runs suivants) |
-| 2026-05-02 | **fix(zoho URLs)** : URLs projets/tâches incorrectes dans Charlotte et Leon (format `#zp/dashboard/{id}` inventé) → URL validée `#zp/projects/{id}/` (SPA fragment) |
-| 2026-05-02 | **feat(zoho-connector v1.1)** : `_inject_web_urls()` centralisé — enrichit chaque réponse proxy avec `web_url` pour projets/tâches/milestones/tasklists ; Charlotte + Leon migrent de la construction locale vers `item["web_url"]` ; section "Règles de conception connector-system" + piège §8 ajoutés dans CLAUDE.md |
-| 2026-05-02 | **feat(charlotte): `project_health_check`** — bilan cross-systèmes Zoho+GitHub+Vercel+Penpot+Notion en un appel parallèle ; `update_docs=True` croise les liens dans Zoho description + page Notion ; règle 11 dans le prompt (pas de `zoho_list_projects` pour les demandes "vérifier/checker/rassure-moi") |
-| 2026-05-02 | **doc: cycle de vie projet** — section "Planification → Production" ajoutée dans CLAUDE.md : 3 phases (Exploration/Planification/Production), frontière de déclenchement annotée dans le diagramme DevProjectWorkflow, 3 gaps documentés (trigger Zoho status P1, mapper Zoho→ProjectSpec P1, email enrichi P3) |
-| 2026-05-02 | **fix(dns/neokube.fr)** : DNS zone opérationnelle — (1) bug Openprovider API identifié : `{"zone":{"records":[...]}}` retournait success:true silencieusement sans appliquer les records ; format correct = `{"id":zone_id, "name":"zone", "records":{"add":[...]}}` + TTL min 600s ; (2) domaine délégué vers Cloudflare NS sans zone CF → SERVFAIL ; NS remis sur Openprovider via `PUT /domains/29414839` ; (3) 5 records ajoutés : A mail→45.130.81.100, MX prio=10, SPF, DKIM Stalwart, DMARC ; (4) openprovider-connector v1.1 : endpoints `/dns/records/add` + `/dns/records/remove` ; (5) section Scaleway TEM + Penpot SMTP ajoutées dans CLAUDE.md |
-| 2026-05-02 | **feat(stalwart): migration Scaleway + fix AUTH PLAIN** — Stalwart déplacé du StatefulSet K8s vers instance Docker DEV1-S Scaleway fr-par-1 (`51.15.253.114`) ; accès SSH permanent (`id_ed25519_neokube`) ; K8s : StatefulSet+PVC supprimés, Services ClusterIP + Endpoints manuels ajoutés (stalwart-mail + stalwart-web → 51.15.253.114) ; dispatcher configmap : `start_tls=True → False` ; **fix AUTH** : bug Stalwart v0.11.8 — `session.auth.mechanisms` doit être une **string expression** `"[plain, login, oauthbearer]"` (pas un tableau TOML, pas le format conditionnel `[[array]]` — tous deux échouent silencieusement ou crashent à cause du tri alphabétique BTreeMap RocksDB) ; `tls.enable = false` sur listener submission ; DNS A `mail.neokube.fr` mis à jour `45.130.81.100 → 51.15.253.114` ; E2E validé : aiosmtplib `start_tls=False` depuis K8s → Stalwart Scaleway → email reçu |
-| 2026-05-03 | **fix(stalwart/relay): smtp-tem-proxy** — Scaleway bloque ports SMTP outbound (25/465/587) depuis instances DEV1-S ; proxy Python `smtp-tem-proxy` (systemd, port 1025) créé sur l'instance : accepte SMTP de Stalwart et relaye via API HTTP TEM Scaleway (HTTPS:443) ; 3 bugs corrigés : (1) Stalwart DNS resolver async bypass `/etc/hosts` → utiliser hostname DNS réel `mail.neokube.fr` comme adresse relay ; (2) Stalwart avorte après EHLO sans STARTTLS même avec `tls.enable=false` → `[queue.outbound.tls] starttls="optional"` ; (3) `MAIL FROM:<email> SIZE=...` → `.strip("<>")` laissait `email>` → fix regex `re.search(r'<([^>]+)>', cmd)` ; fix(penpot) SMTP_TLS=false + JAVA_TOOL_OPTIONS vide ; fix(ingress) stalwart-web → `mail-admin.neokube.local` ; E2E validé : Penpot recovery mail reçu |
-| 2026-05-03 | **fix(hosts): mail-admin.neokube.local** — ajout `192.168.1.28 mail-admin.neokube.local` dans `/etc/hosts` neokube-beta (manquant → page blanche dans le navigateur) ; à ajouter aussi sur la machine client |
-| 2026-05-03 | **fix(stalwart/webadmin): version épinglée v0.1.23** — binaire v0.11.8 embarque un webadmin nécessitant Stalwart ≥ 0.13.0 ("Unsupported server version") ; pinglage sur webadmin v0.1.23 (dernier compatible v0.11.8) via `webadmin.resource` + `webadmin.auto-update = false` + `webadmin.path = /opt/stalwart-mail/etc/webadmin` dans config.toml ; login webadmin opérationnel |
-| 2026-05-03 | **feat(stalwart): Roundcube webmail** — déployé dans namespace `stalwart` (`roundcubemail:latest-apache`) ; IMAP → stalwart-mail:143, SMTP → stalwart-mail:587 (credentials `%u`/`%p`) ; sqlite PVC 1Gi local-path ; ingress `webmail.neokube.local` (Traefik) ; `/etc/hosts` neokube-beta mis à jour ; opérationnel HTTP 200 |
-| 2026-05-03 | **feat(infra): Cloudflare Tunnel** — `neokube-tunnel` (ID `94ff6f9f-2498-470e-9a7b-b4d3ed9e94fb`) ; `cloudflared:latest` 2 replicas dans kube-system ; 8 connexions QUIC actives vers datacenter CF Paris ; config ingress : 8 services (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify) → Traefik Host override ; GitOps `apps/cloudflare-tunnel/base/` |
-| 2026-05-03 | **feat(cloudflare): two-token architecture + CNAMEs** — séparation `Neomnia-account` (CF_API_TOKEN, compte complet) / `Neomnia-domains` (CF_DNS_TOKEN, Zone DNS:Edit all zones) ; cloudflare-connector v1.1 : `CF_DNS_TOKEN` prioritaire, fallback `CF_API_TOKEN` ; Vault `secret/neokube/infrastructure/cloudflare` version 4 (CF_DNS_TOKEN ajouté) ; 8 CNAMEs neomnia.net créés (chat/headlamp/temporal/langfuse/webmail/mailhub/design/dify → tunnel) ; tunnel opérationnel : HTTP 200 vérifié sur chat.neomnia.net + headlamp.neomnia.net |
-| 2026-05-03 | **feat(surfsense): déploiement SurfSense v1.0** — moteur RAG open-source (alternatif Perplexity) dans namespace `surfsense` ; 7 composants K8s : postgres (pgvector/pg17, 10Gi, wal_level=logical), redis, searxng, backend FastAPI, celery worker, zero-cache (rocicorp/zero:0.26.2, 1.5Gi RAM), frontend Next.js ; embedding `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` local 384-dim (chonkie v1.6 ignore base_url openai → pas de LiteLLM pour les embeddings) ; Langfuse (LangSmith-compat), Notion OAuth ; 3 ingresses dual-host (neokube.local + neomnia.net) ; 3 CNAMEs + 3 règles tunnel Cloudflare ajoutées (surfsense/surfsense-api/surfsense-zero) ; HTTP 200 validé sur surfsense.neokube.fr + surfsense-api.neokube.fr/health |
-| 2026-05-03 | **fix(litellm): OOMKill** — memory limit 512Mi → 2Gi ; LiteLLM crashait en boucle (exit 137) depuis 8j (7 restarts), causait l'échec de tous les appels LLM SurfSense et autres agents ; fix GitOps `deployment-litellm.yaml` |
-| 2026-05-03 | **fix(surfsense): LLM preferences + prompts** — l'espace "Neomnia Studio" était configuré sur AUTO (mode cloud SurfSense) au lieu de GPT-4o via LiteLLM ; switché sur `agent_llm_id=1` (GPT-4o) via `PUT /api/v1/search-spaces/1/llm-preferences` ; 7 configs LLM créées (GPT-4o, Mistral, Codestral via API + Gemini Flash/Pro/Claude Sonnet/Opus via INSERT SQL direct car validation SurfSense échoue sur quota/billing) ; prompts E2E validés |
-| 2026-05-03 | **doc: architecture domaines + process CF** — section "Architecture des noms de domaine" ajoutée dans CLAUDE.md : règle fondamentale neomnia.net=public/neokube.local=LAN/neokube.fr=mail, process complet "ajouter un service public", anti-pattern CNAME Openprovider→cfargotunnel sans proxy CF, règle R5 connector-system |
-| 2026-05-03 | **feat(scraping): google-discovery-connector v1.0 + crawlee-service v1.0** — deux microservices scraping dans `connector-system` ; `google-discovery-connector` (port 8008, Python FastAPI) : `POST /search` → Google Custom Search API, credentials Vault `secret/neokube/infrastructure/google` (GOOGLE_SEARCH_API_KEY + GOOGLE_CX_ID), 100 req/j gratuites ; `crawlee-service` (port 8009, Node.js, image `mcr.microsoft.com/playwright:v1.49.0-noble`) : `POST /crawl`, `POST /batch` (max 10 URLs, concurrence 3), `POST /screenshot` → PNG base64, mutex interne pour sérialiser les sessions Chromium ; startup ~2min (npm install crawlee@3 + playwright install chromium) ; GitOps `apps/connector-system/base/` mis à jour |
-| 2026-05-03 | **feat(infra): migration neokube.fr → Cloudflare + domaine de référence** — zone CF `neokube.fr` créée via CF_GLOBAL_KEY (`c58eafb1b5550...`, `informatique@neomnia.net`) ; NS Openprovider → `abby.ns.cloudflare.com`/`david.ns.cloudflare.com` (propagation immédiate) ; records mail recréés dans CF (A/MX/SPF/DKIM/DMARC, `mail.neokube.fr` DNS-only) ; 11 CNAMEs tunnel créés dans zone neokube.fr ; tunnel rules reset vers neokube.fr uniquement (11 règles propres) ; `neokube.fr` devient le domaine de référence NeoKube (remplace neomnia.net pour tous les nouveaux services) ; Vault `CF_GLOBAL_KEY`+`CF_ACCOUNT_EMAIL`+`CF_NEOKUBE_ZONE_ID`+`CF_NEOKUBE_DOMAIN` provisionnés |
-| 2026-05-03 | **fix(cloudflare-connector v1.2): Global API Key prioritaire** — cloudflare-connector v1.2 : priorité d'auth Global Key (`X-Auth-Email`+`X-Auth-Key`) > CF_DNS_TOKEN > CF_API_TOKEN ; résout l'impossibilité de créer des zones CF avec les tokens scoped (permission `zone.create` non accordable sur tokens `cfat_`) |
-| 2026-05-03 | **fix(surfsense): CORS + migration neokube.fr** — root cause "Unable to connect to the server" : frontend `http://surfsense.neokube.local` appelait `https://surfsense-api.neomnia.net` → CORS 400 (origin non whitelistée) ; fix : `NEXT_FRONTEND_URL=https://surfsense.neokube.fr` dans configmap, 3 ingresses mis à jour (neomnia.net → neokube.fr), Domi configmap domain_ref migré, dispatcher fallback migré ; HTTP 200 sur surfsense.neokube.fr |
-| 2026-05-03 | **feat(surfsense): connecteur Notion** — token legacy `[NOTION_TOKEN_REDACTED]` ; connecteur inséré directement en DB (id=1, space=1, `NOTION_INTEGRATION_TOKEN`) ; 444 pages Notion accessibles via l'intégration ; indexation déclenchée via Celery `index_notion_pages` sur queue `surfsense.connectors` ; `enable_summary=false` pour éviter 444 appels LLM ; indexation périodique toutes les 24h activée |
-| 2026-05-04 | **feat(penpot): v3.0 — Zoho + Notion + wireframes multi-pages** — agent Penpot lit les tâches/jalons Zoho (via Vault creds + refresh token direct), lit la doc Notion (token `ntn_...` dans Vault `secret/neokube/apps/notion`), poste commentaire Zoho sur les tâches design après création (HTTP 201 validé) ; wireframes v3 : une frame Penpot par page du site extraite des tâches Zoho (Home/Services/À propos/Contact) + layouts spécifiques + frame jalons ; deployment-penpot mis à jour (VAULT_ADDR, VAULT_TOKEN, ZOHO_PORTAL_ID) ; fix Vault KV v2 path (`secret/neokube/...` → `/v1/secret/data/neokube/...`) |
-| 2026-05-04 | **feat(spec): ProjectSpec 13 champs — ajout `notion_page_id`** — `notion_page_id` ajouté aux 3 endroits (règle anti-pattern 3) : schema JSON Schema Leon (`dispatch_project`), dict spec `_execute_tool`, `dispatcher_validate_spec` setdefault ; optionnel (None par défaut, option 2 validée) ; si présent → Penpot agent charge la page Notion avant de générer les wireframes |
-| 2026-05-04 | **feat(penpot): v3.3 — wireframes dual desktop+mobile 9 pages + RAG** — frames desktop 1440px + mobile 375px côte à côte ; hauteurs calculées au contenu (DH/MH exacts) ; footer enrichi (adresse Paris, contact@neomnia.studio) ; _verify_penpot_url (get-project-files) ; brief design complet sur les tâches Zoho (statut/avancement/priorité/durée) ; indexation RAG 10 points dans collection `zoho-tasks` (1 global + 9 pages) ; auth LiteLLM LITELLM_API_KEY dans deployment-penpot ; brand color #32AFB1 extrait de neomnia.net |
-| 2026-05-04 | **feat(connector): dataforseo-connector v1.0** — port 8010, connector-system ; credentials Vault `secret/neokube/infrastructure/dataforseo` (DATAFORSEO_LOGIN/PASSWORD/API_KEY) ; `POST /search` fallback auto DataForSEO → SearXNG (surfsense-searxng self-hosted) ; `POST /proxy` accès direct DataForSEO v3 ; E2E validé provider=dataforseo 5 résultats Penpot SaaS UI kit
-| 2026-05-04 | **fix(penpot): PENPOT_FRONTEND_URL → design.neokube.fr** — URL de livraison corrigée : `http://penpot.neokube.local` → `https://design.neokube.fr` (URL publique Cloudflare Tunnel) ; liens Zoho/email/pm-decisions pointent désormais vers l'URL publique accessible |
-| 2026-05-04 | **doc(penpot): gestion projets/fichiers** — section "Penpot — Gestion des projets" ajoutée dans CLAUDE.md : soft-delete (deleted_at+7j visible dans get-projects), hard-delete SQL procédure complète (tables NO ACTION vs CASCADE), bug 204 connecteur cosmétique, URL livraison, vérification fichier, idempotence, RAG zoho-tasks |
-| 2026-05-04 | **cleanup(penpot): purge 10 anciens projets** — 9 doublons "Neomnia.net Refonte — Design" + 1 "Neomnia.net — Refonte" (Default team) supprimés via SQL hard-delete ; Penpot.neokube.local ne retourne plus que 3 projets : 2 Drafts + 1 actif |
-| 2026-05-04 | **feat(penpot): wireframes v4 — design system v2 + composants nav 4 états + hero dashboard** — `_img_placeholder()` helper remplace les rectangles gris plats (crosshair + badge PRIMARY + dimensions) ; hero desktop : dark shell UI avec topbar, 4 KPI cards, 7-bar chart, agent status sidebar ; hero mobile : compact dark dashboard ; `_build_design_system()` v2 : 5 sections (colors usage, typo 6 variants, grid+spacing, motion tokens, image variants) ; `_build_components()` v2 : 4 sections (6 boutons×2états, nav 4 états+annotations transition, 7 badges, 4 états formulaire) |
-| 2026-05-04 | **feat(indexer): design-knowledge-indexer v1.0** — CronJob dimanche 4h Europe/Paris, namespace management ; pipeline DataForSEO SERP → crawlee-service scraping → LiteLLM embed → Qdrant collection design-knowledge (768 dims, Cosine) ; 17 requêtes / 9 catégories + 10 URLs statiques ; enrichissement agent penpot (_query_design_knowledge + _build_inspiration_frame à Y=18000) ; fix crawlee-service : playwright@1.49.0 explicite + PLAYWRIGHT_BROWSERS_PATH=/ms-playwright (MCR image pré-installé, startup 60s vs 3min) ; secret cluster-manager-secrets (LITELLM_MASTER_KEY=sk-neokube-litellm-master) à créer dans namespace management au bootstrap |
-| 2026-05-04 | **feat(indexer): crawlee-service v2 — réécriture Playwright direct** — remplacement de la couche Crawlee par Playwright direct (`chromium.launch()` + pool de 2 pages partagées) ; root cause : Crawlee cacheait `CRAWLEE_STORAGE_DIR` à l'import (singleton Configuration) ignorant les modifications runtime ; bug AutoscaledPool : sous-lecture cgroup (768MB au lieu de 3Gi) → throttle total ; résultats : startup ~60s, `/crawl`, `/batch`, `/screenshot` opérationnels ; memory limit 512Mi → 3Gi ; 53 points indexés dans `design-knowledge` |
-| 2026-05-04 | **feat(indexer): penpot-template-indexer v1.0** — crawl Penpot Hub (libraries-templates + 7 URLs catégorie + community) ; classification 15 types de projet (wireframe/icon-set/design-system/ui-kit/dashboard/landing-page/mobile-app/ecommerce/blog/portfolio/saas-webapp/planning/ux-research/presentation/framework-kit) ; 226 templates indexés dans Qdrant collection `penpot-templates` (768 dims, Cosine) ; CronJob annuel (manuel) ; gotcha : LITELLM_URL doit inclure `:4000` (port non-standard) |
-| 2026-05-04 | **feat(surfsense): SharePoint upload** — script `~/scripts/sharepoint_to_surfsense.py` ; upload 1 995 fichiers depuis `~/SharePoint/` (8 sites prioritaires) via `POST /api/v1/documents/fileupload` ; filtres venv/~$ ; JWT token dans `SURFSENSE_URL=http://surfsense-api.neokube.local` ; connecteur OneDrive personnel créé (ID 2, `chvandendriessche@neomnia.net`) via Azure App Registration `SurfSense-Neokube` (CLIENT_ID dans Vault `secret/neokube/apps/surfsense`) |
-| 2026-05-04 | **feat(monitoring): Grafana + Loki + Promtail** — namespace `monitoring` ; Loki 2.9.8 (log aggregation, 30j rétention, hostPath `/var/lib/loki` 10Gi) ; Promtail 2.9.8 (DaemonSet, collecte tous les pods via `/var/log/pods`, labels namespace/app/pod/container/job_name) ; Grafana 10.4.3 (dashboard pré-provisionné "NeoKube — CronJobs & Batch" : 4 panels CronJobs/RAG/erreurs/agents) ; Vault `secret/neokube/apps/monitoring` (GRAFANA_ADMIN_PASSWORD) ; `grafana.neokube.local` + `grafana.neokube.fr` (CNAME + règle tunnel CF) ; fix inotify : `fs.inotify.max_user_instances=512` dans `/etc/sysctl.d/99-inotify.conf` |
-| 2026-05-04 | **feat(monitoring/smtp): smtp-relay pod** — Go's smtp.PlainAuth refuse les credentials en clair sur connexion non-TLS (hostname ≠ localhost) → déploiement d'un relay Python (aiosmtpd+aiosmtplib) dans namespace monitoring ; Grafana → smtp-relay:25 (plaintext, sans auth) → stalwart-mail:587 (avec credentials no-reply) → TEM → chvandendriessche@neomnia.net ; 3 règles d'alerte Loki provisionnées : CronJob ERROR, backup TERMINÉ, indexer TERMINÉ ; **gotcha : `admin@neokube.fr` ne peut pas recevoir de mails** — conflit avec `authentication.fallback-admin.user="admin"` dans config.toml Stalwart (SMTP lookup du local-part "admin" trouve le superuser système, pas le compte individual) ; utiliser `chvandendriessche@neomnia.net` pour les alertes monitoring |
-| 2026-05-05 | **fix(surfsense): celery OOMKill + DB migrations** — surfsense-celery crash 128 restarts (exit 137) : autoscale max=10 workers × 460MB sentence-transformers = OOMKill ; memory limit 4Gi → 8Gi ; migrations Alembic désynchronisées (alembic_version=116, schema=~140) : table agent_action_log hors Alembic bloquait migration 130 — renamed + DROP CASCADE index orphelins, stamp 140, alembic upgrade head applique 141+142 ; SurfSense pleinement fonctionnel |
-| 2026-05-05 | **fix(surfsense): JWT + dédup + LLM quota** — token expiré (2026-05-04 20:50 UTC) → nouveau token PyJWT exp 2027-05-05 ; `GET /documents/search/titles` format changé (list → `{items, has_more}`) → fix parse + page_size=50000 ; tous les LLM API quotas épuisés simultanément (OpenAI/Anthropic/Gemini) → mistral-large-latest comme provider de secours ; 2 629 fichiers SharePoint (9 sites dont Management) re-indexés |
-| 2026-05-05 | **feat(alerting): ntfy v2.11.0 + système de notifications push** — ntfy déployé dans namespace `interfaces` (NTFY_AUTH_DEFAULT_ACCESS=deny-all, upstream ntfy.sh pour relay iOS/Android push) ; CNAME `ntfy.neokube.fr` + règle tunnel Cloudflare ; Vault `secret/neokube/apps/ntfy` (NTFY_ADMIN_PASSWORD + NTFY_AGENT_PASSWORD) ; `llm-key-validation` v2 : schedule 6h→*/6h, vrais appels complétion 1 token (détecte quota épuisé), notification ntfy priorité urgent/high selon providers KO ; Grafana : contact point ntfy-neokube webhook (POST auth Basic, routes severity=error\|warning) ; Charlotte SRE : activity `sre_ntfy_notify` — OOMKill/CrashLoop/severity critical|warning → urgent/high ; Dispatcher : activity `dispatcher_ntfy_notify` — blocked_vera/approval_timeout/deploy_failed/deployed ; helper `_ntfy_notify` + NTFY_URL/NTFY_USER/VAULT_NTFY_PATH ajoutés dans configs Charlotte et Dispatcher |
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 60 entrées, 2026-03-15 → 2026-05-05.
+Toutes les phases de sécurité (0–3) et capacités (4a–10d) sont ✅ terminées.
