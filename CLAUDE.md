@@ -312,6 +312,8 @@ for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design'
 
 ## Architecture agents
 
+> Sécurité agents (sidecars tool-validator + output-guard, policies par agent, checklist intégration) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+
 ### Rôles et périmètres
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
@@ -419,6 +421,12 @@ ProjectSpec validé par Dispatcher
 **Ajouté le 2026-04-27** : `ClusterRole admin-sys-executor` + binding sur `admin-sys-agent` SA.
 
 **Posture sécurité Aria/Nox/Vera/Penpot/Dispatcher** : pas de kubectl installé dans les pods, pas de ClusterRoleBinding, toutes les opérations infrastructure passent par les connectors (github/neon/vercel/penpot) via token Vault. Seule Charlotte peut agir sur le cluster, via admin-sys uniquement (token `X-Admin-Sys-Token`).
+
+### Vault — carte des chemins
+
+> Carte complète Vault → K8s secrets + mécanismes de sync : **[CLAUDE-vault.md](CLAUDE-vault.md)**
+>
+> **Règle** : avant de déclarer un secret "absent de Vault", consulter cette carte. Les secrets K8s `openai-secret`, `anthropic-secret`, `cockpit-secrets` sont des **outputs** du CronJob `llm-key-sync` qui lit `secret/neokube/llm-api-keys` — ils sont bien dans Vault.
 
 ### Connector-system — architecture (état 2026-04-28)
 
@@ -738,6 +746,66 @@ datasets==4.8.4
 
 ---
 
+## Évaluation agents — agent_eval.py
+
+Script de tests de performance pour tous les agents NeoKube, basé sur LLM-as-judge.
+
+- Script : `~/scripts/agent_eval.py`
+- Ré-indexation RAG Neo : `~/scripts/reindex_neo_knowledge.py`
+- LLM judge : `mistral` (via virtual key `LITELLM_MASTER_KEY` de cockpit-secrets)
+- Méthode : chaque agent reçoit son system prompt (Langfuse si disponible, fallback sinon) + 3 scénarios métier. Le juge évalue relevance/qualité/instructions sur 10.
+
+### Commandes
+
+```bash
+# Évaluer tous les agents
+python3 ~/scripts/agent_eval.py
+
+# Agents spécifiques
+python3 ~/scripts/agent_eval.py neo dispatcher nox
+
+# Ré-indexer CLAUDE.md dans Qdrant (après mise à jour CLAUDE.md)
+python3 ~/scripts/reindex_neo_knowledge.py
+
+# Dry run (vérifier les chunks sans indexer)
+python3 ~/scripts/reindex_neo_knowledge.py --dry-run
+```
+
+### Scores de référence (2026-05-06)
+
+| Agent | Score | Modèle | Notes |
+|---|---|---|---|
+| Domi | 9.7/10 | mistral | DNS/domaines, excellent |
+| Penpot | 9.6/10 | mistral | Design scaffolding, excellent |
+| Vera | 9.2/10 | mistral-large | QA review, excellent |
+| Aria | 9.1/10 | codestral | Frontend code gen, excellent |
+| Dispatcher | 10.0/10 | mistral | Après fix prompt Langfuse (was 7.6) |
+| Nox | 8.9/10 | codestral | Après fix prompt Langfuse (was 8.0) |
+| Charlotte | 8.2/10 | mistral | SRE cluster |
+| Leon | 8.2/10 | mistral-large | Chef projet |
+| Neo | 8.5/10 | mistral-large | Après fix RAG + URLs system prompt (was 7.7) |
+
+### Prompts Langfuse enregistrés
+
+| Nom | Agent | Notes |
+|---|---|---|
+| `charlotte-sre` | Charlotte | Surveillance cluster, décisions critiques |
+| `leon-pm` | Leon | Chef de projet, dialogue client |
+| `neo-assistant` | Neo | v2 : ajout URLs NeoKube de référence |
+| `vera-qa` | Vera | QA review, gate qualité |
+| `zoho-project-analyst` | zoho-observer | Analyse projets Zoho |
+| `dispatcher-orchestrator` | Dispatcher | v1 : flux 9 étapes + return_exceptions=True |
+| `nox-backend` | Nox | v1 : contrainte NeoBridge (young-fog-76038471) |
+
+### Résolution automatique des credentials
+
+Le script lit tout depuis K8s (pattern `_kubectl_secret()`) — aucun secret hardcodé :
+- `cluster-manager-secrets` (agent-system) → Langfuse PK/SK
+- `cockpit-secrets` (cockpit) → LITELLM_MASTER_KEY (pour le judge)
+- `litellm-agent-keys` (agent-system) → virtual keys par agent
+
+---
+
 ## Penpot — Gestion des projets et fichiers (agent penpot-agent v3.x)
 
 **Instance** : `penpot` namespace — backend `penpot-backend.penpot.svc.cluster.local:6060`
@@ -901,17 +969,22 @@ Chaque agent a son propre profil LLM, configuré dans son deployment K8s. **Jama
 
 ### Profils LLM actifs (état 2026-05-06)
 
-| Agent | `LLM_MODEL` | `LLM_MODEL_REASONING` | `LLM_FALLBACK` | Justification |
+> **⚠️ TEMPORAIRE (depuis 2026-05-06)** : Charlotte et Penpot sont sur `mistral` (fallback) — compte Anthropic épuisé. Dispatcher et Domi sont sur `mistral` (fallback) — quota Gemini-flash épuisé (réinitialisation quotidienne). Quand les crédits sont restaurés, revenir aux modèles cibles ci-dessous.
+
+| Agent | `LLM_MODEL` actuel | Modèle cible | `LLM_FALLBACK` | Justification |
 |---|---|---|---|---|
-| **Charlotte** SRE | `claude-sonnet` | — | — | Décisions critiques cluster, meilleur raisonnement |
+| **Charlotte** SRE | `mistral` ⚠️ | `claude-sonnet` | — | Décisions critiques cluster, meilleur raisonnement |
 | **Leon** Chef de Projet | `mistral-large-2407` | `mistral-large-2407` | — | Dialogue client, multi-LLM natif selon complexité |
-| **Dispatcher** | `gemini-flash` | — | — | Orchestration pure, pas de génération lourde |
-| **Aria** Frontend | `codestral` | — | — | Génération de code optimisée |
-| **Nox** Backend | `codestral` | — | — | Génération de code optimisée |
-| **Vera** QA | `mistral-large-2407` | — | — | Analyse qualité et raisonnement |
-| **Penpot** Design | `gemini-flash` | — | — | Scaffolding léger |
-| **Domi** Domain Infra | `gemini-flash` | — | — | Opérations déterministes |
-| **Neo** Assistant | `mistral-large-2407` | — | `gemini-flash` | Assistant démo client, fine-tuning futur |
+| **Dispatcher** | `mistral` ⚠️ | `gemini-flash` | — | Orchestration pure, pas de génération lourde |
+| **Aria** Frontend | `codestral` | `codestral` | — | Génération de code optimisée |
+| **Nox** Backend | `codestral` | `codestral` | — | Génération de code optimisée |
+| **Vera** QA | `mistral-large-2407` | `mistral-large-2407` | — | Analyse qualité et raisonnement |
+| **Penpot** Design | `mistral` ⚠️ | `gemini-flash` | — | Scaffolding léger |
+| **Domi** Domain Infra | `mistral` ⚠️ | `gemini-flash` | — | Opérations déterministes |
+| **Neo** Assistant | `mistral-large-2407` | `mistral-large-2407` | `gemini-flash` | Assistant démo client, fine-tuning futur |
+
+> **Restaurer Charlotte + Penpot sur claude-sonnet** : recharger le compte Anthropic → `llm-key-sync` mettra à jour `anthropic-secret` → modifier `LLM_MODEL: "claude-sonnet"` dans `deployment-charlotte.yaml` et `deployment-penpot.yaml` → `kubectl rollout restart`.
+> **Restaurer Dispatcher + Domi sur gemini-flash** : quota Gemini se réinitialise automatiquement chaque jour → modifier `LLM_MODEL: "gemini-flash"` dans les deployments concernés.
 
 ### Règles strictes
 
@@ -933,24 +1006,35 @@ PostgreSQL `litellm-postgres` branché sur LiteLLM (namespace `cockpit`). Une vi
 **R9.6 — Langfuse : toujours `cluster-manager-secrets` depuis `agent-system`**
 `cockpit-secrets` est dans le namespace `cockpit` — inaccessible depuis `agent-system`. Pour `LANGFUSE_PUBLIC_KEY` et `LANGFUSE_SECRET_KEY`, toujours référencer `cluster-manager-secrets` (namespace `agent-system`). Clés Langfuse actives : `secret/neokube/infrastructure/langfuse` dans Vault. Public key : `pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f`. Projet Langfuse unique : `neokube-agents` (id `d869b2aec6ce42eeb2a676d89`).
 
+**R9.7 — Identité complète dans chaque trace Langfuse (mail + scope)**
+Chaque appel LiteLLM doit transporter l'identité complète de l'agent dans `metadata` : nom, email (`@neokube.fr`), périmètre de permissions. Langfuse doit pouvoir filtrer par agent ET afficher son email et ses droits. Voir **[CLAUDE-agents.md](CLAUDE-agents.md)** — §Identité d'agent.
+
 ### Pattern d'appel LLM correct dans le code agent
 
 ```python
-LLM_MODEL        = os.getenv("LLM_MODEL",        "mistral-large-2407")  # défaut = dev seulement
-LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL",  "http://litellm.cockpit.svc.cluster.local:4000")
-LITELLM_API_KEY  = os.getenv("LITELLM_API_KEY",   "")   # virtual key depuis litellm-agent-keys
-LANGFUSE_PK      = os.getenv("LANGFUSE_PUBLIC_KEY","")
-LANGFUSE_SK      = os.getenv("LANGFUSE_SECRET_KEY","")
+AGENT_NAME        = os.getenv("AGENT_NAME",        "nom-agent")
+AGENT_EMAIL       = os.getenv("AGENT_EMAIL",        "nom-agent@neokube.fr")
+PERMISSIONS_SCOPE = os.getenv("PERMISSIONS_SCOPE",  "")
+LLM_MODEL         = os.getenv("LLM_MODEL",          "mistral-large-2407")
+LITELLM_BASE_URL  = os.getenv("LITELLM_BASE_URL",   "http://litellm.cockpit.svc.cluster.local:4000")
+LITELLM_API_KEY   = os.getenv("LITELLM_API_KEY",    "")   # virtual key depuis litellm-agent-keys
+LANGFUSE_PK       = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+LANGFUSE_SK       = os.getenv("LANGFUSE_SECRET_KEY", "")
 
-# Appel avec metadata agent obligatoire (traçabilité Langfuse par user_id)
+# Appel avec identité complète — user_id + email + scope visible dans Langfuse
 response = await httpx.AsyncClient().post(
     f"{LITELLM_BASE_URL}/v1/chat/completions",
     headers={"Authorization": f"Bearer {LITELLM_API_KEY}"},
     json={
         "model": LLM_MODEL,
         "messages": messages,
-        "user": "nom-agent",                           # ← user_id dans Langfuse
-        "metadata": {"agent": "nom-agent", "workflow": "nom-workflow"}
+        "user": AGENT_NAME,                            # ← user_id filtrable dans Langfuse
+        "metadata": {
+            "agent":             AGENT_NAME,
+            "agent_email":       AGENT_EMAIL,          # ← identité mail visible dans trace
+            "permissions_scope": PERMISSIONS_SCOPE,    # ← droits d'accès de l'agent
+            "workflow":          "nom-workflow",
+        }
     }
 )
 ```
@@ -970,10 +1054,12 @@ response = await httpx.AsyncClient().post(
 | `{temporal_ns}` | si agent Temporal, sinon `—` | `dispatcher` ou nouveau |
 | `{llm_model}` | voir §R9 | `mistral-large-2407` |
 | `{budget_eur}` | selon charge prévue | `5` |
+| `{scope}` | périmètre outils | `github+vercel` \| `zoho+qdrant` \| `llm_chat` \| `all` |
 
-**Mettre à jour les deux tables dans CLAUDE.md :**
+**Mettre à jour les trois tables dans CLAUDE.md :**
 - §Architecture agents → ajouter la ligne (Rôle, Runtime, Port, Temporal NS, Status)
 - §R9 → ajouter la ligne (LLM_MODEL, justification)
+- §Identité d'agent dans CLAUDE-agents.md → ajouter la ligne (mail, SA, RBAC, sidecars, Langfuse user_id)
 
 ### 1. ServiceAccount K8s (sécurité — pas de ClusterRoleBinding sauf besoin explicite)
 ```bash
@@ -1059,6 +1145,21 @@ spec:
               name: vault-root-token
               key: root-token
               optional: true
+        # ── Identité agent (R10) ─────────────────────────────────────────────
+        - name: AGENT_NAME
+          value: "{name}"
+        - name: AGENT_EMAIL
+          value: "{name}@neokube.fr"
+        - name: PERMISSIONS_SCOPE
+          value: "{scope}"               # ex: "github+vercel" | "zoho+qdrant" | "llm_chat" | "all"
+        - name: MAIL_FROM
+          value: "{name}@neokube.fr"
+        - name: MAIL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: agent-mail-secrets
+              key: MAIL_PASSWORD_{NAME_UPPER}
+              optional: true
         # ── Agent port ───────────────────────────────────────────────────────
         - name: AGENT_PORT
           value: "{port}"
@@ -1112,16 +1213,18 @@ spec:
 ```python
 import os, httpx
 
-AGENT_NAME       = "{name}"
-LLM_MODEL        = os.getenv("LLM_MODEL",        "mistral-large-2407")
-LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL",  "http://litellm.cockpit.svc.cluster.local:4000")
-LITELLM_API_KEY  = os.getenv("LITELLM_API_KEY",   "")
-LANGFUSE_PK      = os.getenv("LANGFUSE_PUBLIC_KEY","")
-LANGFUSE_SK      = os.getenv("LANGFUSE_SECRET_KEY","")
-VAULT_ADDR       = os.getenv("VAULT_ADDR",        "http://vault.security.svc.cluster.local:8200")
-VAULT_TOKEN      = os.getenv("VAULT_TOKEN",       "")
+AGENT_NAME        = os.getenv("AGENT_NAME",        "{name}")
+AGENT_EMAIL       = os.getenv("AGENT_EMAIL",        "{name}@neokube.fr")
+PERMISSIONS_SCOPE = os.getenv("PERMISSIONS_SCOPE",  "")
+LLM_MODEL         = os.getenv("LLM_MODEL",          "mistral-large-2407")
+LITELLM_BASE_URL  = os.getenv("LITELLM_BASE_URL",   "http://litellm.cockpit.svc.cluster.local:4000")
+LITELLM_API_KEY   = os.getenv("LITELLM_API_KEY",    "")
+LANGFUSE_PK       = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+LANGFUSE_SK       = os.getenv("LANGFUSE_SECRET_KEY", "")
+VAULT_ADDR        = os.getenv("VAULT_ADDR",          "http://vault.security.svc.cluster.local:8200")
+VAULT_TOKEN       = os.getenv("VAULT_TOKEN",         "")
 
-# Appel LLM — user + metadata obligatoires pour traçabilité Langfuse
+# Appel LLM — identité complète dans chaque trace Langfuse (user_id + email + scope)
 async def call_llm(messages: list, workflow: str = "") -> str:
     async with httpx.AsyncClient(timeout=60) as c:
         r = await c.post(
@@ -1130,8 +1233,13 @@ async def call_llm(messages: list, workflow: str = "") -> str:
             json={
                 "model":    LLM_MODEL,
                 "messages": messages,
-                "user":     AGENT_NAME,                          # ← user_id Langfuse
-                "metadata": {"agent": AGENT_NAME, "workflow": workflow}
+                "user":     AGENT_NAME,          # ← user_id Langfuse (filtrable par agent)
+                "metadata": {
+                    "agent":             AGENT_NAME,
+                    "agent_email":       AGENT_EMAIL,
+                    "permissions_scope": PERMISSIONS_SCOPE,
+                    "workflow":          workflow,
+                }
             }
         )
     return r.json()["choices"][0]["message"]["content"]
@@ -1147,8 +1255,94 @@ kubectl apply -f ~/Kubinote-GitOps/apps/agent-system/base/deployment-{name}.yaml
 kubectl apply -f ~/Kubinote-GitOps/apps/agent-system/base/service-{name}.yaml
 
 # Vérification complète
-kubectl exec deploy/{name} -n agent-system -- env | grep -E "LITELLM|LANGFUSE|LLM_MODEL|VAULT"
+kubectl exec deploy/{name} -n agent-system -- env | grep -E "LITELLM|LANGFUSE|LLM_MODEL|VAULT|AGENT_|MAIL_|PERMISSIONS"
 ```
+
+### 8. Synchronisation Langfuse — 3 actions obligatoires
+
+#### 8a. Enregistrer le system prompt dans Langfuse
+
+```bash
+LF_PK="pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f"
+LF_SK=$(kubectl get secret cluster-manager-secrets -n agent-system \
+  -o jsonpath='{.data.LANGFUSE_SECRET_KEY}' | base64 -d)
+
+curl -s -u "$LF_PK:$LF_SK" \
+  -X POST "http://langfuse.neokube.local/api/public/v2/prompts" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "{name}-agent",
+    "type": "text",
+    "prompt": "<system prompt complet de l agent>",
+    "labels": ["production", "latest"],
+    "config": {
+      "agent": "{name}",
+      "permissions_scope": "{scope}",
+      "description": "<rôle en une ligne>"
+    }
+  }'
+```
+
+> Noms de prompts existants : `charlotte-sre`, `leon-pm`, `neo-assistant`, `vera-qa`, `zoho-project-analyst`.
+> Convention : `{name}-{role}` (ex: `felix-ops`).
+
+#### 8b. Ajouter des items au dataset `neokube-evals`
+
+```bash
+# Ajouter 2-3 questions de référence représentatives du rôle de l'agent
+for question in \
+  "Question type 1 pour {name}" \
+  "Question type 2 pour {name}"; do
+  curl -s -u "$LF_PK:$LF_SK" \
+    -X POST "http://langfuse.neokube.local/api/public/dataset-items" \
+    -H "Content-Type: application/json" \
+    -d "{\"datasetName\":\"neokube-evals\",
+         \"input\":{\"question\":\"$question\"},
+         \"metadata\":{\"agent\":\"{name}\",\"category\":\"<catégorie>\"}}"
+done
+```
+
+> Dataset ID : `cmou0e5wo000889pktwct4xhz` — endpoint correct : `POST /api/public/dataset-items` (pas `/datasets/{id}/items`).
+
+#### 8c. Implémenter le scoring dans le code agent
+
+```python
+async def _send_score(trace_name: str, score_name: str, value: float, comment: str = "") -> None:
+    """Envoie un score Langfuse rattaché à une trace par résolution du traceId."""
+    creds = base64.b64encode(f"{LANGFUSE_PK}:{LANGFUSE_SK}".encode()).decode()
+    if not (LANGFUSE_PK and LANGFUSE_SK):
+        return
+    try:
+        async with httpx.AsyncClient(timeout=5) as c:
+            # Résoudre le traceId depuis le trace_name
+            r = await c.get(
+                f"{LANGFUSE_BASE_URL}/api/public/traces",
+                params={"name": trace_name, "limit": 1, "orderBy": "timestamp.DESC"},
+                headers={"Authorization": f"Basic {creds}"},
+            )
+            traces = r.json().get("data", [])
+            if not traces:
+                return
+            trace_id = traces[0]["id"]
+            # Poster le score rattaché
+            await c.post(
+                f"{LANGFUSE_BASE_URL}/api/public/scores",
+                headers={"Authorization": f"Basic {creds}", "Content-Type": "application/json"},
+                content=json.dumps({
+                    "id":       str(uuid.uuid4()),
+                    "traceId":  trace_id,
+                    "name":     score_name,
+                    "value":    value,          # float entre 0.0 et 1.0 recommandé
+                    "comment":  comment,
+                    "dataType": "NUMERIC",
+                    "source":   "API",
+                }).encode(),
+            )
+    except Exception:
+        pass
+```
+
+> **Règle de scoring** : envoyer au moins 1 score par workflow terminal (ex: `quality_score`, `task_success`, `sre_health`). Valeur entre 0.0 (échec) et 1.0 (succès parfait).
 
 ---
 
