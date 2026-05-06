@@ -927,26 +927,97 @@ Neo est l'assistant démo client. Son modèle (`mistral-large-2407`, futur fine-
 **R9.4 — Multi-LLM dans un workflow = variables séparées**
 Si un agent utilise plusieurs LLM dans son process (ex: Leon `LLM_MODEL` + `LLM_MODEL_REASONING`), chaque rôle a sa propre variable d'environnement dans le deployment. Jamais de switch de modèle par logique conditionnelle hardcodée dans le code.
 
-**R9.5 — Virtual keys LiteLLM (à activer quand PostgreSQL ajouté à LiteLLM)**
-Dès qu'un PostgreSQL est branché à LiteLLM, créer une virtual key par agent avec budget mensuel. Stocker dans Vault à `secret/neokube/agents/{name}/litellm_key`. Remplacer `LITELLM_MASTER_KEY` par la virtual key dans chaque deployment. Budget cible : Charlotte 30€, Neo 20€, Leon 10€, autres 5€/mois.
+**R9.5 — Virtual keys LiteLLM — ✅ ACTIF depuis 2026-05-06**
+PostgreSQL `litellm-postgres` branché sur LiteLLM (namespace `cockpit`). Une virtual key par agent, budget mensuel défini, stockée dans Vault `secret/neokube/agents/{name}/llm` (champ `LITELLM_API_KEY`). Secret K8s `litellm-agent-keys` dans `agent-system` — clés `LITELLM_KEY_{AGENT}`. Aucun agent n'utilise plus `LITELLM_MASTER_KEY`.
+
+**R9.6 — Langfuse : toujours `cluster-manager-secrets` depuis `agent-system`**
+`cockpit-secrets` est dans le namespace `cockpit` — inaccessible depuis `agent-system`. Pour `LANGFUSE_PUBLIC_KEY` et `LANGFUSE_SECRET_KEY`, toujours référencer `cluster-manager-secrets` (namespace `agent-system`). Clés Langfuse actives : `secret/neokube/infrastructure/langfuse` dans Vault. Public key : `pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f`. Projet Langfuse unique : `neokube-agents` (id `d869b2aec6ce42eeb2a676d89`).
 
 ### Pattern d'appel LLM correct dans le code agent
 
 ```python
-LLM_MODEL = os.getenv("LLM_MODEL", "mistral-large-2407")  # défaut = valeur de dev seulement
-LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "http://litellm.cockpit.svc.cluster.local:4000")
+LLM_MODEL        = os.getenv("LLM_MODEL",        "mistral-large-2407")  # défaut = dev seulement
+LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL",  "http://litellm.cockpit.svc.cluster.local:4000")
+LITELLM_API_KEY  = os.getenv("LITELLM_API_KEY",   "")   # virtual key depuis litellm-agent-keys
+LANGFUSE_PK      = os.getenv("LANGFUSE_PUBLIC_KEY","")
+LANGFUSE_SK      = os.getenv("LANGFUSE_SECRET_KEY","")
 
-# Appel avec metadata agent obligatoire (traçabilité Langfuse)
+# Appel avec metadata agent obligatoire (traçabilité Langfuse par user_id)
 response = await httpx.AsyncClient().post(
     f"{LITELLM_BASE_URL}/v1/chat/completions",
     headers={"Authorization": f"Bearer {LITELLM_API_KEY}"},
     json={
         "model": LLM_MODEL,
         "messages": messages,
+        "user": "nom-agent",                           # ← user_id dans Langfuse
         "metadata": {"agent": "nom-agent", "workflow": "nom-workflow"}
     }
 )
 ```
+
+---
+
+## Checklist — Intégration d'un nouvel agent NeoKube
+
+> À suivre intégralement pour chaque nouvel agent ajouté dans `agent-system`.
+
+### 1. Choisir le profil LLM (R9)
+- Ajouter une ligne dans le tableau R9 (CLAUDE.md §R9) avec `LLM_MODEL` justifié
+- Choisir parmi : `claude-sonnet` (décisions critiques), `mistral-large-2407` (raisonnement), `codestral` (code), `gemini-flash` (orchestration légère)
+
+### 2. Créer la virtual key LiteLLM
+```bash
+MASTER_KEY="sk-neokube-litellm-master"
+curl -s -X POST http://litellm.neokube.local/key/generate \
+  -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" \
+  -d '{"key_alias":"agent-{name}","metadata":{"agent":"{name}"},"models":["{model}","gemini-flash","nomic-embed-text"],"max_budget":5,"budget_duration":"1mo"}'
+```
+
+### 3. Stocker dans Vault + secret K8s
+```bash
+# Vault
+kubectl exec -n security vault-0 -- vault kv put secret/neokube/agents/{name}/llm \
+  LITELLM_API_KEY="sk-..." LLM_MODEL="{model}" BUDGET_EUR="5"
+
+# Secret K8s litellm-agent-keys (patch)
+kubectl patch secret litellm-agent-keys -n agent-system --type='json' -p='[
+  {"op":"add","path":"/data/LITELLM_KEY_{NAME}","value":"'$(echo -n sk-... | base64 -w0)'"}
+]'
+```
+
+### 4. Deployment K8s — variables obligatoires
+```yaml
+env:
+- name: LITELLM_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: litellm-agent-keys          # ← TOUJOURS litellm-agent-keys
+      key: LITELLM_KEY_{NAME}
+- name: LLM_MODEL
+  value: "{model}"                       # ← JAMAIS de défaut implicite en prod
+- name: LITELLM_BASE_URL
+  value: "http://litellm.cockpit.svc.cluster.local:4000"
+- name: LANGFUSE_PUBLIC_KEY
+  value: "pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f"
+- name: LANGFUSE_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: cluster-manager-secrets     # ← JAMAIS cockpit-secrets (mauvais namespace)
+      key: LANGFUSE_SECRET_KEY
+- name: LANGFUSE_BASE_URL
+  value: "http://langfuse.cockpit.svc.cluster.local:3000"
+```
+
+### 5. Code Python — pattern standard
+- Lire `LLM_MODEL` depuis `os.getenv`
+- Passer `"user": "nom-agent"` dans chaque appel LiteLLM (traçabilité Langfuse)
+- Passer `"metadata": {"agent": "nom-agent", "workflow": "..."}` dans chaque appel
+- Ne jamais lire de clé API externe directement — toujours via Vault ou env var
+
+### 6. Kustomization
+- Ajouter le deployment dans `apps/agent-system/base/kustomization.yaml`
+- Appliquer : `kubectl apply -f deployment-{name}.yaml`
+- Vérifier : `kubectl exec deploy/{name} -n agent-system -- env | grep -E "LITELLM|LANGFUSE|LLM_MODEL"`
 
 ---
 

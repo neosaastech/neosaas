@@ -1,0 +1,259 @@
+## Pièges connus — Anti-patterns à éviter
+
+### 1. Vercel `gitSource.repoId` doit être un `int`
+
+L'API Vercel `/v13/deployments` exige que `repoId` soit un entier (`int`), pas une chaîne.
+Passer `str(link["repoId"])` produit l'erreur `incorrect_git_source_info` sans message clair.
+
+```python
+# FAUX
+body["gitSource"] = {"type": "github", "ref": ref, "repoId": str(link["repoId"])}
+# CORRECT
+body["gitSource"] = {"type": "github", "ref": ref, "repoId": int(link["repoId"])}
+```
+
+Fallback si `repoId` vaut 0 : utiliser `{"org": link["org"], "repo": link["repo"]}`.
+
+---
+
+### 2. `asyncio.gather` dans un workflow Temporal — toujours `return_exceptions=True` pour les activités non-critiques
+
+Sans ce flag, une exception dans **n'importe quelle** activité du gather fait échouer tout le workflow.
+Les activités optionnelles (Penpot, Domi) doivent retourner un `dict` vide en cas d'échec, pas lever.
+
+```python
+_results = await asyncio.gather(
+    workflow.execute_activity(aria_build_frontend, ...),  # critique
+    workflow.execute_activity(nox_build_backend,  ...),  # critique
+    workflow.execute_activity(penpot_create_design, ...), # optionnel
+    workflow.execute_activity(domi_provision_domain, ...), # optionnel
+    return_exceptions=True,
+)
+for _r in _results[:2]:           # re-raise si Aria ou Nox échouent
+    if isinstance(_r, BaseException):
+        raise _r
+penpot_result = _results[2] if not isinstance(_results[2], BaseException) else {}
+domi_result   = _results[3] if not isinstance(_results[3], BaseException) else {}
+```
+
+**Règle** : toute activité dont l'échec ne doit pas bloquer le workflow = activité optionnelle = `return_exceptions=True` + valeur de repli.
+
+---
+
+### 3. Ajouter un champ au ProjectSpec : 3 endroits à synchroniser
+
+Quand un nouveau champ est ajouté au `ProjectSpec` (ex: `domain_mode`, `domain_name`) :
+
+1. **`configmap-leon-script.yaml`** — schéma du tool `dispatch_project` (paramètres JSON Schema)
+2. **`configmap-leon-script.yaml`** — construction du dict `spec` dans `_execute_tool / dispatch_project`
+3. **`configmap-dispatcher-script.yaml`** — `dispatcher_validate_spec` : `spec.setdefault("champ", valeur_défaut)`
+
+Oublier l'un des trois provoque soit un champ absent de la spec (Leon ne l'envoie pas), soit une KeyError côté Dispatcher.
+
+---
+
+### 4. Toute variable `os.getenv()` utilisée en production doit être dans le ConfigMap
+
+Si un agent lit `os.getenv("MA_VAR", "")` pour un mode actif, la variable doit être déclarée dans son `configmap-<agent>-config.yaml`.
+Une valeur vide silencieuse est difficile à déboguer (pas d'erreur au démarrage, comportement incorrect à l'exécution).
+
+Exemple manquant corrigé : `CF_ACCOUNT_ID` dans `configmap-domi-config.yaml` (requis pour le mode `register`).
+
+**Checklist** à appliquer à chaque nouvel agent ou nouveau mode :
+- [ ] Lister tous les `os.getenv()` du script
+- [ ] Vérifier que chacun est présent dans le ConfigMap ou injecté depuis un Secret
+- [ ] Les variables non-optionnelles ne doivent pas avoir de valeur par défaut vide
+
+---
+
+### 5. Les pods ne rechargent pas les ConfigMaps automatiquement
+
+Kubernetes **ne redémarre pas** les pods quand un ConfigMap est modifié (sauf Reloader non installé ici).
+Après tout `kubectl apply` qui modifie un ConfigMap, relancer les pods concernés :
+
+```bash
+kubectl rollout restart deployment/<agent> -n agent-system
+```
+
+Pods à redémarrer systématiquement après modification de leurs scripts :
+| ConfigMap modifié | Deployment à redémarrer |
+|---|---|
+| `configmap-dispatcher-script` | `dispatcher` |
+| `configmap-leon-script` | `leon` |
+| `configmap-aria-script` | `aria` |
+| `configmap-nox-script` | `nox` |
+| `configmap-vera-script` | `vera` |
+| `configmap-domi-script` / `configmap-domi-config` | `domi` |
+| `configmap-penpot-script` | `penpot` |
+| `configmap-sre-script` / `configmap-charlotte-config` | `agent-charlotte` |
+
+### 6. SMTP via Stalwart — service `stalwart-mail`, pas `stalwart-web`
+
+Stalwart expose **deux services** dans le namespace `stalwart` :
+- `stalwart-web.stalwart.svc.cluster.local:8080` → API HTTP admin (stalwart-connector)
+- `stalwart-mail.stalwart.svc.cluster.local:587` → SMTP submission (aiosmtplib)
+
+Utiliser `stalwart-web` pour SMTP provoque un timeout aiosmtplib (`CancelledError` dans `asyncio.wait_for`) car le port 587 n'est pas exposé sur ce service.
+
+```python
+# FAUX — stalwart-web = HTTP admin uniquement
+SMTP_HOST = "stalwart-web.stalwart.svc.cluster.local"
+
+# CORRECT — stalwart-mail = ports SMTP 25/465/587
+SMTP_HOST = "stalwart-mail.stalwart.svc.cluster.local"
+```
+
+Pattern `aiosmtplib` STARTTLS utilisé dans les agents :
+```python
+import aiosmtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+password = await _load_stalwart_password()  # Vault secret/neokube/apps/stalwart.NOREPLY_PASSWORD
+msg = MIMEMultipart("alternative")
+msg["From"] = MAIL_FROM          # no-reply@neokube.fr, leon@neokube.fr, etc.
+msg["To"]   = recipient
+msg["Subject"] = subject
+msg.attach(MIMEText(body_html, "html"))
+await aiosmtplib.send(msg, hostname=SMTP_HOST, port=587, start_tls=True,
+                      username=MAIL_FROM, password=password)
+```
+
+Credentials par agent dans Vault :
+| Agent | Vault path | Clé |
+|---|---|---|
+| Dispatcher | `secret/neokube/apps/stalwart` | `NOREPLY_PASSWORD` |
+| Leon | `secret/neokube/agents/leon` | `SMTP_PASSWORD` |
+| Vera | `secret/neokube/agents/vera` | `SMTP_PASSWORD` |
+| Domi | `secret/neokube/agents/domi` | `SMTP_PASSWORD` |
+
+**Gotcha `validate_certs=False`** : Stalwart utilise un certificat self-signed en interne → `aiosmtplib` lève `CERTIFICATE_VERIFY_FAILED` si `validate_certs` n'est pas `False`. Acceptable pour connexion intra-cluster.
+
+**Gotcha rôle `user`** : Les comptes Stalwart créés via API sans `roles` ne peuvent pas soumettre d'email (550 5.7.1). Tous les comptes agents doivent avoir `roles: ["user"]` :
+```bash
+# Patch via pod curl dans namespace stalwart
+curl -X PATCH http://stalwart-web.stalwart.svc.cluster.local:8080/api/principal/<account> \
+  -u "admin:ADMIN_PASSWORD" -H "Content-Type: application/json" \
+  -d '[{"action":"set","field":"roles","value":["user"]}]'
+```
+
+---
+
+### 7. LiteLLM + HuggingFace router — `_embed()` retourne des scalaires, pas un vecteur
+
+Quand LiteLLM proxifie `nomic-embed-text` vers HuggingFace (`paraphrase-multilingual-mpnet-base-v2`), la réponse `/v1/embeddings` est **non-standard** : le champ `data` contient 768 entrées séparées (une par dimension), chacune avec un `"embedding"` scalar — pas une seule entrée avec un vecteur complet.
+
+`data[0]["embedding"]` vaut donc un `float` (−0.206…), pas une `list[float]`.
+Upserter ce scalar dans Qdrant produit un **HTTP 400**.
+
+```python
+# FAUX — ne fonctionne qu'avec OpenAI/Mistral (format standard)
+return r.json()["data"][0]["embedding"]
+
+# CORRECT — détecte les deux formats
+data = r.json()["data"]
+first = data[0]["embedding"]
+if isinstance(first, list):
+    return first
+return [item["embedding"] for item in data]   # HuggingFace router
+```
+
+Ce pattern doit être appliqué dans **tous** les `_embed()` des agents (dispatcher, charlotte-sre, leon, etc.).
+
+---
+
+### 8. URLs externes : construire côté connector, jamais côté agent
+
+**Symptôme** : Charlotte et Leon généraient des URLs Zoho incorrectes (ex: `#zp/dashboard/{id}`, `/projects/{id}/` sans `#`) parce que chaque agent avait sa propre implémentation de construction d'URL — certaines inventées, toutes désynchronisées.
+
+**Cause racine** : les connectors avaient été conçus comme proxies HTTP fins (Phase 1). La logique de présentation (URLs, labels) s'est accumulée dans les agents au lieu de rester au niveau du connector.
+
+**Règle** : **Toute enrichissement de la réponse d'une API externe appartient au connector, pas à l'agent.**
+
+```python
+# FAUX — chaque agent construit sa propre URL (désynchronisation garantie)
+# configmap-leon-script.yaml
+url = f"https://projects.zoho.com/portal/neomniadotnet#zp/projects/{p['id']}/"
+
+# configmap-sre-script.yaml
+url = f"https://projects.zoho.com/portal/{ZOHO_PORTAL_NAME}#zp/projects/{pid}/"
+
+# CORRECT — le connector injecte web_url dans chaque réponse
+# configmap-zoho-connector.yaml  ← un seul endroit
+p["web_url"] = f"{WEB_BASE}#zp/projects/{pid}/"
+
+# Les agents lisent simplement :
+url = p.get("web_url", "")
+```
+
+**Pattern à appliquer à tout nouveau connector :**
+
+```python
+def _inject_web_urls(path: str, body: dict) -> dict:
+    """Post-processing centralisé : enrichit les réponses avec web_url."""
+    if "projects" in body:
+        for p in body["projects"]:
+            p["web_url"] = f"{WEB_BASE}#zp/projects/{p['id']}/"
+    if "tasks" in body:
+        for t in body["tasks"]:
+            t["web_url"] = t.get("link", {}).get("web", {}).get("url", "")
+    # ... autres ressources
+    return body
+
+# Appelé une seule fois dans /proxy, avant return :
+return _inject_web_urls(req.path, r.json())
+```
+
+**Checklist pour chaque nouveau connector :**
+- [ ] Identifier toutes les URLs web consultables par un humain dans l'API (projets, tâches, tickets, fichiers…)
+- [ ] Ajouter un `_inject_web_urls()` dans le connector dès la v1.0
+- [ ] Les agents ne doivent **jamais** construire d'URL vers l'API externe — ils lisent `item["web_url"]`
+- [ ] Documenter le format d'URL validé dans `CLAUDE.md` et dans la memory `reference_<api>_api.md`
+
+**URLs Zoho validées (2026-05-02) :**
+| Ressource | Format |
+|---|---|
+| Projet | `https://projects.zoho.com/portal/neomniadotnet#zp/projects/{id}/` |
+| Tâche | retournée par l'API dans `link.web.url` (format `#zp/task-detail/{id}`) |
+| Milestone | `#zp/projects/{project_id}/milestones/` |
+| Tasklist | `#zp/projects/{project_id}/tasks/` |
+
+---
+
+
+### 13. Secrets K8s cloisonnés par namespace — `cockpit-secrets` inaccessible depuis `agent-system`
+
+Les secrets K8s sont **scoped par namespace**. Un pod dans `agent-system` ne peut pas lire un secret défini dans `cockpit`.
+
+**Symptôme silencieux :** `optional: true` + mauvais namespace = variable d'environnement vide, aucune erreur au démarrage. Les scores Langfuse et traces directes sont perdus sans log d'erreur.
+
+```yaml
+# FAUX — cockpit-secrets est dans le namespace cockpit, pas agent-system
+- name: LANGFUSE_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: cockpit-secrets        # ← inaccessible depuis agent-system !
+      key: LANGFUSE_SECRET_KEY
+      optional: true               # ← masque l'erreur silencieusement
+
+# CORRECT — cluster-manager-secrets est dans agent-system
+- name: LANGFUSE_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: cluster-manager-secrets
+      key: LANGFUSE_SECRET_KEY
+```
+
+**Secrets par namespace (état 2026-05-06) :**
+| Namespace | Secret | Contenu |
+|---|---|---|
+| `agent-system` | `cluster-manager-secrets` | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LITELLM_MASTER_KEY` |
+| `agent-system` | `litellm-agent-keys` | `LITELLM_KEY_{AGENT}` (virtual keys par agent) |
+| `agent-system` | `vault-root-token` | `root-token` |
+| `cockpit` | `cockpit-secrets` | `MISTRAL_API_KEY`, `GEMINI_API_KEY`, `LANGFUSE_*`, `LITELLM_*`, `LANGFUSE_PG_PASS` |
+| `security` | `vault-init-keys` | `root-token` source |
+| `connector-system` | `vault-root-token` | copie du root-token Vault |
+
+**Règle** : pour tout nouvel agent dans `agent-system`, utiliser exclusivement `cluster-manager-secrets` et `litellm-agent-keys`. Ne jamais référencer `cockpit-secrets`.
+
+---
