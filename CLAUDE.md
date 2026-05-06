@@ -959,65 +959,196 @@ response = await httpx.AsyncClient().post(
 
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
-> À suivre intégralement pour chaque nouvel agent ajouté dans `agent-system`.
+> À suivre intégralement pour chaque nouvel agent ajouté dans `agent-system`. Aucune étape ne peut être sautée.
 
-### 1. Choisir le profil LLM (R9)
-- Ajouter une ligne dans le tableau R9 (CLAUDE.md §R9) avec `LLM_MODEL` justifié
-- Choisir parmi : `claude-sonnet` (décisions critiques), `mistral-large-2407` (raisonnement), `codestral` (code), `gemini-flash` (orchestration légère)
+### 0. Décider les paramètres de base (avant de coder)
 
-### 2. Créer la virtual key LiteLLM
+| Paramètre | Valeurs possibles | Exemple |
+|---|---|---|
+| `{name}` | slug lowercase | `felix` |
+| `{port}` | prochain libre après 8489 | `8491` |
+| `{temporal_ns}` | si agent Temporal, sinon `—` | `dispatcher` ou nouveau |
+| `{llm_model}` | voir §R9 | `mistral-large-2407` |
+| `{budget_eur}` | selon charge prévue | `5` |
+
+**Mettre à jour les deux tables dans CLAUDE.md :**
+- §Architecture agents → ajouter la ligne (Rôle, Runtime, Port, Temporal NS, Status)
+- §R9 → ajouter la ligne (LLM_MODEL, justification)
+
+### 1. ServiceAccount K8s (sécurité — pas de ClusterRoleBinding sauf besoin explicite)
 ```bash
+kubectl create serviceaccount {name}-sa -n agent-system
+# Pas de ClusterRoleBinding par défaut — voir §RBAC agents si accès K8s requis
+```
+
+### 2. Virtual key LiteLLM + Vault + secret K8s
+```bash
+# 2a. Créer la virtual key
 MASTER_KEY="sk-neokube-litellm-master"
-curl -s -X POST http://litellm.neokube.local/key/generate \
+VKEY=$(curl -s -X POST http://litellm.neokube.local/key/generate \
   -H "Authorization: Bearer $MASTER_KEY" -H "Content-Type: application/json" \
-  -d '{"key_alias":"agent-{name}","metadata":{"agent":"{name}"},"models":["{model}","gemini-flash","nomic-embed-text"],"max_budget":5,"budget_duration":"1mo"}'
-```
+  -d "{\"key_alias\":\"agent-{name}\",\"metadata\":{\"agent\":\"{name}\"},\"models\":[\"{llm_model}\",\"gemini-flash\",\"nomic-embed-text\"],\"max_budget\":{budget_eur},\"budget_duration\":\"1mo\"}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
+echo "Virtual key : $VKEY"
 
-### 3. Stocker dans Vault + secret K8s
-```bash
-# Vault
+# 2b. Stocker dans Vault
 kubectl exec -n security vault-0 -- vault kv put secret/neokube/agents/{name}/llm \
-  LITELLM_API_KEY="sk-..." LLM_MODEL="{model}" BUDGET_EUR="5"
+  LITELLM_API_KEY="$VKEY" LLM_MODEL="{llm_model}" BUDGET_EUR="{budget_eur}"
 
-# Secret K8s litellm-agent-keys (patch)
-kubectl patch secret litellm-agent-keys -n agent-system --type='json' -p='[
-  {"op":"add","path":"/data/LITELLM_KEY_{NAME}","value":"'$(echo -n sk-... | base64 -w0)'"}
-]'
+# 2c. Ajouter au secret K8s litellm-agent-keys
+kubectl patch secret litellm-agent-keys -n agent-system --type='json' -p="[
+  {\"op\":\"add\",\"path\":\"/data/LITELLM_KEY_{NAME_UPPER}\",\"value\":\"$(echo -n $VKEY | base64 -w0)\"}
+]"
 ```
 
-### 4. Deployment K8s — variables obligatoires
+### 3. Deployment K8s — template complet
+
 ```yaml
-env:
-- name: LITELLM_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: litellm-agent-keys          # ← TOUJOURS litellm-agent-keys
-      key: LITELLM_KEY_{NAME}
-- name: LLM_MODEL
-  value: "{model}"                       # ← JAMAIS de défaut implicite en prod
-- name: LITELLM_BASE_URL
-  value: "http://litellm.cockpit.svc.cluster.local:4000"
-- name: LANGFUSE_PUBLIC_KEY
-  value: "pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f"
-- name: LANGFUSE_SECRET_KEY
-  valueFrom:
-    secretKeyRef:
-      name: cluster-manager-secrets     # ← JAMAIS cockpit-secrets (mauvais namespace)
-      key: LANGFUSE_SECRET_KEY
-- name: LANGFUSE_BASE_URL
-  value: "http://langfuse.cockpit.svc.cluster.local:3000"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {name}
+  namespace: agent-system
+  labels:
+    app: {name}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {name}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {name}
+    spec:
+      serviceAccountName: {name}-sa
+      nodeSelector:
+        kubernetes.io/hostname: kubinote
+      containers:
+      - name: {name}
+        image: python:3.12-slim
+        env:
+        # ── LLM (R9) ────────────────────────────────────────────────────────
+        - name: LITELLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: litellm-agent-keys      # TOUJOURS litellm-agent-keys
+              key: LITELLM_KEY_{NAME_UPPER}
+        - name: LLM_MODEL
+          value: "{llm_model}"              # JAMAIS de défaut implicite en prod
+        - name: LITELLM_BASE_URL
+          value: "http://litellm.cockpit.svc.cluster.local:4000"
+        # ── Langfuse (R9.6) ─────────────────────────────────────────────────
+        - name: LANGFUSE_PUBLIC_KEY
+          value: "pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f"
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cluster-manager-secrets # JAMAIS cockpit-secrets (mauvais namespace)
+              key: LANGFUSE_SECRET_KEY
+        - name: LANGFUSE_BASE_URL
+          value: "http://langfuse.cockpit.svc.cluster.local:3000"
+        # ── Vault ────────────────────────────────────────────────────────────
+        - name: VAULT_ADDR
+          value: "http://vault.security.svc.cluster.local:8200"
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: vault-root-token
+              key: root-token
+              optional: true
+        # ── Agent port ───────────────────────────────────────────────────────
+        - name: AGENT_PORT
+          value: "{port}"
+        ports:
+        - containerPort: {port}
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {port}
+          initialDelaySeconds: 120
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {port}
+          initialDelaySeconds: 90
+          periodSeconds: 15
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
 ```
 
-### 5. Code Python — pattern standard
-- Lire `LLM_MODEL` depuis `os.getenv`
-- Passer `"user": "nom-agent"` dans chaque appel LiteLLM (traçabilité Langfuse)
-- Passer `"metadata": {"agent": "nom-agent", "workflow": "..."}` dans chaque appel
-- Ne jamais lire de clé API externe directement — toujours via Vault ou env var
+### 4. Service K8s
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {name}
+  namespace: agent-system
+spec:
+  selector:
+    app: {name}
+  ports:
+  - port: {port}
+    targetPort: {port}
+```
 
-### 6. Kustomization
-- Ajouter le deployment dans `apps/agent-system/base/kustomization.yaml`
-- Appliquer : `kubectl apply -f deployment-{name}.yaml`
-- Vérifier : `kubectl exec deploy/{name} -n agent-system -- env | grep -E "LITELLM|LANGFUSE|LLM_MODEL"`
+### 5. Namespace Temporal (si agent Temporal uniquement)
+```bash
+# Créer le namespace Temporal (idempotent via cluster-bootstrap)
+# Ajouter dans apps/agent-system/base/configmap-temporal-namespaces.yaml :
+# - name: {name}, retention: 7d
+```
+
+### 6. Code Python — pattern standard obligatoire
+```python
+import os, httpx
+
+AGENT_NAME       = "{name}"
+LLM_MODEL        = os.getenv("LLM_MODEL",        "mistral-large-2407")
+LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL",  "http://litellm.cockpit.svc.cluster.local:4000")
+LITELLM_API_KEY  = os.getenv("LITELLM_API_KEY",   "")
+LANGFUSE_PK      = os.getenv("LANGFUSE_PUBLIC_KEY","")
+LANGFUSE_SK      = os.getenv("LANGFUSE_SECRET_KEY","")
+VAULT_ADDR       = os.getenv("VAULT_ADDR",        "http://vault.security.svc.cluster.local:8200")
+VAULT_TOKEN      = os.getenv("VAULT_TOKEN",       "")
+
+# Appel LLM — user + metadata obligatoires pour traçabilité Langfuse
+async def call_llm(messages: list, workflow: str = "") -> str:
+    async with httpx.AsyncClient(timeout=60) as c:
+        r = await c.post(
+            f"{LITELLM_BASE_URL}/v1/chat/completions",
+            headers={"Authorization": f"Bearer {LITELLM_API_KEY}"},
+            json={
+                "model":    LLM_MODEL,
+                "messages": messages,
+                "user":     AGENT_NAME,                          # ← user_id Langfuse
+                "metadata": {"agent": AGENT_NAME, "workflow": workflow}
+            }
+        )
+    return r.json()["choices"][0]["message"]["content"]
+```
+
+### 7. Kustomization + déploiement
+```bash
+# Ajouter dans apps/agent-system/base/kustomization.yaml :
+#   - deployment-{name}.yaml
+#   - service-{name}.yaml
+
+kubectl apply -f ~/Kubinote-GitOps/apps/agent-system/base/deployment-{name}.yaml
+kubectl apply -f ~/Kubinote-GitOps/apps/agent-system/base/service-{name}.yaml
+
+# Vérification complète
+kubectl exec deploy/{name} -n agent-system -- env | grep -E "LITELLM|LANGFUSE|LLM_MODEL|VAULT"
+```
 
 ---
 
