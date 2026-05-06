@@ -804,6 +804,50 @@ Le script lit tout depuis K8s (pattern `_kubectl_secret()`) — aucun secret har
 - `cockpit-secrets` (cockpit) → LITELLM_MASTER_KEY (pour le judge)
 - `litellm-agent-keys` (agent-system) → virtual keys par agent
 
+### Tags Langfuse — usage par projet/contexte
+
+Les traces envoyées par `agent_eval.py` portent des tags dans `metadata.tags` :
+```python
+"tags": [f"agent:{agent_name}", "eval", "neokube-evals"]
+```
+En production, les agents peuvent taguer leurs traces par contexte :
+- `"project:{zoho_project_id}"` → filtrer toutes les traces d'un projet client
+- `"workflow:dev-project"` → voir toutes les étapes d'un DevProjectWorkflow
+- `"eval"` → distinguer les tests automatiques des appels réels
+- `"emergency"` → marquer les décisions critiques de Charlotte
+
+Dans Langfuse UI : **Traces** → filtre par `Tags contains "project:xxx"` → tous les appels LLM de ce projet dans l'ordre chronologique.
+
+### Architecture scoring continu — roadmap
+
+**État actuel (2026-05-06) :**
+- Charlotte envoie déjà `sre_push_langfuse_score` (health_score + severity) dans Langfuse après chaque analyse cluster
+- Dispatcher envoie déjà des notifs ntfy (deployed / blocked / failed) via `dispatcher_ntfy_notify`
+- `agent_eval.py` envoie des scores LLM-as-judge ponctuels (manuel)
+
+**À implémenter (P2) — CronJob eval automatique :**
+```yaml
+# CronJob agent-eval-nightly — management namespace, schedule 0 2 * * *
+# Lance python3 ~/scripts/agent_eval.py sur tous les agents
+# Si score moyen < 7.5 → alerte ntfy priority=urgent + tag "degradation"
+```
+
+**À implémenter (P2) — Workflow eval score dans Dispatcher :**
+```python
+# En fin de DevProjectWorkflow : envoyer un score global basé sur les résultats
+workflow_score = 1.0 if not errors else (0.5 if partial else 0.0)
+await workflow.execute_activity(sre_push_langfuse_score, ...)
+```
+
+**À implémenter (P2) — Charlotte intervention automatique :**
+Charlotte reçoit déjà des signaux sur la santé du cluster. On peut ajouter :
+1. Charlotte poll Langfuse `/api/public/scores?name=agent_eval&limit=50`
+2. Si score d'un agent < 7.0 sur les 3 dernières exécutions → analyse + ntfy urgent
+3. Si la cause est un problème de modèle LLM (quota épuisé) → Charlotte déclenche `llm-key-sync` via admin-sys
+4. Si la cause est un prompt dégradé → Charlotte alerte Charles avec le contexte Langfuse
+
+Voir §Architecture agents → Charlotte pour le pattern d'intervention.
+
 ---
 
 ## Penpot — Gestion des projets et fichiers (agent penpot-agent v3.x)
@@ -1348,5 +1392,5 @@ async def _send_score(trace_name: str, score_name: str, value: float, comment: s
 
 ## Historique des actions Claude
 
-Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 60 entrées, 2026-03-15 → 2026-05-05.
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 67 entrées, 2026-03-15 → 2026-05-06.
 Toutes les phases de sécurité (0–3) et capacités (4a–10d) sont ✅ terminées.
