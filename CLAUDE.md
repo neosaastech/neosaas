@@ -319,7 +319,7 @@ for sub in ['chat','headlamp','temporal','langfuse','webmail','mailhub','design'
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, réception ProjectSpec | Temporal | 8383 | `sre-charlotte` | active v3.0 |
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E (scan+remédiation+eval watch) | Temporal | 8383 | `sre-charlotte` | active v3.11 |
 | **Leon** | Chef de Projet — qualification brief, émission ProjectSpec, Zoho, dispatch | Temporal | 8181 | `leon` | active v2.0 |
 | **Dispatcher** | Orchestre DevProjectWorkflow — validate→Aria+Nox+Penpot→Vera→approval→deploy→mail | Temporal | 8484 | `dispatcher` | active v1.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel project | Temporal | 8485 | `dispatcher` | active v1.0 |
@@ -396,6 +396,20 @@ Brief (Slack #produit / Open WebUI)
 - `neomnia/template-fastapi` — FastAPI + asyncpg + Dockerfile + `.env.example`
 
 **Neon — contrainte org** : `POST /projects` bloqué (org managed by Vercel). Nox utilise le projet existant **NeoBridge** (`young-fog-76038471`) et crée une branche dédiée par projet (`POST /projects/{id}/branches`). Résultat : `neon_branch_id` + `neon_endpoint_host`.
+
+### Charlotte SRE — Architecture interne (v3.11)
+
+`SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (défaut 300s) via un Temporal Schedule.
+
+| Bloc | Étapes | Activités clés |
+|---|---|---|
+| **A — Scan** | 1. Temporal failures · 2. Pod health · 3. Backup status · 4. LLM key status · 5. Vectorisation | `sre_scan_temporal_failures`, `sre_scan_pod_health`, `sre_verify_backup`, `sre_check_llm_key_status` |
+| **B — Remédiation** | 6. Auto-restart agents CrashLoop | `sre_auto_restart_agents` |
+| **C — LLM** | 7. Analyse LLM (diagnostic + sévérité) · score Langfuse `cluster_health_score` | `sre_analyze_with_llm`, `sre_push_langfuse_score` |
+| **D — Reporting** | 8. Matrice agents · 9. ntfy si severity critical/warning | `sre_agent_health_matrix`, `sre_ntfy_notify` |
+| **E — Eval Watch** | 10. Poll scores Langfuse (1 cycle sur `EVAL_WATCH_EVERY_N`=6) → ntfy + llm-key-sync si dégradation | `sre_check_eval_scores` |
+
+Variables d'environnement importantes : `SRE_SCAN_INTERVAL_S` (300), `EVAL_WATCH_EVERY_N` (6), `EVAL_SCORE_THRESHOLD` (7.0), `LLM_ANALYZE_EVERY_N` (1).
 
 ### Flux Leon → Charlotte (SRE)
 
@@ -776,21 +790,55 @@ python3 ~/scripts/reindex_neo_knowledge.py --dry-run
 
 | Agent | Score | Modèle | Notes |
 |---|---|---|---|
+**Scores `agent_eval.py` (scénarios interactifs, 2026-05-06) :**
+
+| Agent | Score | Modèle | Notes |
+|---|---|---|---|
 | Domi | 9.7/10 | mistral | DNS/domaines, excellent |
 | Penpot | 9.6/10 | mistral | Design scaffolding, excellent |
 | Vera | 9.2/10 | mistral-large | QA review, excellent |
 | Aria | 9.1/10 | codestral | Frontend code gen, excellent |
 | Dispatcher | 10.0/10 | mistral | Après fix prompt Langfuse (was 7.6) |
 | Nox | 8.9/10 | codestral | Après fix prompt Langfuse (was 8.0) |
-| Charlotte | 8.2/10 | mistral | SRE cluster |
+| Charlotte | 9.17/10 | mistral | Après fix namespaces + R9/Bloc E dans system prompt (was 8.2) |
 | Leon | 8.2/10 | mistral-large | Chef projet |
 | Neo | 8.5/10 | mistral-large | Après fix RAG + URLs system prompt (was 7.7) |
+
+**Scores `agent-eval-nightly` CronJob (scénarios opérationnels réels, premier run 2026-05-06) :**
+
+| Agent | Score | Notes |
+|---|---|---|
+| Dispatcher | 8.3/10 | Stable |
+| Vera | 7.7/10 | Stable |
+| Aria | 7.2/10 | ⚠️ sous seuil 7.5 |
+| Penpot | 6.8/10 | ⚠️ questions soft-delete + URL |
+| Nox | 6.7/10 | ⚠️ NeoBridge partiel sur scénarios étendus |
+| Leon | 6.4/10 | ⚠️ domain_mode + ProjectSpec avancé |
+| Charlotte | 6.3/10 → 9.17/10 | ✅ Fix namespaces v2 + R9/Bloc E — voir éval manuelle ci-dessous |
+| Domi | 6.2/10 | ⚠️ domi_link_vercel_domain + renouvellement |
+| Neo | 4.0/10 | ⚠️ judge_error sur scénario 2, URL OK (9/10) |
+
+> Les scores CronJob sont plus bas car les scénarios testent des connaissances opérationnelles précises (pas de prompts simplifiés). C'est la **base de référence réaliste**. Objectif : tous > 7.5 après amélioration des prompts.
+
+**Évaluation manuelle Charlotte (6 scénarios SRE, 2026-05-06) :**
+
+| Scénario | Score | Verdict |
+|---|---|---|
+| OOMKill LiteLLM (cockpit) | 9.33/10 | ✅ |
+| Agents Running non Ready | 9.33/10 | ✅ |
+| Quota Anthropic épuisé | 8.67/10 | ✅ (gap: R9 fallback non cité) |
+| CronJob backup kubectl not found | 9.33/10 | ✅ |
+| sre_check_eval_scores — agents dégradés | 8.67/10 | ✅ (gap: Bloc E comportement) |
+| ntfy auth.db vide | 9.67/10 | ✅ |
+| **Global** | **9.17/10** | **✅ post-fix v2** |
+
+> Gaps identifiés (corrigés dans v2) : namespaces `agent-ops`→`agent-system`, `open-webui`→`interfaces`, `vault`→`security` ; absence R9 governance table ; Bloc E non défini.
 
 ### Prompts Langfuse enregistrés
 
 | Nom | Agent | Notes |
 |---|---|---|
-| `charlotte-sre` | Charlotte | Surveillance cluster, décisions critiques |
+| `charlotte-sre` | Charlotte | v2 : namespaces corrects + admin-sys + R9 governance + Bloc E |
 | `leon-pm` | Leon | Chef de projet, dialogue client |
 | `neo-assistant` | Neo | v2 : ajout URLs NeoKube de référence |
 | `vera-qa` | Vera | QA review, gate qualité |
