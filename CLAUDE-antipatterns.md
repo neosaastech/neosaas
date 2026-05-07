@@ -257,3 +257,89 @@ Les secrets K8s sont **scoped par namespace**. Un pod dans `agent-system` ne peu
 **Règle** : pour tout nouvel agent dans `agent-system`, utiliser exclusivement `cluster-manager-secrets` et `litellm-agent-keys`. Ne jamais référencer `cockpit-secrets`.
 
 ---
+
+### 14. Heap limit (Node.js / JVM) ≠ OOMKilled (cgroup) — augmenter `limits.memory` ne suffit PAS
+
+Symptôme observé sur `surfsense-zero-cache` (rocicorp/zero, Node.js) : `CrashLoopBackOff` avec dans les logs :
+```
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+```
+
+`kubectl describe pod` ne montre **PAS** `OOMKilled` ni `Exit Code 137` — le conteneur sort proprement parce que c'est V8 qui tue le process, pas le cgroup Linux.
+
+**Diagnostic différencié** :
+| Symptôme | Cause | Fix |
+|---|---|---|
+| `Reason: OOMKilled` + `Exit Code: 137` | Linux cgroup | Augmenter `resources.limits.memory` |
+| Logs `FATAL ERROR: Reached heap limit` | V8 (Node.js) plafonné à ~1.7 Gi par défaut | `env: NODE_OPTIONS=--max-old-space-size=<MB>` |
+| Logs `java.lang.OutOfMemoryError: Java heap space` | JVM `-Xmx` trop bas | `env: JAVA_OPTS=-Xmx<size>` |
+| Logs Python `MemoryError` sans OOMKilled | Code applicatif | Profiler le code, pas un fix infra |
+
+**Erreur classique** (qu'a fait Charlotte initialement avant durcissement) : voir CrashLoopBackOff → augmenter `limits.memory` de 4Gi à 8Gi → rollout réussi → ❌ le nouveau pod re-crashe immédiatement avec le même `FATAL ERROR` parce que V8 reste plafonné.
+
+**Fix correct** appliqué dans `deployment-surfsense-zero-cache.yaml` (commit `af3db45`, 2026-05-07) :
+```yaml
+env:
+- name: NODE_OPTIONS
+  value: "--max-old-space-size=10240"  # 10 Gi heap V8
+resources:
+  requests: {memory: 2Gi}
+  limits:   {memory: 12Gi}            # headroom au-dessus du heap
+```
+
+**Attention surfsense-zero-cache spécifiquement** : rocicorp/zero 0.26.x démarre 2 sous-process Node.js indépendants (`syncer` + `change-streamer`), chacun avec son propre heap. 6 Gi crashait encore le change-streamer. **10 Gi tient** avec `replicaSize` ~130 MB. Re-évaluer si la base SurfSense grossit.
+
+**Règle** : avant tout fix OOM, lire ≥ 50 lignes de logs du pod défaillant et chercher `FATAL`, `OutOfMemory`, `heap`. Si présent → c'est un heap limit applicatif, pas un OOM cgroup.
+
+---
+
+### 15. Patcher uniquement le live (kubectl patch) sur ressource GitOps = fix reverté en <5 min
+
+Le CronJob `cluster-bootstrap` (namespace `management`, `*/5 * * * *`) ré-applique `~/Kubinote-GitOps/` toutes les 5 min via `kubectl apply`. Toute modification d'un Deployment/ConfigMap géré GitOps faite par `kubectl patch`, `kubectl set image`, `kubectl scale` (sans modifier le repo) sera **écrasée silencieusement** au prochain tick.
+
+**Procédure correcte** pour modifier une ressource GitOps :
+1. Lire le manifest dans `~/Kubinote-GitOps/apps/<service>/base/<manifest>.yaml`
+2. Modifier le fichier
+3. `kubectl apply -f <fichier>` (immédiat, ne pas attendre le CronJob)
+4. **Vérifier le pod sain ≥30s** (pas seulement le rollout)
+5. **`git commit && git push`** — sans cette étape, le fix sera reverté au prochain sync
+
+**Pourquoi ce pattern échoue en pratique** : un crash serveur, un timeout réseau ou une session fermée entre l'étape 4 et l'étape 5 laisse le cluster dans un état dégradé où le live est fixé mais le repo ne l'est pas. Au prochain tick CronJob, le fix disparaît silencieusement.
+
+**Workflow Charlotte SRE** : utiliser `apply_gitops_fix` (atomique) qui garantit que le push ne peut pas être oublié. Voir [CLAUDE-agents.md](CLAUDE-agents.md#charlotte-sre--protocole-de-remédiation-sécurisé) pour le détail.
+
+---
+
+### 16. Validation post-rollout : `kubectl get pod <ancien-nom>` retourne toujours NotFound
+
+Après `kubectl rollout`, `kubectl scale`, `kubectl apply` sur un Deployment, le **nom du pod change** (nouveau ReplicaSet). Vérifier le fix via `kubectl get pod <ancien-nom>` retourne `NotFound` — ce qui prouve **uniquement** que le pod a été remplacé, pas que le nouveau pod est sain.
+
+**Faux positif typique** :
+```
+$ kubectl rollout status deployment/foo
+deployment "foo" successfully rolled out         # ✓
+$ kubectl get pod foo-old-abc-xyz
+Error: pods "foo-old-abc-xyz" not found          # ✗ ne prouve rien
+```
+→ Le nouveau pod (`foo-new-def-uvw`) peut être en CrashLoopBackOff au moment même de cette vérification.
+
+**Validation correcte** :
+```bash
+# Sélection par label (suit le ReplicaSet courant)
+kubectl get pods -n <ns> -l app=<deployment> -o wide
+
+# Attendre ≥30s sans nouveau restart
+for i in $(seq 1 6); do
+  kubectl get pods -n <ns> -l app=<deployment> -o jsonpath='{.items[*].status.containerStatuses[*].restartCount}'
+  sleep 5
+done
+
+# Lire les logs du nouveau pod (pas l'ancien)
+kubectl logs -n <ns> -l app=<deployment> --tail=50
+```
+
+**Pour Charlotte** : `apply_gitops_fix` appelle `verify_pod_healthy` en interne. Pour les restarts seuls (sans modification de manifest), utiliser `verify_pod_healthy(deployment, namespace, stable_seconds=30)` directement — il sélectionne par label `app=<deployment>` et remonte les logs des pods défaillants.
+
+**Note label Charlotte elle-même** : le label `app=agent-charlotte` ne sélectionne aucun pod (`kubectl get pods -n agent-system -l app=agent-charlotte` → `No resources found`). Pour trouver le pod Charlotte : `kubectl get pods -n agent-system | grep charlotte`.
+
+---
