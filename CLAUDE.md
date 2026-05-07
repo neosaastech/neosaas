@@ -265,6 +265,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 16 | Validation par ancien nom de pod | `kubectl get pod <ancien-nom>` retourne `NotFound` après rollout — ne prouve rien. Utiliser `-l app=<deployment>` ou `verify_pod_healthy` (Charlotte). |
 | 17 | ConfigMap `sre-script` trop grand | `kubectl apply` échoue sur `sre-script` (annotation >262Ko). Utiliser `kubectl replace -f`. Le CronJob `cluster-bootstrap` (kustomize) ne souffre pas de ce problème. |
 | 18 | Label `app=agent-charlotte` inexistant | `-l app=agent-charlotte` retourne 0 pods. Pour trouver Charlotte : `kubectl get pods -n agent-system \| grep charlotte`. |
+| 19 | Mots-clés SRE dans salutations + contexte OWU | Noms d'agents dans `_SRE_KW` → "bonjour charlotte" déclenche le loop. OWU ajoute "#### Code Interpreter..." après le message. Fix : `message.split('\n')[0][:200].lower()` + retirer les noms propres du set. |
+| 20 | System prompt SRE dans chemin conversationnel | `_llm_call(messages)` avec system SRE → Mistral répond "je vérifie le cluster" même pour "bonjour". Fix : remplacer le system message par un prompt léger dans `_conv_messages`. |
 
 ---
 

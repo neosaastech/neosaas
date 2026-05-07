@@ -577,7 +577,45 @@ livenessProbe:  {initialDelaySeconds: 60, failureThreshold: 3}
 readinessProbe: {initialDelaySeconds: 30, failureThreshold: 10}
 ```
 
-**Ce qui a empêché le push initial :** le serveur neokube-beta a crashé après `kubectl apply` mais avant `git_push`. Le pod vivait avec le fix en live, mais le repo pointait vers l'ancienne config — cluster-bootstrap allait reverter. → C'est la raison d'être de `apply_gitops_fix` : rendre le push impossible à oublier.
+**Ce qui a empêché le push initial :** le serveur neokube-beta a crashé après `kubectl apply` mais avant `git_push`. Le pod vivait avec le fix en live, mais le repo pointait vers l'ancienne config — cluster-bootstrap allait reverter. → C'est la raison d'être de `apply_gitops_fix` : rendre le push impossible à oublié.
+
+### Chemin conversationnel Charlotte (2026-05-07)
+
+Charlotte distingue les messages conversationnels des requêtes SRE **avant** d'entrer dans le loop ReAct.
+
+**Détection (endpoint `/mission`) :**
+```python
+_SRE_KW = {
+    "pod","cluster","kubectl","namespace","deploy","restart","crash","error","down",
+    "alert","logs","log","agent",
+    "surfsense","qdrant","vault","stalwart","litellm","langfuse","temporal","gitops",
+    "penpot","zoho","github","vercel","neon","dns","cloudflare","ingress","traefik",
+    "cpu","mem","memory","oom","oomkill","évén","event","incident","remediat",
+    "backup","sync","cron","job","scan","health","check","verify","fix","patch",
+    "notion","dataforseo","seo","crawl","scrape","email","mail","smtp","imap",
+}
+# Première ligne uniquement — OWU ajoute "#### Code Interpreter\n..." après le message réel
+_msg_lower = message.split('\n')[0][:200].lower()
+_is_conversational = not any(kw in _msg_lower for kw in _SRE_KW)
+```
+
+**Règles de construction du set `_SRE_KW` :**
+- PAS de noms propres ni de prénoms (`"charlotte"`, `"leo"`, `"neo"`, etc.) — ils apparaissent dans les salutations
+- PAS de mots ambigus courts (`"log"` seul OK, mais `"le"`, `"un"` non)
+- Tronquer à la première ligne pour ignorer le contexte que OWU injecte après le message
+
+**Réponse conversationnelle (system prompt léger) :**
+```python
+_conv_messages = [
+    {"role": "system", "content": (
+        "Tu es Charlotte, assistante IA de l'équipe NeoKube. "
+        "Réponds de façon amicale, concise et naturelle. "
+        "Si l'utilisateur mentionne un incident ou un problème cluster, dis-lui de préciser."
+    )},
+] + [m for m in messages if m.get("role") != "system"]
+_conv_resp = await _llm_call(_conv_messages, temperature=0.5, max_tokens=256, ...)
+```
+Ne jamais passer le system prompt SRE complet dans ce chemin — le LLM l'absorbe et tente d'agir en SRE même sans outils.
 
 ---
 

@@ -343,3 +343,61 @@ kubectl logs -n <ns> -l app=<deployment> --tail=50
 **Note label Charlotte elle-même** : le label `app=agent-charlotte` ne sélectionne aucun pod (`kubectl get pods -n agent-system -l app=agent-charlotte` → `No resources found`). Pour trouver le pod Charlotte : `kubectl get pods -n agent-system | grep charlotte`.
 
 ---
+
+### 19. Charlotte — mots-clés SRE dans les salutations + contexte Code Interpreter OWU
+
+**Symptôme** : "bonjour charlotte" déclenche le loop ReAct complet (8 tours, `list_cluster_state`, etc.) au lieu d'une réponse amicale directe.
+
+**Cause 1 — noms d'agents dans `_SRE_KW`**
+Les noms comme `"charlotte"`, `"leon"`, `"nox"`, etc. figuraient dans le set de mots-clés SRE. "bonjour charlotte" → `_is_conversational = False` → loop complet.
+
+**Cause 2 — Open WebUI ajoute du contexte après le message utilisateur**
+OWU injecte un bloc système après le message réel :
+```
+bonjour charlotte
+#### Code Interpreter
+You have access to python3...
+```
+`message.lower()` portait sur l'intégralité du texte — des mots comme `"check"`, `"deploy"`, `"scan"` dans ce contexte OWU pouvaient fausser la détection même pour un simple "bonjour".
+
+**Fix** :
+```python
+# FAUX
+_msg_lower = message.lower()
+_is_conversational = not any(kw in _msg_lower for kw in _SRE_KW)
+
+# CORRECT — première ligne seulement + noms d'agents hors du set
+_msg_lower = message.split('\n')[0][:200].lower()
+_is_conversational = not any(kw in _msg_lower for kw in _SRE_KW)
+# Et dans _SRE_KW : PAS de "charlotte", "leon", "aria", "nox", "vera", "domi", "neo"
+```
+
+**Règle générale** : ne jamais inclure de noms propres ou prénoms dans un set de mots-clés technique. Toujours tronquer l'entrée utilisateur à la première ligne quand OWU est impliqué.
+
+---
+
+### 20. Charlotte — system prompt SRE dans le chemin conversationnel
+
+**Symptôme** : la détection `_is_conversational` fonctionne (steps=0) mais Mistral répond quand même "Je vais vérifier l'état du cluster NeoKube" à "bonjour".
+
+**Cause** : le chemin conversationnel passait la liste complète `messages` (incluant le system prompt SRE de 4000+ tokens) à `_llm_call`. Mistral, se croyant agent SRE, répondait en mode SRE même sans outils.
+
+**Fix** : remplacer le system message par un prompt léger pour le chemin conversationnel uniquement :
+```python
+# FAUX
+_conv_resp = await _llm_call(messages, ...)  # messages contient le system prompt SRE
+
+# CORRECT
+_conv_messages = [
+    {"role": "system", "content": (
+        "Tu es Charlotte, assistante IA de l'équipe NeoKube. "
+        "Réponds de façon amicale, concise et naturelle. "
+        "Si l'utilisateur mentionne un incident ou un problème cluster, dis-lui de préciser."
+    )},
+] + [m for m in messages if m.get("role") != "system"]
+_conv_resp = await _llm_call(_conv_messages, temperature=0.5, max_tokens=256, ...)
+```
+
+**Règle** : le system prompt d'un agent SRE/outil ne doit jamais être utilisé pour des réponses conversationnelles libres — le modèle en absorbe le contexte et tente d'agir en conséquence même sans tools.
+
+---
