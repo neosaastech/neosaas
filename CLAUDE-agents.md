@@ -761,6 +761,10 @@ spec:
               name: vault-root-token
               key: root-token
               optional: true
+        - name: OPENWEBUI_URL
+          value: "http://open-webui.interfaces.svc.cluster.local:8080"
+        - name: VAULT_OPENWEBUI
+          value: "secret/data/neokube/infrastructure/openwebui"
         - name: AGENT_NAME
           value: "{name}"
         - name: AGENT_EMAIL
@@ -860,6 +864,100 @@ async def call_llm(messages: list, workflow: str = "") -> str:
         )
     return r.json()["choices"][0]["message"]["content"]
 ```
+
+### 6b. Open WebUI — auto-enregistrement (obligatoire)
+
+> Chaque nouvel agent DOIT s'enregistrer dans Open WebUI au démarrage. Référence canonique : **neo.py v1.2** (Charlotte utilise le même pattern).
+
+**Variables requises dans le ConfigMap** (déjà incluses dans le template §3 ci-dessus) :
+```yaml
+OPENWEBUI_URL: "http://open-webui.interfaces.svc.cluster.local:8080"
+VAULT_OPENWEBUI: "secret/data/neokube/infrastructure/openwebui"
+VAULT_ADDR: "http://vault.security.svc.cluster.local:8200"
+```
+
+**Endpoint `/v1/models` à ajouter au FastAPI** (requis pour la découverte OWU) :
+```python
+@app.get("/v1/models")
+async def list_models():
+    return {"object": "list", "data": [{
+        "id": AGENT_NAME, "object": "model",
+        "created": 1700000000, "owned_by": "neokube",
+        "name": f"{AGENT_NAME.capitalize()} — Agent NeoKube"
+    }]}
+```
+
+**Fonctions à ajouter au code de l'agent** :
+```python
+import time
+
+OPENWEBUI_URL  = os.getenv("OPENWEBUI_URL",  "http://open-webui.interfaces.svc.cluster.local:8080")
+VAULT_OPENWEBUI = os.getenv("VAULT_OPENWEBUI", "secret/data/neokube/infrastructure/openwebui")
+AGENT_PORT     = int(os.getenv("AGENT_PORT", "8000"))
+_owu_jwt_cache: dict = {}
+
+async def _owu_get_token() -> str:
+    """Lit les credentials OWU depuis Vault, obtient un JWT (cache 20h)."""
+    now = time.time()
+    if _owu_jwt_cache.get("token") and now < _owu_jwt_cache.get("exp", 0):
+        return _owu_jwt_cache["token"]
+    async with httpx.AsyncClient(timeout=10) as c:
+        r = await c.get(
+            f"{VAULT_ADDR}/v1/{VAULT_OPENWEBUI}",
+            headers={"X-Vault-Token": VAULT_TOKEN}
+        )
+        d = r.json().get("data", {}).get("data", {})
+        pw = d.get("ADMIN_PASSWORD", "")
+        email = d.get("ADMIN_EMAIL", "admin@neokube.fr")
+        r2 = await c.post(
+            f"{OPENWEBUI_URL}/api/v1/auths/signin",
+            json={"email": email, "password": pw}
+        )
+        jwt = r2.json().get("token", "")
+    _owu_jwt_cache["token"] = jwt
+    _owu_jwt_cache["exp"] = now + 72000  # 20h
+    return jwt
+
+async def _owu_self_register() -> None:
+    """Enregistre l'agent comme connexion OpenAI-compatible dans Open WebUI (idempotent)."""
+    try:
+        token = await _owu_get_token()
+        base_url = f"http://{AGENT_NAME}.agent-system.svc.cluster.local:{AGENT_PORT}"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"{OPENWEBUI_URL}/api/v1/openai/config", headers=headers)
+            cfg = r.json()
+            urls = cfg.get("OPENAI_API_BASE_URLS", [])
+            keys = cfg.get("OPENAI_API_KEYS", [])
+            found = next((i for i, u in enumerate(urls) if AGENT_NAME in u), -1)
+            if found >= 0:
+                urls[found] = base_url
+                keys[found] = "neokube"
+            else:
+                urls.append(base_url)
+                keys.append("neokube")
+            cfg["OPENAI_API_BASE_URLS"] = urls
+            cfg["OPENAI_API_KEYS"]      = keys
+            await c.post(
+                f"{OPENWEBUI_URL}/api/v1/openai/config/update",
+                headers=headers, json=cfg
+            )
+        print(f"[OWU] {AGENT_NAME} enregistré → {base_url}", flush=True)
+    except Exception as e:
+        print(f"[OWU] enregistrement échoué (non bloquant) : {e}", flush=True)
+```
+
+**Intégration dans le lifespan** — appeler `_owu_self_register()` avant la boucle principale :
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _owu_self_register()
+    # ... reste du démarrage (IMAP loop, etc.)
+    yield
+    # ... nettoyage
+```
+
+> **Règle** : l'enregistrement est non bloquant (exception catchée). Un échec OWU ne doit jamais empêcher le démarrage de l'agent.
 
 ### 7. Kustomization + déploiement
 
