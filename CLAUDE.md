@@ -267,6 +267,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 18 | Label `app=agent-charlotte` inexistant | `-l app=agent-charlotte` retourne 0 pods. Pour trouver Charlotte : `kubectl get pods -n agent-system \| grep charlotte`. |
 | 19 | Mots-clés SRE dans salutations + contexte OWU | Noms d'agents dans `_SRE_KW` → "bonjour charlotte" déclenche le loop. OWU ajoute "#### Code Interpreter..." après le message. Fix : `message.split('\n')[0][:200].lower()` + retirer les noms propres du set. |
 | 20 | System prompt SRE dans chemin conversationnel | `_llm_call(messages)` avec system SRE → Mistral répond "je vérifie le cluster" même pour "bonjour". Fix : remplacer le system message par un prompt léger dans `_conv_messages`. |
+| 21 | Loop ReAct sur messages conversationnels | Tout message → `run_agent()` complet même pour "bonjour". Fix : détecter les mots-clés métier sur **la première ligne du dernier message uniquement** → fast-path LLM léger sans outils. Obligatoire pour tout agent OWU-facing. |
 
 ---
 

@@ -401,3 +401,45 @@ _conv_resp = await _llm_call(_conv_messages, temperature=0.5, max_tokens=256, ..
 **Règle** : le system prompt d'un agent SRE/outil ne doit jamais être utilisé pour des réponses conversationnelles libres — le modèle en absorbe le contexte et tente d'agir en conséquence même sans tools.
 
 ---
+
+### 21. Loop ReAct déclenché par des messages conversationnels — règle globale agents
+
+**Symptôme** : un simple "bonjour" ou "merci" à Leon ou Neo prend 6–12 secondes car le loop ReAct complet se déclenche (outils, itérations, system prompt lourd).
+
+**Cause** : absence de détection conversationnelle avant le loop. Tout message entrant → `run_agent()` → loop N itérations avec le system prompt complet + liste d'outils.
+
+**Cause secondaire** : la détection existante (Neo) portait sur l'ensemble de l'historique de conversation (`" ".join(all user messages)`) — des mots-clés d'échanges antérieurs polluaient la détection du message courant.
+
+**Fix obligatoire pour tout agent OWU-facing** :
+
+```python
+# 1. Set de mots-clés métier propres à l'agent
+_AGENT_KW = {"zoho", "github", "projet", "deploy", "brief", ...}
+
+# 2. Ne tester que la première ligne du DERNIER message utilisateur
+last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+user_text = last_user.split('\n')[0][:200].lower()  # première ligne, tronquée
+needs_tools = any(kw in user_text for kw in _AGENT_KW)
+
+# 3. Fast-path si pas de mot-clé — LLM léger sans outils, system prompt minimal
+if not needs_tools:
+    conv_messages = [
+        {"role": "system", "content": "Tu es [Agent], réponds brièvement et amicalement."},
+    ] + [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"]
+    # appel LLM direct sans tools, max_tokens=256
+    # retourner immédiatement (streaming ou non)
+```
+
+**État d'application** :
+| Agent | Statut | PR/Commit |
+|---|---|---|
+| Charlotte | ✅ antipatterns #19–20 | historique |
+| Leon | ✅ 2026-05-08 | `6a3ea09` |
+| Neo | ✅ 2026-05-08 | `(ce commit)` |
+| admin-sys | N/A — exécuteur K8s, pas conversationnel | — |
+
+**Checklist nouvel agent OWU-facing** : avant de brancher un agent sur OWU, implémenter ce pattern. Ajouter à l'étape 6 de la checklist agent (`CLAUDE-agents.md`).
+
+**Règle** : ne jamais passer la liste de mots-clés sur l'historique complet — toujours sur la première ligne du dernier message uniquement.
+
+---
