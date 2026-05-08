@@ -997,6 +997,43 @@ async def lifespan(app: FastAPI):
 
 > **Règle** : l'enregistrement est non bloquant (exception catchée). Un échec OWU ne doit jamais empêcher le démarrage de l'agent.
 
+### 6c. Fast-path conversationnel (obligatoire pour tout agent OWU-facing)
+
+> **Règle** : tout agent exposé à OWU via `/v1/chat/completions` DOIT implémenter ce pattern avant son loop ReAct/outil. Sans ça, un simple "bonjour" déclenche le loop complet (6–12s de latence). Voir antipattern #21.
+
+**Pattern standard :**
+```python
+# 1. Set de mots-clés métier propres à l'agent (exemples)
+_AGENT_KW = {
+    "zoho", "github", "vercel", "neon", "projet", "project", "brief", "deploy",
+    "tâche", "task", "branch", "repo", "bug", "fix", ...  # adapter au domaine
+}
+
+# 2. Dans le endpoint /v1/chat/completions — avant tout appel run_agent/loop
+last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+user_text = last_user.split('\n')[0][:200].lower()  # première ligne seulement
+needs_tools = any(kw in user_text for kw in _AGENT_KW)
+
+if not needs_tools:
+    # Fast-path : LLM léger, sans outils, system prompt minimal
+    conv_messages = [
+        {"role": "system", "content": (
+            f"Tu es {AGENT_NAME}, agent IA chez Néomnia. "
+            "Réponds de façon amicale, concise et naturelle en 1 à 3 phrases. "
+            "Si l'utilisateur mentionne une tâche ou un projet, invite-le à préciser."
+        )},
+    ] + [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"]
+    # appel LLM direct sans tools, max_tokens=256, retourner immédiatement
+```
+
+**Règles de construction du set `_AGENT_KW` :**
+- PAS de noms propres ni de prénoms — ils apparaissent dans les salutations ("bonjour léon")
+- Tester uniquement la **première ligne** du **dernier message** utilisateur
+- Ne jamais tester l'historique complet (des mots-clés anciens polluent la détection)
+- Ne jamais passer le system prompt complet dans le chemin conversationnel
+
+**Implémentations de référence** : `configmap-leon-script.yaml` (`_LEON_KW`) · `configmap-neo-script.yaml` (`_TOOL_KW`) · `configmap-sre-script.yaml` (`_SRE_KW`)
+
 ### 7. Kustomization + déploiement
 
 ```bash
