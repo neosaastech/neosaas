@@ -122,6 +122,32 @@ Cette section est la référence pour comprendre à quel moment un projet passe 
 
 ---
 
+### Signalisation Zoho — statuts tâches
+
+| Statut | ID portail | Déclencheur | Signification |
+|---|---|---|---|
+| `open` | `2114101000000016068` | Création tâche | À traiter — zoho-observer va la détecter |
+| `closed` | `2114101000000016071` | `percent_complete=100` | Traité — workflow terminé |
+
+> Pas de statut "In Progress" dans ce portail. Le commentaire 🤖 joue ce rôle.
+> Une tâche fermée ne peut pas être réouverte via API (règle portail `CANNOT_OPEN_TASK`).
+
+**Flux signalisation** :
+```
+[Open + tag @agent]
+  → zoho-observer détecte (scan toutes les 2min)
+  → check commentaire 🤖 (idempotence cross-redémarrage)
+  → dispatch workflow + commentaire détaillé (agent, workflow_id, timestamp)
+
+[Workflow en cours]  ←  commentaire 🤖 = journal de bord
+
+[Workflow terminé]
+  → dispatcher_zoho_callback : commentaire résultat + percent_complete=100
+  → [Closed]
+```
+
+---
+
 ### Gaps — Ce qui manque pour le flux cible (2026-05-02)
 
 #### Gap 1 — Trigger "Zoho status → production" `[priorité haute]`
