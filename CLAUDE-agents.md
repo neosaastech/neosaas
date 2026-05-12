@@ -421,7 +421,7 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ---
 
-## Charlotte SRE — Architecture interne (v3.11)
+## Charlotte SRE — Architecture interne (v3.12)
 
 `SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (défaut 300s) via un Temporal Schedule.
 
@@ -492,6 +492,7 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 | `read_file` (fuzzy) | Lit `/gitops/...` ou `/var/sre/...` ; si introuvable, propose des candidats fuzzy par tokens du nom | Avant tout `apply_gitops_fix` ou `write_file` |
 | `write_file` | Écrit un manifest dans `/gitops/` | Fallback si `apply_gitops_fix` non disponible |
 | `git_status` / `git_push` | Commit/push vers `Kubinote-GitOps` | Fallback si `apply_gitops_fix` non disponible |
+| `ask_clarification` | **Pause le ReAct loop** et pose une question à l'utilisateur avant d'agir | Avant toute action irréversible ou ambiguë (voir règle 6b) |
 
 ### Workflow remédiation pour ressource managée GitOps
 
@@ -563,48 +564,70 @@ kubectl get pods -n agent-system -l app=agent-sre   # à vérifier selon la vers
 
 **Mauvaise remédiation initiale :** `kubectl patch` pour augmenter `limits.memory` 4Gi→8Gi (live, pas GitOps), validé via l'ancien nom de pod. Résultat : nouveau pod re-crashe immédiatement (V8 reste plafonné à ~1.7 Gi), patch live reverté par cluster-bootstrap en <5 min.
 
-**Root cause :** zero-cache (rocicorp/zero 0.26.x) démarre 2 sous-process Node.js indépendants (`syncer` + `change-streamer`), chacun avec son propre heap V8. Le heap total nécessaire est donc ~2× la `replicaSize` (130 MB empirique). 6 Gi crashait encore le change-streamer. **10 Gi tient.**
+**Root cause initiale (2026-05-07) :** zero-cache démarre 2 sous-process Node.js indépendants (`syncer` + `change-streamer`), chacun avec son propre heap V8 — le heap cumulé pouvait atteindre 10 Gi sans GC. Fix initial : `--max-old-space-size=10240` + `limits.memory: 12Gi` → stable, mais consommation passive 7.1 Gi même au repos (V8 ne GC jamais avant d'atteindre la limite).
 
-**Fix définitif (commit `af3db45`) :**
+**Root cause réelle (2026-05-12) :** avec un heap de 10 Go, V8 n'active le GC agressif qu'à ~8 Gi — l'accumulateur passif colonise la RAM sans jamais libérer. La `zero.db` replica locale réelle est 124 MB (stable).
+
+**Fix définitif (2026-05-12) :**
 ```yaml
 env:
 - name: NODE_OPTIONS
-  value: "--max-old-space-size=10240"   # 10 Gi heap V8
+  value: "--max-old-space-size=4096"   # Force GC agressif dès 4 Gi
 resources:
-  requests: {memory: 2Gi}
-  limits:   {memory: 12Gi}             # headroom au-dessus du heap
+  requests: {memory: 1Gi}
+  limits:   {memory: 5Gi}             # headroom : snapshot initial > 2 Gi
 livenessProbe:  {initialDelaySeconds: 60, failureThreshold: 3}
 readinessProbe: {initialDelaySeconds: 30, failureThreshold: 10}
 ```
+Résultat : 7.1 Gi → ~1.5 Gi steady-state. Mémoire cluster : 76 % → 53 %.
 
 **Ce qui a empêché le push initial :** le serveur neokube-beta a crashé après `kubectl apply` mais avant `git_push`. Le pod vivait avec le fix en live, mais le repo pointait vers l'ancienne config — cluster-bootstrap allait reverter. → C'est la raison d'être de `apply_gitops_fix` : rendre le push impossible à oublié.
 
-### Chemin conversationnel Charlotte (2026-05-07)
+### Routing sémantique Charlotte (v3.12 — 2026-05-12)
 
-Charlotte distingue les messages conversationnels des requêtes SRE **avant** d'entrer dans le loop ReAct.
+Charlotte classe chaque message **avant** d'entrer dans le loop ReAct. Depuis v3.12, la détection est sémantique (LLM léger) et non plus lexicale (mots-clés).
 
-**Détection (endpoint `/mission`) :**
-```python
-_SRE_KW = {
-    "pod","cluster","kubectl","namespace","deploy","restart","crash","error","down",
-    "alert","logs","log","agent",
-    "surfsense","qdrant","vault","stalwart","litellm","langfuse","temporal","gitops",
-    "penpot","zoho","github","vercel","neon","dns","cloudflare","ingress","traefik",
-    "cpu","mem","memory","oom","oomkill","évén","event","incident","remediat",
-    "backup","sync","cron","job","scan","health","check","verify","fix","patch",
-    "notion","dataforseo","seo","crawl","scrape","email","mail","smtp","imap",
-}
-# Première ligne uniquement — OWU ajoute "#### Code Interpreter\n..." après le message réel
-_msg_lower = message.split('\n')[0][:200].lower()
-_is_conversational = not any(kw in _msg_lower for kw in _SRE_KW)
+#### Flux de routing
+
+```
+message reçu
+  → extraire première ligne (ignorer bruit OWU "#### Code Interpreter\n...")
+  → last_assistant avait un "?" dans l'historique ? → sre direct (réponse à question en attente)
+  → sinon : classify_call(max_tokens=5, temperature=0.0)
+      → "conv" → fast-path conversationnel (LLM léger, 0 outil)
+      → "sre"  → ReAct loop (turn 0 : tool_choice="required")
 ```
 
-**Règles de construction du set `_SRE_KW` :**
-- PAS de noms propres ni de prénoms (`"charlotte"`, `"leo"`, `"neo"`, etc.) — ils apparaissent dans les salutations
-- PAS de mots ambigus courts (`"log"` seul OK, mais `"le"`, `"un"` non)
-- Tronquer à la première ligne pour ignorer le contexte que OWU injecte après le message
+**Pourquoi sémantique et non lexical :**
+L'approche par mots-clés (`_SRE_KW`) échouait sur les paraphrases implicites :
+`"as-tu appliqué cette version ?"` → aucun keyword détecté → fast-path → Charlotte hallucine une réponse sans vérifier le cluster.
+Un classifieur LLM comprend l'intention, pas juste les tokens.
 
-**Réponse conversationnelle (system prompt léger) :**
+**Implémentation :**
+```python
+# 1. Bypass si question en attente (ask_clarification dans le tour précédent)
+_last_assistant = next(
+    (m.get("content", "") for m in reversed(history) if m.get("role") == "assistant"), ""
+)
+if _last_assistant and "?" in _last_assistant:
+    _is_conversational = False  # réponse à question infra → toujours sre
+else:
+    # 2. Classification sémantique
+    _classify_resp = await _llm_call(
+        [{"role": "system", "content": (
+            "Tu es un classificateur SRE. Réponds UNIQUEMENT par 'sre' ou 'conv'.\n"
+            "'sre' = vérification/action infra : pods, configs, versions, patches, santé, DNS, LLM...\n"
+            "'conv' = échange purement conversationnel : salutation, remerciement, question générale.\n"
+            "En cas de doute, réponds 'sre'."
+        )},
+         {"role": "user", "content": message.split('\n')[0][:300]}],
+        temperature=0.0, max_tokens=5,
+        trace_name=f"charlotte-classify-{session_id}",
+    )
+    _is_conversational = (_classify_resp or "sre").strip().lower().startswith("conv")
+```
+
+**Chemin conversationnel (system prompt léger) :**
 ```python
 _conv_messages = [
     {"role": "system", "content": (
@@ -615,7 +638,38 @@ _conv_messages = [
 ] + [m for m in messages if m.get("role") != "system"]
 _conv_resp = await _llm_call(_conv_messages, temperature=0.5, max_tokens=256, ...)
 ```
-Ne jamais passer le system prompt SRE complet dans ce chemin — le LLM l'absorbe et tente d'agir en SRE même sans outils.
+Ne jamais passer le system prompt SRE complet dans ce chemin — Mistral répond "je vérifie le cluster" même pour "bonjour".
+
+**ReAct loop — `tool_choice="required"` au tour 0 :**
+Tout message routé `sre` déclenche le loop avec `tool_choice="required"` au premier tour. Charlotte ne peut pas répondre en texte sans avoir appelé au moins un outil. Cela empêche les réponses LLM inventées sur l'état du cluster.
+
+### Outil `ask_clarification` (v3.12)
+
+Charlotte peut **suspendre le ReAct loop** pour poser une question avant d'agir sur une ressource ambiguë ou irréversible.
+
+**Quand Charlotte DOIT demander (règle 6b du system prompt) :**
+- Valeur cible non précisée : *"augmente la mémoire de zero-cache"* → Charlotte demande combien
+- Cible ambiguë : *"redémarre le service mail"* → Charlotte demande Stalwart ou le pod K8s ?
+- Action irréversible sans confirmation explicite de l'utilisateur
+
+**Quand Charlotte agit directement (sans demander) :**
+- Actions read-only : `get`, `logs`, `describe`, `list`
+- Corrections évidentes : pod CrashLoop → restart, OOM confirmé → ajuster limits
+- Quand la valeur cible est explicite dans le message
+
+**Comportement technique :**
+```python
+if fn_name == "ask_clarification":
+    question = fn_args.get("question", "")
+    context  = fn_args.get("context", "")
+    final = f"{context}\n\n{question}".strip() if context else question
+    # → emit "done" avec la question comme réponse
+    # → la question est stockée dans l'historique de session
+    # → prochain message utilisateur : bypass classifieur ("?" détecté) → sre direct
+    break  # loop ReAct suspendu — Charlotte n'agit pas
+```
+
+La question est tracée dans Langfuse sous `charlotte-classify-{session_id}`. Le classifieur ne facture que ~5 tokens de sortie (Mistral le plus économique disponible).
 
 ---
 
@@ -1032,7 +1086,7 @@ if not needs_tools:
 - Ne jamais tester l'historique complet (des mots-clés anciens polluent la détection)
 - Ne jamais passer le system prompt complet dans le chemin conversationnel
 
-**Implémentations de référence** : `configmap-leon-script.yaml` (`_LEON_KW`) · `configmap-neo-script.yaml` (`_TOOL_KW`) · `configmap-sre-script.yaml` (`_SRE_KW`)
+**Implémentations de référence** : `configmap-leon-script.yaml` (`_LEON_KW`) · `configmap-neo-script.yaml` (`_TOOL_KW`) · `configmap-sre-script.yaml` (classifieur LLM sémantique — pas de set de mots-clés depuis v3.12)
 
 ### 7. Kustomization + déploiement
 

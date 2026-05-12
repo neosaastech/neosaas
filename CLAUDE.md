@@ -132,7 +132,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.11 |
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.12 |
 | **Leon** | Chef de Projet — brief → ProjectSpec → Zoho → dispatch | Temporal | 8181 | `leon` | active v2.0 |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v1.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel | Temporal | 8485 | `dispatcher` | active v1.0 |
@@ -268,6 +268,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 19 | Mots-clés SRE dans salutations + contexte OWU | Noms d'agents dans `_SRE_KW` → "bonjour charlotte" déclenche le loop. OWU ajoute "#### Code Interpreter..." après le message. Fix : `message.split('\n')[0][:200].lower()` + retirer les noms propres du set. |
 | 20 | System prompt SRE dans chemin conversationnel | `_llm_call(messages)` avec system SRE → Mistral répond "je vérifie le cluster" même pour "bonjour". Fix : remplacer le system message par un prompt léger dans `_conv_messages`. |
 | 21 | Loop ReAct sur messages conversationnels | Tout message → `run_agent()` complet même pour "bonjour". Fix : détecter les mots-clés métier sur **la première ligne du dernier message uniquement** → fast-path LLM léger sans outils. Obligatoire pour tout agent OWU-facing. |
+| 22 | `kubectl replace` supprime les clés ConfigMap non listées | `kubectl replace -f cm.yaml` remplace le CM **en entier** — toutes les clés absentes du fichier disparaissent. Toujours inclure **toutes** les clés existantes dans le fichier de remplacement. `kubectl apply` (< 262 KB) fait un merge et évite ce problème. |
 
 ---
 
@@ -299,4 +300,4 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Historique des actions Claude
 
-Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 67 entrées, 2026-03-15 → 2026-05-06.
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 89 entrées, 2026-03-15 → 2026-05-12.

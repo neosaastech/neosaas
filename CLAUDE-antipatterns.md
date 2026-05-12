@@ -443,3 +443,29 @@ if not needs_tools:
 **Règle** : ne jamais passer la liste de mots-clés sur l'historique complet — toujours sur la première ligne du dernier message uniquement.
 
 ---
+
+### 22. `kubectl replace` supprime les clés ConfigMap non listées
+
+**Symptôme :** Charlotte en CrashLoopBackOff avec `ModuleNotFoundError: httpx` après un `kubectl replace` du ConfigMap `sre-script`.
+
+**Cause :** `kubectl replace -f cm.yaml` remplace le ConfigMap **en entier** par le contenu du fichier. Si le fichier ne contient que `sre_agent.py` et pas `requirements.txt`, la clé `requirements.txt` est supprimée du ConfigMap. L'init container `install-deps` cherche `/scripts/requirements.txt` → not found → `pip install` échoue → `httpx` absent → crash.
+
+**Anti-pattern :**
+```python
+# ❌ FAUX : génère un CM avec seulement sre_agent.py
+cm = {"data": {"sre_agent.py": script}}
+kubectl replace -f cm.yaml  # → requirements.txt disparaît
+```
+
+**Fix :**
+```python
+# ✅ CORRECT : inclure TOUTES les clés du ConfigMap
+cm = {"data": {
+    "requirements.txt": "httpx>=0.27\nfastapi>=0.111\nuvicorn>=0.30\ntemporalio>=1.7\npyyaml>=6.0\n",
+    "sre_agent.py": script,
+}}
+```
+
+**Règle** : avant tout `kubectl replace` d'un ConfigMap, lire la liste des clés actuelles (`kubectl get configmap <name> -o jsonpath='{.data}' | python3 -c "import json,sys; print(list(json.load(sys.stdin).keys()))"`) et s'assurer que toutes sont présentes dans le fichier de remplacement. `kubectl apply` (quand possible) ne souffre pas de ce problème car il fait un merge, mais pour les ConfigMaps > 262 KB, seul `kubectl replace` est utilisable.
+
+---
