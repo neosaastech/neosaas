@@ -276,6 +276,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 27 | Events périmés reportés comme problèmes actuels | Charlotte reporte des Events de pods morts (persist 1h après mort) comme critiques, sans croiser avec la liste live. Fix : ÉTAPE 2b — croisement obligatoire Event vs liste ÉTAPE 1. Règle : Events = indices passés, jamais preuve d'état courant. `sre_scan_pod_health` refactorisé JSON pour détecter pods NotReady. |
 | 28 | Réponse finale en un seul chunk SSE (faux streaming) | `_build_sse(full_reply)` ou `delta.content = full_reply` → utilisateur attend en silence puis reçoit tout d'un coup. Fix : Pattern A (Pipe/Charlotte) → `_llm_call_stream` + events `token`. Pattern B (OpenAI-compat/Neo/Leon) → fast-path `stream=True` LiteLLM, agent-path mot-par-mot. Checklist étape 6d + 6e (ntfy mission done). |
 | 29 | `{placeholder}` littéral dans f-string system prompt | `system = f"""... {agent} ..."""` → Python évalue `agent` comme variable → `NameError` à chaque appel mission. Fix : `{{agent}}` (double accolade = accolade littérale dans f-string). Seules les variables Python réelles (`{session_id}`, `{interface}`) restent sans double accolade. |
+| 30 | `project_health_check` retourne Penpot name/url mais pas `project_id` | `_check_penpot()` calculait `pid` mais ne l'incluait pas dans le dict → Charlotte ne pouvait jamais passer l'UUID à `dispatch_design_deploy`. Règle : toute `_check_<service>()` doit retourner **tous** les identifiants nécessaires aux outils aval. Séquence Rule 13 : `project_health_check` → `ask_clarification` (confirmation) → `dispatch_design_deploy`. |
 
 ---
 
@@ -307,4 +308,4 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Historique des actions Claude
 
-Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 97 entrées, 2026-03-15 → 2026-05-12.
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 102 entrées, 2026-03-15 → 2026-05-12.

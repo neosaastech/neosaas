@@ -717,3 +717,30 @@ PROTOCOLE :
 **Règle** : dans toute f-string système, chaque `{placeholder_littéral}` doit être `{{placeholder_littéral}}`. Seules les variables Python réelles (`{session_id}`, `{interface}`, `{datetime.now()...}`) restent sans double accolade.
 
 **Fix appliqué** : commit `bb9c154` — 4 occurrences `{agent}` → `{{agent}}` dans `configmap-sre-script.yaml`.
+
+---
+
+### 30. `project_health_check` retourne les métadonnées Penpot mais pas le `project_id`
+
+`_check_penpot()` dans Charlotte récupère le projet Penpot par fuzzy match sur le nom, calcule son UUID (`pid = pp.get("id", "")`), mais retournait uniquement `{ok, name, url}` — sans `project_id`. Résultat : Rule 13 demandait à Charlotte de passer l'UUID à `dispatch_design_deploy`, mais cette valeur était introuvable dans le résultat de `project_health_check`.
+
+**Symptôme** : Charlotte trouve le projet Penpot par nom mais ne peut pas déclencher le pipeline — elle finit par demander à l'utilisateur de saisir manuellement l'UUID, ou pire, invente une valeur.
+
+```python
+# ❌ FAUX — project_id jamais retourné
+return {"ok": True, "name": pp["name"],
+        "url": f"http://penpot.neokube.local/..."}
+
+# ✅ CORRECT — project_id inclus
+return {"ok": True, "name": pp["name"], "project_id": pid,
+        "url": f"http://penpot.neokube.local/..."}
+```
+
+**Règle générale** : toute fonction `_check_<service>()` dans `project_health_check` doit retourner **tous les identifiants** nécessaires aux outils aval (IDs, slugs, noms exacts) — pas seulement les champs d'affichage.
+
+**Séquence correcte Rule 13** (Charlotte → pipeline Penpot→Vercel) :
+1. `project_health_check(project_name="<nom>")` → lit `penpot.project_id`
+2. `ask_clarification` — confirmation utilisateur avec nom + ID trouvés
+3. `dispatch_design_deploy(penpot_project_id="<uuid>")` — seulement après confirmation
+
+**Fix appliqué** : commit `cc35d37`.
