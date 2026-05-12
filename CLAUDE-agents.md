@@ -443,14 +443,16 @@ ProjectSpec validé par Dispatcher
   → Charlotte : déclenche SREProvisionWorkflow si infra requise
 ```
 
-### admin-sys v4.1 (`interfaces` namespace, port 8000)
+### admin-sys v5.0 (`interfaces` namespace, port 8000)
 
-- `GET /health` — libre (probes K8s)
-- `POST /execute {args: [...], timeout?: int}` — exécute kubectl, FORBIDDEN: exec/cp/port-forward/proxy
-- `POST /apply {manifest: str, namespace?: str}` — kubectl apply -f -
-- **Auth** : header `X-Admin-Sys-Token` obligatoire sur `/execute` et `/apply` (secret `admin-sys-token` dans `interfaces` + `agent-system`)
+- `GET /health` — libre (probes K8s) — retourne aussi `"helm": true/false`
+- `POST /execute {args: [...], timeout?: int}` — exécute kubectl, FORBIDDEN: exec/cp/port-forward/proxy/attach
+- `POST /apply {manifest: str, namespace?: str}` — kubectl apply -f - (manifests arbitraires)
+- `POST /helm {args: [...], timeout?: int}` — helm (upgrade/install/rollback/history/status/list/repo/search/get/diff/show)
+- **Auth** : header `X-Admin-Sys-Token` obligatoire sur `/execute`, `/apply`, `/helm` (secret `admin-sys-token`)
 - ClusterRole `admin-sys-executor` : lecture universelle + mutations workloads/config/RBAC/batch
-- GitOps : `apps/interfaces/base/configmap-admin-sys-script.yaml` + `rbac-admin-sys-executor.yaml`
+- Helm 3.17.3 installé dans le pod via initContainer
+- GitOps : `apps/interfaces/base/configmap-admin-sys-script.yaml` + `deployment-admin-sys-agent.yaml`
 
 **Règle de fallback Charlotte** :
 
@@ -484,15 +486,30 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 
 | Outil | Rôle | Usage |
 |---|---|---|
-| `run_kubectl` | kubectl read/rollout uniquement (`delete`/`exec`/`cp`/`port-forward` bloqués) | Diagnostic + apply |
+| `run_kubectl` | kubectl via admin-sys — read + mutations. **`exec`/`cp`/`port-forward` bloqués. `delete` autorisé.** | Diagnostic, get pods, logs, delete pods éphémères |
+| `kubectl_apply` | Applique un manifest YAML arbitraire via admin-sys `/apply` (≠ GitOps) | Pods éphémères de maintenance, Jobs, ressources temporaires |
 | `restart_deployment` | `kubectl rollout restart` ciblé | Restart sans modifier le manifest |
 | `list_cluster_state` | Vue agrégée (pods + agents + backup + analyse LLM récente) | Étape 1 obligatoire avant toute remédiation |
-| `apply_gitops_fix` | **⭐ OUTIL PRINCIPAL** : atomique write+apply+verify+push en une opération | Pour toute modification manifest GitOps |
+| `apply_gitops_fix` | **⭐ OUTIL PRINCIPAL** : atomique write+apply+verify+push en une opération | Pour toute modification manifest GitOps (persistée dans Git) |
 | `verify_pod_healthy` | Validation post-fix : Ready=N/N + 0 restart pendant `stable_seconds` (défaut 30) | Utilisé en interne par `apply_gitops_fix`, ou seul après `restart_deployment` |
 | `read_file` (fuzzy) | Lit `/gitops/...` ou `/var/sre/...` ; si introuvable, propose des candidats fuzzy par tokens du nom | Avant tout `apply_gitops_fix` ou `write_file` |
 | `write_file` | Écrit un manifest dans `/gitops/` | Fallback si `apply_gitops_fix` non disponible |
 | `git_status` / `git_push` | Commit/push vers `Kubinote-GitOps` | Fallback si `apply_gitops_fix` non disponible |
 | `ask_clarification` | **Pause le ReAct loop** et pose une question à l'utilisateur avant d'agir | Avant toute action irréversible ou ambiguë (voir règle 6b) |
+| `check_service_version` | Version courante vs dernière disponible (DockerHub/GitHub API) | Obligatoire avant toute mise à jour |
+| `helm_upgrade` | Helm upgrade via admin-sys `/helm` | Uniquement traefik et vault |
+| `test_agent_stream` | Smoke test streaming SSE d'un agent OWU-facing — compte les chunks SSE reçus (>3 = OK) | Étape 6 du protocole de correction code agents |
+
+**Philosophie des outils Charlotte (2026-05-12) :**
+> Charlotte dispose de **primitives génériques** Kubernetes — pas d'outils programmés pour chaque situation.
+> Avec `kubectl_apply` + `run_kubectl` (delete autorisé), Charlotte peut créer tout pod éphémère de maintenance
+> par raisonnement (manifest généré par le LLM), attendre sa complétion, lire les logs, nettoyer.
+> Ajouter un outil spécifique par cas = anti-pattern (voir antipattern #23).
+
+**Frontière de sécurité : admin-sys** (pas Charlotte)
+- admin-sys bloque : `exec`, `cp`, `port-forward`, `proxy`, `attach`
+- Charlotte bloque en plus : `exec`, `cp`, `port-forward` (redondant, sécurité en profondeur)
+- `delete` : autorisé dans Charlotte et admin-sys — récupérable (K8s recrée les pods managés par un deployment)
 
 ### Workflow remédiation pour ressource managée GitOps
 
@@ -703,6 +720,16 @@ Brief (Slack #produit / Open WebUI)
   → Dispatcher : write_pm_decisions (Qdrant pm-decisions, inclut penpot_url + domain)
   → Dispatcher : zoho_callback (commentaire tâche Zoho + lien Design Penpot)
   → Dispatcher : send_client_mail (email post-deploy → spec.client_email, non-bloquant)
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━ DESIGN → CODE (Phase 3b) ━━━━━━━━━━━━━━━━━━━━━━━━
+  Charlotte : dispatch_design_deploy(penpot_project_id="<uuid>")
+              → POST dispatcher:8484/trigger-penpot
+  → Dispatcher : PenpotToVercelWorkflow
+      Aria (aria_export_penpot)    : exporte design Penpot via penpot-connector
+      Aria (aria_generate_nextjs)  : génère Next.js (page.tsx, composants, CSS) via codestral
+      Aria (aria_push_to_github)   : push sur branche design/penpot-export-{id[:8]}
+  → Dispatcher : redeploy Vercel (vercel-connector) — preview deploy branche
+  → Dispatcher : ntfy notification mission-done
 ```
 
 **Leon ne code jamais, ne déploie jamais** — interdit par `forbidden_actions` dans l'AgentSpec.
@@ -1087,6 +1114,181 @@ if not needs_tools:
 - Ne jamais passer le system prompt complet dans le chemin conversationnel
 
 **Implémentations de référence** : `configmap-leon-script.yaml` (`_LEON_KW`) · `configmap-neo-script.yaml` (`_TOOL_KW`) · `configmap-sre-script.yaml` (classifieur LLM sémantique — pas de set de mots-clés depuis v3.12)
+
+---
+
+### 6d. Streaming token-by-token (obligatoire pour tout agent OWU-facing)
+
+> **Règle** : tout agent exposé à OWU DOIT streamer sa réponse token par token. Envoyer la réponse entière en un seul chunk SSE (`delta.content = full_reply`) crée une expérience figée — l'utilisateur attend en silence puis reçoit tout d'un coup. Voir antipattern #28.
+
+Deux patterns selon l'architecture de l'agent :
+
+#### Pattern A — Pipe SSE (Charlotte)
+
+Charlotte génère sa réponse via `/mission/stream` (SSE propriétaire). La synthèse finale utilise `_llm_call_stream` qui lit les tokens LiteLLM au fil de la génération et les émet comme events `token` :
+
+```python
+async def _llm_call_stream(messages, temperature=0.1, max_tokens=2048):
+    """Async generator — un yield par token LiteLLM."""
+    payload = {"model": LLM_MODEL, "messages": messages,
+               "max_tokens": max_tokens, "temperature": temperature, "stream": True}
+    async with httpx.AsyncClient(timeout=120) as c:
+        async with c.stream("POST", f"{LITELLM_BASE_URL}/v1/chat/completions",
+                            headers=_auth_headers(), json=payload) as resp:
+            async for line in resp.aiter_lines():
+                if not line.startswith("data: "): continue
+                data = line[6:].strip()
+                if data == "[DONE]": break
+                chunk = json.loads(data)
+                delta = chunk["choices"][0]["delta"].get("content") or ""
+                if delta:
+                    yield delta
+
+# Usage dans mission() — synthèse finale :
+chunks = []
+async for chunk in _llm_call_stream(messages):
+    chunks.append(chunk)
+    await _emit(session_id, {"type": "token", "text": chunk})
+final = "".join(chunks) or await _llm_call(...)  # fallback si stream échoue
+```
+
+Le Pipe OWU reçoit les events `token` et les `yield` directement :
+```python
+elif etype == "token":
+    if not _got_tokens:
+        _got_tokens = True
+        yield "\n"
+    yield text
+elif etype == "done":
+    # NE PAS re-yielder answer si tokens déjà reçus — déjà affiché
+    if not _got_tokens:
+        yield ev.get("answer", "")
+```
+
+#### Pattern B — OpenAI-compat `/v1/chat/completions` (Neo, Leon)
+
+**Fast-path** (sans outils) : streaming LiteLLM direct, transparent pour OWU :
+```python
+async def _stream_direct():
+    async with httpx.AsyncClient(timeout=60) as c:
+        async with c.stream("POST", f"{LITELLM_URL}/v1/chat/completions",
+                            json={"model": LLM_MODEL, "messages": messages, "stream": True}) as r:
+            async for line in r.aiter_lines():
+                if line.startswith("data: "):
+                    raw = line[6:].strip()
+                    if raw == "[DONE]":
+                        yield "data: [DONE]\n\n"; break
+                    chunk = json.loads(raw)
+                    chunk["model"] = AGENT_NAME
+                    yield f"data: {json.dumps(chunk)}\n\n"
+
+if stream_requested:
+    return StreamingResponse(_stream_direct(), media_type="text/event-stream")
+```
+
+**Agent path** (avec outils) : la réponse est assemblée avant d'être streamée. Utiliser le streaming mot-par-mot — meilleur que rien, suffisant en pratique :
+```python
+async def _stream_reply_words(reply: str):
+    chat_id = f"{AGENT_NAME}-{uuid.uuid4().hex[:8]}"
+    words = reply.split(" ")
+    for i, word in enumerate(words):
+        text = word + (" " if i < len(words) - 1 else "")
+        chunk = {"id": chat_id, "object": "chat.completion.chunk", "model": AGENT_NAME,
+                 "choices": [{"delta": {"content": text}, "index": 0, "finish_reason": None}]}
+        yield f"data: {json.dumps(chunk)}\n\n"
+        await asyncio.sleep(0)  # yield event loop entre chaque mot
+    done = {"id": chat_id, "object": "chat.completion.chunk", "model": AGENT_NAME,
+            "choices": [{"delta": {}, "index": 0, "finish_reason": "stop"}]}
+    yield f"data: {json.dumps(done)}\n\ndata: [DONE]\n\n"
+
+if stream_requested:
+    return StreamingResponse(_stream_reply_words(reply), media_type="text/event-stream")
+```
+
+**État au 2026-05-12 :**
+| Agent | Fast-path | Agent-path | Statut |
+|---|---|---|---|
+| Charlotte | ✅ tokens réels (`_llm_call_stream`) | ✅ tokens réels | ✅ Complet |
+| Neo | ✅ LiteLLM `stream=True` (`_stream_direct`) | ✅ mot-par-mot | ✅ Complet |
+| Leon | ⚠️ `_build_sse` 2 chunks fixes | ⚠️ `_build_sse` 2 chunks fixes | 🔴 À corriger |
+
+**Leon** : synchrone (thread pool `_run_sync`) — migration vers streaming async à planifier séparément. Priorité basse (agent de planification, réponses longues déjà attendues).
+
+---
+
+### 6e. Notification ntfy de fin de mission (obligatoire pour agents avec outils)
+
+> **Règle** : tout agent OWU-facing qui exécute des outils DOIT envoyer une notification ntfy `priority=low` quand la mission est terminée. L'utilisateur peut changer d'onglet pendant qu'un agent travaille (30s–3min) — sans notification, il ne sait pas quand revenir.
+
+**Pattern** (commun à tous les agents) :
+```python
+# Après avoir assemblé la réponse finale
+_used_tools = [s for s in result_steps if s.get("tool") not in (None, "final_answer")]
+if _used_tools and len(final) > 50:
+    await _ntfy_notify(
+        f"✅ {AGENT_NAME} — mission terminée",
+        f"📋 {message[:100]}\n\n{final[:300]}",
+        priority="low",
+        tags=[AGENT_NAME.lower(), "done"],
+    )
+```
+
+**Règles de déclenchement :**
+- ✅ Déclencher si : au moins 1 outil utilisé ET réponse > 50 chars
+- ❌ Ne pas déclencher pour : échanges conversationnels (fast-path), réponses d'erreur courtes
+- **Topic** : `neokube-alerts` (même topic que les alertes SRE) — `priority=low` les distingue visuellement
+
+**État au 2026-05-12 :**
+| Agent | ntfy mission |
+|---|---|
+| Charlotte | ✅ Implémenté |
+| Neo | 🔴 À implémenter |
+| Leon | 🔴 À implémenter |
+
+---
+
+### 6f. Charlotte corrige les autres agents — protocole autonome
+
+> **Règle** : Charlotte est autorisée à corriger le code Python des autres agents dans leurs ConfigMaps pour les patterns documentés dans son RAG. Elle NE PEUT PAS se corriger elle-même.
+
+**Patterns autorisés :**
+- Streaming token-by-token (antipattern #28 / étape 6d)
+- Fast-path conversationnel (antipattern #21 / étape 6c)
+- Notification ntfy mission (étape 6e)
+
+**Protocole en 6 étapes — obligatoire, aucune étape sautée :**
+
+```
+1. read_file('apps/agent-system/base/configmap-{agent}-script.yaml')
+   ↳ Lire le code AVANT modification (ne jamais inventer le contenu)
+
+2. Identifier dans le RAG le pattern exact à appliquer (CLAUDE-agents.md §6d/6c/6e)
+
+3. apply_gitops_fix(file='apps/agent-system/base/configmap-{agent}-script.yaml',
+                    content=<fichier complet corrigé>)
+   ↳ TOUTES les clés du ConfigMap présentes (antipattern #22)
+
+4. restart_deployment(name='{agent}', namespace='agent-system')
+
+5. verify_pod_healthy(deployment='{agent}', namespace='agent-system', stable_seconds=30)
+   ↳ Si échec → NE PAS continuer, alerter ntfy + ask_clarification
+
+6. test_agent_stream(agent='{agent}')
+   ↳ >3 chunks → ✅ fix confirmé, répondre avec le résultat
+   ↳ 1-2 chunks → ❌ fix échoué → alerter ntfy + ask_clarification
+```
+
+**État streaming agents OWU au 2026-05-12 :**
+
+| Agent | Service K8s | Fast-path | Agent-path | ntfy | À corriger |
+|---|---|---|---|---|---|
+| **Charlotte** | `agent-charlotte:8383` | ✅ tokens réels | ✅ tokens réels | ✅ | — |
+| **Neo** | `agent-neo:8490` | ✅ LiteLLM direct | ✅ mot-par-mot | ❌ | ntfy |
+| **Leon** | `agent-leo:8181` | ❌ 2 chunks fixes | ❌ 2 chunks fixes | ❌ | streaming + ntfy |
+
+Charlotte peut être missionnée pour corriger Neo (ntfy) et Leon (streaming + ntfy) de façon autonome en suivant ce protocole.
+
+---
 
 ### 7. Kustomization + déploiement
 
