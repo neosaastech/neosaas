@@ -134,8 +134,8 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 |---|---|---|---|---|---|
 | **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.12 |
 | **Leon** | Chef de Projet — brief → ProjectSpec → Zoho → dispatch | Temporal | 8181 | `leon` | active v2.0 |
-| **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v1.0 |
-| **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel | Temporal | 8485 | `dispatcher` | active v1.0 |
+| **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
+| **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v2.0 |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
@@ -161,15 +161,16 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Cycle de vie d'un projet — Planification → Production
 
-> Détail complet (phases, flux, gaps P1/P3) : **[CLAUDE-pipeline.md](CLAUDE-pipeline.md)**
+> Détail complet (phases, flux, gaps résolus) : **[CLAUDE-pipeline.md](CLAUDE-pipeline.md)**
 
 | Phase | Agent | Déclencheur | Sortie |
 |---|---|---|---|
 | **Exploration** | Charlotte | Mention projet → `project_health_check` | Bilan ✅/❌ Zoho/GitHub/Vercel/Penpot/Notion |
 | **Planification** | Leon | Brief → dialogue 10 tours → `dispatch_project` | ProjectSpec 13 champs + projet Zoho structuré |
-| **Production** | Dispatcher+Aria+Nox+Penpot+Domi+Vera | `POST /trigger` | 2 repos GitHub, Vercel deploy, Neon branch, Penpot design, domaine |
+| **Production** | Dispatcher+Aria+Nox+Penpot+Domi+Vera | `POST /trigger` ou Zoho "Prêt pour production" | 2 repos GitHub, Vercel deploy, Neon branch, Penpot design, domaine |
+| **Design→Code** | Charlotte + Dispatcher + Aria v2.0 | `dispatch_design_deploy(penpot_project_id)` | Branche GitHub `design/penpot-export-{id}` + Vercel preview |
 
-**Gaps ouverts** : trigger Zoho status → production **(P1)** · mapper Zoho→ProjectSpec **(P1)** · email enrichi étape par étape **(P3)**
+**Gaps** : ~~trigger Zoho status → production~~ ✅ · ~~mapper Zoho→ProjectSpec~~ ✅ · ~~email enrichi étape par étape~~ ✅ (tous résolus 2026-05-12)
 
 ---
 
@@ -192,7 +193,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 **Webadmin** : `http://mail-admin.neokube.local` — login `admin` / Vault `ADMIN_PASSWORD`
 **SMTP interne** : `stalwart-mail.stalwart.svc.cluster.local:587` — plaintext, `start_tls=False`
 
-**Comptes agents** : `no-reply@`, `leon@`, `vera@`, `domi@neokube.fr`
+**Comptes agents** : `no-reply@`, `leon@`, `vera@`, `domi@`, `aria@`, `nox@neokube.fr`
 **Tous les comptes doivent avoir `roles: ["user"]`** sinon Stalwart retourne 550 5.7.1.
 **`session.auth.mechanisms`** : string `"[plain, login, oauthbearer]"` — PAS un tableau TOML.
 **`admin@neokube.fr` ne peut pas recevoir de mails** — utiliser `chvandendriessche@neomnia.net` pour les alertes.
@@ -308,4 +309,4 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Historique des actions Claude
 
-Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 102 entrées, 2026-03-15 → 2026-05-12.
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 104 entrées, 2026-03-15 → 2026-05-12.

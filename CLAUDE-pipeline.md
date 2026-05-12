@@ -148,82 +148,58 @@ Cette section est la référence pour comprendre à quel moment un projet passe 
 
 ---
 
-### Gaps — Ce qui manque pour le flux cible (2026-05-02)
+### Gaps — État au 2026-05-12
 
-#### Gap 1 — Trigger "Zoho status → production" `[priorité haute]`
+#### Gap 1 — Trigger "Zoho status → production" ✅ `[résolu 2026-05-12]`
 
-**Problème** : zoho-observer surveille uniquement les projets créés *par Leon* via l'API. Il ne détecte pas les changements de statut sur un projet existant, qu'il ait été créé par Leon ou manuellement.
-
-**Impact** : impossible de lancer la production depuis Zoho PM sans passer par Leon en mode chatbot.
-
-**Solution envisagée** :
-```python
-# Dans zoho-observer — nouveau poll périodique (ex: toutes les 5 min)
-projects = GET /projects/?status=active
-for p in projects:
-    if p["custom_status_name"] == "Prêt pour production":
-        if not already_dispatched(p["id"]):
-            spec = zoho_to_project_spec(p)   # → Gap 2
-            POST dispatcher/trigger, body=spec
-            mark_dispatched(p["id"])          # évite le double-déclenchement
-```
+**Implémenté dans zoho-observer v3.0** : boucle C `_project_scan_loop()` (300s) — détecte les projets avec `custom_status_name == "Prêt pour production"`, construit le ProjectSpec via `zoho_to_project_spec()`, déclenche `POST dispatcher/trigger`, marque dispatché par commentaire 🤖 (idempotence cross-redémarrage).
 
 ---
 
-#### Gap 2 — Mapper "Zoho project → ProjectSpec" `[priorité haute]`
+#### Gap 2 — Mapper "Zoho project → ProjectSpec" ✅ `[résolu 2026-05-12]`
 
-**Problème** : Le ProjectSpec est aujourd'hui construit *uniquement* par Leon via dialogue. Il n'existe pas de fonction qui lit un projet Zoho existant et produit un ProjectSpec valide.
+**Implémenté dans zoho-observer v3.0** : `zoho_to_project_spec(proj)` lit les champs structurés `field: value` dans la description du projet Zoho.
 
-**Impact** : même si Gap 1 est résolu, il n'y a rien pour extraire les 12 champs du projet Zoho.
+**Convention description Zoho** : une ligne par champ, lisible par un humain et parsable par `_extract_field()` :
+```
+type: webapp
+email: client@company.com
+domain: subdomain
+domain_name: mon-projet
+features: auth, dashboard, api
+criteria: Auth fonctionnelle, Dashboard affiché, API répond
+```
 
-**Mapping envisagé** :
+**Mapping implémenté** :
 
 | Champ ProjectSpec | Source Zoho | Fallback |
 |---|---|---|
 | `project_id` | `project.id_string` | — |
 | `title` | `project.name` | — |
 | `objective` | `project.description` (1ère ligne) | `"Voir projet Zoho"` |
-| `client_email` | `project.description` (pattern `email:...`) | `""` (non-bloquant) |
-| `project_type` | `project.description` (pattern `type:...`) | `"webapp"` |
-| `domain_mode` | `project.description` (pattern `domain:...`) | `"subdomain"` |
-| `domain_name` | `project.description` (pattern `domain_name:...`) | `""` |
-| `acceptance_criteria` | noms des milestones | `[]` |
+| `client_email` | description `email:` | `""` (non-bloquant) |
+| `project_type` | description `type:` | `"webapp"` |
+| `domain_mode` | description `domain:` | `"subdomain"` |
+| `domain_name` | description `domain_name:` | slug from title |
+| `acceptance_criteria` | description `criteria:` ou noms des milestones | `[]` |
 | `zoho_project_id` | `project.id_string` | — |
 | `emitted_at` | timestamp du trigger | — |
 
-> Convention proposée : stocker les champs structurés dans la description Zoho sous forme `champ: valeur` (une par ligne), lisibles par un humain et parsables par le mapper.
+---
+
+#### Gap 3 — Email de rapport étape par étape ✅ `[résolu 2026-05-12]`
+
+**Implémenté dans dispatcher v2.0** : `dispatcher_send_client_mail(spec, report)` génère un email HTML avec tableau 7 étapes (Frontend, Backend, Neon, Penpot, Domaine, QA Vera, URL prod). Chaque étape affiche ✅/❌ + lien ou message d'erreur. Un seul email en fin de workflow.
 
 ---
 
-#### Gap 3 — Email de rapport étape par étape `[priorité basse]`
+### Résumé des priorités (2026-05-12)
 
-**Problème** : Un seul email est envoyé en fin de workflow (étape 7). L'utilisateur ne sait pas ce qui s'est passé pendant les 5-10 minutes de build.
-
-**Impact** : aucune visibilité en temps réel sur l'avancement (Aria ✅ ? Vera ❌ ?).
-
-**Solution envisagée** : Email récapitulatif enrichi à l'étape 7 qui liste toutes les étapes franchies avec leur statut, construit à partir du Temporal workflow history ou d'un dict d'étapes accumulé dans le workflow context. Pas d'emails intermédiaires (spam) — un seul email complet.
-
-```
-Objet : ✅ Projet {title} — déploiement terminé
-
-Étapes franchies :
-  ✅ Aria  — repo frontend créé : github.com/neomnia/{slug}-frontend
-  ✅ Nox   — repo backend + branche Neon : {endpoint_host}
-  ✅ Penpot — design initialisé : {penpot_url}
-  ✅ Domi  — domaine provisionné : {slug}.neomnia.net
-  ✅ Vera  — QA approuvée (0 issue bloquante)
-  ✅ Deploy — URL live : https://{slug}.neomnia.net
-```
-
----
-
-### Résumé des priorités (2026-05-02)
-
-| Item | Effort | Valeur | Priorité |
-|---|---|---|---|
-| Gap 1 — Trigger Zoho status | Moyen (zoho-observer + poll) | Haute — enlève la dépendance au chatbot Leon | **P1** |
-| Gap 2 — Mapper Zoho → ProjectSpec | Moyen (fonction pure, testable) | Haute — condition sine qua non du Gap 1 | **P1** |
-| Gap 3 — Email enrichi | Faible (Dispatcher étape 7) | Moyenne — meilleure UX mais non bloquant | **P3** |
+| Item | Statut | Commit |
+|---|---|---|
+| Gap 1 — Trigger Zoho status | ✅ Résolu | `b2da695` |
+| Gap 2 — Mapper Zoho → ProjectSpec | ✅ Résolu | `b2da695` |
+| Gap 3 — Email enrichi | ✅ Résolu | `b2da695` |
 
 ---
 
