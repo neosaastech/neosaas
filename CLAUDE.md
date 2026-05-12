@@ -269,6 +269,13 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 20 | System prompt SRE dans chemin conversationnel | `_llm_call(messages)` avec system SRE → Mistral répond "je vérifie le cluster" même pour "bonjour". Fix : remplacer le system message par un prompt léger dans `_conv_messages`. |
 | 21 | Loop ReAct sur messages conversationnels | Tout message → `run_agent()` complet même pour "bonjour". Fix : détecter les mots-clés métier sur **la première ligne du dernier message uniquement** → fast-path LLM léger sans outils. Obligatoire pour tout agent OWU-facing. |
 | 22 | `kubectl replace` supprime les clés ConfigMap non listées | `kubectl replace -f cm.yaml` remplace le CM **en entier** — toutes les clés absentes du fichier disparaissent. Toujours inclure **toutes** les clés existantes dans le fichier de remplacement. `kubectl apply` (< 262 KB) fait un merge et évite ce problème. |
+| 23 | Outil ad-hoc par situation (over-engineering Charlotte) | `maintenance_pod(pvc=...)` → demain `redis_flush_tool()`, etc. Règle : Charlotte a des **primitives génériques** (`kubectl_apply` + `run_kubectl delete`). La connaissance du fix va dans le system prompt/RAG, pas dans le code. |
+| 24 | Contexte ReAct trop volumineux → Charlotte sans réponse | 5 outils × 8000 chars = 40KB par tour → Mistral timeout → pas de réponse. Fix : limiter l'injection à **2500 chars** par résultat d'outil. |
+| 25 | Nom de pod périmé dans `kubectl logs` | Charlotte utilise un nom de pod extrait des Events ou describe (anciens ReplicaSets) au lieu du pod actuel. Fix : guard runtime vérifie l'existence du pod avant d'exécuter `kubectl logs`. |
+| 26 | Protection Charlotte auto-restart surface seulement | Règle `if name == "agent-charlotte": return "INTERDIT"` dans le tool interactif uniquement — `sre_auto_restart_agents` (Temporal) n'avait pas la vérification. Charlotte pouvait se killer elle-même toutes les 5 min. Fix : même guard dans **toutes** les activités Temporal. Checklist : `grep -n "rollout restart" sre_agent.py` → chaque occurrence doit vérifier charlotte. |
+| 27 | Events périmés reportés comme problèmes actuels | Charlotte reporte des Events de pods morts (persist 1h après mort) comme critiques, sans croiser avec la liste live. Fix : ÉTAPE 2b — croisement obligatoire Event vs liste ÉTAPE 1. Règle : Events = indices passés, jamais preuve d'état courant. `sre_scan_pod_health` refactorisé JSON pour détecter pods NotReady. |
+| 28 | Réponse finale en un seul chunk SSE (faux streaming) | `_build_sse(full_reply)` ou `delta.content = full_reply` → utilisateur attend en silence puis reçoit tout d'un coup. Fix : Pattern A (Pipe/Charlotte) → `_llm_call_stream` + events `token`. Pattern B (OpenAI-compat/Neo/Leon) → fast-path `stream=True` LiteLLM, agent-path mot-par-mot. Checklist étape 6d + 6e (ntfy mission done). |
+| 29 | `{placeholder}` littéral dans f-string system prompt | `system = f"""... {agent} ..."""` → Python évalue `agent` comme variable → `NameError` à chaque appel mission. Fix : `{{agent}}` (double accolade = accolade littérale dans f-string). Seules les variables Python réelles (`{session_id}`, `{interface}`) restent sans double accolade. |
 
 ---
 
@@ -300,4 +307,4 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Historique des actions Claude
 
-Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 89 entrées, 2026-03-15 → 2026-05-12.
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 97 entrées, 2026-03-15 → 2026-05-12.

@@ -469,3 +469,251 @@ cm = {"data": {
 **Règle** : avant tout `kubectl replace` d'un ConfigMap, lire la liste des clés actuelles (`kubectl get configmap <name> -o jsonpath='{.data}' | python3 -c "import json,sys; print(list(json.load(sys.stdin).keys()))"`) et s'assurer que toutes sont présentes dans le fichier de remplacement. `kubectl apply` (quand possible) ne souffre pas de ce problème car il fait un merge, mais pour les ConfigMaps > 262 KB, seul `kubectl replace` est utilisable.
 
 ---
+
+---
+
+### 23. Outil ad-hoc par situation — Charlotte doit raisonner depuis des primitives génériques
+
+**Symptôme :** Un outil `maintenance_pod` est créé spécifiquement pour nettoyer un PVC zero-cache. Demain il faudra `redis_flush_tool`, `qdrant_compact_tool`, etc.
+
+**Cause :** On programme chaque cas de maintenance au lieu de donner à Charlotte les primitives génériques nécessaires pour raisonner elle-même.
+
+**Anti-pattern :**
+```python
+# ❌ FAUX : outil spécifique qui encapsule un pattern
+maintenance_pod(pvc_name="surfsense-zero-cache-pvc", command="rm -f /data/zero.db")
+# → Demain : redis_flush_pod(), qdrant_vacuum_pod(), postgres_vacuum_pod()...
+```
+
+**Fix :** primitives génériques `kubectl_apply` + `run_kubectl delete` :
+```python
+# ✅ CORRECT : Charlotte génère le manifest, applique, attend, lit les logs, nettoie
+kubectl_apply(manifest="""
+apiVersion: v1
+kind: Pod
+metadata:
+  name: zero-cache-maintenance
+  namespace: surfsense
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/hostname: kubinote
+  containers:
+  - name: maintenance
+    image: busybox:1.36
+    command: ["/bin/sh", "-c", "rm -f /data/zero.db /data/zero.db-wal && echo DONE"]
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: surfsense-zero-cache-pvc
+""")
+# Puis : run_kubectl(["get","pod","zero-cache-maintenance","-n","surfsense"]) → attendre Succeeded
+# Puis : run_kubectl(["logs","zero-cache-maintenance","-n","surfsense"])
+# Puis : run_kubectl(["delete","pod","zero-cache-maintenance","-n","surfsense"])
+```
+
+**Règle :** Ne jamais ajouter un outil Charlotte pour chaque nouveau type d'incident. Si Charlotte manque d'un outil, se demander : quelle **primitive générique** lui permettrait de raisonner seule ? Candidates : `kubectl_apply`, `kubectl delete` (déjà autorisé), `read_file`, `write_file`. La **connaissance** (pattern de fix) va dans le system prompt ou la RAG — pas dans le code.
+
+---
+
+### 24. Contexte ReAct trop volumineux → LLM timeout → Charlotte sans réponse
+
+**Symptôme :** Charlotte appelle 5+ outils en tour 1, dont des sorties kubectl volumineuses (logs 50KB). Après le tour 2, le LLM ne répond plus. L'utilisateur attend indéfiniment, aucune réponse n'arrive dans OWU.
+
+**Cause :** `tool_result[:8000]` × 5 outils = 40KB de contexte ajouté au tour 1. Avec le system prompt (~6KB) + historique, le contexte total dépasse 60KB. L'appel LLM au tour 3 timeout (>60s pour Mistral) → `_llm_call` retourne `""` → `break` sans `final`. La synthesis fallback timeout aussi → `final = "Je n'ai pas pu..."`. Mais si le stream SSE OWU a aussi expiré, même ce message est perdu.
+
+**Anti-pattern :**
+```python
+# ❌ FAUX : 8000 chars par outil, 5 outils = 40KB contexte
+loop_messages.append({"role": "tool", "content": tool_result[:8000]})
+```
+
+**Fix :**
+```python
+# ✅ CORRECT : 2500 chars max par outil + note de troncature
+_ctx = tool_result[:2500]
+if len(tool_result) > 2500:
+    _ctx += f"\n[...tronqué à 2500/{len(tool_result)} chars]"
+loop_messages.append({"role": "tool", "content": _ctx})
+```
+
+**Règle :** Le contexte du ReAct loop est cumulatif (N tours × M outils × chars). Toujours limiter l'injection de résultats d'outils à 2500 chars. Si Charlotte a besoin de plus de détails, elle peut rappeler `run_kubectl logs` avec `--tail=20` ciblé plutôt que d'injecter 50KB en une fois.
+
+---
+
+### 25. Nom de pod périmé dans `kubectl logs` — extrait de events/describe au lieu de `get pods`
+
+**Symptôme :** `Error from server (NotFound): pods "surfsense-zero-cache-56c47fbb4-vzrj5" not found` — Charlotte avait pourtant le bon pod `5f65b49769-bcm8q` dans les résultats du tour précédent.
+
+**Cause :** Charlotte appelle `kubectl get events -n surfsense` ou `kubectl describe deployment surfsense-zero-cache`. Ces sorties contiennent des noms de **vieux pods** (anciens ReplicaSets dans les Events, `OldReplicaSets` dans describe). Le LLM "lit" ces noms dans le contexte et les utilise pour l'appel logs suivant, ignorant le nom actuel obtenu par `kubectl get pods -l app=...`.
+
+**Anti-pattern :**
+```bash
+# ❌ FAUX : nom extrait des events (vieux ReplicaSet)
+kubectl logs surfsense-zero-cache-56c47fbb4-vzrj5  # → NotFound
+```
+
+**Fix runtime (guard dans `run_kubectl`) :**
+```python
+# Avant d'exécuter kubectl logs <pod>, vérifier l'existence du pod
+if args[0] == "logs" and pod_name:
+    check = _kubectl("get", "pod", pod_name, "-n", ns, "--no-headers", timeout=5)
+    if "not found" in check.lower() or not check.strip():
+        return f"[ERREUR] Pod '{pod_name}' introuvable. Utilise kubectl get pods -l app=<name> -n <ns> d'abord."
+```
+
+**Règle :** Le nom de pod pour `kubectl logs` doit TOUJOURS venir d'un `kubectl get pods -l app=<name> -n <ns>` exécuté dans le **même tour** (ou le tour immédiatement précédent). Jamais d'un `describe`, `events`, ou d'un appel antérieur. Le guard runtime intercepte les cas où le LLM se trompe de source.
+
+---
+
+### 26. Protection Charlotte auto-restart : tool interactif protégé, scan automatique non protégé
+
+**Symptôme :** Charlotte se redémarre lors d'un health check cluster, coupant la session SSE et le Temporal worker. Le bug avait déjà été "corrigé" mais la protection n'était au bon endroit.
+
+**Cause :** La protection `if name in ("agent-charlotte", "charlotte") and ns == "agent-system": return "⛔ INTERDIT..."` était uniquement dans le tool interactif `restart_deployment` (appelé depuis le ReAct loop). La fonction automatique `sre_auto_restart_agents` (appelée toutes les 5min par `SREScanWorkflow`) n'avait **aucune** exclusion. Si Charlotte détectait ses propres restarts élevés dans `pod_issues`, elle exécutait `kubectl rollout restart deployment/agent-charlotte` en mode automatique.
+
+**Anti-pattern :**
+```python
+# ❌ FAUX : protection uniquement dans le tool interactif
+@app.post("/mission")
+async def mission(...):
+    if tool_name == "restart_deployment":
+        if name == "agent-charlotte":
+            return "⛔ INTERDIT"   # ← seulement ici
+        _kubectl("rollout", "restart", ...)
+
+# Pendant ce temps, le scan auto fait :
+@activity.defn("sre_auto_restart_agents")
+async def sre_auto_restart_agents(pod_issues):
+    _kubectl("rollout", "restart", f"deployment/{deployment}", ...)  # ← pas de protection !
+```
+
+**Fix :**
+```python
+# ✅ CORRECT : protection dans la fonction de scan automatique également
+if deployment == "agent-charlotte" and ns == "agent-system":
+    actions.append({"action": "SKIP", "reason": "INTERDIT — auto-restart Charlotte bloqué"})
+    log.warning("AUTO-RESTART BLOQUÉ : tentative de restart agent-charlotte annulée")
+    continue
+```
+
+**Règle :** Toute règle de sécurité sur Charlotte doit être implémentée **à tous les points d'entrée** : tool interactif (mission) ET activités Temporal automatiques (SREScanWorkflow). Une protection "en surface" (tool UI) ne protège pas contre les chemins automatiques. Checklist de vérification : `grep -n "rollout restart\|rollout.*restart" sre_agent.py` → chaque occurrence doit avoir la vérification charlotte.
+
+---
+
+### 27. Charlotte reporte des Events périmés comme problèmes actuels (pods morts)
+
+**Symptôme :** Charlotte rapporte `surfsense-zero-cache-5f65b49769-bcm8q` en "CrashLoopBackOff Critique" et `agent-charlotte-78ddd97967-9grx4` avec "readiness probe échoue" — alors que ces deux pods n'existent plus (`NotFound`) et que l'état réel du cluster est sain.
+
+**Cause :** Les Events Kubernetes persistent jusqu'à **1 heure après la mort d'un pod**. Charlotte exécute :
+```
+ÉTAPE 1 : list_cluster_state()     ← lit l'état LIVE (correct)
+ÉTAPE 2 : kubectl get events       ← lit tous les events, y compris des pods morts
+ÉTAPE 3 : synthèse                 ← croise les Events avec... rien. Pas de croisement.
+```
+Charlotte voit un Event "BackOff" pour un pod mort il y a 52 min et le classe "Critique" sans vérifier si ce pod existe toujours dans la liste ÉTAPE 1.
+
+**Conséquence :** 2 faux positifs critiques dans un rapport sur 6 items = taux d'hallucination 33%. L'utilisateur ne peut pas distinguer les vraies alertes des fantômes.
+
+**Cas réel (2026-05-12) :**
+- `surfsense-zero-cache-5f65b49769-bcm8q` → pod mort (fix zero.db effectué 50 min avant l'audit). Nouveau pod `996db44c6-lsd7k` Running 1/1. Charlotte reporte l'ancien comme "Critique".
+- `agent-charlotte-78ddd97967-9grx4` → ancien pod Charlotte, remplacé par `67df57cb9c-qqnvm` (3/3 Running). Charlotte le reporte comme "Critique readiness échoue".
+
+**Problème jumeau — scan automatique ne détecte pas les pods NotReady :**
+`sre_scan_pod_health` utilisait `custom-columns` avec `containerStatuses[0].state.waiting.reason`. Un pod Running mais non-Ready (readiness probe failing) n'a pas de `waiting.reason` — il passe complètement à travers le scan. `open-webui` (0/1 Ready, 3 restarts) n'était jamais notifié via ntfy.
+
+**Fix appliqué :**
+
+1. **System prompt — règle ÉTAPE 2b (croisement obligatoire) :**
+```
+→ ÉTAPE 2b — FILTRE ANTI-PODS-MORTS OBLIGATOIRE :
+   Pour chaque pod mentionné dans un Event, croiser avec la liste ÉTAPE 1 :
+   • Pod ABSENT de la liste → event périmé → NE PAS reporter → ignorer
+   • Pod PRÉSENT mais Running/Ready → event résolu → severity=info seulement
+   • Pod PRÉSENT et toujours NotReady/CrashLoop → problème actif → reporter
+```
+
+2. **`sre_scan_pod_health` — refactorisé vers JSON (détecte les pods NotReady) :**
+```python
+# ✅ NOUVEAU : détecte Running mais non-Ready (grace 5 min démarrage)
+elif phase == "Running" and ready_c < total_c and age_min > 5:
+    issues.append({"namespace": ns, "pod": name,
+                   "phase": phase,
+                   "reason": f"NotReady({ready_c}/{total_c})",
+                   "restarts": restarts})
+```
+
+**Règle :** Charlotte a deux sources d'état cluster : `list_cluster_state` (LIVE) et `kubectl get events` (passé). L'état LIVE est la vérité. Les Events sont des indices contextuels — jamais une preuve d'état courant. Toujours croiser avant de reporter.
+
+**Checklist de vérification :** Avant de reporter un problème issu d'un Event : (1) extraire le nom du pod, (2) vérifier sa présence dans la liste ÉTAPE 1, (3) si absent → ignorer, (4) si présent → vérifier son état courant.
+
+---
+
+### 28. Réponse finale en un seul chunk SSE (faux streaming)
+
+**Symptôme :** L'utilisateur attend en silence pendant 15–30s que l'agent travaille, puis reçoit toute la réponse d'un coup. Même si le header SSE est correct, l'expérience est identique à une réponse HTTP bloquante.
+
+**Cause :** Le pattern `_build_sse` (Leon) ou `_stream_reply` (Neo avant fix) wrappent la réponse complète dans un seul chunk `delta.content` :
+```python
+# ❌ FAUX STREAMING — toute la réponse dans un seul chunk
+chunk = {"choices": [{"delta": {"content": full_reply}, "finish_reason": None}]}
+yield f"data: {json.dumps(chunk)}\n\n"
+yield "data: [DONE]\n\n"
+```
+OWU reçoit un seul événement SSE contenant 500 mots → affiche tout d'un coup → indiscernable d'une réponse bloquante.
+
+**Fix — deux patterns selon l'architecture :**
+
+**Pattern A (Pipe SSE — Charlotte)** : `_llm_call_stream` — async generator qui consomme LiteLLM `stream=True` et émet chaque token via `_emit(session_id, {type: "token", text: chunk})`.
+
+**Pattern B (OpenAI-compat — Neo, Leon)** :
+- Fast-path : `c.stream("POST", ..., json={"stream": True})` → forward direct des chunks LiteLLM
+- Agent path (réponse déjà assemblée) : word-by-word avec `await asyncio.sleep(0)` entre chaque mot
+
+```python
+# ✅ CORRECT — mot par mot pour les réponses déjà assemblées
+async def _stream_reply_words(reply: str):
+    for i, word in enumerate(reply.split(" ")):
+        text = word + (" " if i < len(reply.split(" ")) - 1 else "")
+        yield f"data: {json.dumps({..., 'choices': [{'delta': {'content': text}}]})}\n\n"
+        await asyncio.sleep(0)
+    yield f"data: {json.dumps({..., 'choices': [{'delta': {}, 'finish_reason': 'stop'}]})}\n\n"
+    yield "data: [DONE]\n\n"
+```
+
+**Règle** : tout agent OWU-facing DOIT implémenter le streaming token/mot-par-mot. La checklist d'intégration (étape 6d) documente les deux patterns. Tester en ouvrant les DevTools réseau OWU : les chunks SSE doivent arriver progressivement, pas en un seul événement groupé.
+
+**Règle jumelle — ntfy (étape 6e)** : tout agent avec outils DOIT envoyer une notification ntfy `priority=low` quand la mission est terminée. Sans ça, l'utilisateur doit garder l'onglet OWU actif pour savoir quand l'agent a fini.
+
+---
+
+### 29. `{placeholder}` dans un f-string system prompt → NameError
+
+Un system prompt Python f-string (`system = f"""..."""`) peut contenir des placeholders destinés au LLM (ex: `{agent}`, `{nom}`) qui ne sont PAS des variables Python. Python les évalue comme expressions → `NameError: name 'agent' is not defined` à chaque appel.
+
+**Symptôme** : Charlotte retourne `⚠️ name 'agent' is not defined` dans OWU après le message "📂 Historique de session chargé". L'erreur est catchée dans `_runner()` et émise comme événement SSE `{"type": "error"}`.
+
+```python
+# ❌ FAUX — {agent} évalué comme variable Python
+system = f"""
+PROTOCOLE :
+1. read_file('apps/agent-system/base/configmap-{agent}-script.yaml')
+4. restart_deployment(name='{agent}', namespace='agent-system')
+"""
+# → NameError: name 'agent' is not defined
+
+# ✅ CORRECT — {{agent}} = accolade littérale dans f-string
+system = f"""
+PROTOCOLE :
+1. read_file('apps/agent-system/base/configmap-{{agent}}-script.yaml')
+4. restart_deployment(name='{{agent}}', namespace='agent-system')
+"""
+# → affiche correctement {agent} au LLM
+```
+
+**Règle** : dans toute f-string système, chaque `{placeholder_littéral}` doit être `{{placeholder_littéral}}`. Seules les variables Python réelles (`{session_id}`, `{interface}`, `{datetime.now()...}`) restent sans double accolade.
+
+**Fix appliqué** : commit `bb9c154` — 4 occurrences `{agent}` → `{{agent}}` dans `configmap-sre-script.yaml`.
