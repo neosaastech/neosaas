@@ -128,7 +128,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 > Charlotte internals, RBAC, admin-sys API, DevProjectWorkflow, R9, Checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
-> **Charlotte SRE — protocole de remédiation sécurisé** (GitOps drift, `verify_pod_healthy`, OOM différencié, périmètre étendu) : **[CLAUDE-agents.md#charlotte-sre--protocole-de-remédiation-sécurisé-durci-2026-05-07](CLAUDE-agents.md)**
+> **Charlotte SRE v3.14 — protocole de remédiation sécurisé** (GitOps drift, `verify_pod_healthy`, OOM différencié, périmètre durci v8, outils Dispatcher) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
@@ -144,6 +144,16 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
 **admin-sys** : `POST /execute {args}` + `POST /apply {manifest}` — auth `X-Admin-Sys-Token`, namespace `interfaces`.
+
+**Charlotte — Délégation Dispatcher (v3.14)** : Charlotte ne gère pas le pipeline métier elle-même — elle délègue via deux outils :
+
+| Outil Charlotte | Endpoint Dispatcher | Rôle |
+|---|---|---|
+| `trigger_dispatcher_workflow(dev_project, spec)` | `POST :8484/trigger` | Lance `DevProjectWorkflow` complet |
+| `trigger_dispatcher_workflow(check_status)` | `GET :8484/workflows` | Liste les workflows Temporal actifs |
+| `signal_workflow(wf_id, approve)` | `POST :8484/approve/{id}` | Débloque le déploiement Vercel |
+| `signal_workflow(wf_id, reject)` | `POST :8484/reject/{id}` | Annule le workflow |
+| `dispatch_design_deploy(penpot_id)` | `POST :8484/trigger-penpot` | Lance `PenpotToVercelWorkflow` |
 
 ### Vault — carte des chemins
 
@@ -161,7 +171,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 | Serveur | Namespace | Endpoint | Agents |
 |---|---|---|---|
-| `github-mcp` | `connector-system` | `:8080/mcp` (streamable-http) | Aria, Nox |
+| `github-mcp` | `connector-system` | `:8080/mcp` (streamable-http) | Aria, Nox, Dispatcher |
 | `k8s-mcp` | `agent-system` | `:8080/mcp` (streamable-http) | Charlotte |
 | `mcp.neon.tech` | remote | `https://mcp.neon.tech/sse` | Nox |
 
@@ -294,17 +304,18 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 > Règles complètes (R9.1–R9.7), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
-| Agent | `LLM_MODEL` actuel | Modèle cible |
-|---|---|---|
-| **Charlotte** SRE | `mistral` ⚠️ | `claude-sonnet` |
-| **Leon** | `mistral-large-2407` | `mistral-large-2407` |
-| **Dispatcher** | `mistral` ⚠️ | `gemini-flash` |
-| **Aria** / **Nox** | `codestral` | `codestral` |
-| **Vera** | `mistral-large-2407` | `mistral-large-2407` |
-| **Penpot** / **Domi** | `mistral` ⚠️ | `gemini-flash` |
-| **Neo** | `mistral-large-2407` | `mistral-large-2407` |
+| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | Modèle cible |
+|---|---|---|---|
+| **Charlotte** SRE | `claude-sonnet` ✅ (sessions `/mission`) | `mistral` (scans Temporal) | `claude-sonnet` |
+| **Leon** | `mistral-large-2407` | — | `mistral-large-2407` |
+| **Dispatcher** | `mistral` ⚠️ | — | `gemini-flash` |
+| **Aria** / **Nox** | `codestral` | — | `codestral` |
+| **Vera** | `mistral-large-2407` | — | `mistral-large-2407` |
+| **Penpot** / **Domi** | `mistral` ⚠️ | — | `gemini-flash` |
+| **Neo** | `mistral-large-2407` | — | `mistral-large-2407` |
 
-⚠️ = fallback temporaire (Anthropic épuisé pour Charlotte/Penpot, Gemini épuisé pour Dispatcher/Domi).
+⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
+Charlotte v3.14 : split LLM — `claude-sonnet` pour les sessions interactives (`/mission`), `mistral` pour les scans Temporal automatiques (`sre_analyze_with_llm`). Économie ~23$/jour.
 
 ---
 

@@ -421,7 +421,7 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ---
 
-## Charlotte SRE — Architecture interne (v3.12)
+## Charlotte SRE — Architecture interne (v3.14)
 
 `SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (défaut 300s) via un Temporal Schedule.
 
@@ -484,7 +484,7 @@ ProjectSpec validé par Dispatcher
 
 ### Architecture outils — Phase 2 MCP (2026-05-13)
 
-Charlotte v3.13 dispose de deux couches d'outils K8s :
+Charlotte v3.14 dispose de deux couches d'outils K8s :
 
 1. **Outils propres Charlotte** (`run_kubectl`, `kubectl_apply`, etc.) — primitives génériques validées
 2. **Outils K8s MCP** (`k8s_pods_list`, `k8s_events_list`, `k8s_resources_scale`, etc.) — découverts dynamiquement au démarrage depuis le serveur MCP `k8s-mcp.agent-system:8080`
@@ -508,6 +508,8 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 | `check_service_version` | Version courante vs dernière disponible (DockerHub/GitHub API) | Obligatoire avant toute mise à jour |
 | `helm_upgrade` | Helm upgrade via admin-sys `/helm` | Uniquement traefik et vault |
 | `test_agent_stream` | Smoke test streaming SSE d'un agent OWU-facing — compte les chunks SSE reçus (>3 = OK) | Étape 6 du protocole de correction code agents |
+| `trigger_dispatcher_workflow` | Délègue un workflow au Dispatcher Temporal : `dev_project` (lance `DevProjectWorkflow` complet Aria+Nox+Vera+deploy) ou `check_status` (liste les workflows actifs) | Charlotte délègue le pipeline métier sans l'absorber |
+| `signal_workflow` | Envoie un signal à un `DevProjectWorkflow` en attente : `approve` (déclenche déploiement Vercel) ou `reject` (annule) | Relais de l'approbation humaine vers Temporal |
 | `k8s_*` (MCP) | **19 outils K8s MCP** découverts dynamiquement : `k8s_pods_list`, `k8s_pods_log`, `k8s_events_list`, `k8s_resources_scale`, `k8s_resources_create_or_update`, etc. | Opérations K8s typées via MCP — complément à `run_kubectl` |
 
 **Philosophie des outils Charlotte (2026-05-12) :**
@@ -555,7 +557,7 @@ JAMAIS oublier git_push — sans ça le fix est reverté en <5 min par cluster-b
 1. **GitOps drift** — tout patch live d'une ressource présente dans `~/Kubinote-GitOps/apps/` est reverté en <5 min par le CronJob `cluster-bootstrap`. `apply_gitops_fix` garantit le push. Sans push, le fix disparaît.
 2. **Validation post-fix** — `kubectl get pod <ancien-nom>` retourne `NotFound` après un rollout, ce n'est PAS la preuve que le fix marche. `apply_gitops_fix` appelle `verify_pod_healthy` en interne (sélection par label `app=<deployment>`, Ready=N/N pendant ≥30s sans restart).
 3. **OOM différencié** — `OOMKilled` (cgroup, exit 137 dans `describe`) vs heap limit applicatif (logs : `FATAL ERROR: Reached heap limit`, `OutOfMemoryError`). Augmenter `limits.memory` ne fixe que le premier. Le second nécessite `NODE_OPTIONS=--max-old-space-size`, `JAVA_OPTS=-Xmx`, etc. Voir [CLAUDE-antipatterns.md §14](CLAUDE-antipatterns.md).
-4. **Périmètre étendu (2026-05-07)** — `monitoring`, `stalwart`, `penpot`, `dify`, `surfsense` sont désormais **autorisés en remédiation** sur demande explicite (au lieu de SIGNALER uniquement). `kube-system` et `security` restent SIGNALER uniquement.
+4. **Périmètre durci v8 (2026-05-13)** — `kube-system`, `security`, `monitoring`, `stalwart`, `penpot`, `dify`, `surfsense` sont tous **SIGNALER UNIQUEMENT** — `confirmation_required: true` obligatoire même si l'humain demande "corrige directement". `apply_gitops_fix` est bloqué (hard, code-level) sur ces namespaces. Aucune remédiation automatique, même sur demande explicite. *(Durci suite à hallucination Charlotte sur surfsense-zero-cache 2026-05-13 — `_NO_ACTION_NS` guard dans sre_agent.py.)*
 5. **Restart Charlotte interdit** — Charlotte ne peut pas redémarrer `agent-charlotte` elle-même (`restart_deployment` retourne ⛔), cela couperait la session en cours.
 
 ### Gotchas opérationnels Charlotte (2026-05-07)
@@ -756,22 +758,23 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 
 ### Profils LLM actifs
 
-> **⚠️ TEMPORAIRE (depuis 2026-05-06)** : Charlotte et Penpot sur `mistral` (compte Anthropic épuisé). Dispatcher et Domi sur `mistral` (quota Gemini-flash épuisé, réinitialisation quotidienne).
+> **⚠️ TEMPORAIRE** : Dispatcher et Domi sur `mistral` (quota Gemini-flash épuisé, réinitialisation quotidienne).
+> Charlotte est passée à `claude-sonnet` (2026-05-13 — Anthropic rechargé). Split LLM actif : `claude-sonnet` pour `/mission`, `mistral` pour scans Temporal.
 
-| Agent | `LLM_MODEL` actuel | Modèle cible | Justification |
-|---|---|---|---|
-| **Charlotte** SRE | `mistral` ⚠️ | `claude-sonnet` | Décisions critiques cluster |
-| **Leon** | `mistral-large-2407` | `mistral-large-2407` | Dialogue client |
-| **Dispatcher** | `mistral` ⚠️ | `gemini-flash` | Orchestration pure |
-| **Aria** Frontend | `codestral` | `codestral` | Génération de code |
-| **Nox** Backend | `codestral` | `codestral` | Génération de code |
-| **Vera** QA | `mistral-large-2407` | `mistral-large-2407` | Analyse qualité |
-| **Penpot** Design | `mistral` ⚠️ | `gemini-flash` | Scaffolding léger |
-| **Domi** Domain | `mistral` ⚠️ | `gemini-flash` | Opérations déterministes |
-| **Neo** Assistant | `mistral-large-2407` | `mistral-large-2407` | Assistant démo client |
+| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | Modèle cible | Justification |
+|---|---|---|---|---|
+| **Charlotte** SRE | `claude-sonnet` ✅ | `mistral` | `claude-sonnet` | Décisions critiques cluster + split coût |
+| **Leon** | `mistral-large-2407` | — | `mistral-large-2407` | Dialogue client |
+| **Dispatcher** | `mistral` ⚠️ | — | `gemini-flash` | Orchestration pure |
+| **Aria** Frontend | `codestral` | — | `codestral` | Génération de code |
+| **Nox** Backend | `codestral` | — | `codestral` | Génération de code |
+| **Vera** QA | `mistral-large-2407` | — | `mistral-large-2407` | Analyse qualité |
+| **Penpot** Design | `mistral` | — | `gemini-flash` | Scaffolding léger |
+| **Domi** Domain | `mistral` ⚠️ | — | `gemini-flash` | Opérations déterministes |
+| **Neo** Assistant | `mistral-large-2407` | — | `mistral-large-2407` | Assistant démo client |
 
-> **Restaurer Charlotte + Penpot** : recharger Anthropic → `llm-key-sync` → modifier `LLM_MODEL: "claude-sonnet"` dans deployments → `kubectl rollout restart`.
 > **Restaurer Dispatcher + Domi** : quota Gemini se réinitialise auto → modifier `LLM_MODEL: "gemini-flash"` dans deployments.
+> **Charlotte split** : `LLM_SCAN_MODEL` est disponible pour tout agent avec des activités Temporal coûteuses. Pattern : `_llm_call(model=LLM_SCAN_MODEL)` dans les activités périodiques.
 
 ### Règles R9
 
