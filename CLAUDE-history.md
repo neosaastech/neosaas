@@ -1,10 +1,11 @@
 # Historique des actions Claude — neokube-beta
 
-> Archivé depuis CLAUDE.md — 108 entrées, 2026-03-15 → 2026-05-13.
+> Archivé depuis CLAUDE.md — 109 entrées, 2026-03-15 → 2026-05-13.
 > Toutes les phases de sécurité (0–3) et capacités (4a–10d) sont ✅ terminées.
 
 | Date | Action |
 |---|---|
+| 2026-05-13 | **feat(charlotte): prompt Langfuse v6 — MCP migration** — `connector-system` : ajout `github-mcp (port 8080, MCP streamable-http)` ; `agent-system` : ajout `k8s-mcp (port 8080, MCP streamable-http)` ; nouveau bloc `OUTILS K8S MCP` (k8s_* préfixés) listant 12 outils + règles lecture vs mutation ; `push-charlotte-prompt-v6.py` créé + exécuté ; `CLAUDE-charlotte-prompt.md` re-vectorisé via `pull-charlotte-prompt.sh --apply` ; commit GitOps `081683b` ; sync bidirectionnel Direction 1 + Direction 2 opérationnels |
 | 2026-05-13 | **feat(mcp): Nox v3.0 — Neon MCP remote (Phase 1b complète)** — `_mcp_neon()` helper SSE (`mcp.neon.tech/sse`) avec `Authorization: Bearer NEON_API_KEY` ; `create_branch(projectId, branchName)` + regex `Branch ID: br-xxx` ; `get_connection_string(projectId, branchId)` + regex `@<host>/` pour extraire l'host ; `NEON_API_KEY` depuis `leon-neon-secrets` ; `NEON_CONNECTOR_URL` supprimé de Nox ; test E2E live sur `young-fog-76038471` confirmé (branch créée + host extrait + nettoyage) ; Nox est maintenant 100% MCP (GitHub MCP + Neon MCP) ; commit `fdcc477` |
 | 2026-05-13 | **feat(mcp): Phase 2 — K8s MCP server + Charlotte v3.13** — Déploiement `kubernetes-mcp-server` (Red Hat/CNCF, `ghcr.io/containers/kubernetes-mcp-server:latest`) dans `agent-system` : 20 outils K8s (`pods_list`, `pods_log`, `events_list`, `resources_create_or_update`, `resources_scale`, etc.) ; Charlotte v3.13 : `mcp>=1.0.0` ajouté requirements.txt, imports `ClientSession + streamablehttp_client`, `MCP_K8S_URL` env var, `_init_k8s_mcp_tools()` (découverte dynamique au démarrage, non-bloquant), `_mcp_k8s_call()` (routage outils `k8s_*`), `_K8S_MCP_TOOLS` mergé dans `_MISSION_TOOLS + _K8S_MCP_TOOLS` ; commit `e352349` ; `kubectl replace sre-script` + rollout restart |
 | 2026-05-13 | **feat(mcp): Phase 1 — GitHub MCP + Aria v3.0 + Nox v2.0** — Déploiement `github-mcp-server` (officiel GitHub v1.0.4) dans `connector-system` ; Aria v3.0 : template repo reste via github-connector, branch → `create_branch` MCP, push multi-fichiers → `push_files` MCP (atomique) ; Nox v2.0 : branch → `create_branch` MCP, OpenAPI stub → `create_or_update_file` MCP ; `github-mcp-token` Secret créé dans `connector-system` + `agent-system` ; commit `ccad832` |
