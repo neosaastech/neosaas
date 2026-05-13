@@ -745,3 +745,42 @@ return {"ok": True, "name": pp["name"], "project_id": pid,
 3. `dispatch_design_deploy(penpot_project_id="<uuid>")` — seulement après confirmation
 
 **Fix appliqué** : commit `cc35d37`.
+
+---
+
+### 31. `raise` à l'intérieur d'un `async with ClientSession()` MCP → ExceptionGroup non catchable
+
+**Contexte** : agents Aria, Nox (et tout agent Python utilisant `mcp>=1.0.0` avec `streamablehttp_client` ou `sse_client`).
+
+**Symptôme** : l'activité Temporal lève une `ExceptionGroup` au lieu d'une `RuntimeError` — le `except RuntimeError as e` dans l'appelant ne catch pas, l'activité échoue complètement au lieu d'être gérée proprement.
+
+**Cause** : `ClientSession` et `streamablehttp_client` utilisent des anyio `TaskGroup` en interne. Tout `raise` à l'intérieur de ces context managers est wrappé en `ExceptionGroup` lors du `__aexit__`.
+
+```python
+# ❌ FAUX — raise inside TaskGroup → ExceptionGroup
+async with streamablehttp_client(URL) as (r, w, _):
+    async with ClientSession(r, w) as session:
+        result = await session.call_tool(tool, args)
+        if result.isError:
+            raise RuntimeError(f"MCP {tool}: {result.content}")  # wrappé en ExceptionGroup
+        return json.loads(result.content[0].text)
+
+# ✅ CORRECT — stocker l'erreur, raise APRÈS la sortie des context managers
+async def _mcp_call(tool, args):
+    _err = None
+    _text = None
+    async with streamablehttp_client(URL) as (r, w, _):
+        async with ClientSession(r, w) as session:
+            _res = await session.call_tool(tool, args)
+            if _res.isError:
+                _err = str(_res.content)
+            else:
+                _text = _res.content[0].text if _res.content else "{}"
+    if _err:
+        raise RuntimeError(f"MCP {tool}: {_err}")   # raise propre, hors TaskGroup
+    return json.loads(_text)
+```
+
+**Règle** : dans tout helper MCP (`_mcp_github`, `_mcp_neon`, `_mcp_k8s_call`, etc.), ne **jamais** `raise` à l'intérieur d'un `async with ClientSession()`. Stocker dans `_err`, lever après. Même règle pour les `return` de données — stocker dans `_text`/`_data`, retourner après.
+
+**Fix appliqué** : commit `1cd9bdd`.
