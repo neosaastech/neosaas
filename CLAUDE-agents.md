@@ -761,20 +761,24 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 > **⚠️ TEMPORAIRE** : Dispatcher et Domi sur `mistral` (quota Gemini-flash épuisé, réinitialisation quotidienne).
 > Charlotte est passée à `claude-sonnet` (2026-05-13 — Anthropic rechargé). Split LLM actif : `claude-sonnet` pour `/mission`, `mistral` pour scans Temporal.
 
-| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | Modèle cible | Justification |
-|---|---|---|---|---|
-| **Charlotte** SRE | `claude-sonnet` ✅ | `mistral` | `claude-sonnet` | Décisions critiques cluster + split coût |
-| **Leon** | `mistral-large-2407` | — | `mistral-large-2407` | Dialogue client |
-| **Dispatcher** | `mistral` ⚠️ | — | `gemini-flash` | Orchestration pure |
-| **Aria** Frontend | `codestral` | — | `codestral` | Génération de code |
-| **Nox** Backend | `codestral` | — | `codestral` | Génération de code |
-| **Vera** QA | `mistral-large-2407` | — | `mistral-large-2407` | Analyse qualité |
-| **Penpot** Design | `mistral` | — | `gemini-flash` | Scaffolding léger |
-| **Domi** Domain | `mistral` ⚠️ | — | `gemini-flash` | Opérations déterministes |
-| **Neo** Assistant | `mistral-large-2407` | — | `mistral-large-2407` | Assistant démo client |
+| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` | Modèle cible |
+|---|---|---|---|---|---|
+| **Charlotte** SRE | `claude-sonnet` ✅ | `mistral` | `mistral-large-2407` | `mistral` | `claude-sonnet` |
+| **Leon** | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
+| **Dispatcher** | `mistral` ⚠️ | — | — | — | `gemini-flash` |
+| **Aria** Frontend | `codestral` | — | — | — | `codestral` |
+| **Nox** Backend | `codestral` | — | — | — | `codestral` |
+| **Vera** QA | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
+| **Penpot** Design | `mistral` | — | — | — | `gemini-flash` |
+| **Domi** Domain | `mistral` ⚠️ | — | — | — | `gemini-flash` |
+| **Neo** Assistant | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
 
 > **Restaurer Dispatcher + Domi** : quota Gemini se réinitialise auto → modifier `LLM_MODEL: "gemini-flash"` dans deployments.
-> **Charlotte split** : `LLM_SCAN_MODEL` est disponible pour tout agent avec des activités Temporal coûteuses. Pattern : `_llm_call(model=LLM_SCAN_MODEL)` dans les activités périodiques.
+> **Charlotte split (3 niveaux)** :
+> - `LLM_MODEL=claude-sonnet` → missions SRE réelles (ReAct loop, tool calls kubectl/GitOps)
+> - `LLM_CONV_MODEL=mistral-large-2407` → classify + fast-path conversationnel ("bonjour", questions générales)
+> - `LLM_SCAN_MODEL=mistral` → scans Temporal automatiques (`sre_analyze_with_llm`)
+> - `LLM_FALLBACK=mistral` → fallback automatique si quota `LLM_MODEL` épuisé (HTTP 402), avec ntfy alerte
 
 ### Règles R9
 
@@ -791,6 +795,10 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 **R9.6** — Langfuse : toujours `cluster-manager-secrets` depuis `agent-system` (jamais `cockpit-secrets`, mauvais namespace). Public key : `pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f`. Projet : `neokube-agents`.
 
 **R9.7** — Identité complète dans chaque trace Langfuse : nom, email (`@neokube.fr`), périmètre permissions.
+
+**R9.8** — `LLM_FALLBACK` doit être **lu depuis l'env ET effectivement utilisé** dans `_llm_call` et `_llm_call_stream`. Le déclarer dans le deployment sans le consommer dans le code ne protège pas contre les quota épuisés. Pattern obligatoire : détection HTTP 402 / mots-clés `"credit"`, `"insufficient"`, `"quota"` → retry avec `LLM_FALLBACK` + ntfy alerte rate-limitée (1/h). Voir antipattern #32.
+
+**R9.9** — `_llm_call_stream` doit accepter un paramètre `model: str | None = None` pour permettre l'override par `LLM_CONV_MODEL`. Sans ce paramètre, toute les variantes streaming (fast-path conversationnel, synthèse finale) brûlent le modèle premium même pour des messages triviaux.
 
 ---
 

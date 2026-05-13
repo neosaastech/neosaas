@@ -297,6 +297,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 29 | `{placeholder}` littéral dans f-string system prompt | `system = f"""... {agent} ..."""` → Python évalue `agent` comme variable → `NameError` à chaque appel mission. Fix : `{{agent}}` (double accolade = accolade littérale dans f-string). Seules les variables Python réelles (`{session_id}`, `{interface}`) restent sans double accolade. |
 | 30 | `project_health_check` retourne Penpot name/url mais pas `project_id` | `_check_penpot()` calculait `pid` mais ne l'incluait pas dans le dict → Charlotte ne pouvait jamais passer l'UUID à `dispatch_design_deploy`. Règle : toute `_check_<service>()` doit retourner **tous** les identifiants nécessaires aux outils aval. Séquence Rule 13 : `project_health_check` → `ask_clarification` (confirmation) → `dispatch_design_deploy`. |
 | 31 | `raise` dans `async with ClientSession()` MCP → ExceptionGroup | `raise RuntimeError()` à l'intérieur d'un `async with ClientSession()` anyio → wrappé en `ExceptionGroup` → `except RuntimeError` ne catch pas. Fix : stocker `_err/_text` dans les context managers, lever/retourner **après** la sortie. S'applique à tout helper MCP (`_mcp_github`, `_mcp_neon`, etc.). |
+| 32 | `_llm_call` silencieux sur quota épuisé | HTTP 402 retourne `""` sans fallback ni alerte → session perdue, message générique incompréhensible, ntfy peut envoyer du JSON brut. Fix : détecter 402/`"credit"`/`"insufficient"` → fallback `LLM_FALLBACK`, ntfy rate-limitée 1/h, filtrer `final.startswith("{")` dans ntfy mission-end. `LLM_CONV_MODEL` pour classify + fast-path conv (10× moins cher que claude-sonnet). |
 
 ---
 
@@ -304,18 +305,18 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 > Règles complètes (R9.1–R9.7), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
-| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | Modèle cible |
-|---|---|---|---|
-| **Charlotte** SRE | `claude-sonnet` ✅ (sessions `/mission`) | `mistral` (scans Temporal) | `claude-sonnet` |
-| **Leon** | `mistral-large-2407` | — | `mistral-large-2407` |
-| **Dispatcher** | `mistral` ⚠️ | — | `gemini-flash` |
-| **Aria** / **Nox** | `codestral` | — | `codestral` |
-| **Vera** | `mistral-large-2407` | — | `mistral-large-2407` |
-| **Penpot** / **Domi** | `mistral` ⚠️ | — | `gemini-flash` |
-| **Neo** | `mistral-large-2407` | — | `mistral-large-2407` |
+| Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` |
+|---|---|---|---|---|
+| **Charlotte** SRE | `claude-sonnet` ✅ | `mistral` | `mistral-large-2407` | `mistral` |
+| **Leon** | `mistral-large-2407` | — | — | — |
+| **Dispatcher** | `mistral` ⚠️ | — | — | — |
+| **Aria** / **Nox** | `codestral` | — | — | — |
+| **Vera** | `mistral-large-2407` | — | — | — |
+| **Penpot** / **Domi** | `mistral` ⚠️ | — | — | — |
+| **Neo** | `mistral-large-2407` | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
-Charlotte v3.14 : split LLM — `claude-sonnet` pour les sessions interactives (`/mission`), `mistral` pour les scans Temporal automatiques (`sre_analyze_with_llm`). Économie ~23$/jour.
+**Charlotte — 3 niveaux LLM** : `claude-sonnet` (missions SRE, ReAct + tool calls) · `mistral-large-2407` (classify + fast-path conversationnel) · `mistral` (scans Temporal automatiques). `LLM_FALLBACK=mistral` déclenché automatiquement sur HTTP 402 + ntfy alerte. Voir **R9.8–R9.9** dans CLAUDE-agents.md et **antipattern #32** dans CLAUDE-antipatterns.md.
 
 ---
 

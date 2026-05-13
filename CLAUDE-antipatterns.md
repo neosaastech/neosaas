@@ -784,3 +784,50 @@ async def _mcp_call(tool, args):
 **Règle** : dans tout helper MCP (`_mcp_github`, `_mcp_neon`, `_mcp_k8s_call`, etc.), ne **jamais** `raise` à l'intérieur d'un `async with ClientSession()`. Stocker dans `_err`, lever après. Même règle pour les `return` de données — stocker dans `_text`/`_data`, retourner après.
 
 **Fix appliqué** : commit `1cd9bdd`.
+
+---
+
+### 32. `_llm_call` silencieux sur quota épuisé → session perdue, ntfy JSON brut
+
+**Contexte** : Charlotte (et tout agent utilisant `_llm_call` via LiteLLM). Quand les crédits Anthropic s'épuisent, LiteLLM retourne HTTP 402 avec un body JSON d'erreur.
+
+**Symptôme** :
+- Charlotte répond `"Je n'ai pas pu traiter cette demande (session: ow-xxxxx)"` sans aucune indication de cause
+- L'utilisateur ne sait pas s'il faut recharger les crédits, redémarrer Charlotte, ou investiguer un bug
+- La notification ntfy de fin-de-mission peut contenir le raw JSON de la réponse d'erreur (`{"type":"error","error":{...}}`) si `final` n'est pas filtré
+
+**Cause** :
+1. `_llm_call` retournait `""` sur `HTTP != 200` sans distinguer 402 (quota) d'une vraie erreur
+2. `LLM_FALLBACK` était défini dans le deployment K8s mais jamais lu dans le code Python
+3. `_llm_call_stream` n'avait pas de paramètre `model` → fast-path conversationnel ("bonjour") utilisait `claude-sonnet` au lieu d'un modèle moins cher
+
+```python
+# ❌ FAUX — silencieux, pas de fallback, pas d'alerte
+if r.status_code != 200:
+    log.warning("LLM call HTTP %s: %s", r.status_code, r.text[:300])
+    return ""
+
+# ✅ CORRECT — détection quota + fallback + ntfy
+if r.status_code != 200:
+    _is_quota = (r.status_code == 402 or
+                 any(kw in r.text.lower() for kw in ("credit", "insufficient", "quota", "billing")))
+    if _is_quota and LLM_FALLBACK and _model != LLM_FALLBACK:
+        if time.time() - _quota_alert_ts > 3600:   # ntfy rate-limitée 1/h
+            asyncio.ensure_future(_ntfy_notify(
+                "⚠️ Anthropic — crédits épuisés",
+                f"Quota {_model} épuisé. Charlotte bascule sur {LLM_FALLBACK}.\n"
+                "Recharger : https://console.anthropic.com/settings/billing",
+                priority="high", tags=["warning", "charlotte", "anthropic", "quota"],
+            ))
+        r = await _do_llm_post(LLM_FALLBACK)   # retry avec fallback
+```
+
+**Règles** :
+- `LLM_FALLBACK` doit être lu depuis l'env ET effectivement utilisé dans `_llm_call` et `_llm_call_stream`
+- Ntfy quota : rate-limitée à 1 alerte/heure maximum (`_quota_alert_ts` global)
+- La ntfy mission-end doit filtrer `final` commençant par `{` (corps d'erreur JSON brut)
+- Le message d'erreur générique doit mentionner explicitement le lien billing
+
+**Split coût associé** : `LLM_CONV_MODEL` (env var, défaut `mistral-large-2407`) pour classify + fast-path conversationnel. Seules les vraies missions SRE (tool calls ReAct) utilisent `LLM_MODEL` (claude-sonnet). Voir R9 dans CLAUDE-agents.md.
+
+**Fix appliqué** : commit `3bee404`.
