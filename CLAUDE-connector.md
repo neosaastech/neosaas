@@ -68,7 +68,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `github-connector` | 8001 | `secret/neokube/infrastructure/github` | `GITHUB_TOKEN` |
 | `vercel-connector` | 8002 | `secret/neokube/infrastructure/vercel` | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` |
 | `neon-connector` | 8003 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` |
-| `penpot-connector` | 8004 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` |
+| `penpot-connector` | 8004 | `secret/neokube/infrastructure/penpot` | `PENPOT_ACCESS_TOKEN` (owner), `PENPOT_ARIA_TOKEN`, `PENPOT_AGENT_TOKEN`, `PENPOT_EMAIL`, `PENPOT_PASSWORD` |
 | `openprovider-connector` | 8005 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` |
 | `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_DNS_TOKEN` (prioritaire), `CF_API_TOKEN` (fallback), `CF_ACCOUNT_ID` (optionnel) |
 | `stalwart-connector` | 8007 | `secret/neokube/apps/stalwart` | `ADMIN_PASSWORD` |
@@ -86,7 +86,7 @@ Tous : `GET /health`, `POST /proxy {method?, path, params?, body?}`
 
 **vercel-connector** : injecte automatiquement `teamId` dans les params
 
-**penpot-connector** : `path` = commande RPC Penpot (ex. `create-project`) ; auth session cookie-based, re-login auto sur 401. Voir gotchas dans [CLAUDE-penpot.md](CLAUDE-penpot.md).
+**penpot-connector v2.0** : `path` = commande RPC Penpot (ex. `create-project`) ; auth par priorité : `PENPOT_ACCESS_TOKEN` (JWT `eyJ*` → `Authorization: Token`) → `as_agent="aria"` → `as_agent="penpot"` → email/password fallback. Champ `as_agent` dans le corps proxy pour agir sous l'identité d'un agent spécifique (visible dans l'UI Penpot). Voir gotchas dans [CLAUDE-penpot.md](CLAUDE-penpot.md).
 
 **openprovider-connector v1.1** : auth JWT re-login auto sur 401 ; API base `https://api.openprovider.eu/v1beta` ; endpoints bonus `POST /dns/records/add {zone, records}` et `POST /dns/records/remove {zone, records}`
 
