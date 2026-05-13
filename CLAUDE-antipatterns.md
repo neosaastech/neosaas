@@ -946,3 +946,74 @@ if fn_name == "run_kubectl":
 ```
 
 **Règle** : seules les lectures (get, describe, logs, top) sont dédupliquées. Les commandes d'écriture (delete, apply, patch, create) retournent `None` depuis `_kubectl_fingerprint` et ne sont jamais cachées.
+
+---
+
+### 36. Builder ConfigMap Python — regex sur la clé data échoue si la valeur contient le même mot
+
+Lors du rebuild d'un ConfigMap (ex: `configmap-sre-script.yaml`), extraire une clé existante avec `re.search(r'  requirements\.txt: \|-\n((?:    .*\n)*)', existing)` échoue si le script Python contient lui-même une référence à `requirements.txt` (ex: dans une f-string ou une commande shell). La regex trouve la première occurrence dans le code Python, pas la clé `data`.
+
+**Symptôme** : `ERROR: Could not open requirements file: /scripts/requirements.txt` au démarrage du pod → `ModuleNotFoundError` sur les dépendances.
+
+**Règle** : Ne jamais extraire les clés secondaires d'un ConfigMap existant par regex. À la place, inclure les clés statiques (comme `requirements.txt`) directement et en dur dans le writer Python, à la fin du ConfigMap :
+
+```python
+cm_content = f"""apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sre-script
+  namespace: agent-system
+data:
+  sre_agent.py: |-
+{script_indented}
+  requirements.txt: |
+    httpx>=0.27
+    fastapi>=0.111
+    uvicorn>=0.30
+    temporalio>=1.7
+    pyyaml>=6.0
+    mcp>=1.0.0
+"""
+```
+
+**Note** : `requirements.txt` utilise `|` (newline final) et non `|-` (pas de newline) — les deux marchent pour pip, mais `|` est plus clair.
+
+---
+
+### 37. Classificateur binaire sre/conv route les questions explicatives vers le ReAct loop
+
+Le classificateur 2-classes (`sre` | `conv`) avec biais "en cas de doute → sre" envoyait toute question mentionnant l'infra (ntfy, LLM, agents, quota) vers le path SRE — même si la question demande une **explication** et non une vérification d'état. Avec `tool_choice="required"` au tour 0, Charlotte devait obligatoirement appeler un outil, lançait 4+ tours de kubectl/logs inutiles, et déclenchait l'anti-boucle.
+
+**Exemple** : `"pourquoi on reçoit un message de quota gemini sur ntfy alors qu'on n'utilise pas gemini ?"` → Charlotte sait la réponse depuis son system prompt (Gemini = fallback Dispatcher/Domi), mais le classificateur l'envoyait investiguer kubectl.
+
+**Fix** : Classificateur 3-classes :
+- `sre` = vérification d'état ACTUEL (pods running, config live, crash, backup, etc.)
+- `explain` = question sur le fonctionnement/architecture, même si sujet = infra — Charlotte répond depuis sa connaissance, system SRE complet, sans outil
+- `conv` = salutations, hors-infra
+
+**Règle** : en cas de doute entre `sre` et `explain`, préférer `explain`. Le path `explain` utilise le system SRE complet (Charlotte a toute l'architecture) mais aucun outil et `LLM_CONV_MODEL`.
+
+```python
+# Dans le prompt classificateur :
+"En cas de doute entre sre et explain, préfère 'explain'."
+# Biais inversé par rapport au classificateur 2-classes
+```
+
+### 38. Troncature brute du contexte ReAct — perte d'informations critiques en fin de sortie
+
+Tronquer `tool_result[:2500]` coupe arbitrairement — les erreurs importantes peuvent être en fin de sortie (ex : `Events:` dans `kubectl describe` est toujours en bas).
+
+**Fix** : compression sémantique via Mistral (`LLM_SCAN_MODEL`) pour les outils volumineux (`run_kubectl`, `read_file`) quand `len(tool_result) > 1500`.
+
+```python
+async def _compress_tool_result(tool_name: str, tool_result: str, user_query: str) -> str:
+    if tool_name not in {"run_kubectl", "read_file"} or len(tool_result) <= 1500:
+        return tool_result
+    # Appel Mistral : extrait anomalies uniquement (< 400 chars)
+    compressed = await _llm_call(compress_msgs, max_tokens=120, model=LLM_SCAN_MODEL)
+    if compressed and len(compressed) < len(tool_result):
+        return f"[résumé Mistral]\n{compressed}"
+    return tool_result[:2500] + "..."  # fallback
+```
+
+Applicable à tout agent ReAct avec des outils qui retournent de grands volumes de texte.
