@@ -79,7 +79,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (notifications push v2.11.0) |
 | `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010) |
+| `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -132,11 +132,11 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.12 |
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.13 (K8s MCP) |
 | **Leon** | Chef de Projet — brief → ProjectSpec → Zoho → dispatch | Temporal | 8181 | `leon` | active v2.0 |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
-| **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v2.0 |
-| **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v1.0 |
+| **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
+| **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS | Temporal | 8489 | `dispatcher` | active v1.0 |
@@ -151,11 +151,19 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 >
 > **Règle** : avant de déclarer un secret "absent de Vault", consulter cette carte. Les secrets K8s `openai-secret`, `anthropic-secret`, `cockpit-secrets` sont des **outputs** du CronJob `llm-key-sync` — ils sont bien dans Vault.
 
-### Connector-system
+### Connector-system & MCP Servers
 
-> Architecture complète, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
+> Architecture complète, MCP servers, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
 
 Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body?}` — credentials depuis Vault auto.
+
+**MCP Servers (couche préférée pour GitHub, K8s, Neon) :**
+
+| Serveur | Namespace | Endpoint | Agents |
+|---|---|---|---|
+| `github-mcp` | `connector-system` | `:8080/mcp` (streamable-http) | Aria, Nox |
+| `k8s-mcp` | `agent-system` | `:8080/mcp` (streamable-http) | Charlotte |
+| `mcp.neon.tech` | remote | `https://mcp.neon.tech/sse` | Nox |
 
 ---
 
