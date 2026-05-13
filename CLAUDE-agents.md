@@ -482,6 +482,15 @@ ProjectSpec validé par Dispatcher
 
 ## Charlotte SRE — Protocole de remédiation sécurisé (durci 2026-05-07)
 
+### Architecture outils — Phase 2 MCP (2026-05-13)
+
+Charlotte v3.13 dispose de deux couches d'outils K8s :
+
+1. **Outils propres Charlotte** (`run_kubectl`, `kubectl_apply`, etc.) — primitives génériques validées
+2. **Outils K8s MCP** (`k8s_pods_list`, `k8s_events_list`, `k8s_resources_scale`, etc.) — découverts dynamiquement au démarrage depuis le serveur MCP `k8s-mcp.agent-system:8080`
+
+Le serveur K8s MCP (`ghcr.io/containers/kubernetes-mcp-server`) expose 19-20 outils nommés `k8s_*` dans le contexte Charlotte. Charlotte peut appeler ces outils directement sans connaître la syntaxe kubectl — les types et arguments sont validés par le protocole MCP.
+
 Charlotte a accès aux outils suivants pour agir sur le cluster :
 
 | Outil | Rôle | Usage |
@@ -499,6 +508,7 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 | `check_service_version` | Version courante vs dernière disponible (DockerHub/GitHub API) | Obligatoire avant toute mise à jour |
 | `helm_upgrade` | Helm upgrade via admin-sys `/helm` | Uniquement traefik et vault |
 | `test_agent_stream` | Smoke test streaming SSE d'un agent OWU-facing — compte les chunks SSE reçus (>3 = OK) | Étape 6 du protocole de correction code agents |
+| `k8s_*` (MCP) | **19 outils K8s MCP** découverts dynamiquement : `k8s_pods_list`, `k8s_pods_log`, `k8s_events_list`, `k8s_resources_scale`, `k8s_resources_create_or_update`, etc. | Opérations K8s typées via MCP — complément à `run_kubectl` |
 
 **Philosophie des outils Charlotte (2026-05-12) :**
 > Charlotte dispose de **primitives génériques** Kubernetes — pas d'outils programmés pour chaque situation.
