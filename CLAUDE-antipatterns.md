@@ -717,6 +717,7 @@ PROTOCOLE :
 **Règle** : dans toute f-string système, chaque `{placeholder_littéral}` doit être `{{placeholder_littéral}}`. Seules les variables Python réelles (`{session_id}`, `{interface}`, `{datetime.now()...}`) restent sans double accolade.
 
 **Fix appliqué** : commit `bb9c154` — 4 occurrences `{agent}` → `{{agent}}` dans `configmap-sre-script.yaml`.
+**Récidive Rule 13** (commit `484fd92`) : `{penpot.name}`, `{penpot.project_id}` (×2), `{id[:8]}` dans la séquence d'ask_clarification de Rule 13 → même NameError. Symptôme identique : `⚠️ name 'penpot' is not defined` dans OWU.
 
 ---
 
