@@ -831,3 +831,118 @@ if r.status_code != 200:
 **Split coût associé** : `LLM_CONV_MODEL` (env var, défaut `mistral-large-2407`) pour classify + fast-path conversationnel. Seules les vraies missions SRE (tool calls ReAct) utilisent `LLM_MODEL` (claude-sonnet). Voir R9 dans CLAUDE-agents.md.
 
 **Fix appliqué** : commit `3bee404`.
+
+---
+
+### 33. Charlotte se modifie elle-même → boucle infinie de tentatives bloquées
+
+**Contexte** : Charlotte agent SRE, `write_file` et `apply_gitops_fix` dans `sre_agent.py`.
+
+**Symptôme** : Charlotte reçoit une mission impliquant de modifier ses propres fichiers (ex : améliorer Neo → découvre qu'elle veut aussi patcher `configmap-sre-script.yaml`). Elle appelle `write_file` → bloqué. Appelle `apply_gitops_fix` → bloqué. Re-lit les fichiers → répète. 8 tours complets consommés pour rien, session close sans résultat.
+
+**Cause** : Aucune détection de la tentative d'auto-modification — les outils retournaient une erreur mais le LLM relançait quand même car le system prompt ne précisait pas la règle d'arrêt.
+
+**Fix — deux niveaux** :
+1. **Runtime** : `_is_charlotte_file(path)` vérifie `"charlotte" in path` / `"sre-script" in path` / `basename in frozenset` → retourne immédiatement `❌ AUTO-MODIFICATION BLOQUÉE` + ntfy
+2. **Prompt** : `RÈGLE AUTO-MODIFICATION — ABSOLUE` : 1 seul `ask_clarification` puis stop. `RÈGLE ANTI-BOUCLE` : au tour 4 sans écriture → ntfy + break.
+
+```python
+def _is_charlotte_file(path: str) -> bool:
+    fname = path.split("/")[-1]
+    return (
+        "charlotte" in path.lower()
+        or "sre-script" in path
+        or fname in _CHARLOTTE_OWN_FILES  # {"serviceaccount-sre.yaml", "sre_agent.py"}
+    )
+```
+
+**Comportement attendu** : Charlotte appelle `ask_clarification` avec le contenu exact du changement à appliquer, puis stop. L'humain applique via GitOps.
+
+---
+
+### 34. `_CHARLOTTE_OWN_FILES` frozenset trop large bloque les écrits légitimes sur d'autres agents
+
+**Contexte** : Charlotte tente d'appliquer un fix sur `configmap-neo-script.yaml` (fichier Neo, pas Charlotte).
+
+**Symptôme** : `write_file(path="apps/agent-system/base/configmap-neo-script.yaml")` → bloqué avec `❌ AUTO-MODIFICATION`. Charlotte ne peut pas corriger les fichiers des autres agents.
+
+**Cause** : L'ancien frozenset listait 7 fichiers par nom :
+```python
+_CHARLOTTE_OWN_FILES = frozenset({
+    "configmap-sre-script.yaml",      # ← match par nom exact OK
+    "configmap-charlotte-config.yaml", # ← redondant : "charlotte" déjà dans path
+    "deployment-charlotte.yaml",        # ← idem
+    "serviceaccount-sre.yaml",
+    "service-charlotte.yaml",           # ← idem
+    "pvc-charlotte-state.yaml",         # ← idem
+    "sre_agent.py",
+})
+```
+La condition `_fname in _CHARLOTTE_OWN_FILES` sur le nom seul (sans le path) pouvait en théorie matcher des fichiers homonymes dans d'autres namespaces GitOps.
+
+**Fix** : Réduire le frozenset à 2 entrées (les fichiers Charlotte sans "charlotte" dans le nom) + déléguer la détection au helper `_is_charlotte_file(path)` basé sur le chemin complet :
+
+```python
+_CHARLOTTE_OWN_FILES = frozenset({
+    "serviceaccount-sre.yaml",  # seul fichier Charlotte sans "charlotte" dans le nom
+    "sre_agent.py",
+})
+
+def _is_charlotte_file(path: str) -> bool:
+    fname = path.split("/")[-1]
+    return (
+        "charlotte" in path.lower()   # deployment-charlotte, configmap-charlotte-config…
+        or "sre-script" in path       # configmap-sre-script.yaml
+        or fname in _CHARLOTTE_OWN_FILES
+    )
+```
+
+**Règle** : la détection doit être basée sur le **chemin complet** (pas seulement le basename), pour éviter les faux positifs sur des fichiers homonymes dans d'autres namespaces GitOps.
+
+---
+
+### 35. Anti-boucle `run_kubectl` — variantes `-o` comptent comme des appels distincts
+
+**Contexte** : boucle ReAct Charlotte, `run_kubectl` avec différents formats de sortie.
+
+**Symptôme** : Charlotte appelle successivement :
+```
+run_kubectl(["get", "pod", "neo-abc", "-n", "agent-system", "-o", "yaml"])
+run_kubectl(["get", "pod", "neo-abc", "-n", "agent-system", "-o", "json"])
+run_kubectl(["get", "pod", "neo-abc", "-n", "agent-system", "-o", "jsonpath={.status}"])
+```
+Trois appels API K8s pour la même ressource — contexte augmente inutilement, tours consommés, latence.
+
+**Cause** : L'anti-boucle ne dédupliquait que les appels **identiques** (même JSON d'args). Le flag `-o` suffix différencie les fingerprints → pas de cache.
+
+**Fix** : `_kubectl_fingerprint(args)` normalise en ignorant `-o`/`--output`. `_kubectl_seen` dict (par session ReAct) retourne le résultat mis en cache :
+
+```python
+def _kubectl_fingerprint(args: list) -> str | None:
+    verb = args[0] if args else ""
+    if verb not in ("get", "describe", "logs", "top"):
+        return None  # écriture = pas de cache
+    clean = []
+    skip_next = False
+    for a in args:
+        if skip_next:
+            skip_next = False; continue
+        if a in ("-o", "--output"):
+            skip_next = True; continue
+        if (a.startswith("-o") and len(a) > 2) or a.startswith("--output="):
+            continue
+        clean.append(a)
+    return " ".join(clean)
+
+# Dans la boucle ReAct :
+if fn_name == "run_kubectl":
+    _fp = _kubectl_fingerprint(fn_args.get("args", []))
+    if _fp and _fp in _kubectl_seen:
+        tool_result = f"[déjà exécuté — résultat mis en cache]\n{_kubectl_seen[_fp]}"
+    else:
+        tool_result = await _mission_execute_tool(fn_name, fn_args)
+        if _fp:
+            _kubectl_seen[_fp] = tool_result[:2500]
+```
+
+**Règle** : seules les lectures (get, describe, logs, top) sont dédupliquées. Les commandes d'écriture (delete, apply, patch, create) retournent `None` depuis `_kubectl_fingerprint` et ne sont jamais cachées.
