@@ -421,7 +421,7 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ---
 
-## Charlotte SRE — Architecture interne (v3.14)
+## Charlotte SRE — Architecture interne (v3.15)
 
 `SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (défaut 300s) via un Temporal Schedule.
 
@@ -559,6 +559,11 @@ JAMAIS oublier git_push — sans ça le fix est reverté en <5 min par cluster-b
 3. **OOM différencié** — `OOMKilled` (cgroup, exit 137 dans `describe`) vs heap limit applicatif (logs : `FATAL ERROR: Reached heap limit`, `OutOfMemoryError`). Augmenter `limits.memory` ne fixe que le premier. Le second nécessite `NODE_OPTIONS=--max-old-space-size`, `JAVA_OPTS=-Xmx`, etc. Voir [CLAUDE-antipatterns.md §14](CLAUDE-antipatterns.md).
 4. **Périmètre durci v8 (2026-05-13)** — `kube-system`, `security`, `monitoring`, `stalwart`, `penpot`, `dify`, `surfsense` sont tous **SIGNALER UNIQUEMENT** — `confirmation_required: true` obligatoire même si l'humain demande "corrige directement". `apply_gitops_fix` est bloqué (hard, code-level) sur ces namespaces. Aucune remédiation automatique, même sur demande explicite. *(Durci suite à hallucination Charlotte sur surfsense-zero-cache 2026-05-13 — `_NO_ACTION_NS` guard dans sre_agent.py.)*
 5. **Restart Charlotte interdit** — Charlotte ne peut pas redémarrer `agent-charlotte` elle-même (`restart_deployment` retourne ⛔), cela couperait la session en cours.
+6. **Auto-modification interdite (v3.15, 2026-05-13)** — Charlotte ne peut pas modifier ses propres fichiers (`configmap-sre-script.yaml`, `deployment-charlotte.yaml`, `serviceaccount-sre.yaml`, `configmap-charlotte-config.yaml`, `sre_agent.py`). Double garde :
+   - **Runtime** : `write_file` et `apply_gitops_fix` détectent `_CHARLOTTE_OWN_FILES` → retournent `❌ AUTO-MODIFICATION BLOQUÉE` + ntfy `"🚫 tentative auto-modification"` (priorité high)
+   - **Prompt** : `RÈGLE AUTO-MODIFICATION — ABSOLUE` + `RÈGLE ANTI-BOUCLE` (stop tour 4/8 sans écriture → `ask_clarification` structuré + ntfy)
+   - **Comportement attendu** : Charlotte s'arrête dès la 1ère tentative bloquée, appelle `ask_clarification` en expliquant ce que l'humain doit appliquer manuellement via GitOps. Elle ne boucle pas.
+7. **RBAC pods/exec** — `pods/exec create` ajouté au ClusterRole `agent-sre-role` (2026-05-13) — requis pour `kubectl exec` / `test_agent_stream`.
 
 ### Gotchas opérationnels Charlotte (2026-05-07)
 
@@ -763,7 +768,7 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 
 | Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` | Modèle cible |
 |---|---|---|---|---|---|
-| **Charlotte** SRE | `claude-sonnet` ✅ | `mistral` | `mistral-large-2407` | `mistral` | `claude-sonnet` |
+| **Charlotte** SRE v3.15 | `claude-sonnet` ✅ | `mistral` | `mistral-large-2407` | `mistral` | `claude-sonnet` |
 | **Leon** | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | `gemini-flash` |
 | **Aria** Frontend | `codestral` | — | — | — | `codestral` |

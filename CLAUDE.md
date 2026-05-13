@@ -128,11 +128,11 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 > Charlotte internals, RBAC, admin-sys API, DevProjectWorkflow, R9, Checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
-> **Charlotte SRE v3.14 — protocole de remédiation sécurisé** (GitOps drift, `verify_pod_healthy`, OOM différencié, périmètre durci v8, outils Dispatcher) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Charlotte SRE v3.15 — protocole de remédiation sécurisé** (GitOps drift, `verify_pod_healthy`, OOM différencié, périmètre durci v8, outils Dispatcher, self-mod guard, anti-boucle) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.14 (K8s MCP, LLM split, delegation Dispatcher) |
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.15 (K8s MCP, LLM split, delegation Dispatcher, self-mod guard) |
 | **Leon** | Chef de Projet — brief → ProjectSpec → Zoho → dispatch | Temporal | 8181 | `leon` | active v2.0 |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
@@ -298,6 +298,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 30 | `project_health_check` retourne Penpot name/url mais pas `project_id` | `_check_penpot()` calculait `pid` mais ne l'incluait pas dans le dict → Charlotte ne pouvait jamais passer l'UUID à `dispatch_design_deploy`. Règle : toute `_check_<service>()` doit retourner **tous** les identifiants nécessaires aux outils aval. Séquence Rule 13 : `project_health_check` → `ask_clarification` (confirmation) → `dispatch_design_deploy`. |
 | 31 | `raise` dans `async with ClientSession()` MCP → ExceptionGroup | `raise RuntimeError()` à l'intérieur d'un `async with ClientSession()` anyio → wrappé en `ExceptionGroup` → `except RuntimeError` ne catch pas. Fix : stocker `_err/_text` dans les context managers, lever/retourner **après** la sortie. S'applique à tout helper MCP (`_mcp_github`, `_mcp_neon`, etc.). |
 | 32 | `_llm_call` silencieux sur quota épuisé | HTTP 402 retourne `""` sans fallback ni alerte → session perdue, message générique incompréhensible, ntfy peut envoyer du JSON brut. Fix : détecter 402/`"credit"`/`"insufficient"` → fallback `LLM_FALLBACK`, ntfy rate-limitée 1/h, filtrer `final.startswith("{")` dans ntfy mission-end. `LLM_CONV_MODEL` pour classify + fast-path conv (10× moins cher que claude-sonnet). |
+| 33 | Charlotte se modifie elle-même (boucle) | Charlotte tente `write_file`/`apply_gitops_fix` sur ses propres fichiers → boucle infinie de tentatives bloquées. Guards runtime : `_CHARLOTTE_OWN_FILES` dans `write_file` + `apply_gitops_fix` → bloc + ntfy immédiat. Prompt : `RÈGLE AUTO-MODIFICATION` + `RÈGLE ANTI-BOUCLE` (stop tour 4 sans écriture → ask_clarification structuré). |
 
 ---
 
