@@ -1223,7 +1223,7 @@ if stream_requested:
 |---|---|---|---|
 | Charlotte | ✅ tokens réels (`_llm_call_stream`) | ✅ tokens réels | ✅ Complet |
 | Neo | ✅ LiteLLM `stream=True` (`_stream_direct`) | ✅ mot-par-mot | ✅ Complet |
-| Leon | ⚠️ `_build_sse` 2 chunks fixes | ⚠️ `_build_sse` 2 chunks fixes | 🔴 À corriger |
+| Leon | ✅ `_conv_llm_stream` tokens réels | ✅ `_stream_content` mot/mot | ✅ Corrigé 2026-05-13 |
 
 **Leon** : synchrone (thread pool `_run_sync`) — migration vers streaming async à planifier séparément. Priorité basse (agent de planification, réponses longues déjà attendues).
 
@@ -1297,9 +1297,9 @@ if _used_tools and len(final) > 50:
 |---|---|---|---|---|---|
 | **Charlotte** | `agent-charlotte:8383` | ✅ tokens réels | ✅ tokens réels | ✅ | — |
 | **Neo** | `agent-neo:8490` | ✅ LiteLLM direct | ✅ mot-par-mot | ❌ | ntfy |
-| **Leon** | `agent-leo:8181` | ❌ 2 chunks fixes | ❌ 2 chunks fixes | ❌ | streaming + ntfy |
+| **Leon** | `leon:8181` | ✅ LiteLLM stream | ✅ mot-par-mot | ❌ | ntfy |
 
-Charlotte peut être missionnée pour corriger Neo (ntfy) et Leon (streaming + ntfy) de façon autonome en suivant ce protocole.
+Charlotte peut être missionnée pour corriger Neo (ntfy) et Leon (ntfy) de façon autonome en suivant ce protocole.
 
 ---
 
