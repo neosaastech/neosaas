@@ -1105,3 +1105,22 @@ Voir Pattern A dans CLAUDE-agents.md. S'applique à toute détection d'intent pr
 **Bonus bug corrigé** : Anthropic HTTP 529 (overloaded) traité comme `quota_exceeded` → désormais `rate_limit`.
 
 **Ntfy quotidien "LLM — tous opérationnels"** : envoyé chaque jour à 6h même quand tout va bien → supprimé. Seul le rapport hebdo lundi 6h + les vrais problèmes critiques restent.
+
+---
+
+### 42. Classificateur `task` sur les clarifications contextuelles — réponse JSON artifact
+
+**Symptôme** : L'utilisateur dit "je parle de nos notifications internes et de quota de consommation LLM" → Charlotte classe `task` (voit "quota LLM" = action SRE) → ReAct loop → Mistral retourne `{"follow_ups": [...]}` au lieu d'une réponse naturelle.
+
+**Double racine** :
+1. Classificateur trop large — `task` capturait tous les messages mentionnant des termes techniques, même sans verbe d'action.
+2. Artefact JSON — quand le ReAct loop ne sait pas quoi faire, Mistral retourne un objet JSON structuré plutôt qu'une réponse naturelle.
+
+**Fix 1 — Classificateur** : `question` couvre maintenant les **clarifications contextuelles** (`je parle de X`, `je veux dire X`, `en ce qui concerne X`) et tout message **sans verbe d'action explicite**. `task` exige un verbe actif : restart, fix, list, check, create, apply, investigate, diagnose, show, run.
+
+**Fix 2 — `_sanitize_final_output(text)`** : guard appliqué à `final` dans `/mission` et `/mission/stream`. Si la réponse commence par `{` ou `[` :
+- `{"follow_ups": [...]}` → "Je ne suis pas sûre de ce que tu attends... Peux-tu préciser ?"
+- `{"message": str}` → extrait la valeur du champ
+- Autres dict → sérialise en texte lisible
+
+**Règle** : ne jamais laisser un artefact JSON atteindre l'utilisateur. `_sanitize_final_output()` est le filet de sécurité final avant l'émission SSE.
