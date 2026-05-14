@@ -1017,3 +1017,70 @@ async def _compress_tool_result(tool_name: str, tool_result: str, user_query: st
 ```
 
 Applicable à tout agent ReAct avec des outils qui retournent de grands volumes de texte.
+
+---
+
+### 39. `run_stream()+stream_text(delta=True)` laisse fuiter les tokens tool-call JSON avec mistral
+
+`stream_text(delta=True)` sur PydanticAI + mistral via LiteLLM renvoie les invocations d'outils comme texte brut (ex : `list_cluster_state ব্যক{}`). L'utilisateur voit les fragments JSON d'appel d'outil au lieu de la réponse finale.
+
+**Fix** : utiliser `charlotte_agent.run()` dans `/mission/stream` + émettre le texte final mot-par-mot.
+Les events `tool/step` arrivent quand même via `_tool_emit → queue` pendant `run()`.
+
+```python
+# FAUX — fuite tokens tool-call avec mistral
+async for chunk in await charlotte_agent.run_stream(message, ...):
+    async for text in chunk.stream_text(delta=True):
+        await q.put({"type": "token", "text": text})
+
+# CORRECT — run() bloquant + émission mot-par-mot
+agent_result = await charlotte_agent.run(effective_message, ...)
+final = str(agent_result.output)
+words = final.split(" ")
+for i, w in enumerate(words):
+    await q.put({"type": "token", "text": w + (" " if i < len(words) - 1 else "")})
+```
+
+S'applique à tout agent PydanticAI + mistral via LiteLLM. Claude (Anthropic direct) n'a pas ce problème.
+
+---
+
+### 40. String matching pour détecter l'intent — fragile face aux variantes linguistiques
+
+Hardcoder `"accès"`, `"as-tu"`, etc. échoue sur `"acces"` (sans accent), `"as tu"` (sans tiret), autres langues. Des listes de mots-clés ou `unicodedata.normalize` ne couvrent jamais toutes les variantes.
+
+**Fix** : utiliser le LLM comme interprétateur d'intent. Un appel `LLM_SCAN_MODEL` (mistral, max 10 tokens, ~500ms) retourne un label sémantique stable.
+
+```python
+_INTENT_LABELS = ("greeting", "access_zoho", "access_cluster", "question", "task")
+
+async def _classify_message(msg: str) -> str:
+    resp = await _llm_call(
+        [
+            {"role": "system", "content": (
+                "You are an intent classifier. Reply with EXACTLY one label:\n"
+                "- greeting      : simple greeting or farewell, no technical content\n"
+                "- access_zoho   : asking whether the agent has access to / can connect to Zoho\n"
+                "- access_cluster: asking whether the agent can see K8s pods/cluster/services\n"
+                "- question      : open-ended advice or explanation request — no cluster action\n"
+                "- task          : specific SRE action, cluster operation, or data retrieval"
+            )},
+            {"role": "user", "content": msg[:300]},
+        ],
+        temperature=0, max_tokens=10, model=LLM_SCAN_MODEL,
+    )
+    label = resp.strip().lower().split()[0] if resp.strip() else "task"
+    return label if label in _INTENT_LABELS else "task"
+```
+
+La table intent→comportement est extensible sans maintenance de patterns :
+
+| Intent | Comportement | Contrainte injectée |
+|---|---|---|
+| `greeting` | Réponse LLM directe | 2 phrases, salutation + 1-2 questions |
+| `access_zoho` | Pré-exécute `zoho_list_projects`, injecte résultat | 2 phrases MAX |
+| `access_cluster` | Pré-exécute `list_cluster_state`, injecte résultat | 2 phrases MAX |
+| `question` | Réponse LLM directe | 3 points MAX, pas de YAML |
+| `task` | Loop ReAct complet | — |
+
+Voir Pattern A dans CLAUDE-agents.md. S'applique à toute détection d'intent pré-agent.

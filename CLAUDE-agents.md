@@ -623,22 +623,28 @@ Résultat : 7.1 Gi → ~1.5 Gi steady-state. Mémoire cluster : 76 % → 53 %.
 
 **Ce qui a empêché le push initial :** le serveur neokube-beta a crashé après `kubectl apply` mais avant `git_push`. Le pod vivait avec le fix en live, mais le repo pointait vers l'ancienne config — cluster-bootstrap allait reverter. → C'est la raison d'être de `apply_gitops_fix` : rendre le push impossible à oublié.
 
-### Routing v4.0 — PydanticAI (2026-05-14)
+### Routing v4.0 — PydanticAI + classificateur LLM (2026-05-14)
 
-Charlotte v4 n'a **plus de classificateur ni de routing explicite**. PydanticAI gère le loop nativement : Claude décide lui-même s'il doit appeler des outils ou répondre en texte.
+Charlotte v4 dispose d'un **pré-classificateur 5 classes** (`_classify_message`) exécuté avant `charlotte_agent.run()`. PydanticAI gère ensuite le loop ReAct nativement pour les intents `task`.
 
 #### Flux de routing
 
 ```
-POST /mission {message, session_id, interface}
+POST /mission/stream {message, session_id, interface}
   → _load_pydantic_history(session_id)       ← Qdrant charlotte-conversations
-  → charlotte_agent.run(message,
+  → intent = await _classify_message(message) ← LLM_SCAN_MODEL (mistral, ~500ms)
+      greeting       → effective_message contraint (2 phrases, sans outil)
+      access_zoho    → pré-exécute zoho_list_projects, injecte résultat
+      access_cluster → pré-exécute list_cluster_state, injecte résultat
+      question       → effective_message contraint (3 points, pas de YAML)
+      task           → effective_message inchangé
+  → charlotte_agent.run(effective_message,
         message_history=pydantic_history,
         deps=_MissionDeps(...),
         toolsets=[MCPServerStreamableHTTP(MCP_K8S_URL)])
       → Claude décide naturellement : réponse texte OU appels d'outils
   → _conversation_store(session_id, ...)     → Qdrant
-  → return {answer, steps, session_id}
+  → émission mot-par-mot (antipattern #39 : run_stream fuit les tokens tool-call)
 ```
 
 **Ce qui a été supprimé (v3 → v4) :**
@@ -646,7 +652,7 @@ POST /mission {message, session_id, interface}
 - Classificateur binaire `sre/conv` (`tool_choice="required"` au tour 0)
 - `MAX_TOOL_TURNS` for-loop (8 iterations max)
 - `_MISSION_TOOLS` dict (~727 lignes JSON de specs d'outils)
-- `LLM_CONV_MODEL` pour classify (plus nécessaire — Claude choisit)
+- String matching pour l'intent (`"accès"`, `"as-tu"`) — remplacé par `_classify_message` (antipattern #40)
 
 **FallbackModel natif PydanticAI :**
 ```python
@@ -1090,7 +1096,7 @@ async def lifespan(app: FastAPI):
 > **Règle** : tout agent OWU-facing DOIT implémenter un fast-path conversationnel avant son loop ReAct/outil. Sans ça, un simple "bonjour" déclenche le loop complet (6–12s de latence). Voir antipattern #21.
 >
 > **Deux patterns selon l'interface** :
-> - **Pattern A — Pipe SSE (Charlotte)** : classificateur LLM sémantique 3-classes (`conv` / `explain` / `sre`). `explain` = réponse depuis la connaissance, sans outil. Pas de set de mots-clés — le LLM comprend l'intention.
+> - **Pattern A — Pipe SSE (Charlotte)** : classificateur LLM sémantique 5 classes (`greeting` / `access_zoho` / `access_cluster` / `question` / `task`). Pour `access_*` : pré-exécute l'outil, injecte le résultat. Pas de string matching — Mistral interprète l'intent. Voir antipattern #40.
 > - **Pattern B — OpenAI-compat (Neo, Leon)** : set de mots-clés métier `_AGENT_KW`, detection sur la première ligne du dernier message uniquement.
 
 **Pattern standard :**
@@ -1143,34 +1149,79 @@ Deux patterns selon l'architecture de l'agent :
 
 Charlotte v4 utilise `charlotte_agent.run()` + émission mot-par-mot (antipattern #39 : `run_stream()+stream_text(delta=True)` fuit les tokens tool-call JSON avec mistral via LiteLLM).
 
-**Pré-traitement avant agent.run()** — 2 cas gérés en Python avant l'appel LLM principal :
+**Pré-traitement avant agent.run() — classificateur 5 classes** (antipattern #40 : jamais de string matching) :
 
-**1. Salutation** (`bonjour`, `hello`, etc. — ≤4 mots) :
-- Réponse LLM directe contrainte à 2 phrases, sans tool call.
-- Pas de `list_cluster_state` — inutile et lent pour un simple bonjour.
+`_classify_message(msg)` appelle `LLM_SCAN_MODEL` (mistral, max 10 tokens, ~500ms) et retourne un label parmi :
 
-**2. Question d'accès/connexion** (messages courts ≤25 mots, hors salutation) :
-- Un appel `LLM_SCAN_MODEL` (mistral, max 5 tokens) classifie l'intent : `zoho | cluster | none`.
-- Si intent détecté : pré-exécuter l'outil, injecter le résultat, contraindre à 2 phrases.
-- **Règle** : utiliser le LLM comme interprétateur, jamais du string matching — les variantes linguistiques sont infinies (accents, tirets, ordre des mots, langues).
+| Label | Comportement | Contrainte `effective_message` |
+|---|---|---|
+| `greeting` | Réponse LLM directe, aucun outil | 2 phrases : salutation + 1-2 questions sur ce que l'utilisateur veut faire |
+| `access_zoho` | Pré-exécute `zoho_list_projects`, injecte résultat | 2 phrases MAX. INTERDIT : liste d'outils, limitations |
+| `access_cluster` | Pré-exécute `list_cluster_state`, injecte résultat | 2 phrases MAX. INTERDIT : liste d'outils, limitations |
+| `question` | Réponse LLM directe, aucun outil | 3 points MAX, une phrase par point. Pas de YAML, pas de JSON |
+| `task` | Loop ReAct complet — `effective_message` inchangé | — |
+
+**Implémentation** :
 
 ```python
-# Intent classifier (LLM_SCAN_MODEL = mistral, ~500ms, 5 tokens max)
-_intent_resp = await _llm_call(
-    [{"role": "system", "content": "Reply with ONE word: zoho | cluster | none"},
-     {"role": "user",   "content": message[:200]}],
-    temperature=0, max_tokens=5, model=LLM_SCAN_MODEL,
-)
-if _intent in _ACCESS_TOOL_MAP:
-    _res = await _mission_execute_tool(_ACCESS_TOOL_MAP[_intent], {})
-    effective_message = f"{message}\n\n[RÉSULTAT]\n{_res[:800]}\n[/RÉSULTAT]\n\nRéponds en 2 phrases MAX."
+_INTENT_LABELS = ("greeting", "access_zoho", "access_cluster", "question", "task")
+
+async def _classify_message(msg: str) -> str:
+    resp = await _llm_call(
+        [
+            {"role": "system", "content": (
+                "You are an intent classifier. Reply with EXACTLY one label:\n"
+                "- greeting      : simple greeting or farewell, no technical content\n"
+                "- access_zoho   : asking whether Charlotte has access to / can connect to Zoho\n"
+                "- access_cluster: asking whether Charlotte can see K8s pods/cluster/services\n"
+                "- question      : open-ended advice, recommendation, or explanation request\n"
+                "                  that does NOT require executing a cluster action\n"
+                "- task          : specific SRE action, cluster operation, or data retrieval"
+            )},
+            {"role": "user", "content": msg[:300]},
+        ],
+        temperature=0, max_tokens=10, model=LLM_SCAN_MODEL,
+        trace_name="charlotte-intent-classifier",
+    )
+    label = resp.strip().lower().split()[0] if resp.strip() else "task"
+    return label if label in _INTENT_LABELS else "task"
+
+# Dans _run() de /mission/stream :
+intent = await _classify_message(message)
+effective_message = message
+
+if intent == "greeting":
+    effective_message = (
+        f"{message}\n\nRéponds en 2 phrases max : salutation brève + 1-2 questions directes "
+        f"sur ce que l'utilisateur veut faire aujourd'hui. Pas de liste, pas de tableau."
+    )
+elif intent == "access_zoho":
+    _res = await _mission_execute_tool("zoho_list_projects", {})
+    effective_message = (
+        f"{message}\n\n[RÉSULTAT zoho_list_projects]\n{str(_res)[:800]}\n[/RÉSULTAT]\n\n"
+        f"Réponds en 2 phrases MAX. INTERDIT : liste d'outils, exemples, 'limitations'."
+    )
+elif intent == "access_cluster":
+    _res = await _mission_execute_tool("list_cluster_state", {})
+    effective_message = (
+        f"{message}\n\n[RÉSULTAT list_cluster_state]\n{str(_res)[:800]}\n[/RÉSULTAT]\n\n"
+        f"Réponds en 2 phrases MAX. INTERDIT : liste d'outils, exemples, 'limitations'."
+    )
+elif intent == "question":
+    effective_message = (
+        f"{message}\n\nRéponds en 3 points MAX, une phrase par point. "
+        f"Pas de YAML, pas de sections, pas d'exemples de code, pas de tableau. Direct et actionnable."
+    )
+# intent == "task" → effective_message inchangé, ReAct loop complet
 ```
 
+**Principe clé** : pour les intents `access_*`, l'outil est pré-exécuté en Python **avant** `agent.run()`, et le résultat est injecté dans le message. Mistral ignore souvent les règles du system prompt, mais il ne peut pas ignorer un résultat déjà injecté dans le message utilisateur.
+
 Table intent→outil (extensible sans maintenance de patterns) :
-| Intent LLM | Outil | Ajout |
+| Intent LLM | Pré-exécution | Ajout |
 |---|---|---|
-| `zoho` | `zoho_list_projects` | ✅ |
-| `cluster` / `k8s` | `list_cluster_state` | ✅ |
+| `access_zoho` | `zoho_list_projects` | ✅ |
+| `access_cluster` | `list_cluster_state` | ✅ |
 | _(ajouter ici)_ | _(outil)_ | |
 
 ```python

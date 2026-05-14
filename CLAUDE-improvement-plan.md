@@ -95,21 +95,78 @@ Améliorations spécifiques après Phase 1 :
 
 ## Phase 5 — Neo : améliorations mineures
 
-Neo est déjà solide (streaming ✓, fast-path ✓, IMAP résilient ✓). Améliorations potentielles :
-- Context window management (tronquer l'historique long)
-- Compression des emails volumineux avant injection
+Neo est déjà solide (streaming ✓, fast-path ✓, IMAP résilient ✓).
 
-**Statut** : 🔲 Basse priorité
+**Réalisé :**
+- [x] 5a. Context window management : `/v1/chat/completions` tronque l'historique à system + 20 derniers messages max
+- [x] 5b. Compression des emails volumineux : `_poll_imap()` tronque corps > 3000 chars avant injection dans `_run_agent`
+
+**Statut** : ✅ Terminé — contexte OWU borné, emails volumineux tronqués
 
 ---
 
 ## Ordre d'exécution recommandé
 
 ```
-Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
+Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6
 ```
 
 Phase 1 en premier car elle débloque la vitesse d'itération pour toutes les phases suivantes.
+
+---
+
+## Phase 6 — Charlotte v4.0 : qualité conversations + Bloc F (2026-05-14)
+
+Améliorations de la qualité de l'expérience conversationnelle de Charlotte :
+
+### 6a. Fix streaming — run_stream() → run() + émission mot-par-mot
+
+**Problème** : `run_stream()+stream_text(delta=True)` fuitait les tokens tool-call JSON avec mistral via LiteLLM (ex : `list_cluster_state ব্যক{}`). Voir antipattern #39.
+
+**Fix** : `charlotte_agent.run()` bloquant + émission mot-par-mot du texte final.
+
+- [x] Remplacer `run_stream` par `run()` dans `/mission/stream`
+- [x] Émission `{"type": "token", "text": word}` mot-par-mot après réception du résultat complet
+
+**Statut** : ✅ Terminé
+
+### 6b. Classificateur LLM 5 classes — remplacement string matching (antipattern #40)
+
+**Problème** : string matching (`"accès"`, `"as-tu"`) ne couvre pas les variantes linguistiques (`"acces"`, `"as tu"`, etc.). Architecture fragile et non maintenable.
+
+**Fix** : `_classify_message(msg)` — appel Mistral (LLM_SCAN_MODEL, max 10 tokens) retourne un label parmi `greeting | access_zoho | access_cluster | question | task`.
+
+- [x] Implémenter `_classify_message()` + `_INTENT_LABELS`
+- [x] Routing switch : 5 branches avec `effective_message` injecté avant `agent.run()`
+- [x] `greeting` → 2 phrases, sans outil (latence ~4s)
+- [x] `access_zoho` / `access_cluster` → pré-exécution outil + injection résultat (démontre, ne décrit pas)
+- [x] `question` → contrainte 3 points MAX, pas de YAML ni sections
+- [x] `task` → ReAct loop complet inchangé
+
+**Statut** : ✅ Terminé
+
+### 6c. Bloc F — CharlotteImprovementWorkflow (auto-amélioration hebdomadaire)
+
+**Problème** : l'amélioration de Charlotte est entièrement manuelle. Il n'y a pas de système qui analyse automatiquement la qualité des conversations et propose des pistes.
+
+**Solution** : workflow Temporal hebdomadaire qui collecte les conversations sous-optimales depuis Qdrant, les analyse via Mistral, et publie un rapport dans Zoho + ntfy.
+
+**Architecture** :
+- `sre_collect_conversation_samples` — scroll Qdrant `charlotte-conversations` (rôle=assistant), flag `verbose` / `json_artifact` / `tool_described` / `over_structured`
+- `sre_analyze_quality_patterns` — Mistral identifie 3-5 patterns récurrents + fix proposé (JSON)
+- `sre_publish_improvement_report` — tâche Zoho dans projet NeoKube + ntfy (priorité low)
+- `CharlotteImprovementWorkflow` — enchaîne les 3, skip si < 3 échantillons
+- Schedule hebdomadaire `ScheduleCalendarSpec` dimanche 3h UTC
+
+**Règle** : Charlotte **propose** des améliorations. Elle ne se modifie jamais elle-même (`_is_charlotte_file()` guard).
+
+- [x] 3 activités + workflow implémentés dans `sre_agent_v4.py`
+- [x] Schedule hebdomadaire créé dans `run_schedule_loop`
+- [x] Enregistrement dans le worker `main()`
+- [x] ConfigMap rebuilt (357 KB) + `kubectl replace` + redémarrage Charlotte
+- [x] Charlotte 3/3 Running — imports Bloc F vérifiés
+
+**Statut** : ✅ Terminé
 
 ---
 
@@ -117,8 +174,9 @@ Phase 1 en premier car elle débloque la vitesse d'itération pour toutes les ph
 
 | Phase | Début | Fin | Notes |
 |---|---|---|---|
-| Phase 1 | — | — | |
-| Phase 2 | — | — | |
-| Phase 3 | — | — | |
-| Phase 4 | — | — | |
-| Phase 5 | — | — | |
+| Phase 1 | 2026-05-13 | 2026-05-13 | image 150MB, restart ~15s |
+| Phase 2 | 2026-05-13 | 2026-05-13 | compress Mistral 8KB→400 chars |
+| Phase 3 | 2026-05-13 | 2026-05-13 | Leon /sre-task testé HTTP 200 |
+| Phase 4 | 2026-05-13 | 2026-05-13 | ntfy+Langfuse+Penpot retry |
+| Phase 5 | 2026-05-13 | 2026-05-13 | Neo hist 20 msgs + email 3000 chars |
+| Phase 6 | 2026-05-14 | 2026-05-14 | streaming fix + classificateur 5 classes + Bloc F auto-amélioration |
