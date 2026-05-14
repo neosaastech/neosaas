@@ -1133,14 +1133,44 @@ if not needs_tools:
 
 Deux patterns selon l'architecture de l'agent :
 
-#### Pattern A — Pipe SSE + PydanticAI run_stream() (Charlotte v4, 2026-05-14)
+#### Pattern A — Pipe SSE + PydanticAI agent.run() (Charlotte v4, 2026-05-14)
 
 **Règle globale** : tout agent OWU-facing doit implémenter ces 3 éléments :
 1. **Outils visibles** — émettre un event `{type:"tool", name:"..."}` à chaque appel d'outil
 2. **Indicateur d'attente** — heartbeat 1.5s pendant la réflexion LLM
 3. **Réponse progressive** — tokens delta en temps réel, PAS un seul bloc
 
-Charlotte v4 utilise `charlotte_agent.run_stream()` (PydanticAI natif) :
+Charlotte v4 utilise `charlotte_agent.run()` + émission mot-par-mot (antipattern #39 : `run_stream()+stream_text(delta=True)` fuit les tokens tool-call JSON avec mistral via LiteLLM).
+
+**Pré-traitement avant agent.run()** — 2 cas gérés en Python avant l'appel LLM principal :
+
+**1. Salutation** (`bonjour`, `hello`, etc. — ≤4 mots) :
+- Réponse LLM directe contrainte à 2 phrases, sans tool call.
+- Pas de `list_cluster_state` — inutile et lent pour un simple bonjour.
+
+**2. Question d'accès/connexion** (messages courts ≤25 mots, hors salutation) :
+- Un appel `LLM_SCAN_MODEL` (mistral, max 5 tokens) classifie l'intent : `zoho | cluster | none`.
+- Si intent détecté : pré-exécuter l'outil, injecter le résultat, contraindre à 2 phrases.
+- **Règle** : utiliser le LLM comme interprétateur, jamais du string matching — les variantes linguistiques sont infinies (accents, tirets, ordre des mots, langues).
+
+```python
+# Intent classifier (LLM_SCAN_MODEL = mistral, ~500ms, 5 tokens max)
+_intent_resp = await _llm_call(
+    [{"role": "system", "content": "Reply with ONE word: zoho | cluster | none"},
+     {"role": "user",   "content": message[:200]}],
+    temperature=0, max_tokens=5, model=LLM_SCAN_MODEL,
+)
+if _intent in _ACCESS_TOOL_MAP:
+    _res = await _mission_execute_tool(_ACCESS_TOOL_MAP[_intent], {})
+    effective_message = f"{message}\n\n[RÉSULTAT]\n{_res[:800]}\n[/RÉSULTAT]\n\nRéponds en 2 phrases MAX."
+```
+
+Table intent→outil (extensible sans maintenance de patterns) :
+| Intent LLM | Outil | Ajout |
+|---|---|---|
+| `zoho` | `zoho_list_projects` | ✅ |
+| `cluster` / `k8s` | `list_cluster_state` | ✅ |
+| _(ajouter ici)_ | _(outil)_ | |
 
 ```python
 # Côté agent : _ctx_session propagé aux tool wrappers via ContextVar
@@ -1156,12 +1186,6 @@ async def _tool_emit(tool_name: str, text: str = "") -> None:
 async def list_cluster_state() -> str:
     await _tool_emit("list_cluster_state")
     return await _mission_execute_tool("list_cluster_state", {})
-
-# Handler /mission/stream :
-async with charlotte_agent.run_stream(message, ..., toolsets=[k8s_mcp]) as streamed:
-    async for delta in streamed.stream_text(delta=True):  # tokens LLM en temps réel
-        if delta:
-            await q.put({"type": "token", "text": delta})
 ```
 
 Events SSE émis :
