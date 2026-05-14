@@ -730,9 +730,9 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 > **⚠️ TEMPORAIRE** : Dispatcher et Domi sur `mistral` (quota Gemini-flash épuisé, réinitialisation quotidienne).
 > Charlotte est passée à `claude-sonnet` (2026-05-13 — Anthropic rechargé). Split LLM actif : `claude-sonnet` pour `/mission`, `mistral` pour scans Temporal.
 
-| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` | Modèle cible |
+| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | Modèle cible |
 |---|---|---|---|---|---|
-| **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | — | `mistral` | `claude-sonnet` |
+| **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` | `claude-sonnet` |
 | **Leon** | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | `gemini-flash` |
 | **Aria** Frontend | `codestral` | — | — | — | `codestral` |
@@ -743,10 +743,13 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 | **Neo** Assistant | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
 
 > **Restaurer Dispatcher + Domi** : quota Gemini se réinitialise auto → modifier `LLM_MODEL: "gemini-flash"` dans deployments.
-> **Charlotte split LLM (v4.0 — 2 niveaux, `LLM_CONV_MODEL` supprimé) :**
-> - `LLM_MODEL=claude-sonnet` → missions interactives `/mission` via PydanticAI `Agent.run()` ; `FallbackModel` bascule automatiquement sur `LLM_FALLBACK=mistral` si quota vide
+> **Charlotte split LLM (v4.0 — R9.10) :**
+> - `LLM_MODEL=claude-sonnet` → missions interactives `/mission` via PydanticAI `Agent.run()`
+> - `LLM_SECONDARY=gpt-4o` → **2ème fallback** si claude-sonnet quota épuisé (OpenAI, bonne gestion des tool calls)
+> - `LLM_FALLBACK=mistral` → **3ème fallback** si gpt-4o aussi indisponible
 > - `LLM_SCAN_MODEL=mistral` → scans Temporal automatiques (`sre_analyze_with_llm`) — inchangé
 > - `LLM_CONV_MODEL` n'existe plus : PydanticAI + Claude gèrent nativement conv vs SRE sans classifieur
+> - **`_check_primary_llm()`** — health check toutes les 5 min + ntfy sur transition ok→down et down→ok
 
 ### Règles R9
 
@@ -767,6 +770,20 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 **R9.8** — `LLM_FALLBACK` doit être **lu depuis l'env ET effectivement utilisé** dans `_llm_call` et `_llm_call_stream`. Le déclarer dans le deployment sans le consommer dans le code ne protège pas contre les quota épuisés. Pattern obligatoire : détection HTTP 402 / mots-clés `"credit"`, `"insufficient"`, `"quota"` → retry avec `LLM_FALLBACK` + ntfy alerte rate-limitée (1/h). Voir antipattern #32.
 
 **R9.9** — `_llm_call_stream` doit accepter un paramètre `model: str | None = None` pour permettre l'override par `LLM_CONV_MODEL`. Sans ce paramètre, toute les variantes streaming (fast-path conversationnel, synthèse finale) brûlent le modèle premium même pour des messages triviaux.
+
+**R9.10 — Cascade de fallback LLM (règle globale) :**
+Tout agent interactif (OWU-facing) DOIT avoir une chaîne de 3 modèles avec notification ntfy automatique :
+1. `LLM_MODEL` (modèle principal — ex: `claude-sonnet`, `mistral-large-2407`)
+2. `LLM_SECONDARY` (2ème fallback — ex: `gpt-4o`) — optionnel si `LLM_MODEL` déjà robuste
+3. `LLM_FALLBACK` (filet de sécurité — ex: `mistral`)
+
+Comportement obligatoire :
+- Sur quota/HTTP 400/402 du modèle primaire : basculement **automatique** sur secondaire, puis fallback
+- **ntfy immédiat** : `f"⚠️ {LLM_MODEL} indisponible (HTTP {code}) — fallback activé ({LLM_SECONDARY} → {LLM_FALLBACK})"` — rate-limited 1/h (identique R9.8)
+- **ntfy récupération** : notification quand le modèle primaire revient disponible
+- Le fallback ne doit **jamais** sortir du texte parasité (tool specs en clair) — choisir des modèles qui gèrent le function calling (`gpt-4o`, `mistral-large-2407`)
+- **Charlotte v4** : `FallbackModel(claude-sonnet, gpt-4o, mistral)` + `_check_primary_llm()` (health check 5 min)
+- **Agents Temporal (Leon, Dispatcher, etc.)** : même logique dans `_llm_call()` — déjà implémentée pour R9.8, étendre avec LLM_SECONDARY si besoin
 
 ---
 

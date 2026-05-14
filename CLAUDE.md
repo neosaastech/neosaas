@@ -309,11 +309,11 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Règle R9 — Gouvernance LLM par agent
 
-> Règles complètes (R9.1–R9.7), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> Règles complètes (R9.1–R9.10), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
-| Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` |
+| Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` |
 |---|---|---|---|---|
-| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `mistral` | — *(supprimé v4)* | `mistral` |
+| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` |
 | **Leon** | `mistral-large-2407` | — | — | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — |
 | **Aria** / **Nox** | `codestral` | — | — | — |
@@ -322,7 +322,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | **Neo** | `mistral-large-2407` | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
-**Charlotte v4 — 2 niveaux LLM** : `FallbackModel(claude-sonnet, mistral)` (missions `/mission` via PydanticAI) · `mistral` (scans Temporal automatiques). `LLM_CONV_MODEL` supprimé — plus de classifieur. Voir CLAUDE-agents.md et **antipattern #32** dans CLAUDE-antipatterns.md.
+**Charlotte v4 — cascade LLM 3 niveaux (R9.10)** : `FallbackModel(claude-sonnet → gpt-4o → mistral)` · `_check_primary_llm()` → ntfy ntfy sur quota épuisé · `mistral` pour scans Temporal. Voir R9.10 dans CLAUDE-agents.md.
 
 ---
 
