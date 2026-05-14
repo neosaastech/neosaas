@@ -313,7 +313,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 | Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` |
 |---|---|---|---|---|
-| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` |
+| **Charlotte** SRE v4 | `mistral` ✅ | `mistral` | `claude-sonnet` | `gpt-4o` |
 | **Leon** | `mistral-large-2407` | — | — | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — |
 | **Aria** / **Nox** | `codestral` | — | — | — |
@@ -322,7 +322,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | **Neo** | `mistral-large-2407` | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
-**Charlotte v4 — cascade LLM 3 niveaux (R9.10)** : `FallbackModel(claude-sonnet → gpt-4o → mistral)` · `_check_primary_llm()` → ntfy ntfy sur quota épuisé · `mistral` pour scans Temporal. Voir R9.10 dans CLAUDE-agents.md.
+**Charlotte v4 — cascade LLM 3 niveaux (R9.10)** : `FallbackModel(mistral → claude-sonnet → gpt-4o)` · mistral = ops quotidiennes · claude-sonnet = escalade incidents critiques · `_check_primary_llm()` → ntfy sur quota épuisé · Voir R9.10 dans CLAUDE-agents.md.
 
 ---
 
