@@ -306,12 +306,13 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 38 | Troncature brute du contexte ReAct — perte d'informations critiques en fin de sortie | `tool_result[:2500]` coupe arbitrairement — `Events:` dans `kubectl describe` est toujours en bas. Fix : `_compress_tool_result(tool_name, tool_result, user_query)` → Mistral (`LLM_SCAN_MODEL`) extrait anomalies uniquement (< 400 chars) pour `run_kubectl`/`read_file` > 1500 chars. Fallback troncature 2500 si Mistral échoue. |
 | 39 | `run_stream()+stream_text(delta=True)` laisse fuiter les tokens tool-call JSON avec mistral | `stream_text(delta=True)` sur PydanticAI + mistral via LiteLLM renvoie les invocations d'outils comme texte (ex: `list_cluster_state ব্যক{}`). Fix : utiliser `charlotte_agent.run()` dans `/mission/stream` + émettre le texte final mot-par-mot. Les events `tool/step` arrivent quand même via `_tool_emit → queue` pendant `run()`. |
 | 40 | String matching pour détecter l'intent — fragile face aux variantes linguistiques | Hardcoder `"accès"`, `"as-tu"`, etc. échoue sur `"acces"` (sans accent), `"as tu"` (sans tiret), autres langues. Règle : **utiliser le LLM comme interprétateur d'intent** — `_classify_message()` (LLM_SCAN_MODEL, max 10 tokens) retourne 1 label parmi `greeting \| access_zoho \| access_cluster \| question \| task`. Table intent→comportement extensible sans maintenance. Voir Pattern A dans CLAUDE-agents.md et antipattern #40 dans CLAUDE-antipatterns.md. |
+| 41 | HTTP 429 traité comme `quota_exceeded` — faux positifs ntfy sur Gemini/Mistral | Gemini n'a pas d'API crédit : son 429 = rate limit free-tier, jamais épuisement. Mistral 429 avec Retry-After = rate limit temporaire. Anthropic 529 = overloaded (pas quota). Fix : `rate_limit` pour tous les 429 transitoires. `invalid_providers` = uniquement `quota_exceeded \| error`. Ntfy quotidien "tous opérationnels" supprimé. R9.11 dans CLAUDE-agents.md. |
 
 ---
 
 ## Règle R9 — Gouvernance LLM par agent
 
-> Règles complètes (R9.1–R9.10), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> Règles complètes (R9.1–R9.11), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 | Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` |
 |---|---|---|---|---|

@@ -1084,3 +1084,24 @@ La table intent→comportement est extensible sans maintenance de patterns :
 | `task` | Loop ReAct complet | — |
 
 Voir Pattern A dans CLAUDE-agents.md. S'applique à toute détection d'intent pré-agent.
+
+---
+
+### 41. HTTP 429 traité comme `quota_exceeded` — faux positifs ntfy sur Gemini et Mistral
+
+`test_gemini()` et `test_mistral()` retournaient `quota_exceeded` pour tout HTTP 429. Résultat : chaque rate limit temporaire déclenchait une alerte ntfy "LLM quota épuisé" alors que le provider était simplement à sa limite de débit (per-minute ou free-tier daily).
+
+**Règle** : HTTP 429 ≠ quota épuisé pour Gemini et Mistral.
+
+| Provider | HTTP 429 | HTTP 402 / sans Retry-After |
+|---|---|---|
+| **Anthropic** | `rate_limit` | `quota_exceeded` (402 = billing) |
+| **OpenAI** | `rate_limit` | `quota_exceeded` (402 = payment required) |
+| **Mistral** | `rate_limit` si Retry-After ou "rate" dans message | `quota_exceeded` si "month"/"subscription" |
+| **Gemini** | toujours `rate_limit` (pas d'API crédit, 429 = free-tier limit) | N/A |
+
+**Fix** : `sre_check_llm_key_status` — `invalid_providers` = uniquement `quota_exceeded` | `error`. Les `rate_limit` ne déclenchent pas `llm-key-sync` ni ntfy.
+
+**Bonus bug corrigé** : Anthropic HTTP 529 (overloaded) traité comme `quota_exceeded` → désormais `rate_limit`.
+
+**Ntfy quotidien "LLM — tous opérationnels"** : envoyé chaque jour à 6h même quand tout va bien → supprimé. Seul le rapport hebdo lundi 6h + les vrais problèmes critiques restent.

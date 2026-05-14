@@ -792,6 +792,24 @@ Comportement obligatoire :
 - **Charlotte v4** : `FallbackModel(claude-sonnet, gpt-4o, mistral)` + `_check_primary_llm()` (health check 5 min)
 - **Agents Temporal (Leon, Dispatcher, etc.)** : même logique dans `_llm_call()` — déjà implémentée pour R9.8, étendre avec LLM_SECONDARY si besoin
 
+**R9.11 — Distinction rate_limit vs quota_exceeded (2026-05-14) :**
+
+| Provider | HTTP 429 signifie | HTTP 402 | Distinction |
+|---|---|---|---|
+| **Anthropic** | rate limit temporaire → `rate_limit` | crédit épuisé/facture impayée → `quota_exceeded` | ✅ clair |
+| **OpenAI** | rate limit temporaire → `rate_limit` | paiement requis → `quota_exceeded` | ✅ clair |
+| **Mistral** | rate limit (+ Retry-After) → `rate_limit` ; sans Retry-After + "month" → `quota_exceeded` | N/A | ⚠️ même code |
+| **Gemini** | toujours rate limit free-tier → `rate_limit` | N/A (pas d'API crédit) | ⚠️ jamais quota_exceeded |
+
+Règles ntfy `llm-key-validation` (CronJob 6h) :
+- `quota_exceeded` / `error` sur provider **critique** (openai/anthropic/mistral) → ntfy high/urgent
+- `rate_limit` ou erreurs sur Gemini seul → log, pas de ntfy
+- OK quotidien → **supprimé** (bruit) — ntfy uniquement lundi (rapport hebdo coûts)
+
+Règles `sre_check_llm_key_status()` :
+- `invalid_providers` = uniquement `quota_exceeded` | `error` (pas `rate_limit`, pas `stale`, pas `unconfigured`)
+- Données Vault > 7.5h → status `stale` (CronJob peut avoir raté)
+
 ---
 
 ## Checklist — Intégration d'un nouvel agent NeoKube
