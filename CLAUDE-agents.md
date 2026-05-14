@@ -1116,46 +1116,78 @@ if not needs_tools:
 
 Deux patterns selon l'architecture de l'agent :
 
-#### Pattern A — Pipe SSE (Charlotte)
+#### Pattern A — Pipe SSE + PydanticAI run_stream() (Charlotte v4, 2026-05-14)
 
-Charlotte génère sa réponse via `/mission/stream` (SSE propriétaire). La synthèse finale utilise `_llm_call_stream` qui lit les tokens LiteLLM au fil de la génération et les émet comme events `token` :
+**Règle globale** : tout agent OWU-facing doit implémenter ces 3 éléments :
+1. **Outils visibles** — émettre un event `{type:"tool", name:"..."}` à chaque appel d'outil
+2. **Indicateur d'attente** — heartbeat 1.5s pendant la réflexion LLM
+3. **Réponse progressive** — tokens delta en temps réel, PAS un seul bloc
+
+Charlotte v4 utilise `charlotte_agent.run_stream()` (PydanticAI natif) :
 
 ```python
-async def _llm_call_stream(messages, temperature=0.1, max_tokens=2048):
-    """Async generator — un yield par token LiteLLM."""
-    payload = {"model": LLM_MODEL, "messages": messages,
-               "max_tokens": max_tokens, "temperature": temperature, "stream": True}
-    async with httpx.AsyncClient(timeout=120) as c:
-        async with c.stream("POST", f"{LITELLM_BASE_URL}/v1/chat/completions",
-                            headers=_auth_headers(), json=payload) as resp:
-            async for line in resp.aiter_lines():
-                if not line.startswith("data: "): continue
-                data = line[6:].strip()
-                if data == "[DONE]": break
-                chunk = json.loads(data)
-                delta = chunk["choices"][0]["delta"].get("content") or ""
-                if delta:
-                    yield delta
+# Côté agent : _ctx_session propagé aux tool wrappers via ContextVar
+_ctx_session: ContextVar[str] = ContextVar("_ctx_session", default="")
 
-# Usage dans mission() — synthèse finale :
-chunks = []
-async for chunk in _llm_call_stream(messages):
-    chunks.append(chunk)
-    await _emit(session_id, {"type": "token", "text": chunk})
-final = "".join(chunks) or await _llm_call(...)  # fallback si stream échoue
+async def _tool_emit(tool_name: str, text: str = "") -> None:
+    sid = _ctx_session.get("")
+    if sid:
+        await _emit(sid, {"type": "tool", "name": tool_name, "text": text[:80]})
+
+# Dans chaque outil :
+@charlotte_agent.tool_plain
+async def list_cluster_state() -> str:
+    await _tool_emit("list_cluster_state")
+    return await _mission_execute_tool("list_cluster_state", {})
+
+# Handler /mission/stream :
+async with charlotte_agent.run_stream(message, ..., toolsets=[k8s_mcp]) as streamed:
+    async for delta in streamed.stream_text(delta=True):  # tokens LLM en temps réel
+        if delta:
+            await q.put({"type": "token", "text": delta})
 ```
 
-Le Pipe OWU reçoit les events `token` et les `yield` directement :
+Events SSE émis :
+```
+{"type":"step",  "text":"📂 Historique chargé"}         ← traitement initial
+{"type":"tool",  "name":"run_kubectl", "text":"..."}    ← outil appelé (en temps réel)
+{"type":"token", "text":"Voici "}                       ← delta LLM
+{"type":"token", "text":"les pods..."}
+{"type":"done",  "answer":"...", "steps":[...]}
+{"type":"heartbeat"}                                    ← keep-alive 1.5s
+```
+
+**Pipe OWU — générateur** (`charlotte_pipe.py v3.0`) :
 ```python
-elif etype == "token":
-    if not _got_tokens:
-        _got_tokens = True
-        yield "\n"
-    yield text
-elif etype == "done":
-    # NE PAS re-yielder answer si tokens déjà reçus — déjà affiché
-    if not _got_tokens:
-        yield ev.get("answer", "")
+def pipe(self, body: dict) -> Generator[str, None, None]:
+    with requests.post(stream_url, json={...}, stream=True, timeout=180) as r:
+        for line in r.iter_lines():
+            if not line.startswith(b"data: "): continue
+            ev = json.loads(line[6:])
+            t = ev.get("type")
+            if t == "tool":
+                yield f"`⚙️ {ev['name']}`\n"    # outil visible
+            elif t == "step":
+                yield f"*{ev['text']}*\n"       # étape
+            elif t == "token":
+                if not in_response:
+                    in_response = True
+                    yield "\n"                  # séparateur après les étapes
+                yield ev["text"]               # token progressif
+            elif t == "done":
+                yield f"\n\n`session: {sid}`"
+                return
+```
+
+Résultat côté utilisateur :
+```
+*📂 Historique chargé*
+⚙️ list_cluster_state
+⚙️ run_kubectl
+
+Voici l'état de... [tokens qui arrivent progressivement]
+
+`session: ow-abc123`
 ```
 
 #### Pattern B — OpenAI-compat `/v1/chat/completions` (Neo, Leon)
@@ -1271,15 +1303,15 @@ if _used_tools and len(final) > 50:
    ↳ 1-2 chunks → ❌ fix échoué → alerter ntfy + ask_clarification
 ```
 
-**État streaming agents OWU au 2026-05-12 :**
+**État streaming agents OWU au 2026-05-14 :**
 
-| Agent | Service K8s | Fast-path | Agent-path | ntfy | À corriger |
+| Agent | Service K8s | Outils visibles | Tokens progressifs | Heartbeat | Statut |
 |---|---|---|---|---|---|
-| **Charlotte** | `agent-charlotte:8383` | ✅ tokens réels | ✅ tokens réels | ✅ | — |
-| **Neo** | `agent-neo:8490` | ✅ LiteLLM direct | ✅ mot-par-mot | ❌ | ntfy |
-| **Leon** | `leon:8181` | ✅ LiteLLM stream | ✅ mot-par-mot | ❌ | ntfy |
+| **Charlotte** | `agent-charlotte:8383` | ✅ `_tool_emit` × 35 | ✅ `run_stream()` PydanticAI | ✅ | ✅ v4.0 |
+| **Neo** | `agent-neo:8490` | ❌ | ✅ mot-par-mot | ✅ | ⚠️ pas d'outils visibles |
+| **Leon** | `leon:8181` | ❌ | ✅ mot-par-mot | ❌ | ⚠️ à migrer |
 
-Charlotte peut être missionnée pour corriger Neo (ntfy) et Leon (ntfy) de façon autonome en suivant ce protocole.
+**Règle pour tout nouvel agent OWU-facing** : implémenter les 3 éléments du Pattern A (outils visibles + heartbeat + tokens progressifs). Le pattern Charlotte v4 est la référence.
 
 ---
 
