@@ -128,11 +128,11 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 > Charlotte internals, RBAC, admin-sys API, DevProjectWorkflow, R9, Checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
-> **Charlotte SRE v3.15 — protocole de remédiation sécurisé** (GitOps drift, `verify_pod_healthy`, OOM différencié, périmètre durci v8, outils Dispatcher, self-mod guard, anti-boucle) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Charlotte SRE v4.0 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 36 outils, guards inchangés) + protocole de remédiation sécurisé : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v3.15 (K8s MCP, LLM split, delegation Dispatcher, self-mod guard) |
+| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→E | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
 | **Leon** | Chef de Projet — brief → ProjectSpec → Zoho → dispatch | Temporal | 8181 | `leon` | active v2.1 (`POST /sre-task` ← Charlotte delegate_sre_task) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
@@ -284,9 +284,9 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 16 | Validation par ancien nom de pod | `kubectl get pod <ancien-nom>` retourne `NotFound` après rollout — ne prouve rien. Utiliser `-l app=<deployment>` ou `verify_pod_healthy` (Charlotte). |
 | 17 | ConfigMap `sre-script` trop grand | `kubectl apply` échoue sur `sre-script` (annotation >262Ko). Utiliser `kubectl replace -f`. Le CronJob `cluster-bootstrap` (kustomize) ne souffre pas de ce problème. |
 | 18 | Label `app=agent-charlotte` inexistant | `-l app=agent-charlotte` retourne 0 pods. Pour trouver Charlotte : `kubectl get pods -n agent-system \| grep charlotte`. |
-| 19 | Mots-clés SRE dans salutations + contexte OWU | Noms d'agents dans `_SRE_KW` → "bonjour charlotte" déclenche le loop. OWU ajoute "#### Code Interpreter..." après le message. Fix : `message.split('\n')[0][:200].lower()` + retirer les noms propres du set. |
-| 20 | System prompt SRE dans chemin conversationnel | `_llm_call(messages)` avec system SRE → Mistral répond "je vérifie le cluster" même pour "bonjour". Fix : remplacer le system message par un prompt léger dans `_conv_messages`. |
-| 21 | Loop ReAct sur messages conversationnels | Tout message → `run_agent()` complet même pour "bonjour". Fix : détecter les mots-clés métier sur **la première ligne du dernier message uniquement** → fast-path LLM léger sans outils. Obligatoire pour tout agent OWU-facing. |
+| 19 | Mots-clés SRE dans salutations + contexte OWU | ~~Charlotte v3~~ **Supprimé en v4** — PydanticAI + Claude gèrent nativement. Historique : `_SRE_KW` + `_pending_question` bypassaient le classifieur sur "bonjour charlotte". |
+| 20 | System prompt SRE dans chemin conversationnel | ~~Charlotte v3~~ **Supprimé en v4** — plus de chemin conversationnel distinct. Claude décide naturellement sans system prompt léger séparé. |
+| 21 | Loop ReAct sur messages conversationnels | ~~Charlotte v3~~ **Supprimé structurellement en v4** — `Agent.run()` PydanticAI ne force aucun appel d'outil. Reste valide pour les agents OWU-facing non-PydanticAI (Leon, Neo). |
 | 22 | `kubectl replace` supprime les clés ConfigMap non listées | `kubectl replace -f cm.yaml` remplace le CM **en entier** — toutes les clés absentes du fichier disparaissent. Toujours inclure **toutes** les clés existantes dans le fichier de remplacement. `kubectl apply` (< 262 KB) fait un merge et évite ce problème. |
 | 23 | Outil ad-hoc par situation (over-engineering Charlotte) | `maintenance_pod(pvc=...)` → demain `redis_flush_tool()`, etc. Règle : Charlotte a des **primitives génériques** (`kubectl_apply` + `run_kubectl delete`). La connaissance du fix va dans le system prompt/RAG, pas dans le code. |
 | 24 | Contexte ReAct trop volumineux → Charlotte sans réponse | 5 outils × 8000 chars = 40KB par tour → Mistral timeout → pas de réponse. Fix : limiter l'injection à **2500 chars** par résultat d'outil. |
@@ -302,7 +302,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 34 | `_CHARLOTTE_OWN_FILES` frozenset trop large bloque les écrits sur d'autres agents | Le frozenset listait explicitement 7 fichiers dont certains (ex : `configmap-sre-script.yaml`) pouvaient matcher des chemins légitimes d'autres agents via la condition `"sre-script" in path`. Fix : réduire à 2 entrées (`serviceaccount-sre.yaml`, `sre_agent.py`) + helper `_is_charlotte_file(path)` qui détecte par contenu du chemin ("charlotte" ou "sre-script"). |
 | 35 | Anti-boucle run_kubectl — variantes `-o` comptent comme des appels distincts | `run_kubectl(["get","pod","x","-o","yaml"])` et `run_kubectl(["get","pod","x","-o","json"])` = même ressource mais 2 fingerprints différents → Charlotte re-interroge K8s inutilement. Fix : `_kubectl_fingerprint()` normalise les args en ignorant `-o`/`--output`, `_kubectl_seen` dict par session → retourne le cache avec `"[déjà exécuté]"`. Seules les commandes lecture (get, describe, logs, top) sont dédupliquées. |
 | 36 | Builder ConfigMap Python — regex sur clé data échoue si la valeur contient le même mot | `re.search(r"requirements\.txt:.*", cm_text)` peut matcher une référence à `requirements.txt` dans le code Python à l'intérieur du CM, et non la vraie clé YAML. Fix : hardcoder la clé `requirements.txt` dans le builder, ne jamais l'extraire par regex. |
-| 37 | Classificateur binaire sre/conv route les questions explicatives vers le ReAct loop | Binary classifier `sre/conv` → "pourquoi ntfy envoie quota LLM?" → `sre` → `tool_choice=required` → appel outil forcé → Charlotte cherche dans le cluster au lieu de répondre depuis sa connaissance. Fix : classificateur 3-classes (`sre`/`explain`/`conv`). `explain` = system SRE complet + LLM_CONV_MODEL, sans outils. |
+| 37 | Classificateur binaire sre/conv route les questions explicatives vers le ReAct loop | ~~Charlotte v3~~ **Supprimé structurellement en v4** — plus de classificateur. Reste valide pour les agents qui implémentent un routing custom. |
 | 38 | Troncature brute du contexte ReAct — perte d'informations critiques en fin de sortie | `tool_result[:2500]` coupe arbitrairement — `Events:` dans `kubectl describe` est toujours en bas. Fix : `_compress_tool_result(tool_name, tool_result, user_query)` → Mistral (`LLM_SCAN_MODEL`) extrait anomalies uniquement (< 400 chars) pour `run_kubectl`/`read_file` > 1500 chars. Fallback troncature 2500 si Mistral échoue. |
 
 ---
@@ -313,7 +313,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 | Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` |
 |---|---|---|---|---|
-| **Charlotte** SRE | `claude-sonnet` ✅ | `mistral` | `mistral-large-2407` | `mistral` |
+| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `mistral` | — *(supprimé v4)* | `mistral` |
 | **Leon** | `mistral-large-2407` | — | — | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — |
 | **Aria** / **Nox** | `codestral` | — | — | — |
@@ -322,7 +322,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | **Neo** | `mistral-large-2407` | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
-**Charlotte — 3 niveaux LLM** : `claude-sonnet` (missions SRE, ReAct + tool calls) · `mistral-large-2407` (classify + fast-path conversationnel) · `mistral` (scans Temporal automatiques). `LLM_FALLBACK=mistral` déclenché automatiquement sur HTTP 402 + ntfy alerte. Voir **R9.8–R9.9** dans CLAUDE-agents.md et **antipattern #32** dans CLAUDE-antipatterns.md.
+**Charlotte v4 — 2 niveaux LLM** : `FallbackModel(claude-sonnet, mistral)` (missions `/mission` via PydanticAI) · `mistral` (scans Temporal automatiques). `LLM_CONV_MODEL` supprimé — plus de classifieur. Voir CLAUDE-agents.md et **antipattern #32** dans CLAUDE-antipatterns.md.
 
 ---
 

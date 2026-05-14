@@ -18,7 +18,11 @@ Chaque agent NeoKube possède une **identité complète et cohérente** à trave
 | **Nox** | — | ❌ gap | `nox-sa` | aucun | ❌ gap | `nox` | — |
 | **Penpot** | — | — | `penpot-sa` | aucun | ❌ gap | `penpot` | — |
 
-> **Neo** est le seul agent exposé via Open WebUI (endpoint OpenAI-compat `/v1/chat/completions`). Il agit comme agent maître côté interface humaine, avec accès à tous les connectors et polling IMAP `neo@neokube.fr`.
+> **Agents OWU-facing** — toute interaction humaine passe exclusivement par Open WebUI :
+> - **Charlotte** : Pipe SSE `charlotte_sre` — `/mission/stream` (Pattern A). Interface toujours `"openwebui"`.
+> - **Neo** : endpoint OpenAI-compat `/v1/chat/completions` (Pattern B). Agent maître côté humain, accès tous connectors + polling IMAP `neo@neokube.fr`.
+>
+> Les autres agents (Aria, Nox, Vera, Penpot, Domi, Dispatcher, Leon) sont des workers Temporal ou des services HTTP internes — ils ne sont **jamais** exposés directement à l'utilisateur via OWU.
 
 ### Règle : cohérence identité sur les 5 dimensions
 
@@ -421,7 +425,7 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ---
 
-## Charlotte SRE — Architecture interne (v3.15)
+## Charlotte SRE — Architecture interne (v4.0)
 
 `SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (défaut 300s) via un Temporal Schedule.
 
@@ -482,14 +486,14 @@ ProjectSpec validé par Dispatcher
 
 ## Charlotte SRE — Protocole de remédiation sécurisé (durci 2026-05-07)
 
-### Architecture outils — Phase 2 MCP (2026-05-13)
+### Architecture outils — v4.0 (PydanticAI + MCP, 2026-05-14)
 
-Charlotte v3.14 dispose de deux couches d'outils K8s :
+Charlotte v4.0 dispose de deux couches d'outils K8s, toutes exposées nativement via PydanticAI :
 
-1. **Outils propres Charlotte** (`run_kubectl`, `kubectl_apply`, etc.) — primitives génériques validées
-2. **Outils K8s MCP** (`k8s_pods_list`, `k8s_events_list`, `k8s_resources_scale`, etc.) — découverts dynamiquement au démarrage depuis le serveur MCP `k8s-mcp.agent-system:8080`
+1. **36 outils `@charlotte_agent.tool`** — wrappers fins sur `_mission_execute_tool` (guards de sécurité inchangés)
+2. **Outils K8s MCP** (`k8s_pods_list`, `k8s_events_list`, `k8s_resources_scale`, etc.) — passés via `toolsets=[MCPServerStreamableHTTP(MCP_K8S_URL)]` à chaque `Agent.run()`
 
-Le serveur K8s MCP (`ghcr.io/containers/kubernetes-mcp-server`) expose 19-20 outils nommés `k8s_*` dans le contexte Charlotte. Charlotte peut appeler ces outils directement sans connaître la syntaxe kubectl — les types et arguments sont validés par le protocole MCP.
+Le serveur K8s MCP (`ghcr.io/containers/kubernetes-mcp-server`) expose 19-20 outils nommés `k8s_*`. Charlotte les appelle directement — les types et arguments sont validés par le protocole MCP.
 
 Charlotte a accès aux outils suivants pour agir sur le cluster :
 
@@ -504,7 +508,7 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 | `read_file` (fuzzy) | Lit `/gitops/...` ou `/var/sre/...` ; si introuvable, propose des candidats fuzzy par tokens du nom | Avant tout `apply_gitops_fix` ou `write_file` |
 | `write_file` | Écrit un manifest dans `/gitops/` | Fallback si `apply_gitops_fix` non disponible |
 | `git_status` / `git_push` | Commit/push vers `Kubinote-GitOps` | Fallback si `apply_gitops_fix` non disponible |
-| `ask_clarification` | **Pause le ReAct loop** et pose une question à l'utilisateur avant d'agir | Avant toute action irréversible ou ambiguë (voir règle 6b) |
+| `ask_clarification` | Retourne une question à l'utilisateur — PydanticAI s'arrête naturellement sans loop forcé | Avant toute action irréversible ou ambiguë (voir règle 6b) |
 | `check_service_version` | Version courante vs dernière disponible (DockerHub/GitHub API) | Obligatoire avant toute mise à jour |
 | `helm_upgrade` | Helm upgrade via admin-sys `/helm` | Uniquement traefik et vault |
 | `test_agent_stream` | Smoke test streaming SSE d'un agent OWU-facing — compte les chunks SSE reçus (>3 = OK) | Étape 6 du protocole de correction code agents |
@@ -618,69 +622,42 @@ Résultat : 7.1 Gi → ~1.5 Gi steady-state. Mémoire cluster : 76 % → 53 %.
 
 **Ce qui a empêché le push initial :** le serveur neokube-beta a crashé après `kubectl apply` mais avant `git_push`. Le pod vivait avec le fix en live, mais le repo pointait vers l'ancienne config — cluster-bootstrap allait reverter. → C'est la raison d'être de `apply_gitops_fix` : rendre le push impossible à oublié.
 
-### Routing sémantique Charlotte (v3.12 — 2026-05-12)
+### Routing v4.0 — PydanticAI (2026-05-14)
 
-Charlotte classe chaque message **avant** d'entrer dans le loop ReAct. Depuis v3.12, la détection est sémantique (LLM léger) et non plus lexicale (mots-clés).
+Charlotte v4 n'a **plus de classificateur ni de routing explicite**. PydanticAI gère le loop nativement : Claude décide lui-même s'il doit appeler des outils ou répondre en texte.
 
 #### Flux de routing
 
 ```
-message reçu
-  → extraire première ligne (ignorer bruit OWU "#### Code Interpreter\n...")
-  → last_assistant avait un "?" dans l'historique ? → sre direct (réponse à question en attente)
-  → sinon : classify_call(max_tokens=5, temperature=0.0)
-      → "conv" → fast-path conversationnel (LLM léger, 0 outil)
-      → "sre"  → ReAct loop (turn 0 : tool_choice="required")
+POST /mission {message, session_id, interface}
+  → _load_pydantic_history(session_id)       ← Qdrant charlotte-conversations
+  → charlotte_agent.run(message,
+        message_history=pydantic_history,
+        deps=_MissionDeps(...),
+        toolsets=[MCPServerStreamableHTTP(MCP_K8S_URL)])
+      → Claude décide naturellement : réponse texte OU appels d'outils
+  → _conversation_store(session_id, ...)     → Qdrant
+  → return {answer, steps, session_id}
 ```
 
-**Pourquoi sémantique et non lexical :**
-L'approche par mots-clés (`_SRE_KW`) échouait sur les paraphrases implicites :
-`"as-tu appliqué cette version ?"` → aucun keyword détecté → fast-path → Charlotte hallucine une réponse sans vérifier le cluster.
-Un classifieur LLM comprend l'intention, pas juste les tokens.
+**Ce qui a été supprimé (v3 → v4) :**
+- `_pending_question` heuristique (`"?" in last_assistant`) — bypass systématique du classifieur
+- Classificateur binaire `sre/conv` (`tool_choice="required"` au tour 0)
+- `MAX_TOOL_TURNS` for-loop (8 iterations max)
+- `_MISSION_TOOLS` dict (~727 lignes JSON de specs d'outils)
+- `LLM_CONV_MODEL` pour classify (plus nécessaire — Claude choisit)
 
-**Implémentation :**
+**FallbackModel natif PydanticAI :**
 ```python
-# 1. Bypass si question en attente (ask_clarification dans le tour précédent)
-_last_assistant = next(
-    (m.get("content", "") for m in reversed(history) if m.get("role") == "assistant"), ""
-)
-if _last_assistant and "?" in _last_assistant:
-    _is_conversational = False  # réponse à question infra → toujours sre
-else:
-    # 2. Classification sémantique
-    _classify_resp = await _llm_call(
-        [{"role": "system", "content": (
-            "Tu es un classificateur SRE. Réponds UNIQUEMENT par 'sre' ou 'conv'.\n"
-            "'sre' = vérification/action infra : pods, configs, versions, patches, santé, DNS, LLM...\n"
-            "'conv' = échange purement conversationnel : salutation, remerciement, question générale.\n"
-            "En cas de doute, réponds 'sre'."
-        )},
-         {"role": "user", "content": message.split('\n')[0][:300]}],
-        temperature=0.0, max_tokens=5,
-        trace_name=f"charlotte-classify-{session_id}",
-    )
-    _is_conversational = (_classify_resp or "sre").strip().lower().startswith("conv")
+_mission_primary  = OpenAIChatModel(LLM_MODEL,    provider=_mission_provider)  # claude-sonnet
+_mission_fallback = OpenAIChatModel(LLM_FALLBACK,  provider=_mission_provider)  # mistral
+_mission_llm      = FallbackModel(_mission_primary, _mission_fallback)
 ```
+Si `claude-sonnet` retourne une `ModelAPIError` (quota vide, HTTP 402), PydanticAI bascule automatiquement sur `mistral`.
 
-**Chemin conversationnel (system prompt léger) :**
-```python
-_conv_messages = [
-    {"role": "system", "content": (
-        "Tu es Charlotte, assistante IA de l'équipe NeoKube. "
-        "Réponds de façon amicale, concise et naturelle. "
-        "Si l'utilisateur mentionne un incident ou un problème cluster, dis-lui de préciser."
-    )},
-] + [m for m in messages if m.get("role") != "system"]
-_conv_resp = await _llm_call(_conv_messages, temperature=0.5, max_tokens=256, ...)
-```
-Ne jamais passer le system prompt SRE complet dans ce chemin — Mistral répond "je vérifie le cluster" même pour "bonjour".
+### Outil `ask_clarification` (v4.0)
 
-**ReAct loop — `tool_choice="required"` au tour 0 :**
-Tout message routé `sre` déclenche le loop avec `tool_choice="required"` au premier tour. Charlotte ne peut pas répondre en texte sans avoir appelé au moins un outil. Cela empêche les réponses LLM inventées sur l'état du cluster.
-
-### Outil `ask_clarification` (v3.12)
-
-Charlotte peut **suspendre le ReAct loop** pour poser une question avant d'agir sur une ressource ambiguë ou irréversible.
+Charlotte retourne une question — PydanticAI s'arrête naturellement sans `break` de loop explicite.
 
 **Quand Charlotte DOIT demander (règle 6b du system prompt) :**
 - Valeur cible non précisée : *"augmente la mémoire de zero-cache"* → Charlotte demande combien
@@ -691,20 +668,6 @@ Charlotte peut **suspendre le ReAct loop** pour poser une question avant d'agir 
 - Actions read-only : `get`, `logs`, `describe`, `list`
 - Corrections évidentes : pod CrashLoop → restart, OOM confirmé → ajuster limits
 - Quand la valeur cible est explicite dans le message
-
-**Comportement technique :**
-```python
-if fn_name == "ask_clarification":
-    question = fn_args.get("question", "")
-    context  = fn_args.get("context", "")
-    final = f"{context}\n\n{question}".strip() if context else question
-    # → emit "done" avec la question comme réponse
-    # → la question est stockée dans l'historique de session
-    # → prochain message utilisateur : bypass classifieur ("?" détecté) → sre direct
-    break  # loop ReAct suspendu — Charlotte n'agit pas
-```
-
-La question est tracée dans Langfuse sous `charlotte-classify-{session_id}`. Le classifieur ne facture que ~5 tokens de sortie (Mistral le plus économique disponible).
 
 ---
 
@@ -769,7 +732,7 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 
 | Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_CONV_MODEL` | `LLM_FALLBACK` | Modèle cible |
 |---|---|---|---|---|---|
-| **Charlotte** SRE v3.15 | `claude-sonnet` ✅ | `mistral` | `mistral-large-2407` | `mistral` | `claude-sonnet` |
+| **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | — | `mistral` | `claude-sonnet` |
 | **Leon** | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | `gemini-flash` |
 | **Aria** Frontend | `codestral` | — | — | — | `codestral` |
@@ -780,11 +743,10 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 | **Neo** Assistant | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
 
 > **Restaurer Dispatcher + Domi** : quota Gemini se réinitialise auto → modifier `LLM_MODEL: "gemini-flash"` dans deployments.
-> **Charlotte split (3 niveaux)** :
-> - `LLM_MODEL=claude-sonnet` → missions SRE réelles (ReAct loop, tool calls kubectl/GitOps)
-> - `LLM_CONV_MODEL=mistral-large-2407` → classify + fast-path conversationnel ("bonjour", questions générales)
-> - `LLM_SCAN_MODEL=mistral` → scans Temporal automatiques (`sre_analyze_with_llm`)
-> - `LLM_FALLBACK=mistral` → fallback automatique si quota `LLM_MODEL` épuisé (HTTP 402), avec ntfy alerte
+> **Charlotte split LLM (v4.0 — 2 niveaux, `LLM_CONV_MODEL` supprimé) :**
+> - `LLM_MODEL=claude-sonnet` → missions interactives `/mission` via PydanticAI `Agent.run()` ; `FallbackModel` bascule automatiquement sur `LLM_FALLBACK=mistral` si quota vide
+> - `LLM_SCAN_MODEL=mistral` → scans Temporal automatiques (`sre_analyze_with_llm`) — inchangé
+> - `LLM_CONV_MODEL` n'existe plus : PydanticAI + Claude gèrent nativement conv vs SRE sans classifieur
 
 ### Règles R9
 
@@ -1107,7 +1069,11 @@ async def lifespan(app: FastAPI):
 
 ### 6c. Fast-path conversationnel (obligatoire pour tout agent OWU-facing)
 
-> **Règle** : tout agent exposé à OWU via `/v1/chat/completions` DOIT implémenter ce pattern avant son loop ReAct/outil. Sans ça, un simple "bonjour" déclenche le loop complet (6–12s de latence). Voir antipattern #21.
+> **Règle** : tout agent OWU-facing DOIT implémenter un fast-path conversationnel avant son loop ReAct/outil. Sans ça, un simple "bonjour" déclenche le loop complet (6–12s de latence). Voir antipattern #21.
+>
+> **Deux patterns selon l'interface** :
+> - **Pattern A — Pipe SSE (Charlotte)** : classificateur LLM sémantique 3-classes (`conv` / `explain` / `sre`). `explain` = réponse depuis la connaissance, sans outil. Pas de set de mots-clés — le LLM comprend l'intention.
+> - **Pattern B — OpenAI-compat (Neo, Leon)** : set de mots-clés métier `_AGENT_KW`, detection sur la première ligne du dernier message uniquement.
 
 **Pattern standard :**
 ```python
