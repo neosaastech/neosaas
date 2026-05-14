@@ -436,6 +436,7 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 | **C — LLM** | 7. Analyse LLM (diagnostic + sévérité) · score Langfuse `cluster_health_score` | `sre_analyze_with_llm`, `sre_push_langfuse_score` |
 | **D — Reporting** | 8. Matrice agents · 9. ntfy si severity critical/warning | `sre_agent_health_matrix`, `sre_ntfy_notify` |
 | **E — Eval Watch** | 10. Poll scores Langfuse (1 cycle sur `EVAL_WATCH_EVERY_N`=6) → ntfy + llm-key-sync si dégradation | `sre_check_eval_scores` |
+| **F — Self-Improvement** | Workflow hebdomadaire indépendant (dimanche 3h UTC) — collecte conversations sous-optimales → analyse Mistral → rapport Zoho + ntfy | `sre_collect_conversation_samples`, `sre_analyze_quality_patterns`, `sre_publish_improvement_report` |
 
 Variables importantes : `SRE_SCAN_INTERVAL_S` (300), `EVAL_WATCH_EVERY_N` (6), `EVAL_SCORE_THRESHOLD` (7.0), `LLM_ANALYZE_EVERY_N` (1).
 
