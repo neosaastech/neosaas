@@ -164,28 +164,26 @@ Leon détecte `agent: leon` dans la description, extrait le brief, et démarre l
 
 ---
 
-### Routing conversationnel — Pattern B (keywords)
+### Routing conversationnel — Pattern A (classificateur LLM)
 
-Leon utilise un routage par mots-clés pour identifier les appels qui lui sont destinés :
+Leon utilise un classificateur LLM (antipattern #40 — jamais de string matching) :
 
 ```python
-_LEON_KW = {
-    # Projets et missions
-    "projet", "mission", "créer", "lancer", "démarrer", "nouveau",
-    # Types de travail
-    "scraping", "scraper", "collecte", "extraction", "crawler",
-    "site", "webapp", "application", "api", "backend", "frontend",
-    "design", "maquette", "wireframe", "ux",
-    # Gestion de projet
-    "zoho", "jalon", "milestone", "tâche", "deadline",
-    # Outils
-    "github", "vercel", "neon", "penpot",
-    # Délégation
-    "milo", "zephyr", "nora", "aria",
-}
+_LEON_INTENT_LABELS = ("greeting", "check_agents", "question", "task")
+
+async def _classify_message_leon(msg: str) -> str:
+    # LLM_SCAN_MODEL (mistral, ~500ms, max 10 tokens)
+    # → un label parmi les 4 ci-dessus, "task" par défaut
 ```
 
-**Si la conversation ne contient aucun mot-clé** → réponse conversationnelle rapide sans ReAct loop (pattern fast-path).
+| Label | Comportement | Mécanisme |
+|---|---|---|
+| `greeting` | Fast-path conv 1-2 phrases | LLM direct, pas d'outil |
+| `check_agents` | Pré-exécute `check_sub_agents` en Python, injecte résultat | Pattern A — résultat injecté dans le message user |
+| `question` | Fast-path conv 3 points max | LLM direct, pas d'outil |
+| `task` | ReAct loop complet (CLARIFYING → READY) | `run_agent()` avec historique |
+
+**Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Mistral ne peut pas ignorer un résultat déjà dans le contexte.
 
 ---
 
@@ -282,7 +280,9 @@ Chaque nouveau sous-agent suit la checklist standard (CLAUDE-agents.md §Checkli
 | Meta-calls OWU fast-path | ✅ Code | `### Task:` / `Generate a title` → fast-path direct |
 | Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` — LLM voit tous les messages précédents |
 | `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux si absent |
+| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 4 labels, remplace `_LEON_KW` (2026-05-15) |
+| `check_agents` → pré-exécution outil (Pattern A) | ✅ Code | Résultat injecté dans le message — Mistral ne peut pas l'ignorer |
 | Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 (2026-05-15) |
-| Zephyr — UX/Design agent | ❌ À créer | Port 8492 réservé |
-| Nora — Account Manager agent | ❌ À créer | Port 8493 réservé |
+| Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v1.0 (2026-05-15) |
+| Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 (2026-05-15) |
 | Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |
