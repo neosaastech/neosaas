@@ -21,12 +21,12 @@ Leon **ne délègue jamais à Charlotte** — Charlotte est SRE cluster et n'int
 
 ### Équipe — Sous-agents orchestrés par Leon
 
-| Agent | Rôle | Spécialité | Statut |
-|---|---|---|---|
-| **Aria** | Frontend Builder | Next.js + Vercel + Penpot export | actif v3.0 (GitHub MCP) |
-| **Milo** | Data/Scraping Specialist | Collecte web, pipelines data, volumétrie | **à créer** |
-| **Zephyr** | UX/Design Strategist | Audit UX, wireframes, guidelines, interface Penpot | **à créer** |
-| **Nora** | Account Manager / Client | Communication client, comptes-rendus, suivi satisfaction | **à créer** |
+| Agent | Rôle | Spécialité | Port | Statut |
+|---|---|---|---|---|
+| **Aria** | Frontend Builder | Next.js + Vercel + Penpot export | 8485 | actif v3.0 (GitHub MCP) |
+| **Milo** | Data/Scraping Specialist | Collecte web, pipelines data, volumétrie | 8491 | **actif v1.0** |
+| **Zephyr** | UX/Design Strategist | Audit UX, wireframes, guidelines, interface Penpot | 8492 | **actif v1.0** |
+| **Nora** | Account Manager / Client | Communication client, comptes-rendus, suivi satisfaction | 8493 | **actif v1.0** |
 | **Nox** | Backend Builder | FastAPI + Neon — appelé via Dispatcher | actif v3.0 |
 | **Dispatcher** | Orchestrateur pipeline | DevProjectWorkflow complet (Aria+Nox+Penpot+Domi+Vera) | actif v2.0 |
 
@@ -261,9 +261,9 @@ Le champ `session_state` est interne — il n'est pas affiché à l'utilisateur,
 
 Chaque nouveau sous-agent suit la checklist standard (CLAUDE-agents.md §Checklist intégration) + spécificités Leon :
 
-1. **Interface HTTP** : `POST /mission {message, session_id, context?}` → SSE streaming
+1. **Interface HTTP** : `POST /mission {message, context?}` → réponse JSON (+ `/v1/chat/completions` OWU-compatible)
 2. **Pas de Temporal** : agents conversationnels légers, pas de long workflow
-3. **Port assigné** : Milo=8490, Zephyr=8491, Nora=8492
+3. **Port assigné** : Milo=8491, Zephyr=8492, Nora=8493
 4. **Namespace** : `agent-system`
 5. **LiteLLM key** : créer `sk-milo` / `sk-zephyr` / `sk-nora` dans LiteLLM + Vault
 6. **Langfuse** : prompt + dataset + scoring (tag `agent:milo`)
@@ -276,12 +276,13 @@ Chaque nouveau sous-agent suit la checklist standard (CLAUDE-agents.md §Checkli
 
 | Item | Statut | Notes |
 |---|---|---|
-| Phase CLARIFYING — questions avant dispatch | ✅ Prompt | System prompt mis à jour — pas encore de session state en code |
-| Session state machine (INTAKE/CLARIFYING/READY) | ❌ À implémenter | `leon.py` n'a pas de tracking de phase entre tours |
+| Phase CLARIFYING — questions avant dispatch | ✅ Prompt + Code | System prompt + clarif_turns injecté depuis l'historique |
+| Session state machine (INTAKE/CLARIFYING/READY) | ✅ Prompt | Tracking via historique multi-turn (`history=`) — pas de state serveur |
 | `clarification_turns` passé à `dispatch_project` | ✅ Code | `args.get("clarification_turns", 0)` présent |
-| Meta-calls OWU fast-path | ❌ À implémenter | Leon n'a pas encore le fast-path (contrairement à Charlotte) |
-| Milo — Data/Scraping agent | ❌ À créer | Port 8490 réservé |
-| Zephyr — UX/Design agent | ❌ À créer | Port 8491 réservé |
-| Nora — Account Manager agent | ❌ À créer | Port 8492 réservé |
+| Meta-calls OWU fast-path | ✅ Code | `### Task:` / `Generate a title` → fast-path direct |
+| Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` — LLM voit tous les messages précédents |
+| `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux si absent |
+| Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 (2026-05-15) |
+| Zephyr — UX/Design agent | ❌ À créer | Port 8492 réservé |
+| Nora — Account Manager agent | ❌ À créer | Port 8493 réservé |
 | Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |
-| AutoGen choreography `_delegate()` | ❌ À implémenter | Helper HTTP vers sous-agents |
