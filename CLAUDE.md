@@ -133,13 +133,16 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
 | **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→F | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
-| **Leon** | Chef de Projet — brief → ProjectSpec → Zoho → dispatch | Temporal | 8181 | `leon` | active v2.1 (`POST /sre-task` ← Charlotte delegate_sre_task) |
+| **Leon** | Chef de Production — brief → CLARIFYING → ProjectSpec → dispatch sous-agents | FastAPI+Temporal | 8181 | `leon` | active v2.1 — v3.0 planifié (CLAUDE-leon.md) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS | Temporal | 8489 | `dispatcher` | active v1.0 |
+| **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8490 | — | **à créer** (CLAUDE-leon.md) |
+| **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8491 | — | **à créer** (CLAUDE-leon.md) |
+| **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8492 | — | **à créer** (CLAUDE-leon.md) |
 | **admin-sys** | K8s executor — kubectl délégué par Charlotte | FastAPI | 8000 | — | active v4.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
@@ -164,6 +167,8 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 ### Connector-system & MCP Servers
 
 > Architecture complète, MCP servers, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
+
+> **Leon v3.0 — Chef de Production** (machine d'états INTAKE→CLARIFYING→READY, sous-agents Milo/Zephyr/Nora, AutoGen choreography, polling Zoho) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
 
 Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body?}` — credentials depuis Vault auto.
 
