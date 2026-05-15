@@ -270,19 +270,48 @@ Chaque nouveau sous-agent suit la checklist standard (CLAUDE-agents.md §Checkli
 
 ---
 
+### Workflow documentaire — Cycle de vie d'un projet
+
+Avant tout dispatch, Leon s'assure que le projet est documenté dans Notion :
+
+```
+INTAKE (brief utilisateur)
+  ↓
+Q0 — "Avez-vous une page Notion ?" (obligatoire, Q0 de chaque type de mission)
+  → URL Notion : notion_read_page() → contenu injecté dans le brief
+  → 'non'      : notion_create_page() → page créée, URL retournée
+  ↓
+CLARIFYING (questions type-spécifiques Q1-Qn)
+  ↓
+SURFSENSE (contexte doc si pertinent — Leon peut appeler surfsense_search())
+  ↓
+DISPATCH → Zephyr / Milo / Nora / Dispatcher (avec brief enrichi)
+```
+
+**SurfSense** : compte `leon@neokube.fr` (Editor) — accès à :
+- `[1] Neomnia Studio` — 2670 documents (production, chartes, projets)
+- `[2] Infrastructure NeoKube` — 17 documents (cluster, infra)
+
+Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsense-secrets`.
+
+---
+
 ### Gaps — État au 2026-05-15
 
 | Item | Statut | Notes |
 |---|---|---|
-| Phase CLARIFYING — questions avant dispatch | ✅ Prompt + Code | System prompt + clarif_turns injecté depuis l'historique |
-| Session state machine (INTAKE/CLARIFYING/READY) | ✅ Prompt | Tracking via historique multi-turn (`history=`) — pas de state serveur |
-| `clarification_turns` passé à `dispatch_project` | ✅ Code | `args.get("clarification_turns", 0)` présent |
-| Meta-calls OWU fast-path | ✅ Code | `### Task:` / `Generate a title` → fast-path direct |
-| Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` — LLM voit tous les messages précédents |
-| `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux si absent |
-| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 4 labels, remplace `_LEON_KW` (2026-05-15) |
-| `check_agents` → pré-exécution outil (Pattern A) | ✅ Code | Résultat injecté dans le message — Mistral ne peut pas l'ignorer |
-| Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 (2026-05-15) |
-| Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v1.0 (2026-05-15) |
-| Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 (2026-05-15) |
+| Phase CLARIFYING — questions avant dispatch | ✅ Code | Déterministe — questions hardcodées par type |
+| Session state machine (INTAKE/CLARIFYING/READY) | ✅ Code | Tracking via historique multi-turn |
+| Meta-calls OWU fast-path | ✅ Code | `### Task:` → fast-path direct |
+| Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` |
+| `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux |
+| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 4 labels |
+| Dispatch déterministe post-CLARIFYING | ✅ Code | design→Zephyr, scraping→Milo, comms→Nora, webapp→Dispatcher |
+| `notion_read_page` | ✅ Code | Lit une page Notion via URL/ID — résumé Mistral |
+| `notion_create_page` | ✅ Code | Crée une page projet dans Notion |
+| `surfsense_search` | ✅ Code | Recherche sémantique Neomnia Studio (2670 docs) |
+| Q0 Notion obligatoire | ✅ Code | Toutes missions — URL=lire / 'non'=créer |
+| Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 |
+| Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v1.0 |
+| Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 |
 | Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |

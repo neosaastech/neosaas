@@ -133,7 +133,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
 | **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→F | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
-| **Leon** | Chef de Production — brief → CLARIFYING → ProjectSpec → dispatch sous-agents | FastAPI+Temporal | 8181 | `leon` | active v2.1 — v3.0 planifié (CLAUDE-leon.md) |
+| **Leon** | Chef de Production — brief → Q0 Notion → CLARIFYING → dispatch sous-agents | FastAPI+Temporal | 8181 | `leon` | active v3.0 (Notion+SurfSense, dispatch déterministe) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
@@ -168,7 +168,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 > Architecture complète, MCP servers, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
 
-> **Leon v3.0 — Chef de Production** (machine d'états INTAKE→CLARIFYING→READY, sous-agents Milo/Zephyr/Nora, AutoGen choreography, polling Zoho) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
+> **Leon v3.0 — Chef de Production** (Q0 Notion obligatoire, dispatch déterministe design→Zephyr/scraping→Milo/comms→Nora, notion_read_page + notion_create_page + surfsense_search, SurfSense Neomnia Studio 2670 docs) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
 
 Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body?}` — credentials depuis Vault auto.
 
