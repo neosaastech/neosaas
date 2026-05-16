@@ -740,7 +740,7 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 | Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | Modèle cible |
 |---|---|---|---|---|---|
 | **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` | `claude-sonnet` |
-| **Leon** | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
+| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` (REVIEW) | — | `gpt-4o` |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | `gemini-flash` |
 | **Aria** Frontend | `codestral` | — | — | — | `codestral` |
 | **Nox** Backend | `codestral` | — | — | — | `codestral` |

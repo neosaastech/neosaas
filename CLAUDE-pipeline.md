@@ -22,34 +22,37 @@ Cette section est la référence pour comprendre à quel moment un projet passe 
 
 ### Phase 2 — Planification
 
-**Quand** : Le projet n'existe pas encore (ou est incomplet) — Leon structure le brief.
+**Quand** : Le projet existe dans Notion mais doit être révisé/cadré — ou est nouveau et doit être structuré.
 
 **Agents principaux** : Leon, Charlotte
 
+Leon v3.1 distingue deux sous-modes dans cette phase :
+
+**Sous-mode REVIEW** (projet Notion existant) :
 | Étape | Agent | Action |
 |---|---|---|
-| 1 | Leon | Dialogue de clarification (max 10 tours) — extrait title, objective, contraintes, client_email... |
-| 2 | Leon | Émet le ProjectSpec JSON (12 champs validés) |
-| 3 | Leon | Crée le projet Zoho avec jalons + tasklists + tâches |
-| 4 | Charlotte | `project_health_check(update_docs=True)` — croise les liens Zoho ↔ Notion ↔ autres systèmes |
+| 1 | Leon | `notion_read_page(url)` + `surfsense_search("normes stack Neomnia")` — sans question |
+| 2 | Leon | Analyse des gaps : ✅ conforme / ⚠️ à corriger / ❌ absent |
+| 3 | Leon | Rédige ProjectSpec corrigé → `notion_update_page(url, "ProjectSpec corrigé", contenu)` |
+| 4 | Leon | Demande validation utilisateur sur Notion (1 question) |
+| 5 | Leon → Dispatcher | Après "oui" → `dispatch_project(...)` + créer/mettre à jour Zoho |
+
+**Sous-mode TASK** (nouveau projet) :
+| Étape | Agent | Action |
+|---|---|---|
+| 1 | Leon | Q0 — "Avez-vous une page Notion ?" (URL=lire / 'non'=créer) |
+| 2 | Leon | CLARIFYING Charlotte pattern — 1 question par tour (LLM gère l'état) |
+| 3 | Leon | ProjectSpec validé → `dispatch_project(...)` |
+| 4 | Charlotte | `project_health_check(update_docs=True)` — croise Zoho ↔ Notion ↔ autres systèmes |
 
 **Sorties** :
-- Projet Zoho structuré (jalons, listes, tâches, description avec liens croisés)
-- Page Notion créée ou mise à jour avec section "Liens projet"
-- ProjectSpec JSON prêt (stocké dans Leon, déclenche la production si `dispatch_project` appelé)
+- ProjectSpec conforme aux normes Neomnia (Next.js App Router, Radix UI, Tailwind v4…)
+- Page Notion mise à jour avec section "ProjectSpec corrigé"
+- Projet Zoho structuré (après validation utilisateur)
 
-**Conditions de fin de phase** — l'une ou l'autre :
+**Validation obligatoire** : Leon ne dispatche jamais sans confirmation explicite de l'utilisateur sur le ProjectSpec Notion.
 
-```
-[ACTUEL]  Leon appelle dispatch_project() dès que le ProjectSpec est complet
-          → passage immédiat en production, sans validation humaine du plan Zoho
-
-[CIBLE]   L'utilisateur revoit le plan dans Zoho PM (jalons, tâches, description)
-          → marque le projet "Prêt pour production" (statut custom Zoho)
-          → zoho-observer détecte ce statut → construit ProjectSpec → déclenche Dispatcher
-```
-
-> **Gap actuel** : dans le flux cible, l'humain a une fenêtre de relecture dans Zoho avant que la production ne démarre. Dans le flux actuel, Leon déclenche immédiatement sans ce cran d'arrêt.
+**Cran d'arrêt Zoho (flux cible)** : L'utilisateur peut aussi marquer le projet "Prêt pour production" dans Zoho PM → zoho-observer détecte → déclenche Dispatcher automatiquement (sans passer par Leon).
 
 ---
 
