@@ -169,21 +169,33 @@ Leon détecte `agent: leon` dans la description, extrait le brief, et démarre l
 Leon utilise un classificateur LLM (antipattern #40 — jamais de string matching) :
 
 ```python
-_LEON_INTENT_LABELS = ("greeting", "check_agents", "question", "task")
+_LEON_INTENT_LABELS = ("greeting", "check_agents", "question", "task", "review")
 
 async def _classify_message_leon(msg: str) -> str:
     # LLM_SCAN_MODEL (mistral, ~500ms, max 10 tokens)
-    # → un label parmi les 4 ci-dessus, "task" par défaut
+    # → un label parmi les 5 ci-dessus, "task" par défaut
 ```
 
 | Label | Comportement | Mécanisme |
 |---|---|---|
-| `greeting` | Fast-path conv 1-2 phrases | LLM direct, pas d'outil |
+| `greeting` | Fast-path conv 1-2 phrases | Déterministe (pas de LLM) |
 | `check_agents` | Pré-exécute `check_sub_agents` en Python, injecte résultat | Pattern A — résultat injecté dans le message user |
 | `question` | Fast-path conv 3 points max | LLM direct, pas d'outil |
-| `task` | ReAct loop complet (CLARIFYING → READY) | `run_agent()` avec historique |
+| `task` | ReAct loop CLARIFYING→READY, 1 question par tour | `run_agent()` + `_sanitize_clarifying()` |
+| `review` | Analyse documentaire exhaustive — lit Notion + RAG norms | `run_agent(initial_model=LLM_SECONDARY)` — Claude Sonnet, pas de _sanitize |
 
 **Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Mistral ne peut pas ignorer un résultat déjà dans le contexte.
+
+### Deux modes de conversation — REVIEW vs TASK
+
+Leon distingue deux types de sessions en cours de projet :
+
+| Mode | Déclencheur | Comportement | Modèle |
+|---|---|---|---|
+| **TASK** (nouveau projet) | verbe d'action, pas d'URL Notion | CLARIFYING : une question à la fois jusqu'au ProjectSpec complet → dispatch | `LLM_MODEL` (gpt-4o) |
+| **REVIEW** (révision doc) | URL Notion présente, "revoir"/"analyser"/"auditer"/"corriger les normes" | Lit Notion + cherche dans SurfSense → analyse exhaustive multi-points | `LLM_SECONDARY` (claude-sonnet) |
+
+**`_sanitize_clarifying` exemption** : si `surfsense_search` ou `notion_read_page` est dans les sources utilisées, la réponse est une analyse documentaire — elle passe **sans troncature**.
 
 ---
 
@@ -209,10 +221,10 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 
 | Variable | Valeur | Usage |
 |---|---|---|
-| `LLM_MODEL` | `mistral-large-2407` | Conversations, clarifications, analyse ProjectSpec |
+| `LLM_MODEL` | `gpt-4o` | Conversations, clarifications, analyse ProjectSpec (TASK) |
+| `LLM_MODEL_REASONING` | `mistral-large-2407` | Bascule automatique si > 3 sources actives |
 | `LLM_SCAN_MODEL` | `mistral` | Meta-calls OWU, classification intent, fast-path |
-| `LLM_SECONDARY` | `claude-sonnet` | Escalade si clarification complexe (ambiguïté métier) |
-| `LLM_FALLBACK` | `gpt-4o` | Si Mistral indisponible |
+| `LLM_SECONDARY` | `claude-sonnet` | Mode REVIEW — analyse documentaire Notion + normes (large context) |
 
 **Pas de Temporal pour la couche conversationnelle** — Temporal seulement pour `dispatch_project` (DevProjectWorkflow long).
 
@@ -296,20 +308,22 @@ Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsen
 
 ---
 
-### Gaps — État au 2026-05-15
+### Gaps — État au 2026-05-16
 
 | Item | Statut | Notes |
 |---|---|---|
-| Phase CLARIFYING — questions avant dispatch | ✅ Code | Déterministe — questions hardcodées par type |
+| Phase CLARIFYING — questions avant dispatch | ✅ Code | Charlotte pattern — `run_agent()` + `_sanitize_clarifying()` |
 | Session state machine (INTAKE/CLARIFYING/READY) | ✅ Code | Tracking via historique multi-turn |
 | Meta-calls OWU fast-path | ✅ Code | `### Task:` → fast-path direct |
 | Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` |
 | `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux |
-| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 4 labels |
+| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 5 labels |
+| Mode REVIEW (révision doc Notion + normes) | ✅ Code | label `review` → `run_agent(initial_model=claude-sonnet)`, pas de _sanitize |
+| `_sanitize_clarifying` exemption analyse | ✅ Code | surfsense_search / notion_read_page dans sources → passe intacte |
 | Dispatch déterministe post-CLARIFYING | ✅ Code | design→Zephyr, scraping→Milo, comms→Nora, webapp→Dispatcher |
 | `notion_read_page` | ✅ Code | Lit une page Notion via URL/ID — résumé Mistral |
 | `notion_create_page` | ✅ Code | Crée une page projet dans Notion |
-| `surfsense_search` | ✅ Code | Recherche sémantique Neomnia Studio (2670 docs) |
+| `surfsense_search` | ✅ Code | Recherche sémantique Neomnia Studio (2670+ docs) |
 | Q0 Notion obligatoire | ✅ Code | Toutes missions — URL=lire / 'non'=créer |
 | Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 |
 | Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v2.0 |
