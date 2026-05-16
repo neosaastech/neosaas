@@ -141,7 +141,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS | Temporal | 8489 | `dispatcher` | active v1.0 |
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
-| **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v1.0 |
+| **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v2.0 |
 | **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8493 | — | actif v1.0 |
 | **admin-sys** | K8s executor — kubectl délégué par Charlotte | FastAPI | 8000 | — | active v4.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |

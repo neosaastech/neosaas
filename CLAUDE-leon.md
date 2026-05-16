@@ -25,10 +25,10 @@ Leon **ne délègue jamais à Charlotte** — Charlotte est SRE cluster et n'int
 |---|---|---|---|---|
 | **Aria** | Frontend Builder | Next.js + Vercel + Penpot export | 8485 | actif v3.0 (GitHub MCP) |
 | **Milo** | Data/Scraping Specialist | Collecte web, pipelines data, volumétrie | 8491 | **actif v1.0** |
-| **Zephyr** | UX/Design Strategist | Audit UX, wireframes, guidelines, interface Penpot | 8492 | **actif v1.0** |
+| **Zephyr** | UX/Design Strategist | Audit UX, wireframes, guidelines, interface Penpot | 8492 | **actif v2.0** |
 | **Nora** | Account Manager / Client | Communication client, comptes-rendus, suivi satisfaction | 8493 | **actif v1.0** |
-| **Nox** | Backend Builder | FastAPI + Neon — appelé via Dispatcher | actif v3.0 |
-| **Dispatcher** | Orchestrateur pipeline | DevProjectWorkflow complet (Aria+Nox+Penpot+Domi+Vera) | actif v2.0 |
+| **Nox** | Backend Builder | FastAPI + Neon — appelé via Dispatcher | 8486 | actif v3.0 |
+| **Dispatcher** | Orchestrateur pipeline | DevProjectWorkflow complet (Aria+Nox+Penpot+Domi+Vera) | 8484 | actif v2.0 |
 
 **Principe de délégation** : Leon interroge le sous-agent approprié via `POST /mission` (HTTP simple, sans Temporal). Temporal est réservé aux workflows longs (DevProjectWorkflow via Dispatcher).
 
@@ -94,9 +94,9 @@ Le champ `assigned_agent` détermine la route de dispatch après validation du s
 | Type de mission | Agent cible | Outil Leon |
 |---|---|---|
 | Développement web complet (front+back+deploy) | Dispatcher → Aria+Nox | `dispatch_project(project_type="webapp")` |
-| Scraping / collecte data / pipeline | Milo | `POST milo:8490/mission` |
-| UX audit / wireframes / guidelines design | Zephyr | `POST zephyr:8491/mission` |
-| Communication client / compte-rendu | Nora | `POST nora:8492/mission` |
+| Scraping / collecte data / pipeline | Milo | `POST milo:8491/mission` |
+| UX audit / wireframes / guidelines design | Zephyr | `POST zephyr:8492/mission` |
+| Communication client / compte-rendu | Nora | `POST nora:8493/mission` |
 | Frontend seul (si projet Penpot existant) | Aria via Charlotte | `dispatch_design_deploy(penpot_project_id)` |
 
 **Leon ne code jamais lui-même** — il cadre et route.
@@ -312,6 +312,6 @@ Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsen
 | `surfsense_search` | ✅ Code | Recherche sémantique Neomnia Studio (2670 docs) |
 | Q0 Notion obligatoire | ✅ Code | Toutes missions — URL=lire / 'non'=créer |
 | Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 |
-| Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v1.0 |
+| Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v2.0 |
 | Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 |
 | Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |
