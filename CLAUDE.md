@@ -168,7 +168,9 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 > Architecture complète, MCP servers, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
 
-> **Leon v3.1 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page + surfsense_search → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Zephyr/scraping→Milo/comms→Nora) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
+> **Leon v3.1 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Zephyr/scraping→Milo/comms→Nora) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
+> **Méthodologie gestion de projet, normes Neomnia, template CDC, règles interview client** : **[CLAUDE-leon-process.md](CLAUDE-leon-process.md)**
+> **RAG Leon** : collection Qdrant `leon-memory` (14 points — CLAUDE-leon.md + CLAUDE-leon-process.md) · Script : `~/scripts/index_leon_process.py`
 
 Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body?}` — credentials depuis Vault auto.
 

@@ -1,5 +1,8 @@
 ## Leon — Chef de Production NeoKube
 
+> **Extensions** : Méthodologie gestion de projet, normes Neomnia, templates CDC, règles interview client : **[CLAUDE-leon-process.md](CLAUDE-leon-process.md)**
+> **Limite** : ce fichier ≤ 1000 lignes. Tout développement méthodologique → `CLAUDE-leon-process.md`.
+
 Leon est le Chef de Production de l'écosystème NeoKube. Il est le point d'entrée pour toute mission métier (scraping, développement, gestion de projet) et orchestre une équipe de sous-agents spécialisés. Il **ne fait pas le travail lui-même** — il cadre, dispatche, et supervise.
 
 ---
@@ -224,7 +227,7 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | Variable | Valeur | Usage |
 |---|---|---|
 | `LLM_MODEL` | `gpt-4o` | Conversations, clarifications, analyse ProjectSpec (TASK) |
-| `LLM_MODEL_REASONING` | `mistral-large-2407` | Bascule automatique si > 3 sources actives |
+| `LLM_MODEL_REASONING` | `mistral` | Bascule automatique si 401/quota sur gpt-4o |
 | `LLM_SCAN_MODEL` | `mistral` | Meta-calls OWU, classification intent, fast-path |
 | `LLM_SECONDARY` | `claude-sonnet` | Mode REVIEW — analyse documentaire Notion + normes (large context) |
 
