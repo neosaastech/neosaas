@@ -192,10 +192,12 @@ Leon distingue deux types de sessions en cours de projet :
 
 | Mode | Déclencheur | Comportement | Modèle |
 |---|---|---|---|
-| **TASK** (nouveau projet) | verbe d'action, pas d'URL Notion | CLARIFYING : une question à la fois jusqu'au ProjectSpec complet → dispatch | `LLM_MODEL` (gpt-4o) |
-| **REVIEW** (révision doc) | URL Notion présente, "revoir"/"analyser"/"auditer"/"corriger les normes" | Lit Notion + cherche dans SurfSense → analyse exhaustive multi-points | `LLM_SECONDARY` (claude-sonnet) |
+| **TASK** (nouveau projet) | verbe d'action, pas d'URL Notion | CLARIFYING Charlotte pattern : `run_agent()` + `_sanitize_clarifying()` — 1 question par tour → dispatch | `LLM_MODEL` (gpt-4o) |
+| **REVIEW** (révision doc) | URL Notion présente, "revoir"/"analyser"/"rédiger"/"corriger les normes" | Orchestration déterministe Python — LLM génère le spec text, Python écrit dans Notion | `LLM_SECONDARY` (claude-sonnet) |
 
-**`_sanitize_clarifying` exemption** : si `surfsense_search` ou `notion_read_page` est dans les sources utilisées, la réponse est une analyse documentaire — elle passe **sans troncature**.
+**Principe REVIEW** : le LLM ne *décide* pas des appels d'outils — Python contrôle la séquence. Le LLM génère uniquement le texte du spec. Élimine les hallucinations "je ne peux pas accéder à Notion".
+
+**`_sanitize_clarifying` exemption** (mode TASK) : si `surfsense_search`, `notion_read_page` ou `notion_update_page` sont dans les sources, la réponse est une analyse légitime — elle passe sans troncature.
 
 ---
 
@@ -241,6 +243,7 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | L5 | Appeler Milo/Zephyr/Nora avant que le spec soit validé | Sous-agents reçoivent un spec complet, jamais un brief flou |
 | L6 | Confondre `dispatch_project` (Dispatcher) et `_delegate` (Milo/Zephyr/Nora) | `dispatch_project` = pipeline GitHub+Vercel+Neon. `_delegate` = tâche spécialisée |
 | L7 | Stocker la session dans Qdrant (OWU meta-calls) | Meta-calls → fast-path sans persistance |
+| L8 | Laisser le LLM décider d'appeler un outil d'écriture (Notion, Zoho) | Pour les workflows déterministes (REVIEW), Python appelle l'outil directement — le LLM génère uniquement le texte. Évite les hallucinations "je ne peux pas accéder à X". |
 
 ---
 
@@ -284,20 +287,29 @@ Chaque nouveau sous-agent suit la checklist standard (CLAUDE-agents.md §Checkli
 
 ### Workflow documentaire — Cycle de vie d'un projet
 
-Avant tout dispatch, Leon s'assure que le projet est documenté dans Notion :
+Deux modes selon le contexte :
 
+**Mode REVIEW** (URL Notion fournie — orchestration Python déterministe) :
+```
+Python: notion_read_page(url)           ← lecture directe
+Python: surfsense_search("normes...")   ← 2 recherches normes
+LLM:    génère spec text (texte pur, aucun tool call)
+Python: notion_update_page(url, spec)   ← écriture directe, SANS décision LLM
+        ou fallback notion_create_page()
+Réponse: spec + lien Notion + "validez-vous ?"
+```
+
+**Mode TASK** (nouveau projet — Charlotte pattern) :
 ```
 INTAKE (brief utilisateur)
   ↓
-Q0 — "Avez-vous une page Notion ?" (obligatoire, Q0 de chaque type de mission)
-  → URL Notion : notion_read_page() → contenu injecté dans le brief
-  → 'non'      : notion_create_page() → page créée, URL retournée
+Q0 — "Avez-vous une page Notion ?"
+  → URL : notion_read_page() → contenu injecté
+  → 'non' : notion_create_page()
   ↓
-CLARIFYING (questions type-spécifiques Q1-Qn)
+CLARIFYING 1 question/tour (run_agent + _sanitize_clarifying)
   ↓
-SURFSENSE (contexte doc si pertinent — Leon peut appeler surfsense_search())
-  ↓
-DISPATCH → Zephyr / Milo / Nora / Dispatcher (avec brief enrichi)
+DISPATCH → Zephyr / Milo / Nora / Dispatcher
 ```
 
 **SurfSense** : compte `leon@neokube.fr` (Editor) — accès à :
@@ -318,8 +330,10 @@ Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsen
 | Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` |
 | `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux |
 | Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 5 labels |
-| Mode REVIEW (révision doc Notion + normes) | ✅ Code | label `review` → `run_agent(initial_model=claude-sonnet)`, pas de _sanitize |
-| `_sanitize_clarifying` exemption analyse | ✅ Code | surfsense_search / notion_read_page dans sources → passe intacte |
+| Mode REVIEW — orchestration déterministe | ✅ Code | Python lit Notion+normes → LLM génère spec → Python écrit Notion (sans décision LLM) |
+| Anti-hallucination "je ne peux pas accéder à Notion" | ✅ Code | LLM ne voit jamais l'outil notion_update_page — Python l'appelle directement |
+| Cascade LLM R9 (REVIEW : claude-sonnet→gpt-4o→mistral) | ✅ Code | 401/quota → bascule automatique sur modèle suivant |
+| `_sanitize_clarifying` exemption analyse | ✅ Code | surfsense_search / notion_read_page / notion_update_page dans sources → passe intacte |
 | Dispatch déterministe post-CLARIFYING | ✅ Code | design→Zephyr, scraping→Milo, comms→Nora, webapp→Dispatcher |
 | `notion_read_page` | ✅ Code | Lit une page Notion via URL/ID — résumé Mistral |
 | `notion_create_page` | ✅ Code | Crée une page projet dans Notion |
