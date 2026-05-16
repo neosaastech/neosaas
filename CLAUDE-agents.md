@@ -812,6 +812,70 @@ Règles `sre_check_llm_key_status()` :
 
 ---
 
+## RAG — Écosystème de connaissance par agent
+
+> Tableau complet des collections Qdrant (dims, points, modèle) : **[CLAUDE-cluster.md](CLAUDE-cluster.md)**
+
+Chaque agent a une ou plusieurs collections Qdrant dédiées. Règle : **ne jamais interroger la collection d'un autre agent sans coordination** (ex : Zephyr ne lit pas `sre-charlotte-incidents`).
+
+### Carte RAG → Agent
+
+| Agent | Collections | Type de requête | Moment d'injection |
+|---|---|---|---|
+| **Leon** | `leon-memory` | Normes CDC, process interview, expériences REVIEW | Avant génération spec (mode REVIEW) |
+| **Aria** | `template-neosaas` + `design-knowledge` | Patterns code Next.js, principes UX composants | Dans `system_prompt` de `aria_generate_nextjs` |
+| **Zephyr** | `design-knowledge` + `neomnia_core` | Heuristiques UX par livrable + contexte agence | Dans `prod_user` étape 3 production |
+| **Charlotte** | `sre-charlotte-incidents` + `charlotte-conversations` | Incidents passés + session memory | Automatique via PydanticAI / `_load_pydantic_history` |
+| **Dispatcher** | `pm-decisions` | Décisions projets archivées | Post-workflow (write, pas read) |
+| **Neo** | `neo-memory` | Mémoire assistant | Session memory |
+
+### Fonctions RAG standard
+
+Chaque agent implémente son propre helper `_qdrant_search(collection, query, limit)` — **antipattern #7** : embedder **1 texte à la fois** (HuggingFace via LiteLLM retourne 1 vecteur par appel même avec batch).
+
+```python
+async def _qdrant_search(collection: str, query: str, limit: int = 3) -> str:
+    async with httpx.AsyncClient(timeout=15.0) as c:
+        emb_r = await c.post(f"{LITELLM_URL}/v1/embeddings",
+            headers={"Authorization": f"Bearer {LITELLM_KEY}"},
+            json={"model": EMBED_MODEL, "input": query[:1000]})   # 1 string, pas list
+        emb = emb_r.json()["data"][0]["embedding"]
+        if emb and isinstance(emb[0], list): emb = emb[0]         # fix HuggingFace nested
+        srch_r = await c.post(f"{QDRANT_URL}/collections/{collection}/points/search",
+            json={"vector": emb, "limit": limit, "with_payload": True, "with_vector": False})
+        hits = [h["payload"].get("content") or h["payload"].get("text") or ""
+                for h in srch_r.json().get("result", []) if h.get("score", 0) > 0.3]
+        return "\n\n---\n\n".join(hits)
+```
+
+### Auto-apprentissage Leon
+
+Après chaque CDC écrit dans Notion, `qdrant_learn_from_review(conversation, project_name)` :
+1. LLM_SCAN_MODEL extrait 2–3 leçons clés de la conversation (corrections, normes appliquées, gaps)
+2. Chaque leçon est embeddée et upsertée dans `leon-memory` avec `type=experience`
+3. Appel non-bloquant (`asyncio.ensure_future`) — n'impacte pas la réponse utilisateur
+
+Script de ré-indexation manuelle : `~/scripts/index_leon_process.py` (CLAUDE-leon.md + CLAUDE-leon-process.md).
+
+### Pipeline d'enrichissement futur
+
+```
+Scraping web (via Milo)
+  → contenu PM methodology, articles UX, best practices
+  → index_leon_process.py avec type=scraped
+  → leon-memory
+
+Notion (base interne)
+  → accès live via notion_read_page() — pas indexé (chaque projet est unique)
+  → SurfSense : réservé recherche documentaire externe
+
+neomnia_core (SharePoint, 260k pts)
+  → contexte agence généraliste — utile pour Zephyr (livrable charte/guidelines)
+  → score seuil > 0.3 : filtre les résultats hors-sujet
+```
+
+---
+
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
 > Aucune étape ne peut être sautée.
