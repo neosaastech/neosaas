@@ -57,6 +57,59 @@
 
 ---
 
+## Backup nocturne — `neokube-nightly-backup`
+
+**Schedule** : `0 3 * * *` Europe/Paris — **GitOps** : `~/Kubinote-GitOps/apps/management/base/cronjob-neokube-nightly-backup.yaml`
+
+### Ce qui est sauvegardé
+
+| Artefact | Source | Destination S3 | Format |
+|---|---|---|---|
+| Penpot PostgreSQL | `pg_dump` sur `penpot-postgres.penpot:5432` | `backups-db/penpot-postgres-{TIMESTAMP}.dump` | `pg_dump -Fc` (compressé) |
+| OpenWebUI SQLite | `cp /var/lib/open-webui-data/webui.db` (hostPath) | `backups-db/openwebui-sqlite-{TIMESTAMP}.db` | SQLite brut |
+| Qdrant snapshot | `POST /snapshots` sur `qdrant.rag-system:6333` | **PVC local uniquement** ⚠️ — pas uploadé sur S3 | JSON API |
+| GitOps repo | `rclone sync ~/Kubinote-GitOps` | `gitops/` | Sync complet (sans `.git/`) |
+
+> **⚠️ Gap connu** : le snapshot Qdrant reste sur la PVC locale (`qdrant-data-pv`, 50 Gi). En cas de perte du nœud, les 91 540+ points de `sre-charlotte-incidents` et autres collections seraient perdus. Pour sauvegarder Qdrant sur S3, il faudrait télécharger le snapshot via `GET /collections/{name}/snapshots/{name}` et l'uploader avec rclone.
+
+### Bucket S3
+
+**Bucket** : `kubinote-backups-charles` (Scaleway Object Storage, fr-par)
+**Remote rclone** : `scw-s3:` — config dans le Secret `rclone-scw-conf` (namespace `management`)
+
+```
+backups-db/
+  penpot-postgres-{TIMESTAMP}.dump    # ~taille variable
+  openwebui-sqlite-{TIMESTAMP}.db     # ~taille variable
+gitops/                                # miroir de ~/Kubinote-GitOps
+```
+
+### Notifications ntfy
+
+| Moment | Titre | Contenu |
+|---|---|---|
+| Démarrage | `💾 🌙 Backup nocturne démarré` | Tailles Penpot PG + SQLite + liste composants |
+| Fin OK | `✅ Backup nocturne terminé` | Taille par artefact + total bucket backups-db + gitops |
+| Erreur | `❌ Backup ÉCHOUÉ` | Commande kubectl pour inspecter les logs |
+
+### Commandes utiles
+
+```bash
+# Voir le dernier job
+kubectl get jobs -n management | grep backup
+
+# Logs du dernier backup
+kubectl logs -n management -l app=neokube-nightly-backup --tail=50
+
+# Lister les fichiers S3
+rclone ls scw-s3:kubinote-backups-charles/backups-db/ --config ~/.config/rclone/rclone.conf
+
+# Taille totale du bucket
+rclone size scw-s3:kubinote-backups-charles/ --config ~/.config/rclone/rclone.conf
+```
+
+---
+
 ## Namespaces Temporal (état 2026-04-27)
 
 | Namespace | Agent | Retention |
