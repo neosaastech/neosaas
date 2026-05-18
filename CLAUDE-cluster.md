@@ -67,10 +67,8 @@
 |---|---|---|---|
 | Penpot PostgreSQL | `pg_dump` sur `penpot-postgres.penpot:5432` | `backups-db/penpot-postgres-{TIMESTAMP}.dump` | `pg_dump -Fc` (compressé) |
 | OpenWebUI SQLite | `cp /var/lib/open-webui-data/webui.db` (hostPath) | `backups-db/openwebui-sqlite-{TIMESTAMP}.db` | SQLite brut |
-| Qdrant snapshot | `POST /snapshots` sur `qdrant.rag-system:6333` | **PVC local uniquement** ⚠️ — pas uploadé sur S3 | JSON API |
+| Qdrant snapshot | `POST /snapshots` + `GET /snapshots/{name}` sur `qdrant.rag-system:6333` | `qdrant/qdrant-full-{TIMESTAMP}.snapshot` | Snapshot binaire Qdrant |
 | GitOps repo | `rclone sync ~/Kubinote-GitOps` | `gitops/` | Sync complet (sans `.git/`) |
-
-> **⚠️ Gap connu** : le snapshot Qdrant reste sur la PVC locale (`qdrant-data-pv`, 50 Gi). En cas de perte du nœud, les 91 540+ points de `sre-charlotte-incidents` et autres collections seraient perdus. Pour sauvegarder Qdrant sur S3, il faudrait télécharger le snapshot via `GET /collections/{name}/snapshots/{name}` et l'uploader avec rclone.
 
 ### Bucket S3
 
@@ -79,8 +77,10 @@
 
 ```
 backups-db/
-  penpot-postgres-{TIMESTAMP}.dump    # ~taille variable
-  openwebui-sqlite-{TIMESTAMP}.db     # ~taille variable
+  penpot-postgres-{TIMESTAMP}.dump    # dump pg_dump -Fc
+  openwebui-sqlite-{TIMESTAMP}.db     # SQLite brut
+qdrant/
+  qdrant-full-{TIMESTAMP}.snapshot    # snapshot full toutes collections
 gitops/                                # miroir de ~/Kubinote-GitOps
 ```
 
