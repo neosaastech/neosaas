@@ -427,18 +427,28 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ## Charlotte SRE — Architecture interne (v4.0)
 
-`SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (défaut 300s) via un Temporal Schedule.
+`SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (**1800s = 30 min**) via un Temporal Schedule.
 
 | Bloc | Étapes | Activités clés |
 |---|---|---|
 | **A — Scan** | 1. Temporal failures · 2. Pod health · 3. Backup status · 4. LLM key status · 5. Vectorisation | `sre_scan_temporal_failures`, `sre_scan_pod_health`, `sre_verify_backup`, `sre_check_llm_key_status` |
 | **B — Remédiation** | 6. Auto-restart agents CrashLoop | `sre_auto_restart_agents` |
-| **C — LLM** | 7. Analyse LLM (diagnostic + sévérité) · score Langfuse `cluster_health_score` | `sre_analyze_with_llm`, `sre_push_langfuse_score` |
-| **D — Reporting** | 8. Matrice agents · 9. ntfy si severity critical/warning | `sre_agent_health_matrix`, `sre_ntfy_notify` |
-| **E — Eval Watch** | 10. Poll scores Langfuse (1 cycle sur `EVAL_WATCH_EVERY_N`=6) → ntfy + llm-key-sync si dégradation | `sre_check_eval_scores` |
+| **C — Sévérité** | 7. Sévérité rule-based (critical/warning/info) · score Langfuse `cluster_health_score` · **ntfy granulaire par événement** | `sre_ntfy_alert`, `sre_push_langfuse_score` |
+| **D — Reporting** | 8. Matrice agents · document incident/health si sévérité ≥ warning | `sre_agent_health_matrix`, `sre_document_incident`, `sre_document_health_report` |
+| **E — Eval Watch** | 9. Poll scores Langfuse (1 cycle sur `EVAL_WATCH_EVERY_N`=6) → ntfy + llm-key-sync si dégradation | `sre_check_eval_scores` |
 | **F — Self-Improvement** | Workflow hebdomadaire indépendant (dimanche 3h UTC) — collecte conversations sous-optimales → analyse Mistral → rapport Zoho + ntfy | `sre_collect_conversation_samples`, `sre_analyze_quality_patterns`, `sre_publish_improvement_report` |
+| **G — Image Versions** | Workflow hebdomadaire (dimanche 2h UTC) — scan toutes images K8s vs Docker Hub · ntfy par catégorie : major (high) / minor / patch · **déclenchable manuellement** via `trigger_image_update_scan` | `sre_scan_image_versions` |
 
-Variables importantes : `SRE_SCAN_INTERVAL_S` (300), `EVAL_WATCH_EVERY_N` (6), `EVAL_SCORE_THRESHOLD` (7.0), `LLM_ANALYZE_EVERY_N` (1).
+**ntfy granulaire (Bloc C)** — une alerte par événement réel :
+- Temporal failure → `sre_ntfy_alert` par namespace
+- Pod OOMKilled/CrashLoopBackOff → `sre_ntfy_alert` par pod
+- Backup FAILED/ERROR/STALE → `sre_ntfy_alert`
+- Provider LLM quota_exceeded/error → `sre_ntfy_alert` par provider (**Gemini exclu**)
+- Auto-restart → `sre_ntfy_alert` par agent
+- Drift ESCALATE → `sre_ntfy_alert` urgent ; drift corrigé → `sre_ntfy_alert` default
+
+Variables importantes : `SRE_SCAN_INTERVAL_S` (**1800**), `EVAL_WATCH_EVERY_N` (6), `EVAL_SCORE_THRESHOLD` (7.0).
+> `LLM_ANALYZE_EVERY_N` supprimé — `sre_analyze_with_llm` retiré en 2026-05-19 (redondant, coûteux). Sévérité désormais rule-based.
 
 ### Flux Leon → Charlotte
 
@@ -754,7 +764,7 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 > - `LLM_MODEL=claude-sonnet` → missions interactives `/mission` via PydanticAI `Agent.run()`
 > - `LLM_SECONDARY=gpt-4o` → **2ème fallback** si claude-sonnet quota épuisé (OpenAI, bonne gestion des tool calls)
 > - `LLM_FALLBACK=mistral` → **3ème fallback** si gpt-4o aussi indisponible
-> - `LLM_SCAN_MODEL=mistral` → scans Temporal automatiques (`sre_analyze_with_llm`) — inchangé
+> - `LLM_SCAN_MODEL=mistral` → compression résultats outils ReAct (`_compress_tool_result`) — `sre_analyze_with_llm` supprimé en 2026-05-19
 > - `LLM_CONV_MODEL` n'existe plus : PydanticAI + Claude gèrent nativement conv vs SRE sans classifieur
 > - **`_check_primary_llm()`** — health check toutes les 5 min + ntfy sur transition ok→down et down→ok
 
@@ -801,14 +811,18 @@ Comportement obligatoire :
 | **Mistral** | rate limit (+ Retry-After) → `rate_limit` ; sans Retry-After + "month" → `quota_exceeded` | N/A | ⚠️ même code |
 | **Gemini** | toujours rate limit free-tier → `rate_limit` | N/A (pas d'API crédit) | ⚠️ jamais quota_exceeded |
 
-Règles ntfy `llm-key-validation` (CronJob 6h) :
+Règles ntfy `llm-key-validation` (CronJob `30 6 * * *`) :
 - `quota_exceeded` / `error` sur provider **critique** (openai/anthropic/mistral) → ntfy high/urgent
 - `rate_limit` ou erreurs sur Gemini seul → log, pas de ntfy
-- OK quotidien → **supprimé** (bruit) — ntfy uniquement lundi (rapport hebdo coûts)
+- **Bilan quotidien 8h Paris (6h UTC) et 20h Paris (18h UTC)** : statut providers critiques + solde par agent (LiteLLM `/global/spend/logs`) + budget restant
+- Bilan du soir (18h UTC) inclut le coût mensuel OpenAI
+- Lundi matin : rapport hebdo coûts totaux
+- OK silencieux entre les bilans
 
-Règles `sre_check_llm_key_status()` :
+Règles `sre_check_llm_key_status()` (Charlotte Temporal — Bloc A) :
 - `invalid_providers` = uniquement `quota_exceeded` | `error` (pas `rate_limit`, pas `stale`, pas `unconfigured`)
 - Données Vault > 7.5h → status `stale` (CronJob peut avoir raté)
+- **Gemini exclu du loop Charlotte** — vérifié uniquement dans `llm-key-validation` CronJob
 
 ---
 
@@ -856,6 +870,19 @@ Après chaque CDC écrit dans Notion, `qdrant_learn_from_review(conversation, pr
 3. Appel non-bloquant (`asyncio.ensure_future`) — n'impacte pas la réponse utilisateur
 
 Script de ré-indexation manuelle : `~/scripts/index_leon_process.py` (CLAUDE-leon.md + CLAUDE-leon-process.md).
+
+### `notion_read_page` — Leon (v3.1+, 2026-05-19)
+
+Comportements critiques à connaître :
+
+- **Pagination** : itère jusqu'à 10 pages × 100 blocs (`has_more` + `next_cursor`) — avant : 1 seule page, max ~15 blocs
+- **`child_page`** : les sous-pages Notion (type `child_page`) sont récursivement lues et incluses dans le texte — avant : silencieusement ignorées
+- **Résumé LLM** : 400 mots / 600 tokens / 8000 chars d'input max
+- **Filtre rationale** : si le LLM retourne `"rationale": "JSON parse error"` ou similaire → rationale ignoré, chunk indexé quand même
+- **Seuil enrichissement** : `_enrichment_tip` déclenche si < 10 chunks (avant : < 20)
+- **`block_count`** retourné dans le résultat pour diagnostic
+
+> Si une page Notion retourne peu de chunks (<5), vérifier : (1) la page a-t-elle des sous-pages `child_page` ? (2) `block_count` > 0 ? — Si oui, le contenu est bien lu mais trop court pour générer beaucoup de chunks.
 
 ### Pipeline d'enrichissement futur
 

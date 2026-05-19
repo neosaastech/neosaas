@@ -51,7 +51,7 @@
 | `cluster-bootstrap` | management | `*/5 * * * *` | Applique GitOps + s'assure que les 7 namespaces Temporal existent (idempotent) |
 | `neokube-nightly-backup` | management | `0 3 * * *` (Europe/Paris) | Sauvegarde nightly |
 | `llm-key-sync` | cockpit | `0 * * * *` | Sync clés LLM Vault → K8s secrets → restart LiteLLM/Langfuse si changement |
-| `llm-key-validation` | cockpit | `30 6 * * *` | Valide les clés LLM, ntfy si quota épuisé |
+| `llm-key-validation` | cockpit | `30 6 * * *` | Valide les clés LLM critiques (openai/anthropic/mistral) + bilan solde/agent 8h et 20h Paris |
 | `dify-bootstrap` | dify | `0 4 1 1 *` | Bootstrap Dify annuel (migrations one-shot) |
 | `agent-eval-nightly` | agent-system | `0 2 * * *` (Europe/Paris) | Évalue les 9 agents (LLM-as-judge, 3 scénarios chacun), score Langfuse + alerte ntfy si avg < 7.5 |
 
@@ -107,6 +107,18 @@ rclone ls scw-s3:kubinote-backups-charles/backups-db/ --config ~/.config/rclone/
 # Taille totale du bucket
 rclone size scw-s3:kubinote-backups-charles/ --config ~/.config/rclone/rclone.conf
 ```
+
+---
+
+## Temporal Schedules Charlotte (namespace `sre-charlotte`)
+
+| Schedule ID | Workflow | Déclenchement | Rôle |
+|---|---|---|---|
+| `sre-scan-schedule-charlotte` | `SREScanWorkflow` | toutes les 30 min | Scan cluster : pods, Temporal, backup, LLM keys, drift |
+| `charlotte-improvement-schedule-charlotte` | `CharlotteImprovementWorkflow` | dimanche 3h UTC | Analyse qualité conversations → rapport Zoho + ntfy |
+| `charlotte-image-update-schedule-charlotte` | `SREImageUpdateWorkflow` | dimanche 2h UTC | Scan images K8s vs Docker Hub → rapport ntfy par catégorie (major/minor/patch) |
+
+> `SREImageUpdateWorkflow` est aussi déclenchable manuellement via l'outil Charlotte `trigger_image_update_scan`.
 
 ---
 

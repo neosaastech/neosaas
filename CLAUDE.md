@@ -118,7 +118,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cluster-bootstrap` | management | `*/5 * * * *` | GitOps + namespaces Temporal |
 | `neokube-nightly-backup` | management | `0 3 * * *` | Sauvegarde nightly |
 | `llm-key-sync` | cockpit | `0 * * * *` | Sync clés LLM Vault → K8s |
-| `llm-key-validation` | cockpit | `30 6 * * *` | Valide clés LLM, ntfy si quota épuisé |
+| `llm-key-validation` | cockpit | `30 6 * * *` | Valide clés LLM critiques (openai/anthropic/mistral) + bilan solde matin (8h Paris) et soir (20h Paris) par agent |
 | `dify-bootstrap` | dify | `0 4 1 1 *` | Bootstrap Dify annuel |
 | `agent-eval-nightly` | agent-system | `0 2 * * *` | Évalue 9 agents, alerte ntfy si avg < 7.5 |
 
