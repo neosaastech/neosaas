@@ -100,7 +100,7 @@ Deux variantes d'architecture NLU (compréhension des messages) :
 
 ---
 
-## 2. Interview obligatoire — 5 questions procédurales
+## 2. Interview obligatoire — 7 questions procédurales
 
 Charlotte **doit** conduire cet interview avant tout `create_agent()`. Les questions non
 renseignées par l'utilisateur sont posées via `ask_clarification`.
@@ -153,6 +153,50 @@ Si l'utilisateur dit "interactif" sans préciser → proposer Pattern B par déf
 Pour Pattern A : suggérer `claude-sonnet` (primary) + `mistral` (fallback via FallbackModel).
 Pour Pattern B : suggérer `mistral` ou `mistral-large-2407`.
 
+### Q6 — Connectors (microservices)
+
+Quels connecteurs l'agent utilisera-t-il pour accéder aux systèmes externes ?
+
+Tous les connectors sont dans le namespace `connector-system` et exposent `POST /proxy {path, body}`.
+L'agent les appelle via leur URL interne cluster.
+
+| Connector | Port | Accès | Exemple d'usage |
+|---|---|---|---|
+| `zoho` | 8000 | CRM, Projects, Tickets | Créer tâches Zoho, lire projets |
+| `github` | 8001 | Repos, PRs, Issues | Pousser code, créer branches |
+| `vercel` | 8002 | Déploiements, projets | Déclencher deploys, lire logs |
+| `neon` | 8003 | Bases de données PostgreSQL | Créer branches, exécuter queries |
+| `penpot` | 8004 | Design, projets Penpot | Créer fichiers design |
+| `openprovider` | 8005 | Registrar domaines | Vérifier dispo, acheter domaines |
+| `cloudflare` | 8006 | DNS, tunnels, analytics | Créer CNAMEs, gérer tunnel |
+| `stalwart` | 8007 | Email SMTP | Envoyer emails depuis agents |
+| `google-discovery` | 8008 | Google APIs | — |
+| `crawlee` | 8009 | Scraping web | Crawler, extraire contenu |
+| `dataforseo` | 8010 | SEO, keywords, SERP | Analyse SEO, mots-clés |
+
+**MCP servers** (couche préférée pour opérations complexes) :
+- `github-mcp` (`:8080/mcp` streamable-http) — Aria, Nox, Dispatcher
+- `k8s-mcp` (`agent-system:8080/mcp`) — Charlotte uniquement
+
+Passer la liste comme `connectors="zoho,github"` (virgule-séparé). Si aucun → `""`.
+
+### Q7 — Sidecars de sécurité
+
+Faut-il injecter les sidecars `tool-validator` + `output-guard` dans le pod ?
+
+| Sidecar | Port | Rôle |
+|---|---|---|
+| `tool-validator` | 8090 | Valide chaque appel outil vs `agent-policies.json` avant exécution |
+| `output-guard` | 8091 | Filtre et audit les sorties agent avant émission SSE |
+
+**Règle de décision** :
+- `sidecars_enabled=True` si : agent OWU-facing + accès connectors sensibles (zoho, github, vercel, neon)
+- `sidecars_enabled=False` (défaut) si : service HTTP interne, agent de test, pas d'accès systèmes critiques
+
+Les sidecars lisent leurs configs depuis :
+- `ConfigMap sidecar-scripts` (namespace `agent-system`) — code Python tool_validator.py + output_guard.py
+- `ConfigMap agent-policies` (namespace `agent-system`) — policies.json (entrée ajoutée automatiquement)
+
 ---
 
 ## 3. Arbre de décision
@@ -174,6 +218,14 @@ Demande de création d'agent
     │      └─ Workflows longs → Temporal, runtime="temporal"
     │             └─ + interface humaine → Hybride (FastAPI + Temporal)
     │
+    ├─ Q6: Connectors nécessaires ?
+    │      └─ Liste CSV → connectors="zoho,github,vercel"
+    │         Aucun    → connectors=""
+    │
+    ├─ Q7: Sidecars de sécurité ?
+    │      └─ OWU + connectors sensibles → sidecars_enabled=True
+    │         Service interne / test     → sidecars_enabled=False
+    │
     └─ → Résumé → Confirmation → create_agent()
 ```
 
@@ -183,11 +235,12 @@ Demande de création d'agent
 
 | Étape | Artefact produit |
 |---|---|
-| `sre_write_agent_spec` | `apps/agent-catalog/{name}.yaml` — AgentSpec complet |
+| `sre_write_agent_spec` | `apps/agent-catalog/{name}.yaml` — AgentSpec complet (connectors + sidecars inclus) |
 | `sre_provision_vault_secrets` | Chemin Vault `secret/neokube/apps/{name}` avec placeholders |
 | `sre_create_litellm_key` | Clé virtuelle LiteLLM `/key/generate`, stockée Vault |
-| `sre_provision_k8s_resources` | Namespace · SA · RBAC · ConfigMap config · Deployment · Service |
+| `sre_provision_k8s_resources` | Namespace · SA · RBAC · ConfigMap config · Deployment (avec sidecars si activés) · Service |
 | `sre_generate_agent_code` | `configmap-{name}-script.yaml` — FastAPI minimal (`/health` + `/v1/chat/completions`) |
+| `sre_provision_policy` | Entrée `agent-policies.json` pour l'agent (allowed tools depuis connectors) |
 | `sre_register_agent` | `configmap-agent-registry.yaml` mis à jour |
 | `sre_register_openwebui_pipe` | Pipe Open WebUI (Functions) |
 | `sre_register_openwebui_connection` | Connexion OpenAI-compat Open WebUI (Models) |
@@ -195,6 +248,10 @@ Demande de création d'agent
 
 **Code généré** : FastAPI minimal — Pattern B basique. Pour Pattern A (PydanticAI), Pattern B avancé,
 ou Worker Temporal : code métier à compléter manuellement après provisioning.
+
+**Sidecars injectés automatiquement** si `sidecars_enabled=True` : le Deployment inclut
+`tool-validator` (8090) + `output-guard` (8091), montant `sidecar-scripts` + `agent-policies`
+depuis les ConfigMaps du namespace `agent-system`.
 
 ---
 
@@ -266,7 +323,11 @@ Ces règles s'appliquent à TOUS les agents, quel que soit le type.
 
 ```
 # Créer un agent (interview + workflow automatique)
-create_agent(name, description, runtime, port, model, extra)
+create_agent(
+  name, description, runtime, port, model, extra,
+  connectors="zoho,github",   # CSV des connectors utilisés
+  sidecars_enabled=True        # injecter tool-validator + output-guard
+)
 
 # Provisionner depuis un AgentSpec existant
 provision_agent(spec_path="apps/agent-catalog/{name}.yaml")
