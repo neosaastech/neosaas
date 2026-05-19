@@ -341,9 +341,10 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
-> Checklist complète (8 étapes, templates K8s, scripts LiteLLM/Vault/Langfuse) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Charlotte (pleine autonomie)** : `create_agent(name, description, runtime, port, model)` — 9 étapes auto (spec+code+LiteLLM key+K8s+OWU). Ports libres : 8494-8499.
+> Checklist manuelle (agents Temporal complexes) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
-Étapes : 0. Paramètres → 1. SA K8s → 2. Virtual key LiteLLM + Vault → 3. Deployment → 4. Service → 5. Temporal NS → 6. Code Python → 7. GitOps → 8. Langfuse (prompt + dataset + scoring)
+Étapes auto : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → 5. Code FastAPI starter → 6. Registry → 7. OWU → 8. Langfuse
 
 ---
 

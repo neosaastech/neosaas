@@ -903,9 +903,38 @@ neomnia_core (SharePoint, 260k pts)
 
 ---
 
+## Charlotte — Pleine autonomie création/modification d'agents (Bloc C v2)
+
+> **Commande Charlotte** : `create_agent(name, description, runtime, port, model, extra)`
+> Charlotte génère et provisionne tout sans intervention humaine.
+
+### Workflow `CreateAgentWorkflow` — 9 étapes automatiques
+
+| # | Activité | Résultat |
+|---|---|---|
+| 1 | `sre_write_agent_spec` | `apps/agent-catalog/{name}.yaml` généré et écrit |
+| 2 | `sre_validate_agent_spec` | Validation champs obligatoires |
+| 3 | `sre_provision_vault_secrets` | Chemin Vault créé avec placeholders |
+| 4 | `sre_create_litellm_key` | Clé virtuelle LiteLLM via `/key/generate`, stockée Vault |
+| 5 | `sre_provision_k8s_resources` | Namespace, SA, RBAC, ConfigMap, Deployment, Service + GitOps push |
+| 6 | `sre_generate_agent_code` | `configmap-{name}-script.yaml` (FastAPI minimal) + kustomization |
+| 7 | `sre_register_agent` | `configmap-agent-registry.yaml` mis à jour |
+| 8a | `sre_register_openwebui_pipe` | Pipe Open WebUI (Functions) |
+| 8b | `sre_register_openwebui_connection` | Connexion OpenAI Open WebUI (Models) |
+| 9 | `sre_push_langfuse_score` | Trace Langfuse `agent_created` |
+
+**Ports libres** : 8494, 8495, 8496, 8497, 8498, 8499 (déjà utilisés : 8000→8493)
+**Code généré** : FastAPI minimal avec `/health` + `/v1/chat/completions` (OpenAI-compatible)
+**Modification agent** : `read_file` + `write_file` + `apply_gitops_fix` + `restart_deployment` (PROCÉDURE GITOPS)
+
+**Déclenché via** : `POST /create-agent {"name": "...", "description": "...", "port": 8494, "model": "mistral"}`
+
+---
+
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
-> Aucune étape ne peut être sautée.
+> **Alternative rapide** : demander à Charlotte `create_agent(...)` — elle fait tout automatiquement.
+> Checklist manuelle ci-dessous pour cas avancés (agents Temporal complexes, code custom).
 
 ### 0. Décider les paramètres de base
 
