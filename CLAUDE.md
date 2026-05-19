@@ -77,7 +77,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 |---|---|
 | `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (tunnel, 2 replicas) |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
-| `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (notifications push v2.11.0) |
+| `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (v2.11.0), **whisper-server** (STT local port 8394), **voice-gateway** (WS port 8393), **media-gateway** (préprocessing multimodal CLASS A port 8395) |
 | `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
 | `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
@@ -253,6 +253,30 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ---
 
+## Voix & Audio
+
+> Documentation complète (stack audio, endpoints, architecture, gaps) : **[CLAUDE-audio.md](CLAUDE-audio.md)**
+
+**Stack voix active** (déployée 2026-05-19) :
+
+| Capacité | Backend | Service K8s | Statut |
+|---|---|---|---|
+| STT (parole→texte) | `faster-whisper` base, CPU int8 | `whisper-server.interfaces:8394` | ✅ Déployé (local, gratuit) |
+| TTS (texte→parole) | `voxtral-mini-tts-latest` Mistral | `media-gateway.interfaces:8395/v1/audio/speech` (proxy stable) | ✅ Actif via media-gateway |
+| Voice gateway WebSocket | FastAPI WS + whisper STT + LiteLLM + Mistral TTS | `voice-gateway.interfaces:8393` | ✅ `https://voice.neokube.fr/` |
+| Audio chat (compréhension audio) | `voxtral-small-latest` | — | ⏳ Phase 3 |
+| OCR images (PNG, JPEG) | `pixtral-large-latest` via alias `pixtral` | LiteLLM | ✅ Filter OWU actif |
+| OCR PDFs | `mistral-ocr-latest` (API directe) | — | ✅ Filter OWU actif (valve) |
+
+**media-gateway** : point d'entrée OWU pour tous les agents CLASS A — `http://media-gateway.interfaces.svc.cluster.local:8395`. Prétraite images (Pixtral) et audio (Whisper), et sert de **proxy TTS stable** (`/v1/audio/speech` → Mistral). Les agents restent text-only.
+**whisper-server** : `STT_ENGINE=openai`, `AUDIO_STT_OPENAI_API_BASE_URL=http://whisper-server.interfaces.svc.cluster.local:8394/v1` — OWU natif + voice-gateway + media-gateway l'utilisent.
+**voice-gateway** : WebSocket `wss://voice.neokube.fr/ws` — push-to-talk browser → whisper STT → LiteLLM (charlotte/leon/…) → Mistral TTS.
+**TTS** : `TTS_ENGINE=openai` → media-gateway `:8395/v1` (stable). Mapping voix OWU (alloy/echo/fable/nova/onyx/shimmer) → slugs Mistral dans media-gateway. Clé : Vault `secret/neokube/apps/mistral` → K8s secret `mistral-audio-secret`.
+**Accès public HTTPS** : `https://chat.neokube.fr` — obligatoire pour le micro navigateur (`getUserMedia` exige HTTPS). GitOps : `apps/interfaces/base/ingress-open-webui-public.yaml`.
+**VOICE_MODE** : valve `bool = False` obligatoire dans toute pipe CLASS A — OWU ne transmet pas `type="voice"` aux pipes. Active les phrases d'empathie TTS + nettoyage markdown.
+
+---
+
 ## SurfSense — Moteur de recherche RAG
 
 > Documentation complète (composants, stockage, déploiement, 9 gotchas) : **[CLAUDE-surfsense.md](CLAUDE-surfsense.md)**
@@ -362,11 +386,13 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
+> **Norme classes services + agents + processus dev** : **[CLAUDE-services.md](CLAUDE-services.md)** — référence obligatoire avant toute création.
 > **Charlotte (pleine autonomie)** : `create_agent(name, description, runtime, port, model)` — 9 étapes auto (spec+code+LiteLLM key+K8s+OWU). Ports libres : 8494-8499.
 > Guide complet (4 types d'agents, interview, Pattern A/B, arbre de décision) : **[CLAUDE-create-agent.md](CLAUDE-create-agent.md)**
 > Checklist manuelle (agents Temporal complexes) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
-Étapes auto : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → 5. Code FastAPI starter → 6. Registry → 7. OWU → 8. Langfuse
+**Classes d'agents** : CLASS A (conversational, OWU→media-gateway) · CLASS B (builder, Temporal) · CLASS C (infrastructure SRE) · CLASS D (connector/observer)
+**Étapes auto CLASS A** : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → 5. Code FastAPI starter → 6. Registry → 7. OWU (base_url=media-gateway) → 8. Langfuse
 
 ---
 
