@@ -905,6 +905,11 @@ neomnia_core (SharePoint, 260k pts)
 
 ## Charlotte — Pleine autonomie création/modification d'agents (Bloc C v2)
 
+> Guide complet création : **[CLAUDE-create-agent.md](CLAUDE-create-agent.md)**
+> (4 types agents, interview 5 questions, Pattern A/B NLU, arbre de décision, règles invariantes)
+
+
+
 > **Commande Charlotte** : `create_agent(name, description, runtime, port, model, extra)`
 > Charlotte génère et provisionne tout sans intervention humaine.
 
