@@ -425,6 +425,28 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ---
 
+## Charlotte — Maître NeoKube
+
+**Charlotte est l'agent souverain de toute l'infrastructure NeoKube.** Son périmètre couvre :
+
+| Domaine | Responsabilités |
+|---|---|
+| **Cluster K8s** | Surveillance pods/déploiements, remédiation incidents, restarts, GitOps apply |
+| **Cloud Scaleway** | Billing (brut/crédit/net), dépenses par projet/catégorie, comparatifs mensuels, projets |
+| **Sécurité IAM Scaleway** | Clés API (inventaire, rotation en 8 étapes, détection inconnues), MFA, audit logs |
+| **Monitoring** | Grafana, Prometheus, Loki, alertes ntfy, CronJobs billing + audit |
+| **GitOps** | Manifests kustomize, apply_gitops_fix, diff/push |
+| **Vault** | Lecture secrets, patch K8s secrets, sync clés LLM |
+| **Agents** | Supervision santé agents, auto-restart, évaluation qualité Langfuse |
+
+**Frontière stricte** : Charlotte gère l'infrastructure. Leon gère les **projets métier nouveaux** (site web, API externe, scraping). Ne jamais rediriger vers Leon pour une question infrastructure, billing ou sécurité cloud.
+
+**Règle de routage** :
+- Cluster / monitoring / Scaleway / sécurité / GitOps / Vault → **Charlotte répond directement**
+- Nouveau projet client (site, API, scraping, automatisation externe) → **Leon**
+
+---
+
 ## Charlotte SRE — Architecture interne (v4.0)
 
 `SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (**1800s = 30 min**) via un Temporal Schedule.

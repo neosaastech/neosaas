@@ -130,9 +130,11 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > **Charlotte SRE v4.0 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 36 outils, guards inchangés) + protocole de remédiation sécurisé : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
+> **Charlotte = maître NeoKube** — elle est responsable de TOUTE l'infrastructure : cluster K8s, cloud Scaleway (billing, dépenses, sécurité IAM, rotation clés API, MFA, projets), monitoring (Grafana/Prometheus/Loki), GitOps, Vault, agents déployés. **Frontière claire** : Charlotte gère l'infrastructure — Leon gère les projets métier nouveaux (site web, API, scraping external). Ne jamais renvoyer vers Leon pour une question infrastructure/Scaleway.
+
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | SRE Orchestratrice — surveillance cluster, Blocs A→F | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
+| **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
 | **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.1 (REVIEW mode, notion_update_page, 5 intent labels, claude-sonnet) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
@@ -198,6 +200,18 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | **Design→Code** | Charlotte + Dispatcher + Aria v2.0 | `dispatch_design_deploy(penpot_project_id)` | Branche GitHub `design/penpot-export-{id}` + Vercel preview |
 
 **Gaps** : ~~trigger Zoho status → production~~ ✅ · ~~mapper Zoho→ProjectSpec~~ ✅ · ~~email enrichi étape par étape~~ ✅ (tous résolus 2026-05-12)
+
+---
+
+## Monitoring, Alertes & Données Scaleway
+
+> Documentation complète (pipeline billing, métriques Prometheus, dashboards Grafana, alertes ntfy,
+> situation hacking mai 2026, RBAC, points de vigilance) : **[CLAUDE-monitoring.md](CLAUDE-monitoring.md)**
+
+**Scaleway billing NET** : `scaleway_billing_total_euros` (après crédit) — mai 2026 : brut 2878€, crédit -2878€, **net = 0€**
+**Requête rapide** : `kubectl exec -n monitoring deployment/prometheus -- wget -qO- "http://localhost:9090/api/v1/query?query=scaleway_billing_total_euros" 2>/dev/null`
+**Dashboard** : `https://grafana.neokube.fr/d/scaleway-pilot` — refresh 5 min
+**Sources Charlotte** : `scaleway-billing-history` + `scaleway-inventory-snapshot` (ConfigMaps management) + Prometheus
 
 ---
 
@@ -317,6 +331,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 40 | String matching pour détecter l'intent — fragile face aux variantes linguistiques | Hardcoder `"accès"`, `"as-tu"`, etc. échoue sur `"acces"` (sans accent), `"as tu"` (sans tiret), autres langues. Règle : **utiliser le LLM comme interprétateur d'intent** — `_classify_message()` (LLM_SCAN_MODEL, max 10 tokens) retourne 1 label parmi `greeting \| access_zoho \| access_cluster \| question \| task`. Table intent→comportement extensible sans maintenance. Voir Pattern A dans CLAUDE-agents.md et antipattern #40 dans CLAUDE-antipatterns.md. |
 | 41 | HTTP 429 traité comme `quota_exceeded` — faux positifs ntfy sur Gemini/Mistral | Gemini n'a pas d'API crédit : son 429 = rate limit free-tier, jamais épuisement. Mistral 429 avec Retry-After = rate limit temporaire. Anthropic 529 = overloaded (pas quota). Fix : `rate_limit` pour tous les 429 transitoires. `invalid_providers` = uniquement `quota_exceeded \| error`. Ntfy quotidien "tous opérationnels" supprimé. R9.11 dans CLAUDE-agents.md. |
 | 42 | Classificateur `task` sur clarifications contextuelles + réponse JSON artifact | "je parle de X" classifié `task` (Mistral voit termes techniques) → ReAct loop → `{"follow_ups": [...]}` au lieu d'une réponse naturelle. Fix 1 : `question` couvre les clarifications sans verbe d'action ; `task` exige un verbe explicite (restart, fix, list, etc.). Fix 2 : `_sanitize_final_output()` — guard JSON sur `final` avant émission SSE, convertit `follow_ups`/dict en texte naturel. |
+| 43 | RÈGLE CRITIQUE trop vague → Charlotte renvoie vers Leon pour du billing Scaleway | `RÈGLE CRITIQUE` en tête du system prompt disait "SRE cluster = surveillance/incidents" sans lister le cloud. LLM classifiait "récapitulatif dépenses Scaleway" comme "gestion financière hors SRE" et appliquait le renvoi Leon. **Double injection** : (1) RAPPEL PÉRIMÈTRE dans `intent==task` trop vague ; (2) RÈGLE CRITIQUE en sommet de system prompt trop restrictive — elle prime sur toutes les sections suivantes. Fix : la RÈGLE CRITIQUE liste explicitement les domaines IN-scope (cluster K8s, Scaleway billing/IAM/sécurité, monitoring, GitOps, Vault) et ceux OUT-of-scope (projets métier nouveaux uniquement). Charlotte ne redirige vers Leon QUE pour développement externe/scraping/nouveau site. **Principe** : Charlotte = maître NeoKube — toute infrastructure lui appartient. |
 
 ---
 
