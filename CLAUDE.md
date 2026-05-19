@@ -162,9 +162,13 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 ### Vault — carte des chemins
 
-> Carte complète Vault → K8s secrets + mécanismes de sync : **[CLAUDE-vault.md](CLAUDE-vault.md)**
+> Carte complète Vault → K8s secrets + mécanismes de sync + règles secret leak : **[CLAUDE-vault.md](CLAUDE-vault.md)**
 >
 > **Règle** : avant de déclarer un secret "absent de Vault", consulter cette carte. Les secrets K8s `openai-secret`, `anthropic-secret`, `cockpit-secrets` sont des **outputs** du CronJob `llm-key-sync` — ils sont bien dans Vault.
+>
+> **Règle secret leak** : un agent ne doit JAMAIS lire un K8s secret via `kubectl get secret` et inclure la valeur dans sa réponse. Pattern obligatoire : `Vault → Vault agent injection → /vault/secrets/<name> sourcé → os.environ["VAR"]`. Voir anti-pattern #45 et CLAUDE-vault.md §Règle absolue.
+>
+> **Charlotte** : credentials Scaleway (`SCW_SECRET_KEY`, `SCW_ORG_ID`) injectés par Vault agent au démarrage depuis `secret/neokube/infrastructure/scaleway`. Rôle Vault `charlotte` + policy `charlotte-policy` actifs depuis 2026-05-19.
 
 ### Connector-system & MCP Servers
 

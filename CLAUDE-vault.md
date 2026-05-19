@@ -64,7 +64,7 @@ kubectl create secret docker-registry ghcr-pull-secret \
 | `secret/neokube/infrastructure/zoho` | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNTS_SERVER`, `ZOHO_PORTAL_ID` | zoho-connector (8000) → `leon-zoho-secrets` + `zoho-secrets` (agent-system) [manuels] |
 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` | penpot-connector (8004) |
 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` | openprovider-connector (8005) |
-| `secret/neokube/infrastructure/scaleway` | `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`, `SCW_DEFAULT_PROJECT_ID`, `SCW_TEM_SMTP_HOST/PORT/USER/PASS` | stalwart relay, backups |
+| `secret/neokube/infrastructure/scaleway` | `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`, `SCW_ORG_ID`, `SCW_DEFAULT_PROJECT_ID`, `SCW_DEFAULT_REGION/ZONE`, `SCW_TEM_SMTP_HOST/PORT/USER/PASS` | Charlotte (Vault agent injection), stalwart relay, CronJobs billing/audit (via `scaleway-billing-secret`) |
 | `secret/neokube/infrastructure/langfuse` | `LANGFUSE_PUBLIC_KEY` (`pk-lf-b1a84594…`), `LANGFUSE_SECRET_KEY` | `cluster-manager-secrets` (agent-system) [manuel], sidecars tool-validator/output-guard |
 | `secret/neokube/infrastructure/litellm` | `LITELLM_MASTER_KEY` | LiteLLM, `cockpit-secrets` |
 | `secret/neokube/infrastructure/google` | `GOOGLE_SEARCH_API_KEY`, `GOOGLE_CX_ID` | google-discovery-connector (8008) |
