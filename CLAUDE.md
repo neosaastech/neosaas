@@ -135,7 +135,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
 | **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
-| **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.1 (REVIEW mode, notion_update_page, 5 intent labels, claude-sonnet) |
+| **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.1 (REVIEW mode, notion_update_page, 5 intent labels, gpt-4o) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
@@ -362,6 +362,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 45 | `run_kubectl get secret` → fuite de clé API dans la réponse Charlotte | Charlotte lit un secret K8s via `run_kubectl` pour en extraire l'org_id ou une clé, reçoit tout le contenu base64 dans son contexte LLM, et l'inclut dans sa réponse textuelle. Fix : (1) guard dans `run_kubectl` — si `get secret` dans les args, remplacer toutes les valeurs base64 décodées (>8 chars) par `[SECRET_REDACTED]` avant transmission au LLM ; (2) `RÈGLE SÉCURITÉ ABSOLUE` dans le system prompt — interdiction d'afficher secrets/clés/tokens ; (3) outils dédiés `scw_org_id()` et `_scw_key()` pour extraire uniquement la valeur nécessaire. |
 | 44 | Mistral via Cloudflare AI Gateway génère les tool calls en XML `<function=...>` | Mistral-large-2407 via Cloudflare AI Gateway sort parfois ses invocations d'outils en texte XML `<function=name><parameter=arg>value</parameter></function>` au lieu du format JSON OpenAI-compat. PydanticAI `FallbackModel` ne se déclenche pas (pas d'erreur HTTP), traite la réponse comme texte final, l'outil n'est jamais exécuté. Fix : pour la **path interactive** (`charlotte_agent`), `FallbackModel(claude-sonnet → gpt-4o → mistral)` — claude-sonnet génère des tool calls JSON fiables. Le **scan loop** (`SREScanWorkflow`) appelle `_llm_call(model=LLM_MODEL)` directement → reste sur mistral, non impacté. |
 | 43 | RÈGLE CRITIQUE trop vague → Charlotte renvoie vers Leon pour du billing Scaleway | `RÈGLE CRITIQUE` en tête du system prompt disait "SRE cluster = surveillance/incidents" sans lister le cloud. LLM classifiait "récapitulatif dépenses Scaleway" comme "gestion financière hors SRE" et appliquait le renvoi Leon. **Double injection** : (1) RAPPEL PÉRIMÈTRE dans `intent==task` trop vague ; (2) RÈGLE CRITIQUE en sommet de system prompt trop restrictive — elle prime sur toutes les sections suivantes. Fix : la RÈGLE CRITIQUE liste explicitement les domaines IN-scope (cluster K8s, Scaleway billing/IAM/sécurité, monitoring, GitOps, Vault) et ceux OUT-of-scope (projets métier nouveaux uniquement). Charlotte ne redirige vers Leon QUE pour développement externe/scraping/nouveau site. **Principe** : Charlotte = maître NeoKube — toute infrastructure lui appartient. |
+| 46 | `_md_to_notion_blocks` Leon → Notion 400 `validation_error` sur ProjectSpec | Notion API rejette tout bloc `rich_text` vide, n'interprète pas le Markdown (`**bold**` apparaît littéral), limite `children` à 100/requête, et les séparateurs `\|---\|---\|` deviennent des paragraphes parasites. Fix : (1) `_md_clean()` strip `**`/`*`/`` ` ``/links ; (2) helpers retournent `None` si vide → `_add()` ignore les `None` ; (3) chunk children à 90/requête dans `notion_update_page` + `notion_create_page` ; (4) `- [ ]` → `to_do` natif, lignes `\| col \| col \|` → paragraphe `col │ col`, séparateurs skip ; (5) log body complet + premier bloc sur 4xx. Règle : filtrer les blocs vides avant envoi à toute API tierce, logger le body sur 4xx. |
 
 ---
 
@@ -372,7 +373,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` |
 |---|---|---|---|---|
 | **Charlotte** SRE v4 | `mistral` ✅ | `mistral` | `claude-sonnet` | `gpt-4o` |
-| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` (REVIEW) | — |
+| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` → `gpt-4o` (REVIEW, cascade R9.8) | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — |
 | **Aria** / **Nox** | `codestral` | — | — | — |
 | **Vera** | `mistral-large-2407` | — | — | — |
@@ -398,4 +399,4 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ## Historique des actions Claude
 
-Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 104 entrées, 2026-03-15 → 2026-05-12.
+Archivé dans [CLAUDE-history.md](CLAUDE-history.md) — 173 entrées, 2026-03-15 → 2026-05-20.

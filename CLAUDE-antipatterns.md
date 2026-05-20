@@ -1124,3 +1124,64 @@ Voir Pattern A dans CLAUDE-agents.md. S'applique à toute détection d'intent pr
 - Autres dict → sérialise en texte lisible
 
 **Règle** : ne jamais laisser un artefact JSON atteindre l'utilisateur. `_sanitize_final_output()` est le filet de sécurité final avant l'émission SSE.
+
+---
+
+### 46. `_md_to_notion_blocks` — Notion API rejette les blocs vides + n'interprète pas le markdown
+
+**Symptôme** : `notion_update_page` et `notion_create_page` retournent HTTP 400 `validation_error` lors de l'écriture d'un ProjectSpec contenant tables, checkboxes, bold, et 50+ lignes. Les deux endpoints échouent (PATCH /blocks/{id}/children + POST /pages).
+
+**Quatre racines combinées** :
+
+1. **Blocs `rich_text` vides** — un heading parsé à partir de `### ` (hash + espace + rien) produit `rich_text: [{"text": {"content": ""}}]`. Notion rejette tout bloc avec `rich_text` vide ou ne contenant que des éléments à content `""`. Idem pour les paragraphes générés à partir de lignes contenant uniquement du markdown stripé.
+
+2. **Markdown markers en littéral** — Notion **ne parse pas** le Markdown dans `rich_text.content`. Une ligne `**Objectif :** ...` envoie `**Objectif :**` en clair (les `**` apparaissent visuellement). Les liens `[texte](url)` apparaissent aussi en clair. Aucune erreur côté API, mais rendu cassé. **Risque réel** : certains caractères markdown combinés à du contenu long peuvent dépasser des limites de validation invisibles.
+
+3. **Pas de chunking** — Notion limite `children` à **100 blocs par requête**. Un ProjectSpec ~3000 chars avec sections + tables + bullets peut dépasser. La requête entière est rejetée.
+
+4. **Lignes de tables `|---|---|---|`** — les séparateurs de tables Markdown deviennent des paragraphes inutiles (au mieux moches, au pire participent au dépassement de blocs).
+
+**Fix dans `_md_to_notion_blocks`** :
+
+```python
+def _md_clean(text: str) -> str:
+    text = _re.sub(r'\*\*([^*]+)\*\*', r'\1', text)        # bold
+    text = _re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'\1', text)  # italic
+    text = _re.sub(r'`([^`]+)`', r'\1', text)              # code
+    text = _re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)  # links
+    return text.strip()
+
+def _rt(text: str) -> list[dict]:
+    t = (text or "")[:2000]
+    return [{"type": "text", "text": {"content": t}}] if t else []
+
+def _para(text: str) -> dict | None:
+    rt = _rt(_md_clean(text))
+    return None if not rt else {"object":"block","type":"paragraph","paragraph":{"rich_text":rt}}
+```
+
+Tous les helpers (`_heading`, `_bullet`, `_todo`, `_numbered`) retournent `None` si `rich_text` est vide. Un `_add(b)` garde-fou ignore les `None`.
+
+**Chunking côté `notion_update_page` / `notion_create_page`** :
+
+```python
+for i in range(0, len(blocks), 90):
+    chunk = blocks[i:i+90]
+    pr = await c.patch(f"{NOTION_API_BASE}/blocks/{page_id}/children",
+                       headers=headers, json={"children": chunk})
+    if pr.status_code not in (200, 201):
+        log.warning("Notion chunk %d-%d HTTP %s: %s", i, i+len(chunk), pr.status_code, pr.text[:600])
+        log.warning("Notion first block sample: %s", json.dumps(chunk[0])[:500])
+        return {"error": f"Notion HTTP {pr.status_code}: {pr.text[:500]}"}
+```
+
+`notion_create_page` crée la page avec les 90 premiers blocs, puis PATCH le reste par lots.
+
+**Bonus utile** :
+- `- [ ]` / `- [x]` → `to_do` Notion natif (cases à cocher cliquables) au lieu de `bulleted_list_item`
+- Lignes `| col1 | col2 |` → paragraphe `col1 │ col2` (séparateur unicode propre)
+- Séparateurs `|---|---|` → skip
+
+**Logging** : sur 4xx, logger le body complet + un échantillon JSON du premier bloc — l'API Notion donne souvent un message précis (`body failed validation: body.children[3].paragraph.rich_text should be non-empty array`) qui pointe directement le bloc fautif.
+
+**Règle générale** : pour toute API tierce qui valide des structures imbriquées (Notion, Slack, Linear), **filtrer les éléments à contenu vide avant l'envoi** et **logger le body complet sur 4xx** — la 4xx est presque toujours une validation, jamais un problème d'auth.
