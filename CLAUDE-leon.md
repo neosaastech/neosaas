@@ -247,6 +247,7 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | L6 | Confondre `dispatch_project` (Dispatcher) et `_delegate` (Milo/Zephyr/Nora) | `dispatch_project` = pipeline GitHub+Vercel+Neon. `_delegate` = tâche spécialisée |
 | L7 | Stocker la session dans Qdrant (OWU meta-calls) | Meta-calls → fast-path sans persistance |
 | L8 | Laisser le LLM décider d'appeler un outil d'écriture (Notion, Zoho) | Pour les workflows déterministes (REVIEW), Python appelle l'outil directement — le LLM génère uniquement le texte. Évite les hallucinations "je ne peux pas accéder à X". |
+| L9 | Demander une validation UI avant de dispatcher vers Zoho | Les agents actent et rapportent — pas de bouton de confirmation, pas de page intermédiaire. `_find_zoho_project()` + `_zoho_sync()` s'exécutent inline dans la réponse REVIEW. Voir Règle R-TAR. |
 
 ---
 
@@ -299,8 +300,13 @@ Python: surfsense_search("normes...")   ← 2 recherches normes
 LLM:    génère spec text (texte pur, aucun tool call)
 Python: notion_update_page(url, spec)   ← écriture directe, SANS décision LLM
         ou fallback notion_create_page()
-Réponse: spec + lien Notion + "validez-vous ?"
+Python: _find_zoho_project(title)       ← matching sémantique sur projets actifs
+        → trouvé : lien projet existant
+        → absent : dispatch_zoho() → create_project + milestones + tasks
+Réponse: spec + lien Notion + lien Zoho  ← tout en une seule réponse, aucune confirmation
 ```
+
+**Règle trans-agentique — "Agit et rapporte"** (R-TAR) : les agents ne demandent pas de validation avant d'agir sur des systèmes tiers (Zoho, Notion, GitHub…). Ils agissent, puis incluent le lien du résultat directement dans leur réponse. La seule exception admise : les actions destructives irréversibles (suppression de données).
 
 **Mode TASK** (nouveau projet — Charlotte pattern) :
 ```
@@ -334,6 +340,7 @@ Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsen
 | `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux |
 | Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 5 labels |
 | Mode REVIEW — orchestration déterministe | ✅ Code | Python lit Notion+normes → LLM génère spec → Python écrit Notion (sans décision LLM) |
+| Auto-dispatch Zoho après REVIEW | ✅ Code | `_find_zoho_project()` matching sémantique + `_zoho_sync()` create/link inline — lien dans la réponse |
 | Anti-hallucination "je ne peux pas accéder à Notion" | ✅ Code | LLM ne voit jamais l'outil notion_update_page — Python l'appelle directement |
 | Cascade LLM R9 (REVIEW : claude-sonnet→gpt-4o→mistral) | ✅ Code | 401/quota → bascule automatique sur modèle suivant |
 | `_sanitize_clarifying` exemption analyse | ✅ Code | surfsense_search / notion_read_page / notion_update_page dans sources → passe intacte |
