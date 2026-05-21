@@ -480,15 +480,18 @@ ProjectSpec validé par Dispatcher
   → Charlotte : déclenche SREProvisionWorkflow si infra requise
 ```
 
-### admin-sys v5.0 (`interfaces` namespace, port 8000)
+### admin-sys v6.0 (`interfaces` namespace, port 8000)
 
-- `GET /health` — libre (probes K8s) — retourne aussi `"helm": true/false`
+- `GET /health` — libre (probes K8s) — retourne `"helm"`, `"ssh"`, `"hosts_mounted"`
 - `POST /execute {args: [...], timeout?: int}` — exécute kubectl, FORBIDDEN: exec/cp/port-forward/proxy/attach
 - `POST /apply {manifest: str, namespace?: str}` — kubectl apply -f - (manifests arbitraires)
 - `POST /helm {args: [...], timeout?: int}` — helm (upgrade/install/rollback/history/status/list/repo/search/get/diff/show)
-- **Auth** : header `X-Admin-Sys-Token` obligatoire sur `/execute`, `/apply`, `/helm` (secret `admin-sys-token`)
+- `POST /hosts {action: add|remove|list, hostname: str, ip: str}` — gestion `/etc/hosts` du nœud kubinote (hostPath monté)
+- `POST /ssh {host, command, user?, key_name?, port?, timeout?}` — exécute une commande sur nœud externe via SSH (clés dans secret `admin-sys-ssh-keys`, namespace `interfaces`)
+- **Auth** : header `X-Admin-Sys-Token` obligatoire sur tous les endpoints sauf `/health` (secret `admin-sys-token`)
 - ClusterRole `admin-sys-executor` : lecture universelle + mutations workloads/config/RBAC/batch
-- Helm 3.17.3 installé dans le pod via initContainer
+- Helm 3.17.3 + openssh-client installés dans le pod via initContainer
+- Volumes : `host-etc` (hostPath `/etc/hosts` → `/host-etc/hosts`) + `ssh-client-keys` (secret `admin-sys-ssh-keys`, optional)
 - GitOps : `apps/interfaces/base/configmap-admin-sys-script.yaml` + `deployment-admin-sys-agent.yaml`
 
 **Règle de fallback Charlotte** :
@@ -523,7 +526,7 @@ ProjectSpec validé par Dispatcher
 
 Charlotte v4.0 dispose de deux couches d'outils K8s, toutes exposées nativement via PydanticAI :
 
-1. **36 outils `@charlotte_agent.tool`** — wrappers fins sur `_mission_execute_tool` (guards de sécurité inchangés)
+1. **41 outils `@charlotte_agent.tool`** — wrappers fins sur `_mission_execute_tool` (guards de sécurité inchangés)
 2. **Outils K8s MCP** (`k8s_pods_list`, `k8s_events_list`, `k8s_resources_scale`, etc.) — passés via `toolsets=[MCPServerStreamableHTTP(MCP_K8S_URL)]` à chaque `Agent.run()`
 
 Le serveur K8s MCP (`ghcr.io/containers/kubernetes-mcp-server`) expose 19-20 outils nommés `k8s_*`. Charlotte les appelle directement — les types et arguments sont validés par le protocole MCP.
@@ -547,6 +550,12 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 | `test_agent_stream` | Smoke test streaming SSE d'un agent OWU-facing — compte les chunks SSE reçus (>3 = OK) | Étape 6 du protocole de correction code agents |
 | `trigger_dispatcher_workflow` | Délègue un workflow au Dispatcher Temporal : `dev_project` (lance `DevProjectWorkflow` complet Aria+Nox+Vera+deploy) ou `check_status` (liste les workflows actifs) | Charlotte délègue le pipeline métier sans l'absorber |
 | `signal_workflow` | Envoie un signal à un `DevProjectWorkflow` en attente : `approve` (déclenche déploiement Vercel) ou `reject` (annule) | Relais de l'approbation humaine vers Temporal |
+| `kustomize_apply` | Build kustomize depuis `/gitops/<rel_path>` + POST YAML à admin-sys `/apply` — déploiement immédiat sans attendre le CronJob bootstrap | Installation complète d'un service (après write_file + git_push) |
+| `web_fetch` | GET HTTP public avec httpx (timeout 20s, follow_redirects) — retourne le texte tronqué à `max_chars` (défaut 8000) | Lookup Docker Hub, docs officielles, GitHub raw avant installation |
+| `cloudflare_dns_add` | Crée CNAME/A/TXT sur Cloudflare via cloudflare-connector (`/zones/{id}/dns_records`). Zone neokube.fr par défaut. | Exposition publique d'un nouveau service |
+| `manage_etc_hosts` | Ajoute/supprime/liste entrées dans `/etc/hosts` du nœud kubinote via admin-sys `/hosts` | Résolution locale `.neokube.local` depuis le nœud |
+| `ssh_exec` | Exécute une commande SSH sur un nœud externe via admin-sys `/ssh` (clé dans secret `admin-sys-ssh-keys`) | Pilotage infrastructure cliente ou serveur Docker Scaleway |
+| `send_ntfy` | Envoie notification push ntfy sur `neokube-alerts` — priority, tags, actions (boutons cliquables) | Alertes manuelles, fin de mission, escalade |
 | `k8s_*` (MCP) | **19 outils K8s MCP** découverts dynamiquement : `k8s_pods_list`, `k8s_pods_log`, `k8s_events_list`, `k8s_resources_scale`, `k8s_resources_create_or_update`, etc. | Opérations K8s typées via MCP — complément à `run_kubectl` |
 
 **Philosophie des outils Charlotte (2026-05-12) :**

@@ -88,6 +88,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `dify` | Dify v1.13.3 (agent builder studio) |
 | `surfsense` | SurfSense — 7 composants : postgres, redis, searxng, backend, celery, zero-cache, frontend |
 | `monitoring` | Grafana + Loki (30j rétention) + Promtail (DaemonSet) |
+| `librechat` | LibreChat (interface chat multi-modèles) + MongoDB + Meilisearch — `http://librechat.neokube.local` / `https://librechat.neokube.fr` |
 
 ### Politique LLM & Embeddings
 **100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
@@ -111,6 +112,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `http://webmail.neokube.local` | Roundcube webmail |
 | `http://grafana.neokube.local` | Grafana — logs cluster |
 | `http://ntfy.neokube.local` | ntfy — notifications push |
+| `http://librechat.neokube.local` | LibreChat (chat multi-modèles via LiteLLM) |
 
 ### CronJobs cluster
 | CronJob | Namespace | Schedule | Rôle |
@@ -128,7 +130,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 
 > Charlotte internals, RBAC, admin-sys API, DevProjectWorkflow, R9, Checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
-> **Charlotte SRE v4.0 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 36 outils, guards inchangés) + protocole de remédiation sécurisé : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Charlotte SRE v4.0 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 41 outils, guards inchangés) + protocole de remédiation sécurisé : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 > **Charlotte = maître NeoKube** — elle est responsable de TOUTE l'infrastructure : cluster K8s, cloud Scaleway (billing, dépenses, sécurité IAM, rotation clés API, MFA, projets), monitoring (Grafana/Prometheus/Loki), GitOps, Vault, agents déployés. **Frontière claire** : Charlotte gère l'infrastructure — Leon gère les projets métier nouveaux (site web, API, scraping external). Ne jamais renvoyer vers Leon pour une question infrastructure/Scaleway.
 
@@ -145,10 +147,10 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
 | **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v2.0 |
 | **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8493 | — | actif v1.0 |
-| **admin-sys** | K8s executor — kubectl délégué par Charlotte | FastAPI | 8000 | — | active v4.0 |
+| **admin-sys** | K8s executor — kubectl délégué par Charlotte | FastAPI | 8000 | — | active v6.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
-**admin-sys** : `POST /execute {args}` + `POST /apply {manifest}` — auth `X-Admin-Sys-Token`, namespace `interfaces`.
+**admin-sys v6.0** : `/execute` (kubectl) + `/apply` (manifest) + `/helm` + `/hosts` (/etc/hosts nœud) + `/ssh` (nœud externe) — auth `X-Admin-Sys-Token`, namespace `interfaces`.
 
 **Charlotte — Délégation Dispatcher (v3.14)** : Charlotte ne gère pas le pipeline métier elle-même — elle délègue via deux outils :
 
