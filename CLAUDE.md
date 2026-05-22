@@ -252,13 +252,14 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 > Documentation complète (architecture, phases, processus dev, anti-patterns) : **[CLAUDE-neostudio.md](CLAUDE-neostudio.md)**
 
 **Accès** : `http://neostudio.neokube.local` / `https://neostudio.neokube.fr`
-**Repos** : `charlesvdd/neostudio` (Engine + intégration) · `charlesvdd/superset` (UI Shell fork)
+**Repos** : `charlesvdd/neostudio` (Engine + UI custom + GitOps config)
 **GitOps** : `~/Kubinote-GitOps/apps/interfaces/base/` (5 fichiers neostudio-*)
 **Vault** : `secret/neokube/apps/neostudio` — JWT_SECRET, LITELLM_API_KEY, GITHUB_TOKEN
-**Image** : `ghcr.io/charlesvdd/neostudio:latest` — CI/CD : merge main → push auto
+**Images** : Engine `ghcr.io/charlesvdd/neostudio:latest` · UI `ghcr.io/charlesvdd/neostudio-ui:latest` — CI/CD : push main → build auto, déploiement K8s manuel (`kubectl rollout restart`)
 
-**Stack** : Engine Bun/Hono :4242 (déployé ✅) · UI Shell fork Superset (Phase 1 ⏳)
+**Stack** : Engine Bun/Hono :4242 ✅ · UI Next.js 15 custom :3000 ✅ (Phase D — chat avec identité agent + typing indicator)
 **Agents exposés** : Charlotte · Leon · Aria · Nox · Vera · Dispatcher (via `NEOSTUDIO_AGENTS_CONFIG` ConfigMap)
+**Note** : intégration fork superset-sh/superset abandonnée (UI desktop-first, données mockées — voir CLAUDE-neostudio.md)
 
 ---
 
