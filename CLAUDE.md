@@ -247,6 +247,21 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ---
 
+## NeoStudio — Espace de développement multi-agent
+
+> Documentation complète (architecture, phases, processus dev, anti-patterns) : **[CLAUDE-neostudio.md](CLAUDE-neostudio.md)**
+
+**Accès** : `http://neostudio.neokube.local` / `https://neostudio.neokube.fr`
+**Repos** : `charlesvdd/neostudio` (Engine + intégration) · `charlesvdd/superset` (UI Shell fork)
+**GitOps** : `~/Kubinote-GitOps/apps/interfaces/base/` (5 fichiers neostudio-*)
+**Vault** : `secret/neokube/apps/neostudio` — JWT_SECRET, LITELLM_API_KEY, GITHUB_TOKEN
+**Image** : `ghcr.io/charlesvdd/neostudio:latest` — CI/CD : merge main → push auto
+
+**Stack** : Engine Bun/Hono :4242 (déployé ✅) · UI Shell fork Superset (Phase 1 ⏳)
+**Agents exposés** : Charlotte · Leon · Aria · Nox · Vera · Dispatcher (via `NEOSTUDIO_AGENTS_CONFIG` ConfigMap)
+
+---
+
 ## Dify v1.13.3 — Agent Builder Studio
 
 > Documentation complète (composants, stockage, secrets, intégrations) : **[CLAUDE-dify.md](CLAUDE-dify.md)**
@@ -366,6 +381,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 43 | RÈGLE CRITIQUE trop vague → Charlotte renvoie vers Leon pour du billing Scaleway | `RÈGLE CRITIQUE` en tête du system prompt disait "SRE cluster = surveillance/incidents" sans lister le cloud. LLM classifiait "récapitulatif dépenses Scaleway" comme "gestion financière hors SRE" et appliquait le renvoi Leon. **Double injection** : (1) RAPPEL PÉRIMÈTRE dans `intent==task` trop vague ; (2) RÈGLE CRITIQUE en sommet de system prompt trop restrictive — elle prime sur toutes les sections suivantes. Fix : la RÈGLE CRITIQUE liste explicitement les domaines IN-scope (cluster K8s, Scaleway billing/IAM/sécurité, monitoring, GitOps, Vault) et ceux OUT-of-scope (projets métier nouveaux uniquement). Charlotte ne redirige vers Leon QUE pour développement externe/scraping/nouveau site. **Principe** : Charlotte = maître NeoKube — toute infrastructure lui appartient. |
 | 46 | `_md_to_notion_blocks` Leon → Notion 400 `validation_error` sur ProjectSpec | Notion API rejette tout bloc `rich_text` vide, n'interprète pas le Markdown (`**bold**` apparaît littéral), limite `children` à 100/requête, et les séparateurs `\|---\|---\|` deviennent des paragraphes parasites. Fix : (1) `_md_clean()` strip `**`/`*`/`` ` ``/links ; (2) helpers retournent `None` si vide → `_add()` ignore les `None` ; (3) chunk children à 90/requête dans `notion_update_page` + `notion_create_page` ; (4) `- [ ]` → `to_do` natif, lignes `\| col \| col \|` → paragraphe `col │ col`, séparateurs skip ; (5) log body complet + premier bloc sur 4xx. Règle : filtrer les blocs vides avant envoi à toute API tierce, logger le body sur 4xx. |
 | 47 | Demander une validation UI avant d'agir sur un système tiers (Zoho, GitHub, Notion…) | OWU n'est pas conçu pour les interactions de type formulaire/bouton. Les approches toolbar action, heading-link, /dispatch_ui sont toutes des contournements fragiles. **Règle R-TAR (trans-agentique)** : l'agent vérifie si la ressource existe déjà (matching sémantique), crée ou met à jour, et inclut le lien résultat directement dans sa réponse — aucune confirmation. Seule exception : actions destructives irréversibles. Pattern Leon : `_find_zoho_project(title)` → `_zoho_sync(spec, url, title)` → ligne Markdown avec URL inline. |
+| 48 | `{word,word2}` set literal dans un f-string → NameError masqué | `body=JSON{description,default_project_id,expires_at}` dans un f-string = set literal Python → `NameError: name 'description' is not defined` à chaque appel mission. `log.error(str(e))` sans `exc_info=True` masque le numéro de ligne. Fix : `{{description,default_project_id,expires_at}}`. Règle : tout `{a,b}` dans un f-string est du Python, pas du texte. Détection : `exc_info=True` pour le traceback complet. |
 
 ---
 
@@ -375,7 +391,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 | Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` |
 |---|---|---|---|---|
-| **Charlotte** SRE v4 | `mistral` ✅ | `mistral` | `claude-sonnet` | `gpt-4o` |
+| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` |
 | **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` → `gpt-4o` (REVIEW, cascade R9.8) | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — |
 | **Aria** / **Nox** | `codestral` | — | — | — |
@@ -384,7 +400,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | **Neo** | `mistral-large-2407` | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
-**Charlotte v4 — cascade LLM 3 niveaux (R9.10)** : `FallbackModel(mistral → claude-sonnet → gpt-4o)` · mistral = ops quotidiennes · claude-sonnet = escalade incidents critiques · `_check_primary_llm()` → ntfy sur quota épuisé · Voir R9.10 dans CLAUDE-agents.md.
+**Charlotte v4 — cascade LLM (R9.10)** : classification `_classify_message()` → `mistral` (LLM_SCAN_MODEL, cheap, 10 tokens) · ReAct agent `charlotte_agent.run()` → `FallbackModel(claude-sonnet → gpt-4o → mistral)` · claude-sonnet = créatif + tool calling fiable · gpt-4o = fallback quota · mistral = last resort.
 
 ---
 
