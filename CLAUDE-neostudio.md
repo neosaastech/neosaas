@@ -215,21 +215,52 @@ kubectl exec -n security vault-0 -- vault kv get secret/neokube/apps/neostudio
 |---|---|---|
 | **Phase A** | Infrastructure K8s (Vault, LiteLLM key, Temporal NS, GitOps, DNS, CI/CD) | ✅ Terminé (2026-05-22) |
 | **Phase B** | Engine API : CORS, AgentProvider, sessions LiteLLM SSE | ✅ Terminé (2026-05-22) |
-| **1** | Port UI Shell Linux — intégrer `apps/web` du fork Superset dans `apps/ui/` | ⏳ À faire |
+| **Phase C** | UI Shell minimal — Next.js 15 + Tailwind v4, agent grid + session chat SSE, déployé K8s | ✅ Terminé (2026-05-22) |
+| **1** | Intégration UI Superset complète — remplacer `apps/ui/` par `apps/web` du fork charlesvdd/superset | ⏳ À faire |
 | **2** | Engine tRPC adapter — implémenter les procedures tRPC qu'attend l'UI Superset | ⏳ À faire |
 | **3** | Persistance SQLite — remplacer in-memory sessions store | ⏳ À faire |
 | **4** | Déploiement auto — GitHub Action → admin-sys `/apply` après push image | ⏳ À faire |
 | **5** | App desktop Linux — compiler `apps/desktop` en `.deb` / `.AppImage` | ⏳ À faire |
 
-### Détail Phase 1 — Port UI Shell
+### Détail Phase C — UI Shell minimal (✅ livré 2026-05-22)
+
+**Architecture retenue** : Next.js 15 + Tailwind v4 minimal, déployé comme service K8s séparé. L'UI proxie `/api/v1/*` vers l'Engine via les `rewrites()` de `next.config.ts`.
+
+```
+/                    → agent grid (fetch /api/v1/agents, cartes clickables)
+/session/[id]        → chat SSE (POST /api/v1/session/:id/message, stream tokens)
+```
+
+**Routing K8s** :
+- Ingress `neostudio.neokube.fr` et `.neokube.local` → `neostudio-ui:3000`
+- Next.js rewrite `/api/v1/*` → `neostudio-engine.interfaces.svc.cluster.local:4242`
+- Engine reste accessible directement en interne via son Service K8s
+
+**Images GHCR** :
+- Engine : `ghcr.io/charlesvdd/neostudio:latest` (Dockerfile : `docker/Dockerfile.linux`)
+- UI : `ghcr.io/charlesvdd/neostudio-ui:latest` (Dockerfile : `apps/ui/Dockerfile`)
+
+**Anti-patterns découverts en Phase C** :
+
+| # | Piège | Règle |
+|---|---|---|
+| UI-2 | `output: 'standalone'` Next.js en Docker monorepo | Le bundle standalone ne résout pas `node_modules/next` dans le runner si les paths ne correspondent pas. Fix : utiliser `bun run start` (non-standalone) — plus simple, pas de magie de bundling. |
+| UI-3 | `--frozen-lockfile` sans `bun.lockb` | `bun install --frozen-lockfile` échoue si pas de lock file dans le repo. Omettre le flag pour les nouveaux projets sans lock file commité. |
+| UI-4 | `public/` manquant → Docker COPY échoue | `COPY --from=builder /app/public ./public` échoue si le répertoire n'existe pas dans le builder. Toujours créer `public/.gitkeep` dans le repo Next.js. |
+| UI-5 | CI trigger ne couvre pas `main` | Les jobs Docker avec `if: github.ref == 'refs/heads/main'` ne se déclenchent jamais si `on.push.branches` ne liste pas `main`. Toujours ajouter `main` aux branches déclenchantes quand des jobs sont conditionnels à `main`. |
+| UI-6 | `apps/engine/Dockerfile` inexistant | Le Dockerfile engine était dans `docker/Dockerfile.linux` (convention du repo original). Ne pas supposer la localisation du Dockerfile — vérifier `git ls-files | grep Dockerfile`. |
+
+### Détail Phase 1 — Intégration UI Superset complète
+
+Pré-requis : Phase C déployée (UI minimal fonctionnel).
 
 1. Cloner `apps/web` du fork dans `apps/ui/` de neostudio
 2. Adapter `NEXT_PUBLIC_API_URL` → Engine API
 3. Supprimer/mocker les dépendances non requises (PostHog, Stripe, Upstash)
 4. Remplacer `packages/auth` par JWT NeoKube (JWT_SECRET Vault)
-5. Ajouter `apps/ui/Dockerfile` + build multi-stage
-6. Déployer en K8s (deployment-neostudio-ui.yaml dans interfaces)
-7. Traefik : `/` → UI, `/api/v1/` → Engine
+5. Adapter `apps/ui/Dockerfile` pour le monorepo Turbo
+6. Déployer en K8s (update deployment-neostudio-ui.yaml)
+7. Traefik : `/` → UI, Next.js rewrite → Engine
 
 ### Détail Phase 2 — Engine tRPC adapter
 
