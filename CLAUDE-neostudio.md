@@ -13,19 +13,23 @@ NeoStudio est l'**atelier de développement multi-agent de NeoKube**. Une UI cha
 │     ghcr.io/charlesvdd/neostudio-ui:latest · port 3000      │
 └────────────────────┬────────────────────────────────────────┘
                      │  fetch REST + SSE
-                     │  (rewrite Next.js /api/v1/* → Engine)
+                     │  /api/v1/* → Engine directement (ingress Traefik)
                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              NeoStudio Engine  :4242                        │
-│           apps/engine (Bun + Hono)                         │
+│           apps/engine (Bun + Hono + SQLite)                 │
 │  ghcr.io/charlesvdd/neostudio:latest                        │
 │                                                             │
-│  GET  /api/v1/agents              AgentProvider ConfigMap   │
-│  POST /api/v1/session/start       Crée une session          │
-│  POST /api/v1/session/:id/message Ajoute un message user    │
-│  GET  /api/v1/session/:id/stream  SSE tokens agent          │
-│  GET  /api/v1/session/:id/messages  Historique messages     │
-│  GET  /api/v1/session/:id         Détail session            │
+│  GET  /api/v1/agents                  AgentProvider ConfigMap│
+│  POST /api/v1/session/start           Crée session + workspace│
+│  POST /api/v1/session/:id/message     Ajoute message user   │
+│  GET  /api/v1/session/:id/stream      SSE tokens agent      │
+│  GET  /api/v1/session/:id/activity-stream  SSE activité live│
+│  GET  /api/v1/session/:id/messages    Historique messages   │
+│  GET  /api/v1/session/:id             Détail session        │
+│  GET  /api/v1/session/:id/diff        Diff git workspace    │
+│  POST /api/v1/session/:id/workspace/file  Écriture fichier  │
+│  GET  /api/v1/session/:id/workspace   Liste fichiers        │
 └──────┬──────────────────────────────┬───────────────────────┘
        │                              │
        ▼                              ▼
@@ -126,6 +130,7 @@ apps/desktop/                           # Phase 4 — App desktop Linux
 | `isStreaming` | `boolean` | True dès l'envoi, false à la fin du stream |
 | `loading` | `boolean` | Chargement initial de la session |
 | `autoStreamFired` | `useRef<boolean>` | Guard one-shot pour l'auto-stream initial |
+| `activityEvents` | `ActivityEvent[]` | Événements SSE live (dédupliqués par id) |
 
 `isTyping = isStreaming && !streamingContent` — affiché dans `SessionChat` pendant la phase "thinking" (avant le premier token).
 
@@ -150,9 +155,11 @@ apps/desktop/                           # Phase 4 — App desktop Linux
 | Tests | Push sur main | `bun test` |
 | Build & Push Engine | Push sur main | `ghcr.io/charlesvdd/neostudio:latest` |
 | Build & Push UI | Push sur main | `ghcr.io/charlesvdd/neostudio-ui:latest` |
-| Déploiement K8s | **Manuel** | `kubectl rollout restart deployment/neostudio-ui -n interfaces` |
+| **Déploiement K8s** | Après build engine + ui | `POST https://ops.neokube.fr/execute` → `kubectl rollout restart` (auto ✅) |
+| Desktop Linux | Tag `v*` ou `workflow_dispatch` | `.AppImage` + `.deb` → GitHub Actions artifacts + Release |
 
-> **Gap** : le déploiement K8s n'est pas automatisé. Après chaque push image, il faut relancer manuellement le pod. À résoudre : GitHub Action → admin-sys `/apply` après push image.
+**Workflow `ci.yml`** : lint → tests → docker-engine ∥ docker-ui → deploy (séquentiel, needs les deux builds)
+**Workflow `desktop.yml`** : déclenché indépendamment sur tag ou manuellement
 
 ---
 
