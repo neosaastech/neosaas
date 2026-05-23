@@ -70,9 +70,11 @@ Liste dynamique via `NEOSTUDIO_AGENTS_CONFIG` (ConfigMap K8s) — modifiable san
 
 ### Routing K8s
 
-- Ingress `neostudio.neokube.fr` et `neostudio.neokube.local` → `neostudio-ui:3000`
-- Next.js `rewrites()` : `/api/v1/*` → `http://neostudio-engine.interfaces.svc.cluster.local:4242/api/v1/*`
-- Engine accessible directement en interne via son Service K8s
+- Ingress `neostudio.neokube.fr` et `neostudio.neokube.local` :
+  - `/api/v1` (Prefix) → `neostudio-engine:4242` **directement** (contourne Next.js — obligatoire pour le streaming SSE)
+  - `/` (Prefix) → `neostudio-ui:3000`
+- Next.js `rewrites()` gardé comme fallback dev local uniquement
+- `ops.neokube.fr` → `admin-sys-agent:8000` (via Cloudflare tunnel, sans whitelist IP — usage CI uniquement)
 
 ---
 
@@ -88,14 +90,22 @@ apps/ui/src/app/
 │   │   └── AgentPromptInput.tsx        # Crée session + envoie premier message → redirect
 │   └── [agentId]/
 │       └── session/[sessionId]/
-│           ├── page.tsx                # ← LOGIQUE PRINCIPALE (streaming, état)
+│           ├── page.tsx                # ← LOGIQUE PRINCIPALE (streaming, SSE activité, état)
 │           └── components/
-│               ├── SessionPageContent.tsx  # Layout tabs chat/diff
-│               ├── SessionChat.tsx         # Rendu messages + typing indicator
+│               ├── SessionPageContent.tsx  # Layout tabs + fetch diff on activation
+│               ├── SessionChat.tsx         # Messages + typing indicator + CopyButton
 │               ├── SessionHeader.tsx
-│               ├── SessionTabs.tsx
-│               ├── SessionDiff.tsx
+│               ├── SessionTabs.tsx         # 4 onglets : chat / activité (badge violet) / diff (badge amber) / terminal
+│               ├── SessionDiff.tsx         # FileDiffTool par fichier modifié (vrais contenus git)
+│               ├── ActivityFeed.tsx        # Timeline SSE en temps réel (session.start/step/file.write/…)
+│               ├── SessionTerminal.tsx     # iframe → http://ttyd.neokube.local
 │               └── FollowUpInput.tsx       # Input follow-up + streaming
+
+apps/desktop/                           # Phase 4 — App desktop Linux
+├── main.js                             # Electron BrowserWindow → NEOSTUDIO_URL
+├── package.json                        # electron 31 + electron-builder 24
+└── assets/
+    └── icon.png                        # 512×512 violet-600
 ```
 
 ### Flux session complet
@@ -190,28 +200,131 @@ JWT_SECRET=xxx
 | **C** | UI Shell minimal — Next.js 15, agent grid + session chat SSE | ✅ 2026-05-22 |
 | **D** | UI Chat amélioré — identité agent/user, typing indicator, fix streaming | ✅ 2026-05-23 |
 | **1** | ~~Intégration UI Superset~~ | ❌ Abandonné (2026-05-23) |
-| **2** | Persistance SQLite — remplacer in-memory sessions store | ⏳ À faire |
-| **3** | Déploiement auto — GitHub Action → admin-sys `/apply` après push image | ⏳ À faire |
-| **4** | App desktop Linux — compiler en `.deb` / `.AppImage` | ⏳ À faire |
+| **2** | Live Activity View + git workspace + Terminal + Diff + copy button | ✅ 2026-05-23 |
+| **3** | Déploiement auto — GitHub Action → admin-sys via `ops.neokube.fr` | ✅ 2026-05-23 |
+| **4** | App desktop Linux — `.AppImage` + `.deb` (Electron, `apps/desktop/`) | ✅ 2026-05-23 |
+
+---
 
 ### Détail Phase D — UI Chat amélioré (✅ 2026-05-23)
 
-Améliorations apportées sur l'UI chat de base :
-
 - **`GET /session/:id/messages`** ajouté à l'Engine (manquait — retournait 404)
-- **Auto-stream** : `page.tsx` déclenche automatiquement le stream si le dernier message chargé est `role:"user"` (session créée par `AgentPromptInput` mais stream jamais appelé)
-- **Identité visuelle** : avatar coloré + nom de l'agent au-dessus de chaque message assistant ; label "Vous" côté utilisateur
-- **Typing indicator** : 3 points animés (`animate-bounce` avec délai décalé) pendant la phase "thinking" (avant le premier token)
-- **Buffer SSE correct** : `decoder.decode(value, { stream: true })` + buffer ligne pour éviter les coupures de chunks
-- **`onStreamDone`** : callback pour persister le message assistant dans `messages` state après fin du stream (follow-up)
+- **Auto-stream** : `page.tsx` déclenche automatiquement le stream si le dernier message chargé est `role:"user"`
+- **Identité visuelle** : avatar coloré + nom de l'agent ; label "Vous" côté utilisateur
+- **Typing indicator** : 3 points animés pendant la phase "thinking" (avant le premier token)
+- **Buffer SSE correct** : `decoder.decode(value, { stream: true })` + buffer ligne
+- **`onStreamDone`** : callback → persistance message assistant dans `messages` state
+
+---
+
+### Détail Phase 2 — Live Activity View + workspace (✅ 2026-05-23)
+
+**Activité en temps réel (SSE)**
+
+- Table SQLite `activity_events` + `dbAddActivity` / `dbGetActivities`
+- `emitActivity()` : persiste en DB + notifie les subscribers en mémoire (`Map<sessionId, Set<cb>>`)
+- `GET /:id/activity-stream` : SSE avec heartbeat toutes les 10s + flush 4KB initial pour Traefik
+- `ActivityFeed` component : timeline colorée par type (`session.start`→vert, `step`→violet, `file.write`→amber)
+- Badge violet sur l'onglet "Activité" avec compteur live
+- Fix routing SSE : `/api/v1/*` routé directement vers engine via ingress Traefik (bypass Next.js proxy)
+
+**Git workspace par session**
+
+- `WS_BASE=/data/workspaces/{sessionId}` — init Git au démarrage de session (`git init` + commit initial)
+- Init lazy sur `POST /workspace/file` si le workspace n'existe pas encore
+- `GET /:id/diff` : `git status --porcelain --untracked-files=all` + `git show HEAD:file` → `DiffFile[]`
+- `POST /:id/workspace/file` : écriture fichier dans le workspace + `emitActivity file.write`
+- `GET /:id/workspace` : liste fichiers (`git ls-files`)
+- Dockerfile engine : `RUN apk add --no-cache git` (alpine runner)
+
+**Terminal tab**
+
+- `SessionTerminal.tsx` : iframe vers `http://ttyd.neokube.local`
+- Onglet "Terminal" dans `SessionTabs` (4ème onglet)
+
+**Diff tab réel**
+
+- `SessionPageContent` fetch `GET /api/v1/session/:id/diff` à l'activation de l'onglet Diff
+- Badge amber avec compteur de fichiers modifiés
+- `SessionDiff` affiche les `FileDiffTool` avec vrais contenus old/new
+
+**Copy button**
+
+- `CopyButton` sur chaque message (assistant + user) — visible au hover, feedback checkmark 1.5s
+
+---
+
+### Détail Phase 3 — Déploiement automatique (✅ 2026-05-23)
+
+**Objectif** : supprimer le `kubectl rollout restart` manuel après chaque push image.
+
+**Architecture** :
+- `ops.neokube.fr` — admin-sys exposé publiquement via Cloudflare tunnel (sans IP whitelist)
+- Authentification : `X-Admin-Sys-Token` stocké comme secret GitHub Actions (`ADMIN_SYS_TOKEN`)
+- Ingress K8s : `ingress-admin-sys-agent-public.yaml` (namespace `interfaces`, sans middleware whitelist)
+
+**Flow CI** :
+```
+push main → lint + tests → docker-engine + docker-ui (parallèle) → deploy (séquentiel)
+```
+
+**Job deploy dans `ci.yml`** :
+```yaml
+deploy:
+  needs: [docker-engine, docker-ui]
+  steps:
+    - curl -sf -X POST https://ops.neokube.fr/execute
+        -H "X-Admin-Sys-Token: ${{ secrets.ADMIN_SYS_TOKEN }}"
+        -d '{"args":["rollout","restart","deployment/neostudio-engine","deployment/neostudio-ui","-n","interfaces"]}'
+```
+
+---
+
+### Détail Phase 4 — App desktop Linux (✅ 2026-05-23)
+
+**Stack** : Electron 31 + electron-builder 24 → `.AppImage` (portable) + `.deb` (installable)
+
+**`apps/desktop/`** :
+```
+apps/desktop/
+├── main.js          # BrowserWindow → NEOSTUDIO_URL (défaut : http://neostudio.neokube.local)
+├── package.json     # electron + electron-builder, appId fr.neokube.neostudio
+└── assets/
+    └── icon.png     # 512×512 violet-600
+```
+
+**Fonctionnalités** :
+- Charge `NEOSTUDIO_URL` (env var, défaut `http://neostudio.neokube.local`)
+- Page d'erreur "Connexion impossible" avec bouton Réessayer si le cluster est injoignable
+- Menu application : Recharger (Ctrl+R), DevTools (F12), Quitter (Ctrl+Q)
+- Liens externes (`!neokube`) ouverts dans le navigateur système
+- `backgroundColor: #09090b` — évite le flash blanc au chargement
+
+**Build CI** : `.github/workflows/desktop.yml`
+- Déclenché sur `push tags v*` ou `workflow_dispatch`
+- Produit artifacts GitHub Actions (30j de rétention)
+- Attache les fichiers à la GitHub Release si tag
+
+**Utilisation** :
+```bash
+# Télécharger le dernier build depuis GitHub Actions artifacts ou Release
+chmod +x NeoStudio-0.1.0.AppImage && ./NeoStudio-0.1.0.AppImage
+# ou
+dpkg -i neostudio-desktop_0.1.0_amd64.deb && neostudio-desktop
+
+# Pointer vers une URL custom
+NEOSTUDIO_URL=https://neostudio.neokube.fr ./NeoStudio-0.1.0.AppImage
+```
+
+---
 
 ### Détail Phase 1 abandonnée — Tentative intégration superset-sh/superset (2026-05-23)
 
 **Tentative** : remplacer `apps/ui/` par `apps/web` du fork superset-sh/superset.
 
 **Raisons d'échec** :
-- `apps/web` est une UI **desktop-first** conçue pour Electron — les données sont toutes hardcodées (mock) dans le code
-- Dépendances non-négociables : Neon (DB), Resend (email), Better Auth (OAuth Google/GitHub) — impossibles à stuber proprement
+- `apps/web` est une UI **desktop-first** conçue pour Electron — données toutes hardcodées (mock)
+- Dépendances non-négociables : Neon (DB), Resend (email), Better Auth (OAuth Google/GitHub)
 - Redirect loop auth (`/` → `/sign-in` → `/agents` → `/sign-in` × 10)
 - Stack trop couplée au cloud Superset — pas de mode "standalone NeoKube"
 
@@ -233,3 +346,6 @@ Améliorations apportées sur l'UI chat de base :
 | UI-8 | `streamingContent` jamais persisté | Le texte streamé s'affiche en live mais disparaît à la fin si on ne le copie pas dans `messages` state. Fix : `finally` block → push dans `messages`, vider `streamingContent`. |
 | UI-9 | Chunks SSE coupés | `decoder.decode(value)` sans `{ stream: true }` + `chunk.split("\n")` coupe les lignes SSE en plein milieu. Fix : buffer accumulateur + `lines.pop()` pour garder la ligne incomplète. |
 | UI-10 | Type error TypeScript bloque la build CI | Passer un prop non déclaré dans les types TS → build Docker échoue. TypeScript Check + Tests passent (ils ne font pas `next build`) mais le job Docker échoue. Toujours déclarer les props dans les types avant d'utiliser. |
+| UI-11 | `git status --porcelain` masque les fichiers dans des répertoires non-trackés | `?? src/` au lieu de `?? src/greet.ts` — le diff retourne 0 fichier. Fix : `--untracked-files=all`. Ajouter aussi un guard `statSync().isDirectory()` pour ignorer les entrées répertoire résiduelles. |
+| UI-12 | `initWorkspace` non appelé sur `POST /workspace/file` | Pour les sessions existantes ou créées avant la feature, le workspace n'a pas de `.git`. Écriture silencieuse sans versionning → diff toujours vide. Fix : `initWorkspace()` en début du handler file-write (idempotent). |
+| UI-13 | SSE job deploy GitHub Actions échoue à la première exécution | `ops.neokube.fr` CNAME + route tunnel créés juste avant le push → DNS non propagé pendant le run CI. Pas un bug permanent. Si échec : vérifier depuis l'extérieur avec `curl https://ops.neokube.fr/health`, puis relancer le job via GitHub API `rerun-failed-jobs`. |
