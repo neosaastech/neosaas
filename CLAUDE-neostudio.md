@@ -4,13 +4,13 @@
 
 NeoStudio est l'**atelier de développement multi-agent de NeoKube**. Une UI chat dédiée qui expose les agents NeoKube (Charlotte, Leon, Aria, Nox, Vera, Dispatcher) dans une interface conversationnelle avec streaming SSE, identité visuelle par agent, et follow-up messages.
 
-> **Note d'architecture (2026-05-23)** : L'approche initiale de fork du projet superset-sh/superset a été abandonnée. `apps/web` de superset est une UI desktop-first avec toutes les données mockées — non adaptable en temps raisonnable. L'UI est désormais un Next.js 15 custom maintenu dans `apps/ui/` du repo `charlesvdd/neostudio`.
+> **Note d'architecture (2026-05-23)** : L'approche initiale de fork du projet superset-sh/superset a été abandonnée. `apps/web` de superset est une UI desktop-first avec toutes les données mockées — non adaptable en temps raisonnable. L'UI est désormais un Next.js 15 custom maintenu dans `apps/ui/` du repo `neomnia/neostudio`.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │              NeoStudio UI  (apps/ui)                        │
 │         Next.js 15.3.2 + Tailwind v4 + Bun                 │
-│     ghcr.io/charlesvdd/neostudio-ui:latest · port 3000      │
+│     ghcr.io/neomnia/neostudio-ui:latest · port 3000      │
 └────────────────────┬────────────────────────────────────────┘
                      │  fetch REST + SSE
                      │  /api/v1/* → Engine directement (ingress Traefik)
@@ -18,7 +18,7 @@ NeoStudio est l'**atelier de développement multi-agent de NeoKube**. Une UI cha
 ┌─────────────────────────────────────────────────────────────┐
 │              NeoStudio Engine  :4242                        │
 │           apps/engine (Bun + Hono + SQLite)                 │
-│  ghcr.io/charlesvdd/neostudio:latest                        │
+│  ghcr.io/neomnia/neostudio:latest                        │
 │                                                             │
 │  GET  /api/v1/agents                  AgentProvider ConfigMap│
 │  POST /api/v1/session/start           Crée session + workspace│
@@ -64,7 +64,7 @@ Liste dynamique via `NEOSTUDIO_AGENTS_CONFIG` (ConfigMap K8s) — modifiable san
 |---|---|
 | **Namespace** | `interfaces` |
 | **Deployments** | `neostudio-engine` · `neostudio-ui` |
-| **Images** | Engine : `ghcr.io/charlesvdd/neostudio:latest` · UI : `ghcr.io/charlesvdd/neostudio-ui:latest` |
+| **Images** | Engine : `ghcr.io/neomnia/neostudio:latest` · UI : `ghcr.io/neomnia/neostudio-ui:latest` |
 | **Ports** | Engine : 4242 · UI : 3000 |
 | **URL locale** | `http://neostudio.neokube.local` |
 | **URL publique** | `https://neostudio.neokube.fr` |
@@ -140,7 +140,7 @@ apps/desktop/                           # Phase 4 — App desktop Linux
 
 | Repo | Rôle | Visibilité |
 |---|---|---|
-| `charlesvdd/neostudio` | Engine API + UI + GitOps config | Privé |
+| `neomnia/neostudio` | Engine API + UI + GitOps config | Privé |
 | `neomnia/Kubinote-GitOps` | Manifests K8s | Privé |
 
 > Le fork `charlesvdd/superset` reste public mais n'est plus utilisé dans NeoStudio.
@@ -153,8 +153,8 @@ apps/desktop/                           # Phase 4 — App desktop Linux
 |---|---|---|
 | TypeScript Check | Push sur main | `tsc --noEmit` sur engine + ui |
 | Tests | Push sur main | `bun test` |
-| Build & Push Engine | Push sur main | `ghcr.io/charlesvdd/neostudio:latest` |
-| Build & Push UI | Push sur main | `ghcr.io/charlesvdd/neostudio-ui:latest` |
+| Build & Push Engine | Push sur main | `ghcr.io/neomnia/neostudio:latest` |
+| Build & Push UI | Push sur main | `ghcr.io/neomnia/neostudio-ui:latest` |
 | **Déploiement K8s** | Après build engine + ui | `POST https://ops.neokube.fr/execute` → `kubectl rollout restart` (auto ✅) |
 | Desktop Linux | Tag `v*` ou `workflow_dispatch` | `.AppImage` + `.deb` → GitHub Actions artifacts + Release |
 
@@ -176,7 +176,7 @@ apps/desktop/                           # Phase 4 — App desktop Linux
 ### Développement local
 
 ```bash
-git clone https://github.com/charlesvdd/neostudio
+git clone https://github.com/neomnia/neostudio
 cd neostudio && bun install
 
 # Engine
