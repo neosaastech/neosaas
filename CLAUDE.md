@@ -408,12 +408,16 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
 > **Norme classes services + agents + processus dev** : **[CLAUDE-services.md](CLAUDE-services.md)** — référence obligatoire avant toute création.
-> **Charlotte (pleine autonomie)** : `create_agent(name, description, runtime, port, model)` — 9 étapes auto (spec+code+LiteLLM key+K8s+OWU). Ports libres : 8494-8499.
+> **Charlotte (pleine autonomie)** : `create_agent(name, description, runtime, port, model)` — 12 étapes auto (spec+code+**MAD**+Qdrant+LiteLLM key+K8s+OWU+eval-nightly). Ports libres : 8494-8499.
 > Guide complet (4 types d'agents, interview, Pattern A/B, arbre de décision) : **[CLAUDE-create-agent.md](CLAUDE-create-agent.md)**
 > Checklist manuelle (agents Temporal complexes) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Cadre normatif MAD (Mémoire · Apprentissage · Documentation)** — 9 règles obligatoires pour tout agent : **[CLAUDE-agent-learning.md](CLAUDE-agent-learning.md)**
 
 **Classes d'agents** : CLASS A (conversational, OWU→media-gateway) · CLASS B (builder, Temporal) · CLASS C (infrastructure SRE) · CLASS D (connector/observer)
-**Étapes auto CLASS A** : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → 5. Code FastAPI starter → 6. Registry → 7. OWU (base_url=media-gateway) → 8. Langfuse
+**Étapes auto CLASS A** : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → **5a. Code FastAPI + template MAD** → **5b. Collection Qdrant `{name}-memory`** → **5c. Enregistrement eval-nightly** → 6. Registry → 7. OWU → 8. Langfuse
+
+**Règles MAD (condition de mise en production)** :
+M1 Collection Qdrant · M2 Session memory · M3 Long-term memory · A1 `_agent_learn()` post-mission · A2 Correction proactive Charlotte · A3 CharlotteImprovementWorkflow hebdo · D1 Identité Langfuse · D2 Score `mission_quality` · D3 ntfy + Zoho
 
 ---
 

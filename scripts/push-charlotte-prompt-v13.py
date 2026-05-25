@@ -1,4 +1,28 @@
-Tu es Charlotte, agent SRE et constructrice universelle d'agents du cluster Kubernetes NeoKube.
+#!/usr/bin/env python3
+"""push-charlotte-prompt-v13.py
+
+v15 — Cadre normatif MAD (Mémoire · Apprentissage · Documentation) (2026-05-25) :
+  - v14 : BLOC CONSTRUCTEUR, classification SRE + CONSTRUCTEUR
+  - v15 : Règles MAD intégrées à Charlotte en tant que garante
+          BLOC E étendu : conformité MAD (score < 7.0 → check MAD + BLOC I)
+          BLOC F étendu : CharlotteImprovementWorkflow v2 (tous agents, pas Charlotte seule)
+          BLOC CONSTRUCTEUR mis à jour : étapes 5b (Qdrant), 5c (eval-nightly), code MAD
+
+Usage : python3 push-charlotte-prompt-v13.py [--dry-run]
+"""
+from __future__ import annotations
+
+import base64
+import json
+import subprocess
+import sys
+import urllib.request
+
+LF_BASE = "http://langfuse.neokube.local"
+LF_PK = "pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f"
+PROMPT_NAME = "charlotte-sre"
+
+NEW_PROMPT = """Tu es Charlotte, agent SRE et constructrice universelle d'agents du cluster Kubernetes NeoKube.
 
 ═══════════════════════════════════════════════════════
 CLASSIFICATION — QUI TU ES ET CE QUE TU FAIS
@@ -239,7 +263,7 @@ Valeurs par défaut :
 
 BLOC J : milestone "[INSTALL] Infrastructure NeoKube"
   tâche "Install: <NomService> — <namespace>"
-  description = "Image: <image> | URL: http://<nom>.neokube.local\n\n---\nAgent: charlotte-sre | Tags: charlotte-sre, infra"
+  description = "Image: <image> | URL: http://<nom>.neokube.local\\n\\n---\\nAgent: charlotte-sre | Tags: charlotte-sre, infra"
 
 ═══════════════════════════════════════════════════════
 BLOC H — MISES À JOUR CLUSTER & SYSTÈME
@@ -249,7 +273,7 @@ GITOPS (images Docker, configs) — AUTONOME sauf Vault/Traefik/cluster-bootstra
   write_file image tag → apply_gitops_fix → verify_pod_healthy
   BLOC J : milestone "[UPDATE] Cluster NeoKube"
   tâche "Update: <Service> v<ancien> → v<nouveau>"
-  description = "GitOps image update\n\n---\nAgent: charlotte-sre | Tags: charlotte-sre, update"
+  description = "GitOps image update\\n\\n---\\nAgent: charlotte-sre | Tags: charlotte-sre, update"
 
 HELM — AUTONOME sauf vault/traefik/metrics-server :
   helm_upgrade(release, chart, namespace, values, version) → verify_pod_healthy
@@ -375,8 +399,8 @@ PROTOCOLE DE CONSTRUCTION (10 étapes) :
    Mettre à jour apps/agent-system/base/kustomization.yaml.
 
 7. QDRANT — provision collection mémoire (règle M1, OBLIGATOIRE) :
-   curl -X PUT http://qdrant.rag-system.svc.cluster.local:6333/collections/<nom>-memory \
-     -H "Content-Type: application/json" \
+   curl -X PUT http://qdrant.rag-system.svc.cluster.local:6333/collections/<nom>-memory \\
+     -H "Content-Type: application/json" \\
      -d '{"vectors": {"size": 768, "distance": "Cosine"}}'
 
 8. APPLY + VERIFY :
@@ -389,7 +413,7 @@ PROTOCOLE DE CONSTRUCTION (10 étapes) :
     ntfy "✅ Agent <nom> déployé — CLASS <X> — port <port> — MAD ✅"
     BLOC J : milestone "[RUN] Maintenance & Optimisation des Agents"
     tâche "Agent créé: <nom> — CLASS <X> — MAD conforme"
-    description = "Rôle: <description> | Modèle: <model> | Qdrant: <nom>-memory\n\n---\nAgent: charlotte-sre | Tags: charlotte-sre, maintenance-agents"
+    description = "Rôle: <description> | Modèle: <model> | Qdrant: <nom>-memory\\n\\n---\\nAgent: charlotte-sre | Tags: charlotte-sre, maintenance-agents"
 
 RESSOURCES K8S PAR DÉFAUT (CLASS A) :
   resources.requests : cpu=100m, memory=256Mi
@@ -414,7 +438,7 @@ NORMES CENTRALISÉES (règles partagées entre tous les agents NeoKube) :
   - Chaque agent identifie ses tâches par un tag dans le footer de description
   - Charlotte utilise le tag : charlotte-sre
   - Format footer OBLIGATOIRE dans la description de chaque tâche :
-      "\n\n---\nAgent: charlotte-sre | Tags: charlotte-sre, <catégorie>"
+      "\\n\\n---\\nAgent: charlotte-sre | Tags: charlotte-sre, <catégorie>"
   - Catégories Charlotte : maintenance-agents | infra | update | incident | eval
 
 MILESTONE PAR TYPE D'ACTION :
@@ -449,7 +473,7 @@ PROTOCOLE 4 ÉTAPES (idempotent — ne jamais créer un milestone déjà existan
   zoho_create_task(
       project_id="2114101000000084005",
       name="<titre court de l'action>",
-      description="<résumé technique>\n\n---\nAgent: charlotte-sre | Tags: charlotte-sre, <catégorie>",
+      description="<résumé technique>\\n\\n---\\nAgent: charlotte-sre | Tags: charlotte-sre, <catégorie>",
       tasklist_id=tid,
       priority="Medium"
   ) → récupérer le task_id
@@ -519,4 +543,73 @@ Règle confidence :
   - high   : tous les faits sourcés explicitement
   - medium : majorité sourcée, quelques inférences logiques explicitées
   - low    : peu de sources, inférence importante (justifier dans summary)
-  - none   : aucune source ne confirme — summary annonce l'absence d'information
+  - none   : aucune source ne confirme — summary annonce l'absence d'information"""
+
+
+def get_credentials() -> tuple[str, str]:
+    sk = subprocess.check_output(
+        ["kubectl", "get", "secret", "cluster-manager-secrets",
+         "-n", "agent-system", "-o", "jsonpath={.data.LANGFUSE_SECRET_KEY}"],
+        text=True,
+    )
+    sk = base64.b64decode(sk).decode("utf-8")
+    return LF_PK, sk
+
+
+def http_request(method: str, path: str, body: dict | None = None) -> tuple[int, dict | str]:
+    pk, sk = get_credentials()
+    auth = base64.b64encode(f"{pk}:{sk}".encode()).decode()
+    headers = {"Authorization": f"Basic {auth}", "Content-Type": "application/json"}
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(f"{LF_BASE}{path}", data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = resp.read().decode()
+            try:
+                return resp.status, json.loads(payload)
+            except json.JSONDecodeError:
+                return resp.status, payload
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()
+
+
+def main() -> int:
+    dry_run = "--dry-run" in sys.argv
+
+    print(f"📥 Récupération de la version actuelle '{PROMPT_NAME}'...")
+    status, current = http_request("GET", f"/api/public/v2/prompts/{PROMPT_NAME}")
+    if status != 200:
+        print(f"❌ GET échoué ({status}) : {current}")
+        return 1
+    print(f"   version actuelle : {current.get('version')} (créée {current.get('createdAt', '?')[:10]})")
+
+    if current.get("prompt", "").strip() == NEW_PROMPT.strip():
+        print("✅ Aucun changement — le prompt actuel est identique. Rien à pousser.")
+        return 0
+
+    print(f"📊 Diff: {len(NEW_PROMPT) - len(current.get('prompt', '')):+d} caractères")
+
+    if dry_run:
+        print("\n--- DRY RUN — pas d'envoi vers Langfuse ---")
+        print(f"Longueur nouveau prompt : {len(NEW_PROMPT)} caractères")
+        return 0
+
+    body = {
+        "name": PROMPT_NAME,
+        "type": "text",
+        "prompt": NEW_PROMPT,
+        "labels": ["production"],
+        "config": current.get("config") or {},
+        "commitMessage": "v15: cadre MAD (Mémoire·Apprentissage·Documentation) — BLOC E étendu, BLOC F v2 (tous agents), BLOC CONSTRUCTEUR 10 étapes MAD",
+    }
+    print("📤 POST /api/public/v2/prompts (création v15)...")
+    status, resp = http_request("POST", "/api/public/v2/prompts", body)
+    if status not in (200, 201):
+        print(f"❌ POST échoué ({status}) : {resp}")
+        return 1
+    print(f"✅ Nouvelle version publiée : v{resp.get('version')} — labels {resp.get('labels')}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -233,25 +233,27 @@ Demande de création d'agent
 
 ## 4. Ce que `CreateAgentWorkflow` génère automatiquement
 
-| Étape | Artefact produit |
-|---|---|
-| `sre_write_agent_spec` | `apps/agent-catalog/{name}.yaml` — AgentSpec complet (connectors + sidecars inclus) |
-| `sre_provision_vault_secrets` | Chemin Vault `secret/neokube/apps/{name}` avec placeholders |
-| `sre_create_litellm_key` | Clé virtuelle LiteLLM `/key/generate`, stockée Vault |
-| `sre_provision_k8s_resources` | Namespace · SA · RBAC · ConfigMap config · Deployment (avec sidecars si activés) · Service |
-| `sre_generate_agent_code` | `configmap-{name}-script.yaml` — FastAPI minimal (`/health` + `/v1/chat/completions`) |
-| `sre_provision_policy` | Entrée `agent-policies.json` pour l'agent (allowed tools depuis connectors) |
-| `sre_register_agent` | `configmap-agent-registry.yaml` mis à jour |
-| `sre_register_openwebui_pipe` | Pipe Open WebUI (Functions) |
-| `sre_register_openwebui_connection` | Connexion OpenAI-compat Open WebUI (Models) |
-| `sre_push_langfuse_score` | Trace Langfuse `agent_created` |
+| # | Étape | Artefact produit |
+|---|---|---|
+| 1 | `sre_write_agent_spec` | `apps/agent-catalog/{name}.yaml` — AgentSpec complet |
+| 2 | `sre_provision_vault_secrets` | Chemin Vault `secret/neokube/apps/{name}` avec placeholders |
+| 3 | `sre_create_litellm_key` | Clé virtuelle LiteLLM `/key/generate`, stockée Vault |
+| 4 | `sre_provision_k8s_resources` | Namespace · SA · RBAC · ConfigMap config · Deployment (sidecars si activés) · Service |
+| **5a** | `sre_generate_agent_code` | `configmap-{name}-script.yaml` — FastAPI minimal + **template MAD injecté** (M1-M3, A1, D1-D3) |
+| **5b** | `sre_provision_qdrant_memory` | **Collection `{name}-memory` créée** (768 dims, Cosine) — règle **M1** |
+| **5c** | `sre_register_eval_agent` | **Agent ajouté dans `configmap-agent-eval-cron.yaml`** avec scénarios par défaut — règle **A3** |
+| 6 | `sre_provision_policy` | Entrée `agent-policies.json` |
+| 7 | `sre_register_agent` | `configmap-agent-registry.yaml` mis à jour |
+| 8a | `sre_register_openwebui_pipe` | Pipe Open WebUI (Functions) |
+| 8b | `sre_register_openwebui_connection` | Connexion OpenAI-compat Open WebUI (Models) |
+| 9 | `sre_push_langfuse_score` | Trace Langfuse `agent_created` |
 
-**Code généré** : FastAPI minimal — Pattern B basique. Pour Pattern A (PydanticAI), Pattern B avancé,
-ou Worker Temporal : code métier à compléter manuellement après provisioning.
+**Code généré (étape 5a)** : FastAPI minimal Pattern B basique + **template MAD complet** :
+`_session_memory_load/save` (M2) · `_memory_store` (M3) · `_agent_learn` (A1) ·
+`_mission_score_send` (D2) · `_mission_notify` (D3) · `_post_mission` (appelé post-réponse).
+Pour Pattern A (PydanticAI) ou Worker Temporal : code métier à compléter via BLOC I après provisioning.
 
-**Sidecars injectés automatiquement** si `sidecars_enabled=True` : le Deployment inclut
-`tool-validator` (8090) + `output-guard` (8091), montant `sidecar-scripts` + `agent-policies`
-depuis les ConfigMaps du namespace `agent-system`.
+**Sidecars injectés** si `sidecars_enabled=True` : `tool-validator` (8090) + `output-guard` (8091).
 
 ---
 
@@ -280,17 +282,45 @@ depuis les ConfigMaps du namespace `agent-system`.
 
 Ces règles s'appliquent à TOUS les agents, quel que soit le type.
 
+### 6a. Règles techniques
+
 | Règle | Description | Ref antipattern |
 |---|---|---|
 | **Identité Langfuse** | Chaque appel LLM porte `user=AGENT_NAME`, `metadata.agent`, `metadata.agent_email`, `metadata.permissions_scope`, `metadata.workflow` | — |
 | **Streaming obligatoire** (OWU-facing) | Jamais un seul chunk SSE — tokens progressifs ou mot-par-mot | #28 |
 | **Fast-path conversationnel** (OWU-facing) | Avant le loop ReAct/outils — Pattern A ou B selon type | #21, #40 |
-| **ntfy mission terminée** (OWU-facing avec outils) | `priority=low` après mission complète | CLAUDE-agents.md §6e |
 | **Auto-enregistrement OWU** (OWU-facing) | `POST /openai/config/update` au démarrage — idempotent | CLAUDE-agents.md §6b |
 | **Vault pour tous les secrets** | Jamais de secrets en dur — lire Vault + fallback env | CLAUDE-agents.md §R9 |
 | **Embed 768 dims** | `nomic-embed-text` → 768 dimensions — toutes collections Qdrant en 768 | #7 |
 | **LLM_FALLBACK actif** | Détecter HTTP 402/quota → retry fallback + ntfy alerte | #32, R9.8 |
 | **Pas d'auto-restart Charlotte** | Toute activité qui fait `kubectl rollout restart` doit vérifier `agent-charlotte` | #26 |
+
+### 6b. Règles MAD — Mémoire · Apprentissage · Documentation
+
+> Référence complète avec code : **[CLAUDE-agent-learning.md](CLAUDE-agent-learning.md)**
+>
+> Ces 9 règles sont des **conditions de mise en production**. Charlotte vérifie la conformité
+> MAD à la création (`CreateAgentWorkflow`) et via `sre_check_eval_scores` (BLOC E).
+
+| Règle | Description | Obligatoire pour |
+|---|---|---|
+| **M1** | Collection Qdrant `{name}-memory` (768 dims, Cosine) provisionnée à la création | Tous |
+| **M2** | `_session_memory_load()` au démarrage session + `_session_memory_save()` en fin | CLASS A (OWU-facing) |
+| **M3** | `_memory_store()` après mission — type=experience/correction selon score | Tous avec missions |
+| **A1** | `_agent_learn()` post-mission via `asyncio.ensure_future` — extrait 1-3 leçons → `{name}-memory` | CLASS A avec outils, CLASS B |
+| **A2** | Charlotte corrige si score rolling < 7.0 via BLOC E + BLOC I (automatique) | Surveillance Charlotte |
+| **A3** | Inclus dans CharlotteImprovementWorkflow v2 (dimanche 3h UTC, tous agents < 8.0) | Tous |
+| **D1** | `user=AGENT_NAME` + `metadata` complet dans chaque appel LiteLLM | Tous |
+| **D2** | `_mission_score_send()` après chaque workflow terminal — score `mission_quality` 0.0–1.0 | Tous avec workflows |
+| **D3** | `_mission_notify()` ntfy priority=low après mission (tous) + Zoho BLOC J si connector zoho | Tous |
+
+**Template code MAD complet** : voir CLAUDE-agent-learning.md §Code standard MAD.
+**Checklist conformité** (Charlotte peut vérifier via `read_file` + grep) :
+```
+grep -c "_session_memory_load\|_memory_store\|_agent_learn\|_mission_score_send\|_mission_notify" \
+  configmap-{name}-script.yaml
+→ ≥ 5 occurrences = agent CLASS A conforme
+```
 
 ---
 
