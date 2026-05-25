@@ -221,7 +221,7 @@ Après validation du CDC, Leon crée le projet Zoho avec une structure standard 
 | Nom du projet | CDC — titre | "Refonte neomnia.net" |
 | Description | CDC — objectif (1ère ligne) + champs `key: value` | `type: webapp\nemail: client@company.com` |
 | Statut | `open` | Créé en "open", fermé quand dispatch terminé |
-| Milestones | CDC — critères d'acceptation → 1 milestone par critère | "Auth fonctionnelle", "Dashboard affiché" |
+| Milestones | Structure fixe Neomnia — 4 jalons standard (voir ci-dessous) | — |
 
 **Convention description Zoho** (parsable par zoho-observer) :
 ```
@@ -234,6 +234,51 @@ criteria: Auth fonctionnelle, Dashboard affiché, API répond
 ```
 
 **Règle** : Leon NE met PAS toutes les sections du CDC dans la description Zoho. La description Zoho est un résumé structuré machine-readable. Le CDC complet reste dans Notion.
+
+---
+
+### Modèle de jalons Neomnia (structure fixe — toujours ces 4 jalons)
+
+> **Règle** : tout projet client créé par Leon suit TOUJOURS cette structure à 4 jalons, dans cet ordre. Aucune variation. Les dates sont calculées à partir de `today` (J = date de création).
+
+| # | Nom du jalon | Tasklists | DoD | Dates |
+|---|---|---|---|---|
+| 1 | `[MVP] Produit Opérationnel & Déploiement Scaleway` | Design & UI · Core Dev · Infra-Ops | Application en ligne sur Scaleway, écrans affichés, fonctionnalités de base opérationnelles | J → J+30 |
+| 2 | `[RUN] Apprentissage & Suivi Technique` | Ingestion & RAG · Ajustement des Prompts · Suivi Technique | Application stable, entraînée sur les données réelles, mature | J+31 → J+60 |
+| 3 | `[QA] Vérification de Production` | Recette finale (QA) · Contrôle de Sécurité & Coûts | Feu vert technique complet (Sign-off) — tests, sécurité API, coûts tokens validés | J+61 → J+75 |
+| 4 | `[HANDOVER] Documentation, Formation & Livraison Finale` | Documentation · Formation · Clôture | Livraison finale signée, client autonome, bascule maintenance Zoho Books | J+76 → `acceptance_deadline` (ou J+90) |
+
+**Description de chaque jalon (DoD dans la description Zoho) :**
+
+```
+Jalon 1 [MVP] :
+  "DoD: L'application est en ligne sur Scaleway, les écrans s'affichent et les fonctionnalités de base répondent."
+
+Jalon 2 [RUN] :
+  "DoD: L'application est stable, entraînée et mature sur ses données réelles."
+
+Jalon 3 [QA] :
+  "DoD: Feu vert technique complet (Sign-off) — tests non-régression, sécurité API, coûts tokens validés."
+
+Jalon 4 [HANDOVER] :
+  "DoD: Livraison finale signée, client autonome, bascule maintenance Zoho Books."
+```
+
+**Rôles par jalon :**
+
+| Jalon | Tasklist | Responsable principal |
+|---|---|---|
+| [MVP] | Design & UI | Aria (export Penpot) + Zephyr (UX) |
+| [MVP] | Core Dev | Aria (frontend) + Nox (backend) |
+| [MVP] | Infra-Ops | **Charlotte** (cluster Scaleway, premier déploiement) |
+| [RUN] | Ingestion & RAG | Milo (pipeline data) |
+| [RUN] | Ajustement des Prompts | Leon (optimisation agents applicatifs) |
+| [RUN] | Suivi Technique | **Charlotte** (monitoring logs, détection dérive) |
+| [QA] | Recette finale (QA) | Vera (tests non-régression) |
+| [QA] | Contrôle de Sécurité & Coûts | **Charlotte** (audit clés API, budget tokens) |
+| [HANDOVER] | Documentation | Charlotte (architecture) + Leon (guide utilisateur) |
+| [HANDOVER] | Formation | Leon (programme formation client) |
+| [HANDOVER] | Clôture | Leon (livraison + Zoho Books) |
 
 ---
 
