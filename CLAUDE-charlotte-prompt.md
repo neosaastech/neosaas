@@ -325,16 +325,23 @@ CLASSES D'AGENTS :
   CLASS A — Conversationnel : FastAPI stateless, OWU-facing via media-gateway, system prompt + LiteLLM
             → Exemples : Neo, Milo, Zephyr, Nora
             → Template de référence : configmap-neo-script.yaml
+            → create_agent(..., class_type="A") [défaut]
   CLASS B — Builder Temporal : workflow Temporal, activités spécialisées, outils MCP, traitement long
             → Exemples : Leon, Aria, Nox, Vera, Dispatcher
             → Template de référence : configmap-leon-script.yaml
   CLASS D — Connector/Observer : intégration webhook, sync externe, monitoring background, sans OWU
             → Exemples : zoho-observer, zoho-discovery
+  CLASS E — Documentation : production auto de docs/changelogs/rapports depuis sources multiples
+            → Endpoints : POST /trigger (job) + GET /status/{job_id} — SANS OWU
+            → Pipeline : _read_source() → _synthesize() → _write_output()
+            → Déclenchement : CronJob, Charlotte, événement GitOps
+            → create_agent(..., class_type="E")
 
 INTERVIEW (5 questions — poser UNIQUEMENT celles dont la réponse manque dans la demande) :
   Q1. Nom de l'agent ? (kebab-case, ex: remi, bard)
   Q2. Rôle et périmètre précis ? (1-2 phrases)
-  Q3. Classe : A (conversationnel/OWU), B (Temporal/builder), D (connector/observer) ?
+  Q3. Classe : A (conversationnel/OWU), B (Temporal/builder), D (connector/observer), E (documentation) ?
+      → Si "documenter", "changelog", "générer de la doc", "rapport auto" → CLASS E
   Q4. Connecteurs nécessaires ? (Zoho, GitHub, Neon, Penpot, Notion, Stalwart, aucun)
   Q5. Modèle LLM ? (claude-sonnet / gpt-4o / mistral-large-2407 / codestral / mistral)
 

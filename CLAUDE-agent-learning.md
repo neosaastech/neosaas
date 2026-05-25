@@ -288,33 +288,35 @@ if _used_tools and len(final_reply) > 50:
 | **Zephyr** | ❌ à créer | ❌ gap | ❌ gap | ❌ gap | ✅ | ❌ gap | ✅ | ❌ gap | ❌ pas Zoho |
 | **Nora** | ❌ à créer | ❌ gap | ❌ gap | ❌ gap | ✅ | ❌ gap | ✅ | ❌ gap | ✅ Zoho |
 
+| **CLASS E (nouveau)** | ✅ auto (CreateAgentWorkflow 6c) | N/A (pas de session) | ✅ template E | ✅ template E | ✅ | ❌ gap | ✅ template | ✅ template E | N/A |
+
 **Légende** : ✅ Implémenté · ❌ gap (à implémenter) · N/A (non applicable au type)
+
+**CLASS E — règles spécifiques :**
+- M2 (session memory) = N/A — les agents docs n'ont pas de sessions conversationnelles
+- M3 = `_memory_store("doc")` stocke le résumé de chaque job de documentation
+- D3 = ntfy à chaque job terminé (done/error) — pas de Zoho par défaut
 
 ---
 
-## Impact sur CreateAgentWorkflow — nouvelles étapes obligatoires
+## Impact sur CreateAgentWorkflow — état d'implémentation
 
-`CreateAgentWorkflow` doit inclure ces 3 nouvelles étapes après l'étape 5 (K8s resources) :
+| Étape | Activité | Statut |
+|---|---|---|
+| **5 (code)** | `sre_generate_agent_code` + `_gen_agent_script(class_type)` | ✅ **Implémenté** — CLASS A (MAD v2.0 + streaming) + CLASS E (doc pipeline) |
+| **6b** | `sre_provision_policy` | ✅ Existant |
+| **6c (MAD M1)** | `sre_provision_qdrant_memory` | ✅ **Implémenté** — crée `{name}-memory` (768 dims, Cosine) |
+| **5d** | `sre_register_eval_agent` (enregistrement eval-nightly) | ❌ À implémenter |
 
-### Étape 5b — Provision collection Qdrant `{name}-memory`
-```python
-# sre_provision_qdrant_memory(agent_name)
-curl -X PUT http://qdrant.rag-system.svc.cluster.local:6333/collections/{name}-memory \
-  -H "Content-Type: application/json" \
-  -d '{"vectors": {"size": 768, "distance": "Cosine"}}'
+**Étape 6c** : maintenant intégrée dans `CreateAgentWorkflow` entre step 6b (policy) et step 7 (registry). OWU steps (8a/8b) skippés si `class_type="E"`.
+
+**Checklist conformité MAD** (Charlotte peut vérifier via `read_file` + grep) :
 ```
-
-### Étape 5c — Injection MAD dans le code généré
-`sre_generate_agent_code` doit inclure dans le code FastAPI minimal :
-- `_session_memory_load()` + `_session_memory_save()` (M2)
-- `_memory_store()` (M3)
-- `_agent_learn()` appelé via `asyncio.ensure_future` après réponse finale (A1)
-- `_mission_score()` (D2)
-- Pattern ntfy mission-done dans la réponse (D3)
-
-### Étape 5d — Enregistrement dans `agent-eval-nightly`
-Ajouter l'agent dans la liste des agents évalués par le CronJob `agent-eval-nightly` :
-→ Ajouter dans `configmap-agent-eval-cron.yaml` la section scénarios de l'agent
+grep -c "_session_memory_load\|_memory_store\|_agent_learn\|_mission_score_send\|_mission_notify" \
+  configmap-{name}-script.yaml
+→ CLASS A conforme : ≥ 5 occurrences
+→ CLASS E conforme : ≥ 4 occurrences (pas _session_memory_load)
+```
 
 ---
 

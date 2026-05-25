@@ -413,8 +413,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 > Checklist manuelle (agents Temporal complexes) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > **Cadre normatif MAD (Mémoire · Apprentissage · Documentation)** — 9 règles obligatoires pour tout agent : **[CLAUDE-agent-learning.md](CLAUDE-agent-learning.md)**
 
-**Classes d'agents** : CLASS A (conversational, OWU→media-gateway) · CLASS B (builder, Temporal) · CLASS C (infrastructure SRE) · CLASS D (connector/observer)
-**Étapes auto CLASS A** : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → **5a. Code FastAPI + template MAD** → **5b. Collection Qdrant `{name}-memory`** → **5c. Enregistrement eval-nightly** → 6. Registry → 7. OWU → 8. Langfuse
+**Classes d'agents** : CLASS A (conversational, OWU→media-gateway) · CLASS B (builder, Temporal) · CLASS C (infrastructure SRE) · CLASS D (connector/observer) · **CLASS E (documentation, /trigger+/status, pipeline read→synthesize→write, sans OWU)**
+**Étapes auto (CreateAgentWorkflow)** : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → 5. Code MAD v2.0 (CLASS A ou E) → 6. Policy → **6c. Qdrant `{name}-memory` (M1)** → 7. Registry → 8a/8b. OWU (CLASS A seulement) → 9. Langfuse
 
 **Règles MAD (condition de mise en production)** :
 M1 Collection Qdrant · M2 Session memory · M3 Long-term memory · A1 `_agent_learn()` post-mission · A2 Correction proactive Charlotte · A3 CharlotteImprovementWorkflow hebdo · D1 Identité Langfuse · D2 Score `mission_quality` · D3 ntfy + Zoho

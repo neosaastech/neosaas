@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Les 4 types d'agents NeoKube
+## 1. Les 5 types d'agents NeoKube
 
 ### Type 1 — Conversationnel OWU-facing
 
@@ -100,6 +100,35 @@ Deux variantes d'architecture NLU (compréhension des messages) :
 
 ---
 
+### Type 5 — CLASS E : Agent de Documentation
+
+**CLASS E** = agents dédiés à la production automatique de documentation. Ils lisent des sources
+(fichiers SharePoint, Notion, GitHub, APIs), synthétisent via LLM et écrivent le résultat
+(Notion page, SharePoint, Qdrant pour RAG). Aucune interface OWU.
+
+| Caractéristique | Valeur |
+|---|---|
+| **Interface** | FastAPI `POST /trigger` (déclencher un job) + `GET /status/{job_id}` (suivre) |
+| **Pipeline** | `_read_source()` → `_synthesize()` → `_write_output()` (background task) |
+| **MAD** | M1 + M3 (mémoire docs générées) · A1 (score ≥ 7 → leçons) · D2 + D3 (score + ntfy) |
+| **OWU** | Non — jamais de `/v1/chat/completions` |
+| **Exemples** | Agent doc cluster, agent doc agents NeoKube, agent changelog automatique |
+
+**Endpoints obligatoires :**
+```
+GET  /health                → {"status": "ok", "class": "E", ...}
+POST /trigger               → {"job_id": "abc123", "status": "queued"}
+GET  /status/{job_id}       → {"status": "running|done|error", "output": "...", ...}
+```
+
+**Quand choisir TYPE 5 :**
+- Production automatique de docs techniques, changelogs, rapports
+- Sources : fichiers, APIs, Notion, SharePoint, GitHub
+- Cibles : Notion pages, SharePoint, Qdrant (RAG), fichiers locaux
+- Déclenchement : CronJob, événement GitOps, ou appel Charlotte
+
+---
+
 ## 2. Interview obligatoire — 7 questions procédurales
 
 Charlotte **doit** conduire cet interview avant tout `create_agent()`. Les questions non
@@ -130,15 +159,17 @@ Si pour un client : demander le nom du client et le projet Zoho associé.
 
 Présenter les options avec justification :
 
-| Option | Cas d'usage | Exemple |
-|---|---|---|
-| **Conversationnel OWU — Pattern A** (compréhension large) | Missions complexes, 10+ outils, formulations variées | Charlotte |
-| **Conversationnel OWU — Pattern B** (mots-clés métier) | Domaine précis, vocabulaire stable, 6-8 outils max | Neo, Leon |
-| **Service HTTP interne** | Appelé par d'autres agents, pas d'interaction humaine directe | admin-sys |
-| **Worker Temporal** | Workflows longs, multi-étapes, orchestration | Aria, Nox |
-| **Hybride FastAPI + Temporal** | Interface conversationnelle + tâches longues déléguées | Leon, Charlotte |
+| Option | `class_type` | Cas d'usage | Exemple |
+|---|---|---|---|
+| **Conversationnel OWU — Pattern A** (compréhension large) | `A` | Missions complexes, 10+ outils, formulations variées | Charlotte |
+| **Conversationnel OWU — Pattern B** (mots-clés métier) | `A` | Domaine précis, vocabulaire stable, 6-8 outils max | Neo, Leon |
+| **Service HTTP interne** | `A` | Appelé par d'autres agents, pas d'interaction humaine directe | admin-sys |
+| **Worker Temporal** | — | Workflows longs, multi-étapes, orchestration | Aria, Nox |
+| **Hybride FastAPI + Temporal** | `A` | Interface conversationnelle + tâches longues déléguées | Leon, Charlotte |
+| **Documentation (CLASS E)** | `E` | Production auto de docs, changelogs, rapports depuis sources multiples | — |
 
 Si l'utilisateur dit "interactif" sans préciser → proposer Pattern B par défaut (plus simple), Pattern A si beaucoup d'outils annoncés.
+Si l'utilisateur dit "documentation", "changelog automatique", "générer de la doc" → CLASS E (`class_type="E"`).
 
 ### Q5 — Modèle LLM
 
@@ -352,11 +383,21 @@ grep -c "_session_memory_load\|_memory_store\|_agent_learn\|_mission_score_send\
 ## 8. Commandes Charlotte
 
 ```
-# Créer un agent (interview + workflow automatique)
+# Créer un agent CLASS A (interview + workflow automatique)
 create_agent(
   name, description, runtime, port, model, extra,
   connectors="zoho,github",   # CSV des connectors utilisés
-  sidecars_enabled=True        # injecter tool-validator + output-guard
+  sidecars_enabled=True,       # injecter tool-validator + output-guard
+  class_type="A",              # "A" (défaut) ou "E" (documentation)
+)
+
+# Créer un agent CLASS E (documentation)
+create_agent(
+  name="doc-cluster",
+  description="Produit la documentation du cluster NeoKube depuis les ConfigMaps et logs",
+  runtime="fastapi", port=8494, model="mistral", extra="",
+  connectors="", sidecars_enabled=False,
+  class_type="E",              # /trigger + /status, pas d'OWU, pipeline read→synthesize→write
 )
 
 # Provisionner depuis un AgentSpec existant
