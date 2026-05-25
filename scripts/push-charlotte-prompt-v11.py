@@ -1,11 +1,28 @@
-# CLAUDE-charlotte-prompt.md — Prompt Langfuse charlotte-sre
+#!/usr/bin/env python3
+"""push-charlotte-prompt-v11.py
 
-> **Auto-généré** par `pull-charlotte-prompt.sh` — NE PAS ÉDITER MANUELLEMENT.
-> Source : Langfuse prompt `charlotte-sre` version 12 (dernière modif: 2026-05-25).
-> Claude est maître du contenu — ce fichier sert à détecter les divergences.
+v12 — Charlotte SRE gardienne des agents (2026-05-25) :
+  - CLASSIFICATION en tête de prompt (SRE / SSII-dev / spécialisés)
+  - MANIFESTE AGENTS : table complète chemins ConfigMap, ports, LLM — prêt à l'emploi
+  - BLOC I (nouveau) : protocole optimisation agents existants — 6 étapes obligatoires
+  - QUAND AGIR : modification agent existant = action autonome
+  - RÈGLE HORS PÉRIMÈTRE : "gestion de projet CLIENT" + exception agent SRE explicite
 
-```
-Tu es Charlotte, agent SRE autonome du cluster Kubernetes NeoKube.
+Usage : python3 push-charlotte-prompt-v11.py [--dry-run]
+"""
+from __future__ import annotations
+
+import base64
+import json
+import subprocess
+import sys
+import urllib.request
+
+LF_BASE = "http://langfuse.neokube.local"
+LF_PK = "pk-lf-b1a84594-a9c9-453a-bdec-a511d12e060f"
+PROMPT_NAME = "charlotte-sre"
+
+NEW_PROMPT = """Tu es Charlotte, agent SRE autonome du cluster Kubernetes NeoKube.
 
 ═══════════════════════════════════════════════════════
 CLASSIFICATION — QUI TU ES ET CE QUE TU FAIS
@@ -432,6 +449,76 @@ Règle confidence :
   - high   : tous les faits sont sourcés explicitement (citation directe d'un outil)
   - medium : majorité sourcée, quelques inférences logiques explicitées
   - low    : peu de sources, inférence importante (justifier dans summary)
-  - none   : aucune source ne confirme — summary annonce l'absence d'information
-```
+  - none   : aucune source ne confirme — summary annonce l'absence d'information"""
 
+
+def get_credentials() -> tuple[str, str]:
+    sk = subprocess.check_output(
+        [
+            "kubectl", "get", "secret", "cluster-manager-secrets",
+            "-n", "agent-system",
+            "-o", "jsonpath={.data.LANGFUSE_SECRET_KEY}",
+        ],
+        text=True,
+    )
+    sk = base64.b64decode(sk).decode("utf-8")
+    return LF_PK, sk
+
+
+def http_request(method: str, path: str, body: dict | None = None) -> tuple[int, dict | str]:
+    pk, sk = get_credentials()
+    auth = base64.b64encode(f"{pk}:{sk}".encode()).decode()
+    headers = {"Authorization": f"Basic {auth}", "Content-Type": "application/json"}
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(f"{LF_BASE}{path}", data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            payload = resp.read().decode()
+            try:
+                return resp.status, json.loads(payload)
+            except json.JSONDecodeError:
+                return resp.status, payload
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode()
+
+
+def main() -> int:
+    dry_run = "--dry-run" in sys.argv
+
+    print(f"📥 Récupération de la version actuelle '{PROMPT_NAME}'...")
+    status, current = http_request("GET", f"/api/public/v2/prompts/{PROMPT_NAME}")
+    if status != 200:
+        print(f"❌ GET échoué ({status}) : {current}")
+        return 1
+    print(f"   version actuelle : {current.get('version')} (créée {current.get('createdAt', '?')[:10]})")
+
+    if current.get("prompt", "").strip() == NEW_PROMPT.strip():
+        print("✅ Aucun changement — le prompt actuel est identique. Rien à pousser.")
+        return 0
+
+    print(f"📊 Diff: {len(NEW_PROMPT) - len(current.get('prompt', '')):+d} caractères")
+
+    if dry_run:
+        print("\n--- DRY RUN — pas d'envoi vers Langfuse ---")
+        print(f"Longueur nouveau prompt : {len(NEW_PROMPT)} caractères")
+        return 0
+
+    body = {
+        "name": PROMPT_NAME,
+        "type": "text",
+        "prompt": NEW_PROMPT,
+        "labels": ["production"],
+        "config": current.get("config") or {},
+        "commitMessage": "v12: classification SRE/SSII-dev en tête + manifeste agents prêt à l'emploi + BLOC I gardienne agents",
+    }
+    print("📤 POST /api/public/v2/prompts (création v12)...")
+    status, resp = http_request("POST", "/api/public/v2/prompts", body)
+    if status not in (200, 201):
+        print(f"❌ POST échoué ({status}) : {resp}")
+        return 1
+    print(f"✅ Nouvelle version publiée : v{resp.get('version')} — labels {resp.get('labels')}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
