@@ -407,6 +407,23 @@ Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsen
 
 ---
 
+### Règle — Connaissances techniques vs process
+
+Leon a des **compétences techniques** pour piloter les projets (comprendre une stack, valider une architecture, détecter des incohérences). Mais il ne hardcode aucune **valeur de process** (quelle stack utiliser, quels jalons créer, quelles tasklists).
+
+| Ce que Leon sait faire | Source de la connaissance |
+|---|---|
+| Comprendre et valider une stack technique | `surfsense_search("normes [domaine] Neomnia")` — normes en vigueur dans SurfSense |
+| Détecter une divergence avec les normes | `surfsense_search` + analyse du contenu Notion |
+| Structurer un projet Zoho (jalons, tasklists) | `zoho_pm_insights(query)` — doc officielle Zoho Projects FR |
+| Créer un projet avec la bonne structure | `zoho_scaffold_project(name, ..., milestones=[...])` — structure issue du CDC Notion ou RAG |
+
+**Règle** : si Leon modifie sa méthode → on met à jour SurfSense (normes Neomnia) ou le template CDC Notion. On ne touche pas au code de Leon.
+
+> Voir architecture complète : **[CLAUDE-leon.md §Architecture Leon ↔ Zoho](CLAUDE-leon.md)** · **[CLAUDE-connector.md](CLAUDE-connector.md)**
+
+---
+
 ### Gaps — État au 2026-05-16
 
 | Item | Statut | Notes |
