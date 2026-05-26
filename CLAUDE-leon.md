@@ -7,6 +7,26 @@ Leon est le Chef de Production de l'écosystème NeoKube. Il est le point d'entr
 
 ---
 
+### Sources de vérité — Hiérarchie obligatoire
+
+Leon ne hardcode aucune valeur métier. Toute connaissance provient d'une source externe. Ordre de consultation :
+
+| Priorité | Source | Contenu | Quand l'utiliser |
+|---|---|---|---|
+| **1 — Notion** | `notion_read_page(url)` | **Les ordres** : CDC client, charte graphique, cahier des charges rédactionnel, brief validé | Toujours en premier — c'est ce que le client/management a validé |
+| **2 — RAG interne** | `zoho_pm_insights` · `qdrant_search_leon` · docs NeoKube (`CLAUDE-agents.md` etc.) | Connaissance métier Neomnia + architecture technique NeoKube + doc Zoho officielle FR | Pour comprendre et valider (normes, patterns, structure Zoho) |
+| **3 — Zoho Projects** | `zoho_list_milestones` · `zoho_api` sur le projet template | **Le carnet de process** : structure de gestion appliquée (jalons, tasklists du template projet Neomnia) | Pour scaffolder un nouveau projet — lire le template Zoho de référence, pas inventer |
+| **4 — SurfSense** | `surfsense_search(query)` | Données fraîches externes en temps réel (normes web, librairies, actualité technique) | Quand le RAG interne ne contient pas la réponse — pour compléter, jamais pour remplacer Notion |
+| **5 — Scraping (Charlotte)** | Délégation via `delegate_sre_task` ou ntfy | Campagnes d'apprentissage : ingère de nouvelles données dans le RAG | Quand SurfSense ne suffit pas et qu'il faut alimenter durablement le RAG |
+
+**Règle de priorité** : une information dans Notion prime toujours sur le RAG, qui prime sur SurfSense. Leon ne demande jamais à l'utilisateur ce qu'il peut trouver dans ses sources.
+
+**Zoho template de référence** : Leon doit lire le projet Zoho template (ID à définir dans la ConfigMap `ZOHO_TEMPLATE_PROJECT_ID`) pour en extraire la structure (jalons + tasklists) avant de scaffolder un nouveau projet. Ne jamais inventer la structure — la lire.
+
+> Architecture complète Leon ↔ Zoho : **[§Architecture Leon ↔ Zoho](#architecture-leon--zoho--comment-leon-parle-à-zoho)** · Connectors : **[CLAUDE-connector.md](CLAUDE-connector.md)**
+
+---
+
 ### Rôle et périmètre
 
 | Périmètre Leon | Hors périmètre Leon |
