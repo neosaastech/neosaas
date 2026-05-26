@@ -137,6 +137,84 @@ async def _handle_scraping_mission(spec, session_id):
 
 ---
 
+### Architecture Leon ↔ Zoho — Comment Leon parle à Zoho
+
+**Règle fondamentale** : Leon ne parle **jamais** directement à l'API Zoho. Tout passe par le `zoho-connector` via `POST /proxy`.
+
+```
+Leon (agent-system)
+    │
+    └── POST http://zoho-connector.connector-system.svc.cluster.local:8000/proxy
+              body: {"method": "GET|POST|PUT|DELETE", "path": "/projects/...", "data": {...}}
+              │
+              └── zoho-connector (port 8000)
+                      ├── Gère OAuth2 (refresh token auto via Vault secret/neokube/infrastructure/zoho)
+                      ├── Injecte le portal ID dans les chemins (/portal/neomniadotnet/...)
+                      ├── Normalise les réponses (_inject_web_urls)
+                      └── → api.zoho.com (Zoho Projects API v3)
+```
+
+**Variable d'env** : `ZOHO_CONNECTOR_URL = "http://zoho-connector.connector-system.svc.cluster.local:8000"` (défaut hardcodé si absent du ConfigMap)
+
+**`leon_zoho_refresh_token` est un no-op** — il retourne `""`. L'authentification OAuth2 est entièrement gérée par le connector. Leon ne manipule aucun token Zoho.
+
+#### Patterns de chemins API Zoho
+
+Le connector injecte automatiquement le portal ID (`neomniadotnet`). Leon utilise des chemins relatifs :
+
+| Opération | Méthode | Chemin |
+|---|---|---|
+| Lister projets | GET | `/projects/` |
+| Créer projet | POST | `/projects/` |
+| Supprimer projet | DELETE | `/projects/{project_id}/` |
+| Lister tâches | GET | `/projects/{project_id}/tasks/` |
+| Créer tâche | POST | `/projects/{project_id}/tasks/` |
+| Mettre à jour tâche | POST | `/projects/{project_id}/tasks/{task_id}/` |
+| Supprimer tâche | DELETE | `/projects/{project_id}/tasks/{task_id}/` |
+| Lister milestones | GET | `/projects/{project_id}/milestones/` |
+| Créer milestone | POST | `/projects/{project_id}/milestones/` |
+| Supprimer milestone | DELETE | `/projects/{project_id}/milestones/{milestone_id}/` |
+| Créer tasklist | POST | `/projects/{project_id}/tasklists/` |
+| Lister tasklists | GET | `/projects/{project_id}/tasklists/` |
+
+#### Outils Zoho — Architecture en couches
+
+```
+Outils dédiés (shortcuts)          zoho_api (proxy générique)
+─────────────────────────          ──────────────────────────
+zoho_list_projects                 Tout endpoint non couvert :
+zoho_list_tasks(project_id)          templates de projet
+zoho_create_task(...)                sous-projets (parent_id)
+zoho_update_task(...)                custom fields
+zoho_create_milestone(...)           budgets
+zoho_create_tasklist(...)            membres équipe (users)
+zoho_scaffold_project(...)           tags / labels
+zoho_delete_project(...)             rapports
+zoho_delete_task(...)                fichiers attachés
+zoho_delete_milestone(...)           commentaires
+zoho_list_milestones(project_id)     timesheet entries
+                │                           │
+                └───────────────────────────┘
+                        ZOHO_CONNECTOR_URL/proxy
+```
+
+#### Pattern d'usage `zoho_api`
+
+Quand une opération n'est pas couverte par un outil dédié :
+
+1. `zoho_pm_insights("comment créer un sous-projet")` → trouve le bon endpoint + paramètres dans la doc officielle Zoho (collection `zoho-knowledge`, 267 chunks)
+2. `zoho_api(method="POST", path="/projects/{id}/tasks/", data={...})` → exécute l'appel
+
+**Ne jamais ajouter un nouvel outil dédié** si `zoho_api` peut couvrir le cas. Les outils dédiés existent uniquement pour les opérations à très haute fréquence qui bénéficient d'un formatage spécifique de la réponse (ex: `zoho_list_tasks` retourne une liste normalisée, pas le JSON brut Zoho).
+
+#### Règles R1–R5 connecteurs (CLAUDE-connector.md)
+
+> **R1** — Un connector = source de vérité unique pour son API. Credentials, URL de base, headers : tout appartient au connector.
+> **R2** — Enrichir à la sortie (`_inject_web_urls` dans zoho-connector). Leon ne construit jamais d'URLs Zoho manuellement.
+> **R3** — Toujours utiliser `/proxy {method, path, data?}`.
+
+---
+
 ### Polling Zoho — Lecture des projets (SREScanWorkflow-inspired)
 
 Leon intègre une boucle de surveillance inspirée de `SREScanWorkflow` de Charlotte :
@@ -352,4 +430,5 @@ Credentials dans `secret/neokube/agents/leon` (Vault) + K8s secret `leon-surfsen
 | Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 |
 | Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v2.0 |
 | Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 |
+| `zoho_api` proxy générique | ✅ Code + déployé | Activity `leon_zoho_api` → `ZOHO_CONNECTOR_URL/proxy`. Pattern : `zoho_pm_insights` → endpoint → `zoho_api`. |
 | Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |
