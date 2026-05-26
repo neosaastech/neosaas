@@ -1185,3 +1185,71 @@ for i in range(0, len(blocks), 90):
 **Logging** : sur 4xx, logger le body complet + un échantillon JSON du premier bloc — l'API Notion donne souvent un message précis (`body failed validation: body.children[3].paragraph.rich_text should be non-empty array`) qui pointe directement le bloc fautif.
 
 **Règle générale** : pour toute API tierce qui valide des structures imbriquées (Notion, Slack, Linear), **filtrer les éléments à contenu vide avant l'envoi** et **logger le body complet sur 4xx** — la 4xx est presque toujours une validation, jamais un problème d'auth.
+
+---
+
+### 48. `k8s_pods_exec` via MCP → `UnexpectedModelBehavior` loop
+
+**Symptôme** : Charlotte appelle `k8s_pods_exec` (outil K8s MCP) pour tester un service ou inspecter un pod. Le RBAC bloque l'opération. PydanticAI `Agent.run()` réessaie jusqu'au max retry et lève `UnexpectedModelBehavior: Tool 'pods_exec' exceeded max retries count of 1`, qui remonte en clair dans la réponse OWU.
+
+**Cause** : Le MCP server K8s (`ghcr.io/containers/kubernetes-mcp-server`) expose `k8s_pods_exec`, `k8s_pods_portforward`, `k8s_pods_attach` — mais ces outils sont bloqués au niveau RBAC du ClusterRole `admin-sys-executor`. Charlotte ne peut pas les utiliser.
+
+**Fix code** : catch `UnexpectedModelBehavior` / `"exceeded max retries"` dans `mission_stream` → réponse gracieuse avec nom de l'outil extrait par regex.
+
+**Fix system prompt** : outils MCP INTERDITS listés explicitement avec ⛔ dans la section OUTILS DISPONIBLES.
+
+**Fix classification** : le comportement "agir immédiatement" est injecté dans `intent == "task"` (couche dynamique, plus proche du contexte LLM que les règles statiques du prompt).
+
+**Alternatives** pour les besoins réels :
+- Lire les logs : `run_kubectl(["logs", pod, "-n", ns])` ou `k8s_pods_log`
+- Tester un endpoint : `web_fetch(url)` depuis Charlotte
+- Inspecter un fichier : `read_file` si dans /gitops, sinon `run_kubectl exec` via admin-sys `/execute` avec args explicites
+
+---
+
+### 50. Analyse fictive quand le résultat d'outil est vide ou minimal
+
+**Symptôme** : Un agent appelle un outil (ex : `notion_read_page`, `web_fetch`, `kubectl get`) qui retourne un résultat vide, minimal, ou composé uniquement de liens/métadonnées. Au lieu de le signaler, l'agent génère une analyse détaillée — "points conformes ✅", "éléments obsolètes ❌", "corrections appliquées" — entièrement construite depuis ses connaissances pré-entraînées ou son contexte RAG, sans lien avec ce que l'outil a réellement retourné.
+
+**Cas observé (2026-05-26)** : Charlotte analyse une page Notion quasi-vide (4 liens, aucun contenu). Elle produit un tableau de 5 "points conformes" et 5 "éléments obsolètes" (Jira, Trello, tags Zoho manquants) entièrement inventés, puis déclare "corrections appliquées" sans jamais avoir appelé `notion_update_page`.
+
+**Cause racine** : La règle anti-hallucination existante couvrait les *faits externes* (personnes, URLs, liens) mais pas l'*analyse de résultats d'outils*. Le LLM comble le vide avec ses connaissances générales — ce qui produit une réponse fluide et convaincante mais factuellement fausse.
+
+**Fix system prompt** — règle générique ajoutée dans `RÈGLE ANTI-HALLUCINATION` (statique, s'applique à tous les outils) :
+```
+INTERDIT ABSOLU de générer une analyse, un bilan ou une liste de "points conformes/obsolètes"
+à partir d'une ressource externe (page Notion, fichier, pod, API) si le résultat de l'outil
+est vide, minimal, ou ne contient pas le contenu attendu.
+Si le résultat est vide → dis-le factuellement. Ne compense pas avec tes connaissances.
+
+INTERDIT ABSOLU de déclarer qu'une action a été effectuée (mise à jour, correction, création)
+sans avoir réellement appelé l'outil correspondant dans ce tour.
+```
+
+**Règle d'injection contextuelle simplifiée** : la `RÈGLE NOTION` dans `effective_message` est réduite à l'essentiel (2 lignes : lit + applique si nécessaire). La règle générique statique couvre le reste — y compris pour `web_fetch`, `read_file`, `run_kubectl`, `zoho_list_projects`, etc.
+
+**Principe général** : une règle générique dans le prompt statique vaut mieux que des règles spécifiques par outil qui s'accumulent. Si un outil renvoie du vide, c'est une information en soi — l'agent doit la transmettre, pas la masquer.
+
+**S'applique à** : tous les agents qui lisent des ressources externes avant d'analyser (Charlotte, Leon, Aria, Nox, tout agent CLASS A/E).
+
+---
+
+### 49. Confirmation courte (`"ok"`, `"go"`, `"ok pour mise à jour"`) → classifiée `greeting` → LLM hors-contexte
+
+**Symptôme** : L'utilisateur confirme une action précédente avec une courte affirmation (`"ok pour mise à jour et publication"`, `"oui fais-le"`, `"vas-y"`). Charlotte répond avec du nonsense ou des emoji hors-sujet au lieu de continuer la tâche.
+
+**Cause** : `_classify_message()` (Mistral, 10 tokens, pas d'historique) voit uniquement le texte court. Sans verbe d'action explicite dans sa liste (`restart/fix/list/create/apply...`), il retourne `greeting`. L'instruction `"Réponds en 2 phrases max : salutation brève + 1-2 questions..."` désactive complètement le ReAct loop. Le LLM génère une réponse conversationnelle déconnectée du contexte précédent.
+
+**Cas observé (2026-05-26)** : L'utilisateur dit `"ok pour mise à jour et publication"` après que Charlotte ait analysé une page Notion. Réponse produite : analyse d'emoji pour la phrase `"Je garde un œil dessus et je suis là pour t'épauler si besoin"` — texte trouvé dans l'historique Qdrant.
+
+**Fix** : Pré-check regex AVANT `_classify_message()` dans `/mission/stream` :
+```python
+_AFFIRM_RE = re.compile(r'^(ok|oui|yes|go|d\'accord|parfait|alright|proceed|...)\b', re.IGNORECASE)
+if len(message.strip()) <= 60 and _AFFIRM_RE.match(message.strip()) and history_raw:
+    intent = "task"   # court-circuit : continuer la tâche en cours
+else:
+    intent = await _classify_message(message)
+```
+Condition clé : `history_raw` doit être non-vide (confirme qu'il y a un contexte à continuer). Sans historique, une salutation courte reste classifiée normalement.
+
+**Règle** : toute confirmation ≤ 60 chars commençant par un mot affirmatif ET ayant un historique de session → `task` sans appeler Mistral.

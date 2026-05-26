@@ -51,6 +51,73 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `~/SharePoint/Production-clients/` | Dossiers clients de production (31 entrées) |
 | `~/onedrive/` / `~/OneDrive/` | OneDrive personnel |
 | `~/openapi-servers/` | Serveurs OpenAPI (compose.yaml) |
+| `~/Kubinote-GitOps/docs/` | Miroir des `CLAUDE-*.md` — source RAG Charlotte |
+
+---
+
+## Synchronisation CLAUDE-*.md ↔ Charlotte RAG
+
+**Principe** : Claude Code est le seul maître des `CLAUDE-*.md`. Charlotte les lit via RAG (jamais d'écriture directe). La sync est automatique à chaque édition.
+
+### Flux A — Claude Code → Charlotte RAG (automatique)
+
+```
+Claude Code édite CLAUDE-*.md (Edit/Write)
+    → hook PostToolUse (.claude/settings.json)
+    → scripts/sync-charlotte-docs.sh
+        ├─ cp CLAUDE-*.md → ~/Kubinote-GitOps/docs/
+        ├─ git commit + push origin main
+        └─ scripts/index-claude-docs-surfsense.py (SurfSense)
+    → scripts/index-architecture-docs.py (Qdrant neokube-architecture)
+    → Charlotte lit la collection à chaque mission complexe
+```
+
+### Flux B — Langfuse → local (détection de divergence, manuel)
+
+```
+Langfuse prompt "charlotte-sre" (runtime Charlotte)
+    → scripts/pull-charlotte-prompt.sh          # compare seulement
+    → scripts/pull-charlotte-prompt.sh --apply  # écrit + push GitOps
+    → CLAUDE-charlotte-prompt.md mis à jour
+```
+
+**Règle** : Langfuse est la source de vérité LLM (ce que Charlotte exécute). `CLAUDE-charlotte-prompt.md` est la référence Claude Code (ce qu'on documente). Si elles divergent → investiguer avant de pousser.
+
+### Commandes utiles
+
+```bash
+# Forcer une resync manuelle (après modif CLAUDE-*.md hors session Claude Code)
+bash ~/scripts/sync-charlotte-docs.sh
+
+# Vérifier si le prompt Langfuse a dérivé par rapport au fichier local
+bash ~/scripts/pull-charlotte-prompt.sh
+
+# Ré-indexer la collection neokube-architecture dans Qdrant
+python3 ~/scripts/index-architecture-docs.py
+
+# Vérifier l'état de la collection
+curl -s http://qdrant.neokube.local/collections/neokube-architecture | python3 -m json.tool
+```
+
+### Périmètre écriture Charlotte
+
+Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensemble de l'infrastructure associée à NeoKube. La RAG qu'elle gère lui donne le contexte sur tous les systèmes, et ses 49 outils lui permettent d'agir sur chacun d'eux.
+
+| Système | Charlotte écrit ? | Mécanisme |
+|---|---|---|
+| GitOps K8s (`/gitops/`) | ✅ | `write_file` + `apply_gitops_fix` → push GitHub |
+| Ressources K8s | ✅ | `kubectl_apply` via admin-sys |
+| Paramètres serveur hébergeur | ✅ | `ssh_exec` + `scaleway_api` |
+| Notion | ✅ | `notion_update_page` + `notion_create_page` (notion-connector:8011) |
+| Qdrant (toutes collections) | ✅ | `_qdrant_upsert` interne — incidents, session memory, apprentissage, provision `{agent}-memory` |
+| Zoho Projects | ✅ | `zoho_create_project/task/milestone/tasklist/issue` |
+| DNS Cloudflare | ✅ | `cloudflare_dns_add` |
+| GitHub / Vercel | ✅ | `trigger_dispatcher_workflow` + `trigger_vercel_deploy` |
+| Vault K8s secrets | ✅ | `patch_k8s_secret` |
+| `CLAUDE-*.md` sur neokube-beta | ❌ | **Intentionnel** — pas montés dans le pod Charlotte, maintenus par Claude Code |
+| Son propre code (`sre_agent.py`, `configmap-sre-script.yaml`) | ❌ | Guard dur + ntfy immédiat |
+
+**Seules deux zones sont interdites** : les fichiers source docs sur la machine hôte (sync unidirectionnel Claude Code → RAG), et son propre code (anti-boucle). Sur tout le reste, Charlotte agit en autonomie.
 
 ---
 
@@ -79,7 +146,7 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (v2.11.0), **whisper-server** (STT local port 8394), **voice-gateway** (WS port 8393), **media-gateway** (préprocessing multimodal CLASS A port 8395) |
 | `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **github-mcp**(8080 MCP streamable-http) |
+| `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **notion**(8011), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
@@ -183,6 +250,9 @@ tail -f ~/.local/share/rclone-sharepoint/Production-clients.log
 > Script ré-indexation Leon : `~/scripts/index_leon_process.py`
 
 Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body?}` — credentials depuis Vault auto.
+
+**Notion-connector (port 8011)** — endpoints spécialisés : `POST /search` · `GET /read-content/{id}` · `POST /create-page` · `PATCH /update-page/{id}` · `POST /replace-content/{id}` · `POST /append-blocks/{id}` · `POST /move-page/{id}`
+**Charlotte** : outils `notion_read_page`, `notion_search`, `notion_update_page`, `notion_create_page` — tous via notion-connector (jamais appel direct API Notion).
 
 **MCP Servers (couche préférée pour GitHub, K8s, Neon) :**
 
@@ -383,6 +453,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 46 | `_md_to_notion_blocks` Leon → Notion 400 `validation_error` sur ProjectSpec | Notion API rejette tout bloc `rich_text` vide, n'interprète pas le Markdown (`**bold**` apparaît littéral), limite `children` à 100/requête, et les séparateurs `\|---\|---\|` deviennent des paragraphes parasites. Fix : (1) `_md_clean()` strip `**`/`*`/`` ` ``/links ; (2) helpers retournent `None` si vide → `_add()` ignore les `None` ; (3) chunk children à 90/requête dans `notion_update_page` + `notion_create_page` ; (4) `- [ ]` → `to_do` natif, lignes `\| col \| col \|` → paragraphe `col │ col`, séparateurs skip ; (5) log body complet + premier bloc sur 4xx. Règle : filtrer les blocs vides avant envoi à toute API tierce, logger le body sur 4xx. |
 | 47 | Demander une validation UI avant d'agir sur un système tiers (Zoho, GitHub, Notion…) | OWU n'est pas conçu pour les interactions de type formulaire/bouton. Les approches toolbar action, heading-link, /dispatch_ui sont toutes des contournements fragiles. **Règle R-TAR (trans-agentique)** : l'agent vérifie si la ressource existe déjà (matching sémantique), crée ou met à jour, et inclut le lien résultat directement dans sa réponse — aucune confirmation. Seule exception : actions destructives irréversibles. Pattern Leon : `_find_zoho_project(title)` → `_zoho_sync(spec, url, title)` → ligne Markdown avec URL inline. |
 | 48 | `{word,word2}` set literal dans un f-string → NameError masqué | `body=JSON{description,default_project_id,expires_at}` dans un f-string = set literal Python → `NameError: name 'description' is not defined` à chaque appel mission. `log.error(str(e))` sans `exc_info=True` masque le numéro de ligne. Fix : `{{description,default_project_id,expires_at}}`. Règle : tout `{a,b}` dans un f-string est du Python, pas du texte. Détection : `exc_info=True` pour le traceback complet. |
+| 49 | Confirmation courte (`"ok"`, `"go"`, `"ok pour mise à jour"`) classifiée `greeting` → LLM hors-contexte | `_classify_message()` (Mistral, sans historique) retourne `greeting` pour les confirmations courtes sans verbe d'action explicite → instruction "salutation + questions" désactive le ReAct loop → LLM produit du nonsense (emoji, réponse déconnectée). Fix : pré-check regex AVANT `_classify_message()` : si ≤ 60 chars + mot affirmatif + `history_raw` non-vide → forcer `intent = "task"` sans appeler Mistral. Règle : une confirmation ne peut être un `greeting` que si elle n'a pas de contexte de session précédent. |
+| 50 | Analyse fictive quand le résultat d'outil est vide ou minimal | L'agent appelle `notion_read_page` / `web_fetch` / `run_kubectl` / toute API externe et reçoit un résultat vide ou minimal. Au lieu de le signaler, il génère une analyse détaillée depuis ses connaissances pré-entraînées. Variante : déclare "corrections appliquées" sans avoir appelé l'outil de modification. **Fix** : règle générique dans `RÈGLE ANTI-HALLUCINATION` (statique) — "INTERDIT de générer une analyse si le résultat outil est vide/minimal ; INTERDIT de déclarer une action sans avoir appelé l'outil". Règle contextuelle (ex: RÈGLE NOTION) simplifiée à 2 lignes, la règle statique couvre tous les outils. **Principe** : une règle générique statique > accumulation de règles spécifiques par outil. S'applique à tous les agents qui lisent des ressources externes. |
 
 ---
 
@@ -390,18 +462,20 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 > Règles complètes (R9.1–R9.11), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
-| Agent | `LLM_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` |
-|---|---|---|---|---|
-| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` |
-| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` → `gpt-4o` (REVIEW, cascade R9.8) | — |
-| **Dispatcher** | `mistral` ⚠️ | — | — | — |
-| **Aria** / **Nox** | `codestral` | — | — | — |
-| **Vera** | `mistral-large-2407` | — | — | — |
-| **Penpot** / **Domi** | `mistral` ⚠️ | — | — | — |
-| **Neo** | `mistral-large-2407` | — | — | — |
+| Agent | `LLM_MODEL` | `LLM_CLASSIFY_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | `LLM_CREATION_MODEL` |
+|---|---|---|---|---|---|---|
+| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `claude-sonnet` → `gpt-4o` ✅ (R9.13) | `mistral` (background) | `gpt-4o` | `mistral` | `claude-opus` ✅ (R9.12) |
+| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` → `gpt-4o` (REVIEW, cascade R9.8) | — | — |
+| **Dispatcher** | `mistral` ⚠️ | — | — | — | — |
+| **Aria** / **Nox** | `codestral` | — | — | — | — |
+| **Vera** | `mistral-large-2407` | — | — | — | — |
+| **Penpot** / **Domi** | `mistral` ⚠️ | — | — | — | — |
+| **Neo** | `mistral-large-2407` | — | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
 **Charlotte v4 — cascade LLM (R9.10)** : classification `_classify_message()` → `mistral` (LLM_SCAN_MODEL, cheap, 10 tokens) · ReAct agent `charlotte_agent.run()` → `FallbackModel(claude-sonnet → gpt-4o → mistral)` · claude-sonnet = créatif + tool calling fiable · gpt-4o = fallback quota · mistral = last resort.
+**R9.12 — Création ultra-large** : si le message contient des keywords de création explicites (agent/outil/service + verbe d'action), `charlotte_agent.run()` reçoit `model=_creation_model` (`claude-opus`). Le FallbackModel reste inchangé pour toutes les autres tâches. Contexte réel ≈ 25–30K tokens (system prompt 12K + tool defs 2K + résultats outils) — très en dessous du 200K context window d'Opus.
+**R9.13 — Classificateur intent interactif (claude-sonnet → gpt-4o)** : `_classify_message()` utilise `LLM_CLASSIFY_MODEL=claude-sonnet` (compréhension documentaire, French, contexte implicite) avec fallback `LLM_CLASSIFY_FALLBACK=gpt-4o` si quota épuisé. `LLM_SCAN_MODEL=mistral` reste réservé aux scans Temporal background (background, pas interactif). Séparation : classification interactive = qualité de raisonnement ; scans background = coût/volume.
 
 ---
 
