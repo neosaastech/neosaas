@@ -162,3 +162,63 @@ Toute URL construite manuellement doit être testée dans un vrai navigateur ava
 
 **R5 — Domaines publics = neokube.fr (Cloudflare-managed)**
 Tout nouveau service exposé publiquement utilise un sous-domaine `*.neokube.fr`. Ne jamais exposer sur un domaine dont le DNS n'est pas géré par Cloudflare — le proxy CF est requis pour le tunnel TLS.
+
+**R6 — Le connector encode les règles API, pas les agents**
+Un agent exprime une intention sémantique. Le connector traduit en appels API valides avec les bons champs, les bons formats, les bonnes valeurs par défaut. Quand une API tierce a des règles non documentées (champ obligatoire silencieux, valeur normalisée, rate-limit), la règle va dans le connector — jamais dans le system prompt ou le code agent. Résultat : un nouvel agent n'a pas à redécouvrir ces règles.
+
+---
+
+## zoho-connector v1.2 — Contrat agent
+
+Endpoint interne : `http://zoho-connector.connector-system.svc.cluster.local:8000`
+
+### POST /scaffold — création projet complet
+
+Accepte un payload sémantique, retourne `{project_id, web_url, milestones: {name: id}, tasklists: {name: id}}`.
+
+```json
+{
+  "name": "Website Vitrine — Client XYZ",
+  "description": "...",
+  "start_date": "",        // MM-DD-YYYY — défaut: aujourd'hui
+  "end_date": "",          // MM-DD-YYYY — défaut: start_date
+  "milestones": [
+    {
+      "name": "Phase 1 — Avant-Vente",
+      "flag": "internal",  // "internal" (équipe) | "external" (livrable client)
+      "start": "05-27-2026",
+      "end": "05-29-2026",
+      "tasklists": [
+        { "name": "Cadrage client", "tasks": ["Réunion de lancement", "Validation brief"] }
+      ]
+    }
+  ]
+}
+```
+
+**Normalisations automatiques (les agents n'ont pas à les connaître) :**
+- `start_date`/`end_date` vides → date du jour
+- `flag: "start"` → `"internal"` ; `flag: "end"` → `"external"`
+- `owner` jalon → injecté automatiquement (`630459010`)
+- Rate-limiting : 0.5s/jalon, 0.4s/tasklist, 0.3s/tâche
+
+### POST /proxy — passthrough générique
+
+Pour tout endpoint Zoho non couvert par `/scaffold`. Le proxy normalise aussi les payloads milestone automatiquement (flag + owner + dates).
+
+```json
+{ "method": "POST|GET|PUT|PATCH|DELETE", "path": "/projects/.../...", "data": {} }
+```
+
+**Champs Zoho à retenir (erreurs 6831/6832 si manquants) :**
+
+| Entité | Champs requis | Notes |
+|---|---|---|
+| Milestone | `name`, `start_date`, `end_date`, `flag`, `owner` | flag: `"internal"` ou `"external"` uniquement |
+| Task | `name` | `priority` capitalisé si fourni : `"High"/"Medium"/"Low"` |
+| Tasklist | `name` | `milestone_id` recommandé à la création (PATCH après = erreur 6831) |
+| Project | `name` | `start_date`/`end_date` format `MM-DD-YYYY` |
+
+**Portal** : `809731782` (neomniadotnet) — **Owner ID** : `630459010` (Charles)
+**Base URL** : `https://projectsapi.zoho.com/restapi/portal/809731782`
+**Header obligatoire** : `X-com-zoho-projects-version: 3`
