@@ -1253,3 +1253,85 @@ else:
 Condition clé : `history_raw` doit être non-vide (confirme qu'il y a un contexte à continuer). Sans historique, une salutation courte reste classifiée normalement.
 
 **Règle** : toute confirmation ≤ 60 chars commençant par un mot affirmatif ET ayant un historique de session → `task` sans appeler Mistral.
+
+---
+
+### 51. Question réflexive classifiée `task` → CLARIFYING se relance indéfiniment
+
+**Symptôme** : L'utilisateur demande à Leon de confirmer une action récente : `"as-tu bien créé un template prêt à l'emploi ou as-tu créé un projet au nom de template ?"`. Leon répond avec une nouvelle question CLARIFYING au lieu de répondre directement.
+
+**Cause racine (Leon)** : Après chaque phase CLARIFYING, la dernière réponse de Leon est une question courte (`? && len < 400 chars`) → `_in_active_clarif = True`. Le bypass `if _in_active_clarif → intent = "task"` intercepte la question réflexive **avant** que le classifieur LLM ne la voie. Le handler `task` relance la phase CLARIFYING.
+
+**Cause secondaire** : Le classifieur ne disposait pas d'un label pour les questions réflexives. `"as-tu bien créé X ?"` ressemble à `task` pour Mistral (vocabulaire projet).
+
+**Cas observé (2026-05-26)** : Leon avait créé un projet Zoho nommé "Template CRM" (confusion template vs projet instance). L'utilisateur demande confirmation → Leon re-entre en CLARIFYING au lieu de reconnaître l'erreur.
+
+**Fix — classifieur LLM (anti-pattern #40 respecté)** : Ajouter le label `reflection` dans `_classify_message_leon` :
+```
+- reflection : user asks whether Leon correctly did something, verifies a past action,
+               or asks 'did you do X or Y?' — "as-tu bien créé", "tu as fait", "est-ce que tu as"
+```
+Handler `reflection` : réponse directe oui/non + explication honnête, **aucune question en retour**.
+
+**Ce qui NE marche PAS** : regex pré-check sur `"as-tu"` / `"tu as"` — viole anti-pattern #40 (string matching pour intent).
+
+**Règle** : les questions réflexives sont un intent à part entière dans le classifieur LLM, pas un cas particulier géré par regex. S'applique à tout agent avec une phase CLARIFYING ou de session active.
+
+**Corollaire — Template ≠ projet Zoho** : `"créer un template prêt à l'emploi"` doit être classifié `review` (enrichir la page Notion CDC de référence), jamais `task` (créer un projet Zoho). Ajouter au label `review` du classifieur : `"créer/mettre à jour un template, modèle réutilisable, prêt à l'emploi"`.
+
+---
+
+### 52. Overrides contextuels sur le classifieur → accumulation de règles qui se contredisent
+
+**Symptôme** : Leon ne peut plus supprimer, créer ou lister quoi que ce soit après une session de review Notion. Toute action directe (`"supprime ce projet"`, `"liste les projets"`) est silencieusement reroutée vers le handler `review` — qui tente de lire une page Notion inexistante ou répond hors-contexte.
+
+**Cause racine** : Plutôt que de donner au classifieur suffisamment de contexte pour décider seul, on lui ajoute des **overrides post-hoc** :
+
+```python
+# Override 1 — toute URL Notion dans l'historique = review forcé
+if _notion_in_history(req.messages):
+    intent = "review"
+
+# Override 2 — mots-clés d'action dans le message = task forcé (patch du patch)
+elif any(v in user_msg_lower for v in _ACTION_VERBS):
+    intent = "task"
+
+# Override 3 — clarification active = task forcé
+elif _in_active_clarif:
+    intent = "task"
+
+else:
+    intent = await _classify_message_leon(user_msg)
+```
+
+Chaque override est un pansement sur le précédent. `_notion_in_history` bloquait les suppressions → `_ACTION_VERBS` déblocait les suppressions mais était trop restrictif → nouveau patch → etc. Après 3 cycles, les règles se contredisent.
+
+**Ce qui NE marche PAS** :
+- Listes de verbes d'action (`_ACTION_VERBS`) — viole anti-pattern #40 : `"supprime"` passe, `"efface"` ne passe pas.
+- Flag booléen `_notion_in_history` — l'historique contient une URL Notion = le contexte *était* une review, pas que le *message actuel* est une review.
+- Conditions composées `if url_in_history AND NOT action_verb` — fragile et combinatoire.
+
+**Fix (2026-05-27)** : Supprimer **tous** les overrides contextuels. Passer les 6 derniers messages (3 échanges) directement au classifieur LLM :
+
+```python
+_history_for_classifier = [{"role": m.role, "content": m.content}
+                            for m in req.messages[:-1] if m.role in ("user", "assistant")]
+
+if _in_active_clarif:
+    intent = "task"          # seul bypass légitime : réponse à une question Leon en cours
+else:
+    intent = await _classify_message_leon(user_msg, history=_history_for_classifier)
+```
+
+Le classifieur reçoit l'historique dans ses messages + une instruction explicite :
+
+```
+Context rule: if prior messages show a review session but the CURRENT message requests
+a new direct action, classify as task — context does not override explicit current intent.
+```
+
+Le LLM distingue naturellement `"as-tu analysé la page Notion ?"` (question dans le contexte d'une review) de `"supprime ce projet"` (action directe indépendante du contexte précédent).
+
+**Règle** : un classifieur LLM doit recevoir le contexte dont il a besoin pour décider — jamais des overrides qui court-circuitent sa décision. Le seul bypass légitime est le cas `_in_active_clarif` : si Leon vient de poser une question, la réponse courte de l'utilisateur est forcément une continuation (`task`). Tout autre override viole l'esprit de l'anti-pattern #40.
+
+**Corollaire** : si le classifieur se trompe régulièrement, la solution est d'améliorer ses instructions ou de lui donner plus de contexte — jamais d'ajouter un override externe.
