@@ -1,5 +1,37 @@
 # CLAUDE-agents.md — Architecture sécurité des agents NeoKube
 
+## Doctrine fondamentale — Séparation sémantique / technique
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Agent = spécialiste sémantique et décisionnel              │
+│  → Entraîné sur son domaine métier (Zoho PM, SRE, design…) │
+│  → Comprend l'intention, orchestre, décide                  │
+│  → NE CONNAÎT PAS les règles techniques des APIs tierces    │
+├─────────────────────────────────────────────────────────────┤
+│  Connector / Microservice = spécialiste technique           │
+│  → Règles API hardcodées (champs requis, formats, defaults) │
+│  → Normalisation, rate-limiting, retry, enrichissement      │
+│  → NE PREND PAS de décision métier                          │
+├─────────────────────────────────────────────────────────────┤
+│  Sidecar = spécialiste d'enforcement                        │
+│  → tool-validator : contrôle d'accès par policy             │
+│  → output-guard   : validation format de sortie             │
+│  → NE CONNAÎT PAS le domaine ni les APIs tierces            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Règle d'or** : si une règle peut être exprimée comme `if field == X: inject Y`, elle appartient au connector — jamais dans le system prompt ni dans le code agent. Si une règle nécessite de comprendre l'intention de l'utilisateur, elle appartient à l'agent.
+
+**Conséquence pratique** :
+- Un nouvel agent qui veut utiliser Zoho appelle `/scaffold` ou `/proxy` — il n'a pas besoin de connaître `owner=630459010`, `X-com-zoho-projects-version: 3`, ou le format `MM-DD-YYYY`.
+- Demain un agent veut créer un projet GitHub — le github-connector gère les headers OAuth, les retry sur 422, les slugs. L'agent dit juste "crée un repo `mon-projet` depuis le template `nextjs`".
+- Le sidecar tool-validator bloque les outils hors périmètre — l'agent n'a pas à vérifier lui-même ses droits.
+
+**Référence** : règles R1–R6 dans [CLAUDE-connector.md](CLAUDE-connector.md).
+
+---
+
 ## Identité d'agent — modèle NeoKube
 
 Chaque agent NeoKube possède une **identité complète et cohérente** à travers toute la stack. Ces données sont la source de vérité pour la traçabilité Langfuse, les droits d'accès K8s, et la communication mail.
@@ -695,13 +727,21 @@ POST /mission/stream {message, session_id, interface}
 - `_MISSION_TOOLS` dict (~727 lignes JSON de specs d'outils)
 - String matching pour l'intent (`"accès"`, `"as-tu"`) — remplacé par `_classify_message` (antipattern #40)
 
-**FallbackModel natif PydanticAI :**
+**Architecture deux couches (R9.10) :**
+
+| Couche | Modèle | Rôle | Coût |
+|---|---|---|---|
+| Classification `_classify_message()` | `mistral` (LLM_SCAN_MODEL) | 5 labels, temperature=0, max_tokens=10 | minimal |
+| ReAct agent `charlotte_agent.run()` | `FallbackModel(claude-sonnet → gpt-4o → mistral)` | créatif, autonome, tool calling JSON fiable | moyen |
+
 ```python
-_mission_primary  = OpenAIChatModel(LLM_MODEL,    provider=_mission_provider)  # claude-sonnet
-_mission_fallback = OpenAIChatModel(LLM_FALLBACK,  provider=_mission_provider)  # mistral
-_mission_llm      = FallbackModel(_mission_primary, _mission_fallback)
+_mission_primary   = OpenAIChatModel(LLM_MODEL,     provider=_mission_provider)  # claude-sonnet
+_mission_secondary = OpenAIChatModel(LLM_SECONDARY,  provider=_mission_provider)  # gpt-4o
+_mission_fallback  = OpenAIChatModel(LLM_FALLBACK,   provider=_mission_provider)  # mistral
+_mission_llm       = FallbackModel(_mission_primary, _mission_secondary, _mission_fallback)
 ```
-Si `claude-sonnet` retourne une `ModelAPIError` (quota vide, HTTP 402), PydanticAI bascule automatiquement sur `mistral`.
+
+`claude-sonnet` en premier : fiable pour le tool calling JSON, suit les instructions complexes sans anti-paralysie exhaustive dans le prompt. Si quota épuisé → `gpt-4o`, puis `mistral` en last resort (tool calls parfois XML via Cloudflare AI Gateway — voir antipattern #44).
 
 ### Outil `ask_clarification` (v4.0)
 
@@ -778,23 +818,24 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 > **⚠️ TEMPORAIRE** : Dispatcher et Domi sur `mistral` (quota Gemini-flash épuisé, réinitialisation quotidienne).
 > Charlotte est passée à `claude-sonnet` (2026-05-13 — Anthropic rechargé). Split LLM actif : `claude-sonnet` pour `/mission`, `mistral` pour scans Temporal.
 
-| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | Modèle cible |
-|---|---|---|---|---|---|
-| **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` | `claude-sonnet` |
-| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` (REVIEW) | — | `gpt-4o` |
-| **Dispatcher** | `mistral` ⚠️ | — | — | — | `gemini-flash` |
-| **Aria** Frontend | `codestral` | — | — | — | `codestral` |
-| **Nox** Backend | `codestral` | — | — | — | `codestral` |
-| **Vera** QA | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
-| **Penpot** Design | `mistral` | — | — | — | `gemini-flash` |
-| **Domi** Domain | `mistral` ⚠️ | — | — | — | `gemini-flash` |
-| **Neo** Assistant | `mistral-large-2407` | — | — | — | `mistral-large-2407` |
+| Agent | `LLM_MODEL` actuel | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | `LLM_CREATION_MODEL` | Modèle cible |
+|---|---|---|---|---|---|---|
+| **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` | `claude-opus` ✅ (R9.12) | `claude-sonnet` |
+| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` (REVIEW) | — | — | `gpt-4o` |
+| **Dispatcher** | `mistral` ⚠️ | — | — | — | — | `gemini-flash` |
+| **Aria** Frontend | `codestral` | — | — | — | — | `codestral` |
+| **Nox** Backend | `codestral` | — | — | — | — | `codestral` |
+| **Vera** QA | `mistral-large-2407` | — | — | — | — | `mistral-large-2407` |
+| **Penpot** Design | `mistral` | — | — | — | — | `gemini-flash` |
+| **Domi** Domain | `mistral` ⚠️ | — | — | — | — | `gemini-flash` |
+| **Neo** Assistant | `mistral-large-2407` | — | — | — | — | `mistral-large-2407` |
 
 > **Restaurer Dispatcher + Domi** : quota Gemini se réinitialise auto → modifier `LLM_MODEL: "gemini-flash"` dans deployments.
-> **Charlotte split LLM (v4.0 — R9.10) :**
+> **Charlotte split LLM (v4.0 — R9.10 + R9.12) :**
 > - `LLM_MODEL=claude-sonnet` → missions interactives `/mission` via PydanticAI `Agent.run()`
 > - `LLM_SECONDARY=gpt-4o` → **2ème fallback** si claude-sonnet quota épuisé (OpenAI, bonne gestion des tool calls)
 > - `LLM_FALLBACK=mistral` → **3ème fallback** si gpt-4o aussi indisponible
+> - `LLM_CREATION_MODEL=claude-opus` → **modèle ultra-large** (R9.12) activé automatiquement si message = création d'agent/outil/service (`_is_creation_task()` regex)
 > - `LLM_SCAN_MODEL=mistral` → compression résultats outils ReAct (`_compress_tool_result`) — `sre_analyze_with_llm` supprimé en 2026-05-19
 > - `LLM_CONV_MODEL` n'existe plus : PydanticAI + Claude gèrent nativement conv vs SRE sans classifieur
 > - **`_check_primary_llm()`** — health check toutes les 5 min + ntfy sur transition ok→down et down→ok
@@ -855,6 +896,16 @@ Règles `sre_check_llm_key_status()` (Charlotte Temporal — Bloc A) :
 - Données Vault > 7.5h → status `stale` (CronJob peut avoir raté)
 - **Gemini exclu du loop Charlotte** — vérifié uniquement dans `llm-key-validation` CronJob
 
+**R9.12 — Modèle ultra-large pour création d'agents/outils/services (2026-05-25) :**
+
+La création d'un agent implique 12 étapes orchestrées (spec → Vault → LiteLLM key → K8s → code MAD → policy → Qdrant → OWU → Langfuse). Le raisonnement multi-étapes bénéficie d'un modèle ultra-large.
+
+Implémentation : `_is_creation_task(msg)` (regex sur 400 chars) détecte les keywords `{crée|créer|add|nouvel|build|scaffold|provision|instancie|implémente} × {agent|outil|tool|service|pipe|connector|workflow}`.
+- Si `True` : `charlotte_agent.run(..., model=_creation_model)` — passe `claude-opus` en override per-run
+- Si `False` : `model=None` → FallbackModel habituel (claude-sonnet → gpt-4o → mistral)
+
+Capacité de charge confirmée : contexte réel ≈ 25–30K tokens (system prompt 12K + docstrings outils 2K + résultats tools). Context window Opus = 200K → marge ×6.5. Les activités Temporal (`sre_write_agent_spec`, `sre_generate_agent_code`) sont **déterministes** (0 appel LLM) — seule l'orchestration de l'agent est impactée.
+
 ---
 
 ## RAG — Écosystème de connaissance par agent
@@ -870,7 +921,7 @@ Chaque agent a une ou plusieurs collections Qdrant dédiées. Règle : **ne jama
 | **Leon** | `leon-memory` | Normes CDC, process interview, expériences REVIEW | Avant génération spec (mode REVIEW) |
 | **Aria** | `template-neosaas` + `design-knowledge` | Patterns code Next.js, principes UX composants | Dans `system_prompt` de `aria_generate_nextjs` |
 | **Zephyr** | `design-knowledge` + `neomnia_core` | Heuristiques UX par livrable + contexte agence | Dans `prod_user` étape 3 production |
-| **Charlotte** | `sre-charlotte-incidents` + `charlotte-conversations` | Incidents passés + session memory | Automatique via PydanticAI / `_load_pydantic_history` |
+| **Charlotte** | `sre-charlotte-incidents` + `charlotte-conversations` + **`neokube-architecture`** | Incidents passés + session memory + **docs infra NeoKube** | Automatique via PydanticAI / `_load_pydantic_history` + RAG docs au démarrage mission |
 | **Dispatcher** | `pm-decisions` | Décisions projets archivées | Post-workflow (write, pas read) |
 | **Neo** | `neo-memory` | Mémoire assistant | Session memory |
 
@@ -901,6 +952,32 @@ Après chaque CDC écrit dans Notion, `qdrant_learn_from_review(conversation, pr
 3. Appel non-bloquant (`asyncio.ensure_future`) — n'impacte pas la réponse utilisateur
 
 Script de ré-indexation manuelle : `~/scripts/index_leon_process.py` (CLAUDE-leon.md + CLAUDE-leon-process.md).
+
+### Sync bidirectionnelle CLAUDE-*.md ↔ Charlotte RAG
+
+Les `CLAUDE-*.md` sont la documentation maître (maintenus par Claude Code uniquement). Charlotte les consomme en lecture via RAG — jamais en écriture.
+
+```
+Claude Code  ──[Edit/Write hook]──▶  sync-charlotte-docs.sh
+                                          │
+                              ┌───────────┴────────────┐
+                              ▼                        ▼
+                 Kubinote-GitOps/docs/          index-architecture-docs.py
+                 CLAUDE-*.md (git push)              │
+                                              Qdrant neokube-architecture
+                                              (768 dims, indexé par chunk)
+                                                       │
+                                              Charlotte lit au démarrage
+                                              de chaque mission complexe
+```
+
+**Flux retour** (détection de divergence prompt Langfuse) :
+```bash
+bash ~/scripts/pull-charlotte-prompt.sh          # compare Langfuse ↔ local
+bash ~/scripts/pull-charlotte-prompt.sh --apply  # sync + push si divergence
+```
+
+**Périmètre écriture Charlotte** : Charlotte est le Maître NeoKube — elle écrit dans GitOps K8s, Notion, Qdrant (toutes collections), Zoho, Cloudflare, Vault, GitHub/Vercel, serveur hébergeur. **Seules deux zones sont hors portée** : `CLAUDE-*.md` sur l'hôte (pas montés dans le pod, maintenus par Claude Code) et son propre code (guard anti-boucle). Voir **[CLAUDE.md §Synchronisation CLAUDE-*.md ↔ Charlotte RAG](CLAUDE.md)**.
 
 ### `notion_read_page` — Leon (v3.1+, 2026-05-19)
 
