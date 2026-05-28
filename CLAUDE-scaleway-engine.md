@@ -429,19 +429,119 @@ Cette migration est **non-bloquante** — Charlotte peut continuer à fonctionne
 
 ---
 
+## Protocole de test Charlotte post-migration
+
+La migration Charlotte doit être validée explicitement — le risque est qu'elle continue à appeler l'API directe sans que l'erreur soit visible (les credentials sont toujours dans son pod jusqu'à leur suppression).
+
+### Étape 1 — Test engine isolé (sans Charlotte)
+
+Vérifier que l'engine répond correctement avant de toucher Charlotte :
+
+```bash
+# Depuis un pod quelconque dans le cluster
+# Health
+python3 -c "import urllib.request; print(urllib.request.urlopen('http://scaleway-engine.connector-system.svc.cluster.local:8012/health').read())"
+
+# Liste projets (Charlotte)
+python3 -c "
+import urllib.request, json
+req = urllib.request.Request(
+    'http://scaleway-engine.connector-system.svc.cluster.local:8012/projects',
+    headers={'X-Agent-Id': 'charlotte'}
+)
+print(json.loads(urllib.request.urlopen(req).read()))
+"
+
+# RBAC : aria ne peut pas lire le billing
+python3 -c "
+import urllib.request
+req = urllib.request.Request(
+    'http://scaleway-engine.connector-system.svc.cluster.local:8012/billing',
+    headers={'X-Agent-Id': 'aria'}
+)
+try:
+    urllib.request.urlopen(req)
+except urllib.error.HTTPError as e:
+    print(f'Attendu 403 : {e.code}')  # doit afficher 403
+"
+```
+
+### Étape 2 — Test Charlotte via OWU (scénarios de validation)
+
+Tester depuis Open WebUI (ou Charlotte `/mission`) **après** le refactoring de `scaleway_api()` :
+
+| # | Prompt | Résultat attendu | Indicateur de succès |
+|---|---|---|---|
+| T1 | "Liste-moi les projets Scaleway actifs" | Charlotte liste les projets avec leurs IDs | Appel `GET /projects` loggé dans les traces Langfuse |
+| T2 | "Quel est le billing Scaleway ce mois ?" | Charlotte retourne le total net en euros | Appel `GET /billing` loggé — **pas** d'appel direct `api.scaleway.com` depuis le pod Charlotte |
+| T3 | "Quels serveurs Scaleway sont actifs ?" | Charlotte liste les instances avec état | Appel `GET /instances` via engine |
+| T4 | "Crée un projet Scaleway pour le projet test-demo" | Charlotte crée `client-test-demo` | Appel `POST /projects` avec `X-Agent-Id: charlotte` |
+| T5 | "Audite les clés IAM Scaleway" | Charlotte liste les clés API avec dates d'expiration | Appel `GET /iam` via engine |
+
+### Étape 3 — Vérification que Charlotte n'appelle plus l'API directe
+
+```bash
+# Vérifier qu'il n'y a plus d'appels sortants vers api.scaleway.com depuis le pod Charlotte
+# (après suppression de l'injection Vault SCW_SECRET_KEY)
+kubectl exec -n agent-system deployment/agent-charlotte -- env | grep SCW
+# Doit retourner vide — aucune variable SCW_* dans l'environnement Charlotte
+```
+
+Si cette commande retourne encore `SCW_SECRET_KEY` → l'injection Vault n'a pas été supprimée → Charlotte utilise encore l'API directe.
+
+### Étape 4 — Test de résilience
+
+```bash
+# Simuler une indisponibilité de l'engine
+kubectl scale deployment scaleway-engine -n connector-system --replicas=0
+
+# Charlotte doit répondre avec une erreur gracieuse (pas un crash)
+# Prompt : "Liste les projets Scaleway"
+# Résultat attendu : "scaleway-engine indisponible — impossible de récupérer les projets Scaleway"
+
+# Remettre en ligne
+kubectl scale deployment scaleway-engine -n connector-system --replicas=1
+```
+
+### Étape 5 — Vérification traces Langfuse
+
+Après chaque scénario T1–T5, vérifier dans Langfuse (`http://langfuse.neokube.local`) :
+- Trace Charlotte avec outil `scaleway_*` ou `scaleway_api` appelé
+- Aucune trace montrant `api.scaleway.com` en appel HTTP direct (toujours via engine)
+- Score `mission_quality` ≥ 8/10 sur les scénarios billing/IAM
+
+---
+
 ## Checklist déploiement
 
+### Phase A — Engine
 - [ ] Vault : vérifier `secret/neokube/infrastructure/scaleway` (`SCW_SECRET_KEY`, `SCW_ORG_ID`, `SCW_DEFAULT_PROJECT_ID`)
 - [ ] GitOps : créer les 3 fichiers dans `connector-system/base/`
 - [ ] Kustomization : ajouter les 3 fichiers dans `kustomization.yaml`
-- [ ] Test health : `kubectl exec -n connector-system scaleway-engine-xxx -- python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8012/health').read())"`
-- [ ] Test RBAC : appel sans `X-Agent-Id` → 422 ; appel `X-Agent-Id: aria` sur `/billing` → 403
-- [ ] Domi : ajouter activité `domi_provision_scaleway_project` + SCALEWAY_ENGINE_URL dans ConfigMap
-- [ ] Dispatcher : passer `scaleway_project_id` au rapport de fin de workflow
-- [ ] Charlotte : refactoriser `scaleway_api()` vers proxy engine (optionnel — migration douce)
-- [ ] Leon : renommer `delegate_to_charlotte` → `scaleway_list_projects` + `scaleway_get_project` (outils directs engine)
-- [ ] CLAUDE-connector.md : ajouter scaleway-engine dans la table + architecture
-- [ ] CLAUDE.md : mettre à jour Domi description
+- [ ] Test health : `kubectl exec -n connector-system <pod> -- python3 -c "...http://localhost:8012/health..."`
+- [ ] Test RBAC : sans `X-Agent-Id` → 422 ; `aria` sur `/billing` → 403 ; `charlotte` sur `/billing` → 200
+
+### Phase B — Agents (Domi + Leon)
+- [ ] Domi : ajouter activité `domi_provision_scaleway_project` + `SCALEWAY_ENGINE_URL` dans ConfigMap
+- [ ] Dispatcher : passer `scaleway_project_id` dans le rapport de fin de workflow
+- [ ] Leon : remplacer `delegate_to_charlotte` par `scaleway_list_projects` + `scaleway_get_project` (appels directs engine)
+
+### Phase C — Migration Charlotte (non-bloquante)
+- [ ] Refactoriser `scaleway_api()` → proxy engine (`POST /proxy`, `X-Agent-Id: charlotte`)
+- [ ] Refactoriser `scaleway_billing` → `GET /billing`
+- [ ] Refactoriser `scw_org_id()` + `_scw_key()` → `GET /projects`
+- [ ] **Protocole test Charlotte** : exécuter les 5 scénarios T1–T5 (§Protocole de test)
+- [ ] Vérifier Langfuse : aucun appel direct `api.scaleway.com` depuis pod Charlotte
+- [ ] Supprimer injection Vault `SCW_SECRET_KEY` du pod Charlotte (`serviceaccount-sre.yaml`)
+- [ ] Vérifier : `kubectl exec -n agent-system deployment/agent-charlotte -- env | grep SCW` → vide
+
+### Phase D — Documentation ✅ fait
+- [x] CLAUDE-scaleway-engine.md
+- [x] CLAUDE-connector.md : architecture + table
+- [x] CLAUDE-services.md : port 8012
+- [x] CLAUDE-pipeline.md : Phase 3 Domi
+- [x] CLAUDE.md : Domi v2.0
+- [x] Notion : page projet créée
 
 ---
 
