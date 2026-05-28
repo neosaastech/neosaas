@@ -326,23 +326,167 @@ Leon détecte `agent: leon` dans la description, extrait le brief, et démarre l
 Leon utilise un classificateur LLM (antipattern #40 — jamais de string matching) :
 
 ```python
-_LEON_INTENT_LABELS = ("greeting", "check_agents", "question", "task", "review")
+_LEON_INTENT_LABELS = ("greeting", "check_agents", "reflection", "question",
+                        "task", "review", "rag_mission", "audit")
 
 async def _classify_message_leon(msg: str, history=None) -> str:
     # R9.13 — cascade interactive : LLM_CLASSIFY_MODEL (claude-sonnet) → LLM_CLASSIFY_FALLBACK (gpt-4o) → LLM_MODEL_REASONING (mistral)
     # LLM_SCAN_MODEL (mistral) = réservé aux scans Temporal background, jamais à la classification interactive
-    # → un label parmi les 5 ci-dessus, "task" par défaut
+    # → un label parmi les 8 ci-dessus, "task" par défaut
 ```
+
+#### Intents globaux (applicables à tout agent conversationnel)
 
 | Label | Comportement | Mécanisme |
 |---|---|---|
-| `greeting` | Fast-path conv 1-2 phrases | Déterministe (pas de LLM) |
-| `check_agents` | Pré-exécute `check_sub_agents` en Python, injecte résultat | Pattern A — résultat injecté dans le message user |
+| `greeting` | Fast-path conv 1-2 phrases | Déterministe — pas de LLM |
 | `question` | Fast-path conv 3 points max | LLM direct, pas d'outil |
-| `task` | ReAct loop CLARIFYING→READY, 1 question par tour | `run_agent()` + `_sanitize_clarifying()` |
-| `review` | Analyse documentaire exhaustive — lit Notion + RAG norms | `run_agent(initial_model=LLM_SECONDARY)` — Claude Sonnet, pas de _sanitize |
+| `reflection` | Vérifie une action passée ("as-tu bien créé…") | Réponse directe oui/non — pas de CLARIFYING |
+| `check_agents` | Pré-exécute `check_sub_agents`, injecte résultat | Pattern A — outil appelé avant le LLM |
 
-**Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Mistral ne peut pas ignorer un résultat déjà dans le contexte.
+#### Intents spécifiques Leon
+
+| Label | Comportement | Mécanisme |
+|---|---|---|
+| `task` | ReAct loop CLARIFYING→READY, 1 question par tour | `run_agent()` + `_sanitize_clarifying()` |
+| `review` | Révision documentaire CDC Notion — LLM génère spec, Python écrit | `run_agent(initial_model=LLM_SECONDARY)` — pas de `_sanitize` |
+| `rag_mission` | Indexation/enrichissement collection Qdrant | Handler dédié `_rag_execute()` |
+| `audit` | Inspection complète projet : Notion + normes + Zoho → plan d'action | `run_agent(system_prompt=AUDIT_SYSTEM_PROMPT, audit_mode=True)` — pas de `_sanitize` |
+
+**Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Le LLM ne peut pas ignorer un résultat déjà dans le contexte.
+
+---
+
+### Checklist — Ajout d'un nouvel intent
+
+> **Règle** : un intent mal intégré crashe silencieusement ou retourne du HTML. Suivre cette checklist dans l'ordre.
+
+**Fichiers à modifier** : `configmap-leon-script.yaml` uniquement (sauf ajout ConfigMap env).
+
+#### 1. Label
+
+```python
+# Ligne ~3080
+_LEON_INTENT_LABELS = (..., "mon_intent")
+```
+
+#### 2. Classifier — description sémantique
+
+Dans `_classify_message_leon`, section `system_prompt` :
+
+```
+"- mon_intent : description précise des déclencheurs sémantiques. "
+"  ≠ autres_labels : distinguer explicitement des labels proches.\n"
+```
+
+#### 3. `_history` — disponible avant le routage
+
+`_history` est défini juste avant `_history_for_classifier` (ligne ~4679). Il est disponible dans tous les handlers d'intent. **Ne pas le redéfinir dans le handler.**
+
+#### 4. Handler — template streaming + non-streaming
+
+```python
+# Insérer AVANT le bloc "# ── task →" (ligne ~5440)
+if intent == "mon_intent":
+    if req.stream:
+        async def _monintent_gen():
+            import json as _j
+            _rid, _now = msg_id, int(time.time())
+            def _rc(t):
+                return f"data: {_j.dumps({'id': _rid, 'object': 'chat.completion.chunk', 'created': _now, 'model': 'leon', 'choices': [{'index': 0, 'delta': {'content': t}, 'finish_reason': None}]})}\n\n"
+            yield f"data: {_j.dumps({'id': _rid, 'object': 'chat.completion.chunk', 'created': _now, 'model': 'leon', 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]})}\n\n"
+            yield _rc("> 💬 **Léon** — en cours...\n")
+            _pq: asyncio.Queue = asyncio.Queue()
+            _t = asyncio.create_task(
+                run_agent(user_msg, history=_history, _progress_q=_pq,
+                          initial_model=LLM_MODEL)   # ou LLM_SECONDARY si analyse lourde
+            )
+            while not _t.done():
+                try:
+                    yield _rc(await asyncio.wait_for(_pq.get(), timeout=0.15))
+                except asyncio.TimeoutError:
+                    pass
+            while not _pq.empty():
+                yield _rc(await _pq.get())
+            try:
+                _r = _t.result()
+                _s = _r.get("response") or _r.get("summary") or _r.get("message") or _r.get("result", "")
+                if isinstance(_s, dict):
+                    _s = _j.dumps(_s, ensure_ascii=False)[:2000]
+                _src = set(_r.get("_meta", {}).get("sources", []))
+                _skip = _r.get("_meta", {}).get("audit_mode", False)  # True si bypass sanitize
+                _raw = str(_s)[:6000] if _s else "Mission terminée."
+                _c = "\n\n" + (_raw if _skip else _sanitize_clarifying(_raw, _src))
+            except Exception as _te:
+                _c = f"\n\n❌ Erreur : {_te}"
+            for _i, _w in enumerate(_c.split(' ')):
+                yield _rc(_w if _i == len(_c.split(' ')) - 1 else _w + ' ')
+                await asyncio.sleep(0.008)
+            yield f"data: {_j.dumps({'id': _rid, 'object': 'chat.completion.chunk', 'created': _now, 'model': 'leon', 'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'}]})}\n\ndata: [DONE]\n\n"
+        return StreamingResponse(_monintent_gen(), media_type="text/event-stream")
+    # Non-streaming
+    try:
+        _res = await asyncio.wait_for(
+            run_agent(user_msg, history=_history, initial_model=LLM_MODEL),
+            timeout=240.0,
+        )
+        _s = _res.get("response") or _res.get("summary") or _res.get("message") or _res.get("result", "")
+        if isinstance(_s, dict):
+            _s = json.dumps(_s, ensure_ascii=False)[:2000]
+        _src = set(_res.get("_meta", {}).get("sources", []))
+        _raw = str(_s)[:6000] if _s else "Mission terminée."
+        content = _raw if _res.get("_meta", {}).get("audit_mode") else _sanitize_clarifying(_raw, _src)
+    except asyncio.TimeoutError:
+        content = "⏱️ Timeout."
+    except Exception as _e:
+        content = f"❌ Erreur : {_e}"
+    return {"id": msg_id, "object": "chat.completion", "created": int(time.time()), "model": "leon",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}}
+```
+
+#### 5. `_sanitize_clarifying` — choix explicite
+
+| Intent | Passer par `_sanitize_clarifying` ? | Raison |
+|---|---|---|
+| `task` | ✅ Oui | Forcer 1 question par tour en CLARIFYING |
+| `review` | ❌ Non | Réponse documentaire exhaustive légitime |
+| `audit` | ❌ Non (`audit_mode=True`) | Cycle complet sans troncature |
+| `rag_mission` | ❌ Non | Réponse de mission complète |
+| Nouvel intent action | Selon nature | Clarification itérative → oui ; cycle complet → non |
+
+#### 6. Validation avant déploiement
+
+```bash
+# Valider la syntaxe Python extraite du YAML
+python3 -c "
+content = open('apps/agent-system/base/configmap-leon-script.yaml').read()
+lines = content.split('\n')
+py_lines = []
+in_script = False
+for line in lines:
+    if line.strip().startswith('leon.py: |'):
+        in_script = True; continue
+    if in_script:
+        if line and not line.startswith('    ') and line.strip(): break
+        py_lines.append(line[4:] if line.startswith('    ') else line)
+compile('\n'.join(py_lines), 'leon.py', 'exec')
+print('OK')
+"
+
+# Déployer (fichier >262KB → replace obligatoire, anti-pattern #17)
+kubectl replace -f apps/agent-system/base/configmap-leon-script.yaml
+kubectl rollout restart deployment/leon -n agent-system
+kubectl rollout status deployment/leon -n agent-system --timeout=120s
+```
+
+#### 7. Gotchas YAML+Python
+
+| Piège | Règle |
+|---|---|
+| Triple-quote `"""` dans une string longue | Utiliser une concaténation de strings `("ligne1\n" "ligne2\n")` — les lignes de contenu à 0 indentation terminent le bloc YAML littéral |
+| Contenu multi-ligne dans le CM | Toutes les lignes Python doivent être à **4 espaces** dans le YAML |
+| Variable définie plus bas dans le handler | Vérifier que la variable est définie AVANT le premier `if intent ==` — `_history` est maintenant défini ligne ~4679 |
 
 ### Deux modes de conversation — REVIEW vs TASK
 
