@@ -351,7 +351,7 @@ async def _classify_message_leon(msg: str, history=None) -> str:
 | `task` | ReAct loop CLARIFYING→READY, 1 question par tour | `run_agent()` + `_sanitize_clarifying()` |
 | `review` | Révision documentaire CDC Notion — LLM génère spec, Python écrit | `run_agent(initial_model=LLM_SECONDARY)` — pas de `_sanitize` |
 | `rag_mission` | Indexation/enrichissement collection Qdrant | Handler dédié `_rag_execute()` |
-| `audit` | Inspection complète projet : Notion + normes + Zoho → plan d'action | `run_agent(system_prompt=AUDIT_SYSTEM_PROMPT, audit_mode=True)` — pas de `_sanitize` |
+| `audit` | Inspection complète projet 3 axes (normes+Zoho+doc) → corrections automatiques | `run_agent(system_prompt=AUDIT_SYSTEM_PROMPT, audit_mode=True)` — pas de `_sanitize`. MAD : pre-load `qdrant_search_leon` (audits passés) + post-store résultat |
 
 **Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Le LLM ne peut pas ignorer un résultat déjà dans le contexte.
 
@@ -455,6 +455,15 @@ if intent == "mon_intent":
 | `rag_mission` | ❌ Non | Réponse de mission complète |
 | Nouvel intent action | Selon nature | Clarification itérative → oui ; cycle complet → non |
 
+#### 5b. Vérifier les noms de fonctions avant de les appeler
+
+```bash
+# Toute fonction réutilisée depuis le script doit être vérifiée par grep AVANT le code
+grep -n "^    async def\|^    def" apps/agent-system/base/configmap-leon-script.yaml | grep "mot_clé"
+```
+
+Ne jamais supposer un nom de fonction — l'inventaire exact : `qdrant_search_leon`, `qdrant_learn_from_review`, `qdrant_upsert`, `_embed`, `surfsense_search`, `_llm_secondary`.
+
 #### 6. Validation avant déploiement
 
 ```bash
@@ -500,6 +509,51 @@ Leon distingue deux types de sessions en cours de projet :
 **Principe REVIEW** : le LLM ne *décide* pas des appels d'outils — Python contrôle la séquence. Le LLM génère uniquement le texte du spec. Élimine les hallucinations "je ne peux pas accéder à Notion".
 
 **`_sanitize_clarifying` exemption** (mode TASK) : si `surfsense_search`, `notion_read_page` ou `notion_update_page` sont dans les sources, la réponse est une analyse légitime — elle passe sans troncature.
+
+---
+
+### MODE AUDIT — Structure AUDIT_SYSTEM_PROMPT
+
+L'intent `audit` déclenche `run_agent` avec `AUDIT_SYSTEM_PROMPT` (remplace `SYSTEM_PROMPT`) et `audit_mode=True` (bypass `_sanitize_clarifying`). MAD intégré : pre-load `qdrant_search_leon("audit {projet}")` avant l'appel, post-store résultat dans `leon-memory` après.
+
+#### Règle d'or : contraintes de format EN TÊTE du prompt
+
+Les LLMs ignorent les instructions de format en fin de prompt au profit de leur format par défaut ("Recommandations"). `AUDIT_SYSTEM_PROMPT` commence par `## RÈGLES DE SORTIE — ABSOLUES` avant toute description de tâche.
+
+#### Phases obligatoires
+
+| Phase | Outils appelés | Notes |
+|---|---|---|
+| **1 — Identification** | `zoho_list_projects` (si besoin) | Extraire project_id + TYPE (infra/webapp/design...) |
+| **2 — Contexte** | `surfsense_search`, `notion_search`, `notion_read_page`, `analyze_project_coherence` | Normes Neomnia + CDC Notion |
+| **3 — État Zoho complet** | `zoho_list_milestones`, `zoho_list_tasks`, `zoho_project_status` | + `cluster_status` si TYPE=INFRA |
+| **4 — Analyse** | — | Patterns A/B/C → anomalies CRITIQUE/MINEUR/INFO |
+| **5 — Exécution** | `zoho_update_task`, `zoho_delete_milestone`, `zoho_delete_task` | Étapes A (non-destructif) → B (liste destructif) → C (question oui/non) |
+
+#### Trois patterns de détection (Phase 4)
+
+**Pattern A — TYPE-MISMATCH JALONS**
+Jalons dont le nom ne correspond pas au type du projet. Pour INFRA : "Analyse des besoins", "Analyse et Préparation", "Développement et Intégration", "Frontend", "Design", "Recette", "Spécification" → CRITIQUE.
+Matching par **présence de mot-clé** dans le nom (pas correspondance exacte).
+
+**Pattern B — HORS-PORTÉE ET DOUBLONS**
+- B1 : tâche référençant un autre projet dans son nom ("site-vitrine", "[E2E-", "Page vitrine"…) → CRITIQUE
+- B2 : plusieurs tâches avec le même nom exact → DOUBLON CRITIQUE, conserver une seule
+
+**Pattern C — TÂCHES DONE-MAIS-OPEN**
+Pour projets INFRA : croiser les tâches Open avec `cluster_status` (Phase 3). Si le nom de la tâche contient un composant visible dans `cluster_status` (namespace, deployment, service) → done-mais-open → fermer directement (Étape A, sans confirmation).
+Si `cluster_status` indisponible → passer sans bloquer.
+
+#### Séquence Phase 5 (Exécution)
+
+```
+Étape A : zoho_update_task(status=closed) pour TOUTES les tâches Pattern C → afficher "✅ Fermé : [nom]"
+Étape B : lister les éléments destructifs restants → "🔴 [nom] — raison"  (Pattern A jalons + Pattern B tâches)
+Étape C : DERNIÈRE LIGNE = "Confirmes-tu la suppression de X jalons et Y tâches listés ci-dessus ? (oui/non)"
+```
+
+**INTERDIT** : "Prochaines étapes recommandées", "Actions recommandées", "Étapes suivantes" → action non exécutée.
+**La confirmation utilisateur "oui/non"** est traitée par le SYSTEM_PROMPT normal (pas AUDIT_SYSTEM_PROMPT) — le format post-confirmation peut différer, c'est attendu.
 
 ---
 
@@ -549,6 +603,8 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | L7 | Stocker la session dans Qdrant (OWU meta-calls) | Meta-calls → fast-path sans persistance |
 | L8 | Laisser le LLM décider d'appeler un outil d'écriture (Notion, Zoho) | Pour les workflows déterministes (REVIEW), Python appelle l'outil directement — le LLM génère uniquement le texte. Évite les hallucinations "je ne peux pas accéder à X". |
 | L9 | Demander une validation UI avant de dispatcher vers Zoho | Les agents actent et rapportent — pas de bouton de confirmation, pas de page intermédiaire. `_find_zoho_project()` + `_zoho_sync()` s'exécutent inline dans la réponse REVIEW. Voir Règle R-TAR. |
+| L10 | Instructions de format AUDIT_SYSTEM_PROMPT ignorées si en fin de prompt | Les LLMs suivent les instructions en tête de prompt. `## RÈGLES DE SORTIE — ABSOLUES` doit être la **première section** du prompt, avant toute description de mission. Symptôme : gpt-4o produit "Prochaines étapes recommandées" malgré l'instruction "INTERDIT". |
+| L11 | Pattern C (done-mais-open) détecte 0 tâches sans état cluster réel | L'heuristique "verbe au début du nom" échoue si les noms de tâches ne commencent pas par un verbe. Seul `cluster_status` (Phase 3) permet une détection fiable pour les projets INFRA : composant dans le nom de tâche + composant visible dans `cluster_status` = done. |
 
 ---
 
@@ -656,7 +712,7 @@ Leon a des **compétences techniques** pour piloter les projets (comprendre une 
 | Meta-calls OWU fast-path | ✅ Code | `### Task:` → fast-path direct |
 | Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` |
 | `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux |
-| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 5 labels |
+| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 8 labels (greeting/check_agents/reflection/question/task/review/rag_mission/audit) |
 | Mode REVIEW — orchestration déterministe | ✅ Code | Python lit Notion+normes → LLM génère spec → Python écrit Notion (sans décision LLM) |
 | Auto-dispatch Zoho après REVIEW | ✅ Code | `_find_zoho_project()` matching sémantique + `_zoho_sync()` create/link inline — lien dans la réponse |
 | Anti-hallucination "je ne peux pas accéder à Notion" | ✅ Code | LLM ne voit jamais l'outil notion_update_page — Python l'appelle directement |
@@ -671,4 +727,6 @@ Leon a des **compétences techniques** pour piloter les projets (comprendre une 
 | Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v2.0 |
 | Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 |
 | `zoho_api` proxy générique | ✅ Code + déployé | Activity `leon_zoho_api` → `ZOHO_CONNECTOR_URL/proxy`. Pattern : `zoho_pm_insights` → endpoint → `zoho_api`. |
+| Intent `audit` — inspection 3 axes + corrections auto | ✅ Code | `AUDIT_SYSTEM_PROMPT` + `audit_mode=True` + MAD pre-load/post-store. Patterns A/B/C. `cluster_status` Phase 3 pour INFRA. |
+| R9.13 — cascade classify LLM interactive | ✅ Code | `LLM_CLASSIFY_MODEL=claude-sonnet` → `LLM_CLASSIFY_FALLBACK=gpt-4o` → `LLM_MODEL_REASONING=mistral` |
 | Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |
