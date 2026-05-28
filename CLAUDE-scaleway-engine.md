@@ -473,12 +473,12 @@ Tester depuis Open WebUI (ou Charlotte `/mission`) **après** le refactoring de 
 | # | Prompt | Résultat attendu | Indicateur de succès | Statut (2026-05-28) |
 |---|---|---|---|---|
 | T1 | "Liste-moi les projets Scaleway actifs" | Charlotte liste les projets avec leurs IDs | Appel `GET /projects` loggé dans les traces Langfuse | ✅ OK — `scaleway_list_projects` appelé, 3 projets retournés |
-| T2 | "Quel est le billing Scaleway ce mois ?" | Charlotte retourne le total net en euros | Appel `GET /billing` loggé — **pas** d'appel direct `api.scaleway.com` depuis le pod Charlotte | ⚠️ Contournement — `GET /billing` → 403 (permission `billing:read` manquante). Charlotte lit depuis ConfigMap `scaleway-billing-history` (Prometheus). **Issue Zoho** : `2114101000001744008` |
+| T2 | "Quel est le billing Scaleway ce mois ?" | Charlotte retourne le total net en euros | Appel `GET /billing` loggé — **pas** d'appel direct `api.scaleway.com` depuis le pod Charlotte | ⚠️ Contournement — `GET /billing` → 403 (permission `billing:read` manquante). Charlotte lit depuis ConfigMap `scaleway-billing-history` (Prometheus). **Issue Zoho** : `2114101000001744012` |
 | T3 | "Quels serveurs Scaleway sont actifs ?" | Charlotte liste les instances avec état | Appel `GET /instances` via engine | ✅ OK — `scaleway_list_instances` appelé, stalwart-mail DEV1-S retourné |
 | T4 | "Crée un projet Scaleway pour le projet test-demo" | Charlotte crée `client-test-demo` | Appel `POST /projects` avec `X-Agent-Id: charlotte` | ✅ OK — projet créé (`a8544ee7`) et supprimé (cleanup) |
 | T5 | "Audite les clés IAM Scaleway" | Charlotte liste les clés API avec dates d'expiration | Appel `GET /iam` via engine | ✅ OK — `scaleway_audit_iam` appelé, 2 clés retournées avec dates d'expiration |
 
-> **⚠️ Issue ouverte — T2 billing** : la clé `SCW_SECRET_KEY` dans Vault (`secret/neokube/infrastructure/scaleway`) n'a pas la permission `billing:read` dans l'IAM Scaleway. Action : ajouter la policy `BillingReadOnly` dans la console Scaleway IAM au groupe/application portant cette clé. Aucun changement de code requis. Issue Zoho `2114101000001744008` dans le projet neokube.
+> **⚠️ Issue ouverte — T2 billing** : la clé `SCW_SECRET_KEY` dans Vault (`secret/neokube/infrastructure/scaleway`) n'a pas la permission `billing:read` dans l'IAM Scaleway. Action : ajouter la policy `BillingReadOnly` dans la console Scaleway IAM au groupe/application portant cette clé. Aucun changement de code requis. Issue Zoho `2114101000001744012` dans le projet neokube.
 
 ### Étape 3 — Vérification que Charlotte n'appelle plus l'API directe
 

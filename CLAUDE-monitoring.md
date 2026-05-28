@@ -16,7 +16,7 @@
 
 ## Pipeline données Scaleway
 
-> **⚠️ Contournement billing actif** — `scaleway-engine GET /billing` retourne 403 (permission `billing:read` manquante sur la clé `SCW_SECRET_KEY` Vault). Charlotte lit le billing depuis ce pipeline Prometheus/ConfigMap en fallback. Issue Zoho `2114101000001744008` (projet neokube) — action requise : ajouter `BillingReadOnly` dans IAM Scaleway console.
+> **⚠️ Contournement billing actif** — `scaleway-engine GET /billing` retourne 403 (permission `billing:read` manquante sur la clé `SCW_SECRET_KEY` Vault). Charlotte lit le billing depuis ce pipeline Prometheus/ConfigMap en fallback. Issue Zoho `2114101000001744012` (projet neokube) — action requise : ajouter `BillingReadOnly` dans IAM Scaleway console.
 
 ```
 Scaleway API (billing/v2beta1)
