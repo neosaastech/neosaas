@@ -38,7 +38,9 @@ Leon ne hardcode aucune valeur métier. Toute connaissance provient d'une source
 | Communication client (via Nora) | Design Penpot (→ Zephyr → Penpot agent) |
 | Cohérence Zoho ↔ GitHub ↔ Vercel | — |
 
-Leon **ne délègue jamais à Charlotte** — Charlotte est SRE cluster et n'interagit pas avec le pipeline métier. La délégation inverse existe (Charlotte → Leon via `delegate_sre_task` pour les alertes métier).
+Leon **ne délègue pas à Charlotte pour le pipeline métier** — Charlotte est SRE cluster, pas chef de projet.
+**Exception audit** : `delegate_to_charlotte(query)` est un outil **read-only** utilisé uniquement en MODE AUDIT (Phase 3) pour interroger l'état de services externes (Scaleway, Neon, DNS) que Leon ne peut pas accéder directement pour des raisons de sécurité (credentials Vault réservés à Charlotte).
+La délégation inverse existe : Charlotte → Leon via `delegate_sre_task` pour les alertes métier.
 
 ---
 
