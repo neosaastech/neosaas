@@ -605,6 +605,7 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | L9 | Demander une validation UI avant de dispatcher vers Zoho | Les agents actent et rapportent — pas de bouton de confirmation, pas de page intermédiaire. `_find_zoho_project()` + `_zoho_sync()` s'exécutent inline dans la réponse REVIEW. Voir Règle R-TAR. |
 | L10 | Instructions de format AUDIT_SYSTEM_PROMPT ignorées si en fin de prompt | Les LLMs suivent les instructions en tête de prompt. `## RÈGLES DE SORTIE — ABSOLUES` doit être la **première section** du prompt, avant toute description de mission. Symptôme : gpt-4o produit "Prochaines étapes recommandées" malgré l'instruction "INTERDIT". |
 | L11 | Pattern C (done-mais-open) détecte 0 tâches sans état cluster réel | L'heuristique "verbe au début du nom" échoue si les noms de tâches ne commencent pas par un verbe. Seul `cluster_status` (Phase 3) permet une détection fiable pour les projets INFRA : composant dans le nom de tâche + composant visible dans `cluster_status` = done. |
+| L12 | IDs Zoho perdus entre Phase 3 et Phase 5 — suppressions "not found" | Le LLM ne porte pas fiablement des IDs numériques sur 5 phases de raisonnement. Solution : re-fetcher `zoho_list_milestones` + `zoho_list_tasks` APRÈS confirmation "oui", puis chercher TOUTES les occurrences par nom et supprimer chaque ID trouvé. Même nom = plusieurs IDs = plusieurs suppressions nécessaires. |
 
 ---
 
