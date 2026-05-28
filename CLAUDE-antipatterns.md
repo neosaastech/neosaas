@@ -1365,3 +1365,18 @@ Le LLM distingue naturellement `"as-tu analysé la page Notion ?"` (question dan
 **Vérification** : après `git push`, toujours confirmer que la ressource K8s a bien changé avec `kubectl get <resource> -o yaml | grep <champ>`. Un commit en git ≠ état cluster.
 
 **Cas réel** : commit `6056a18` (fix charlotte-pipe async httpx, 2026-05-26) n'a jamais été déployé — la NameError `{text}` dans `_gen_charlotte_pipe_code` a crié uniquement lors du premier `kubectl replace` manuel (session 2026-05-28). Charlotte tournait depuis 2 jours avec l'ancienne version synchrone du pipe.
+
+---
+
+### 55. Zoho OAuth — scope `ZohoProjects.bugs.ALL` manquant au setup initial
+
+Le refresh token Zoho dans Vault (`secret/neokube/infrastructure/zoho`) a été généré sans le scope `ZohoProjects.bugs.ALL`. Résultat : `POST /projects/{id}/bugs/` → 403 "Invalid OAuth scope".
+
+**Scopes actuels** : `ZohoCRM.modules.ALL`, `ZohoProjects.portals/projects/tasks/milestones/tasklists.ALL`, `ZohoBooks.fullaccess.all`, `ZohoSign.documents.ALL`
+**Scope manquant** : `ZohoProjects.bugs.ALL` (module Issues/Bugs)
+
+**Contournement** : créer via `POST /projects/{id}/tasks/` avec `[BUG]` dans le titre — apparaît dans la vue Tasks, pas Issues.
+
+**Fix définitif** : `kubectl port-forward -n connector-system svc/zoho-connector 8000:8000` puis `GET http://localhost:8000/oauth/authorize` → ouvrir auth_url → Accept → le callback `/oauth/callback` met Vault à jour automatiquement, pas de redémarrage.
+
+**À faire lors du prochain re-auth Zoho** (pas une urgence — les tâches fonctionnent).
