@@ -38,6 +38,8 @@ Chaque service appartient à une classe fonctionnelle. Un agent déclare les cla
 | 8008 | google-discovery | Google Workspace |
 | 8009 | crawlee-service | Scraping web |
 | 8010 | dataforseo-connector | SEO data API |
+| 8011 | notion-connector | Notion API |
+| 8012 | scaleway-engine | Scaleway API — RBAC par agent (voir [CLAUDE-scaleway-engine.md](CLAUDE-scaleway-engine.md)) |
 | 8080 | github-mcp | GitHub MCP streamable-http |
 
 ---

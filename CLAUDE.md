@@ -210,7 +210,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
 | **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
-| **Domi** | Domain Infrastructure Manager — provision domaine + DNS | Temporal | 8489 | `dispatcher` | active v1.0 |
+| **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `dispatcher` | active v1.0 (v2.0 à implémenter : scaleway-engine) |
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
 | **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v2.0 |
 | **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8493 | — | actif v1.0 |
@@ -241,7 +241,8 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 ### Connector-system & MCP Servers
 
-> Architecture complète, MCP servers, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
+> Architecture complète, MCP servers, endpoints, règles R1–R6, zoho-engine v2.0 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
+> **scaleway-engine v1.0** (à déployer) — accès API Scaleway centralisé, RBAC par agent, port 8012 : **[CLAUDE-scaleway-engine.md](CLAUDE-scaleway-engine.md)**
 
 > **Leon v3.3 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Zephyr/scraping→Milo/comms→Nora ; `zoho_delete_projects` confirmed gate + protocole 3-étapes ; intent `audit` 3-axes normes/Zoho/doc + Patterns A/B/C + `cluster_status` Phase 3 INFRA + `delegate_to_charlotte` read-only services externes + MAD pre/post-store ; R9.13 cascade classify claude-sonnet→gpt-4o→mistral ; règle R6 connector) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
 > **Leon ↔ Zoho** : Leon passe **toujours** par `zoho-engine` v2.0 (K8s: `zoho-connector`, port 8000) — 7 endpoints : `/proxy` (générique), `/scaffold` (création projet+jalons atomique), `/delete-projects` (confirmed gate), `/milestone.delete` (⚠️ completion Zoho impossible via REST — anti-pattern #53), `/project.status`, `/task.update`. L'OAuth2 est transparent. `zoho_api(method, path, data?)` = proxy générique pour tout endpoint non couvert. Suppression = protocole 3 étapes obligatoire (`zoho_list_projects` → présenter liste → `zoho_delete_projects(confirmed=True)`). Architecture complète : **[CLAUDE-leon.md §Architecture Leon ↔ Zoho](CLAUDE-leon.md)**

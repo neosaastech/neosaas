@@ -68,7 +68,7 @@ Leon v3.1 distingue deux sous-modes dans cette phase :
 | 2 | Aria | GitHub repo frontend (template-nextjs) + Vercel project | 300 s | **Oui** |
 | 2 | Nox | GitHub repo backend (template-fastapi) + Neon branch | 300 s | **Oui** |
 | 2 | Penpot | Projet Penpot + duplication fichier template | 300 s | Non |
-| 2 | Domi | Provision domaine (subdomain `{slug}.neomnia.net` ou achat) | 300 s | Non |
+| 2 | Domi | ① Provision domaine (`{slug}.neomnia.net` ou achat) ② Créer projet Scaleway (`client-{slug}`) via scaleway-engine | 300 s | Non |
 | 3 | Vera | QA review — acceptance criteria + artefacts Aria/Nox/Penpot | 120 s | **Oui** |
 | 4 | Charlotte | Notification approbation humaine (Temporal signal) | 30 s | — |
 | 5 | — | Approbation humaine (24h max) | 24 h | **Oui** |
@@ -83,8 +83,9 @@ Leon v3.1 distingue deux sous-modes dans cette phase :
 | Vercel | Projet déployé, domaine `{slug}.neomnia.net` lié |
 | Neon | Branche créée sur NeoBridge (`neon_branch_id` + `neon_endpoint_host`) |
 | Penpot | Projet design initialisé (template dupliqué) |
+| **Scaleway** | **Projet client créé : `client-{slug}` (via scaleway-engine, Domi)** |
 | Email | Envoyé à `spec.client_email` avec liens GitHub/Vercel/Penpot |
-| Zoho | Commentaire sur la tâche + lien Penpot |
+| Zoho | Commentaire sur la tâche + lien Penpot + `scaleway_project_id` |
 | Qdrant | Décision archivée dans `pm-decisions` (768-dim, recherche sémantique) |
 
 ---

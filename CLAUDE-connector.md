@@ -1,6 +1,6 @@
 # CLAUDE-connector.md — Connector-system & MCP Servers
 
-## Architecture couches d'accès API (2026-05-27)
+## Architecture couches d'accès API (2026-05-28)
 
 ```
 [Agents Temporal]
@@ -10,15 +10,18 @@
       │       ├── k8s-mcp     → agent-system:8080/mcp       (Kubernetes API)
       │       └── mcp.neon.tech/sse                         (Neon API, remote)
       │
-      ├─── Engines métier (services domaine — règles process + normalisation)
-      │       └── zoho-engine v2.0 → déployé (K8s name: zoho-connector, DNS inchangé)
+      ├─── Engines métier (services domaine — règles process + normalisation + RBAC)
+      │       ├── zoho-engine v2.0    → déployé  (K8s: zoho-connector:8000)
+      │       └── scaleway-engine v1.0 → à déployer (K8s: scaleway-engine:8012)
       │
       └─── Connectors Python (proxy léger + auth)
               └── vercel, penpot, openprovider, cloudflare, stalwart,
                   google-discovery, crawlee, dataforseo, github(legacy), neon(legacy)
 ```
 
-**Règle** : MCP = couche préférée pour GitHub, K8s, Neon. Connectors = proxy léger pour APIs sans MCP. **Engines** = services métier avec logique propre (normalisation, règles process, API sémantique).
+**Règle** : MCP = couche préférée pour GitHub, K8s, Neon. Connectors = proxy léger pour APIs sans MCP. **Engines** = services métier avec logique propre (normalisation, règles process, RBAC par agent, API sémantique).
+
+> **scaleway-engine** : documentation complète → **[CLAUDE-scaleway-engine.md](CLAUDE-scaleway-engine.md)**
 
 ---
 
@@ -100,6 +103,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 | `cloudflare-connector` | 8006 | `secret/neokube/infrastructure/cloudflare` | `CF_DNS_TOKEN` (prioritaire), `CF_API_TOKEN` (fallback), `CF_ACCOUNT_ID` (optionnel) |
 | `stalwart-connector` | 8007 | `secret/neokube/apps/stalwart` | `ADMIN_PASSWORD` |
 | `google-discovery-connector` | 8008 | `secret/neokube/infrastructure/google` | `GOOGLE_SEARCH_API_KEY`, `GOOGLE_CX_ID` |
+| `scaleway-engine` | 8012 | `secret/neokube/infrastructure/scaleway` | `SCW_SECRET_KEY`, `SCW_ORG_ID`, `SCW_DEFAULT_PROJECT_ID` — RBAC par agent via `X-Agent-Id` header |
 | `crawlee-service` | 8009 | — (pas de credentials) | — |
 | `dataforseo-connector` | 8010 | `secret/neokube/infrastructure/dataforseo` | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`, `DATAFORSEO_API_KEY` (base64) |
 
