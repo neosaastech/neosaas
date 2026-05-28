@@ -1335,3 +1335,33 @@ Le LLM distingue naturellement `"as-tu analysé la page Notion ?"` (question dan
 **Règle** : un classifieur LLM doit recevoir le contexte dont il a besoin pour décider — jamais des overrides qui court-circuitent sa décision. Le seul bypass légitime est le cas `_in_active_clarif` : si Leon vient de poser une question, la réponse courte de l'utilisateur est forcément une continuation (`task`). Tout autre override viole l'esprit de l'anti-pattern #40.
 
 **Corollaire** : si le classifieur se trompe régulièrement, la solution est d'améliorer ses instructions ou de lui donner plus de contexte — jamais d'ajouter un override externe.
+
+### 53. `zoho_milestone_complete` — l'API Zoho ignore le champ `status`
+
+`POST /projects/{id}/milestones/{ms_id}/` avec `status: "completed"` retourne HTTP 200 mais la valeur `status` reste `"notcompleted"` dans tous les cas testés (jalons passés, futurs, toutes variantes de payload). L'endpoint `/status/` référencé dans `link.status.url` retourne 6831 (paramètre manquant) quelle que soit la combinaison. La valeur `milestone_status` n'est pas documentée.
+
+**Raison probable** : Zoho Projects calcule le statut d'un jalon à partir des tâches liées. Le champ `status` en GET est en lecture seule — il reflète la progression des tâches, il n'est pas directement écrivable via REST.
+
+**Fix** : supprimer l'endpoint `/milestone.complete` du zoho-engine (trompe-l'œil). Remplacer le besoin par :
+- `zoho_delete_milestone` — pour les jalons incorrects/doublons
+- `zoho_update_task` avec `status: "Closed"` — fermer les tâches liées au jalon pour que Zoho le marque auto
+- `zoho_create_milestone` avec des jalons bien nommés reflétant l'état réel
+
+**Ce qui ne marche PAS** : `/milestone.complete` dans zoho-engine v2.0 — retourne `zoho_confirmed: false` depuis la v2.1 de debug, confirmant que Zoho n'applique pas la mise à jour.
+
+---
+
+### 54. Git push ≠ déployé — pas de controller GitOps automatique
+
+**Symptôme** : un commit est dans `Kubinote-GitOps` depuis des jours mais la ressource K8s n'a pas changé.
+
+**Cause** : le cluster NeoKube n'a **aucun controller GitOps** (pas de Flux, pas d'ArgoCD). Le CronJob `cluster-bootstrap` gère uniquement les namespaces Temporal — il ne fait aucun `kubectl apply`. Git est la source de vérité, mais les changements ne se propagent pas au cluster sans action manuelle.
+
+**Patterns obligatoires** :
+- **Ressource normale** (< 262 KB CM, Deployment, Service…) : `git push` puis `kubectl apply -f <fichier>` dans le namespace correct
+- **`configmap-sre-script.yaml`** (506 KB) : `git push` puis `kubectl replace -f <fichier>` (le `kubectl apply` échoue sur les annotations > 262 KB)
+- **Charlotte `apply_gitops_fix`** : écrit le fichier + git push + kubectl apply atomiquement — ne jamais couper le workflow en deux
+
+**Vérification** : après `git push`, toujours confirmer que la ressource K8s a bien changé avec `kubectl get <resource> -o yaml | grep <champ>`. Un commit en git ≠ état cluster.
+
+**Cas réel** : commit `6056a18` (fix charlotte-pipe async httpx, 2026-05-26) n'a jamais été déployé — la NameError `{text}` dans `_gen_charlotte_pipe_code` a crié uniquement lors du premier `kubectl replace` manuel (session 2026-05-28). Charlotte tournait depuis 2 jours avec l'ancienne version synchrone du pipe.

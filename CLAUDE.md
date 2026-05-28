@@ -136,7 +136,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 > Volumes persistants, collections Qdrant, namespaces Temporal : **[CLAUDE-cluster.md](CLAUDE-cluster.md)**
 
 **Cluster** : `kubinote` (single-node, 12 CPU, 32 GB RAM)
-**GitOps** : `~/Kubinote-GitOps/` — kustomize, appliqué par CronJob `cluster-bootstrap` toutes les 5 min
+**GitOps** : `~/Kubinote-GitOps/` — kustomize, **déploiement 100% MANUEL** (`kubectl apply -f` ou `kubectl replace -f`). Aucun controller automatique (pas de Flux/ArgoCD). Git = source de vérité, mais les changements ne s'appliquent pas sans action manuelle ou `apply_gitops_fix` Charlotte.
 **Ingress** : Traefik, IP `192.168.1.28`, middleware whitelist `kube-system-local-ip-whitelist@kubernetescrd`
 
 ### Namespaces
@@ -149,7 +149,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **notion**(8011), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
-| `management` | CronJob cluster-bootstrap, neokube-nightly-backup |
+| `management` | CronJob cluster-bootstrap (Temporal NS uniquement), neokube-nightly-backup |
 | `penpot` | Penpot (design) |
 | `stalwart` | Stalwart Mail Server v0.11.8 — SMTP/IMAP/Sieve |
 | `dify` | Dify v1.13.3 (agent builder studio) |
@@ -184,7 +184,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 ### CronJobs cluster
 | CronJob | Namespace | Schedule | Rôle |
 |---|---|---|---|
-| `cluster-bootstrap` | management | `*/5 * * * *` | GitOps + namespaces Temporal |
+| `cluster-bootstrap` | management | `*/5 * * * *` | **Namespaces Temporal uniquement** — PAS de GitOps apply |
 | `neokube-nightly-backup` | management | `0 3 * * *` | Sauvegarde nightly |
 | `llm-key-sync` | cockpit | `0 * * * *` | Sync clés LLM Vault → K8s |
 | `llm-key-validation` | cockpit | `30 6 * * *` | Valide clés LLM critiques (openai/anthropic/mistral) + bilan solde matin (8h Paris) et soir (20h Paris) par agent |
@@ -421,9 +421,9 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 7 | `_embed()` HuggingFace | Retourne 768 scalaires séparés — détecter avec `isinstance(first, list)` |
 | 8 | URLs externes | Construire dans le connector (`_inject_web_urls`), jamais dans l'agent |
 | 14 | Heap limit ≠ OOMKilled | `FATAL ERROR: Reached heap limit` (V8/JVM) ≠ Exit 137 cgroup. Augmenter `limits.memory` ne fixe pas un heap limit — utiliser `NODE_OPTIONS=--max-old-space-size`, `JAVA_OPTS=-Xmx`. |
-| 15 | Patch live sur GitOps | `kubectl patch` sans `git_push` est reverté en <5 min par `cluster-bootstrap`. Charlotte doit utiliser `apply_gitops_fix` (atomique) — jamais la procédure 5 étapes manuelle qui peut être interrompue avant le push. |
+| 15 | Patch live sur GitOps | `kubectl patch` sans `git_push` crée une divergence cluster/git permanente (aucun controller n'applique git automatiquement). Charlotte doit utiliser `apply_gitops_fix` (atomique : écrit le fichier + git push + kubectl apply) — jamais la procédure 5 étapes manuelle qui peut être interrompue avant le push. |
 | 16 | Validation par ancien nom de pod | `kubectl get pod <ancien-nom>` retourne `NotFound` après rollout — ne prouve rien. Utiliser `-l app=<deployment>` ou `verify_pod_healthy` (Charlotte). |
-| 17 | ConfigMap `sre-script` trop grand | `kubectl apply` échoue sur `sre-script` (annotation >262Ko). Utiliser `kubectl replace -f`. Le CronJob `cluster-bootstrap` (kustomize) ne souffre pas de ce problème. |
+| 17 | ConfigMap `sre-script` trop grand (506 KB) | `kubectl apply` échoue (annotation >262Ko). Utiliser `kubectl replace -f`. **Conséquence** : les commits sur ce fichier dans git ne s'appliquent PAS automatiquement au cluster — chaque modification nécessite un `kubectl replace` manuel après le push. Un commit en git ≠ déployé. |
 | 18 | Label `app=agent-charlotte` inexistant | `-l app=agent-charlotte` retourne 0 pods. Pour trouver Charlotte : `kubectl get pods -n agent-system \| grep charlotte`. |
 | 19 | Mots-clés SRE dans salutations + contexte OWU | ~~Charlotte v3~~ **Supprimé en v4** — PydanticAI + Claude gèrent nativement. Historique : `_SRE_KW` + `_pending_question` bypassaient le classifieur sur "bonjour charlotte". |
 | 20 | System prompt SRE dans chemin conversationnel | ~~Charlotte v3~~ **Supprimé en v4** — plus de chemin conversationnel distinct. Claude décide naturellement sans system prompt léger séparé. |
@@ -459,6 +459,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | 50 | Analyse fictive quand le résultat d'outil est vide ou minimal | L'agent appelle `notion_read_page` / `web_fetch` / `run_kubectl` / toute API externe et reçoit un résultat vide ou minimal. Au lieu de le signaler, il génère une analyse détaillée depuis ses connaissances pré-entraînées. Variante : déclare "corrections appliquées" sans avoir appelé l'outil de modification. **Fix** : règle générique dans `RÈGLE ANTI-HALLUCINATION` (statique) — "INTERDIT de générer une analyse si le résultat outil est vide/minimal ; INTERDIT de déclarer une action sans avoir appelé l'outil". Règle contextuelle (ex: RÈGLE NOTION) simplifiée à 2 lignes, la règle statique couvre tous les outils. **Principe** : une règle générique statique > accumulation de règles spécifiques par outil. S'applique à tous les agents qui lisent des ressources externes. |
 | 51 | Question réflexive classifiée `task` → CLARIFYING se relance indéfiniment | `_in_active_clarif` bypass intercepte "as-tu bien créé X ?" avant le classifieur LLM → forcer `task` → handler relance CLARIFYING. Cause secondaire : classifieur sans label pour les questions réflexives. **Fix** : ajouter label `reflection` dans `_classify_message_leon` ("as-tu bien...", "tu as fait", "est-ce que tu as") + handler dédié (réponse directe oui/non, aucune question). **Ce qui ne marche pas** : regex pré-check sur "as-tu" — viole anti-pattern #40. **Corollaire** : "créer un template prêt à l'emploi" → classifié `review` (enrichir Notion CDC), jamais `task` (créer un projet Zoho). S'applique à tout agent avec phase CLARIFYING ou session active. |
 | 52 | Overrides contextuels sur le classifieur → accumulation de règles qui se contredisent | `_notion_in_history → force review` bloque les suppressions. Patch : `_ACTION_VERBS → force task`. Patch du patch : conditions composées. Résultat : règles qui se contredisent, agent paralysé après session Notion. **Fix** : supprimer tous les overrides sauf `_in_active_clarif`. Passer les 6 derniers messages au classifieur LLM avec instruction "contexte passé ne prime pas sur l'intent actuel explicite". **Règle** : un classifieur LLM doit recevoir le contexte dont il a besoin pour décider — jamais des overrides qui court-circuitent sa décision. |
+| 53 | `zoho_milestone_complete` — l'API Zoho ignore le champ `status` | `POST /milestones/{id}/` avec `status: "completed"` retourne 200 mais le statut reste `"notcompleted"`. Le statut est calculé auto par Zoho à partir des tâches. Fix : fermer les tâches liées (`zoho_update_task status=Closed`) — Zoho marque le jalon automatiquement. Supprimer `/milestone.complete` du zoho-engine (trompe-l'œil). |
+| 54 | Git push ≠ déployé — aucun controller GitOps automatique | Aucun Flux/ArgoCD dans le cluster. `cluster-bootstrap` gère uniquement les namespaces Temporal, PAS de kustomize apply. Chaque changement nécessite : `git push` **puis** `kubectl apply -f` (ressources < 262KB) ou `kubectl replace -f` (`sre-script` 506KB). Charlotte utilise `apply_gitops_fix` (atomique). Cas réel : commit `6056a18` non déployé pendant 2 jours → NameError au premier `kubectl replace` manuel. |
 
 ---
 
