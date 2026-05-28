@@ -21,7 +21,7 @@ Leon ne hardcode aucune valeur métier. Toute connaissance provient d'une source
 
 **Règle de priorité** : une information dans Notion prime toujours sur le RAG, qui prime sur SurfSense. Leon ne demande jamais à l'utilisateur ce qu'il peut trouver dans ses sources.
 
-**Zoho template de référence** : Leon doit lire le projet Zoho template (ID à définir dans la ConfigMap `ZOHO_TEMPLATE_PROJECT_ID`) pour en extraire la structure (jalons + tasklists) avant de scaffolder un nouveau projet. Ne jamais inventer la structure — la lire.
+**Templates process** : Leon dispose d'un index de 7 types de projets (Website vitrine, NeoSaaS RH/Agences/Formation/CRM, Agent Métier, RAG) avec les structures milestones+tasklists correspondantes, extraites des pages Notion process. Lors du scaffolding Zoho (ÉTAPE 5), Leon sélectionne le template approprié depuis le system prompt — jamais d'improvisation. URLs Notion dans `## TEMPLATES PROCESS NEOMNIA` du configmap.
 
 > Architecture complète Leon ↔ Zoho : **[§Architecture Leon ↔ Zoho](#architecture-leon--zoho--comment-leon-parle-à-zoho)** · Connectors : **[CLAUDE-connector.md](CLAUDE-connector.md)**
 
@@ -159,20 +159,42 @@ async def _handle_scraping_mission(spec, session_id):
 
 ### Architecture Leon ↔ Zoho — Comment Leon parle à Zoho
 
-**Règle fondamentale** : Leon ne parle **jamais** directement à l'API Zoho. Tout passe par le `zoho-connector` via `POST /proxy`.
+**Règle fondamentale** : Leon ne parle **jamais** directement à l'API Zoho. Tout passe par `zoho-engine` v2.0 (K8s service name: `zoho-connector`, port 8000).
 
 ```
 Leon (agent-system)
     │
-    └── POST http://zoho-connector.connector-system.svc.cluster.local:8000/proxy
-              body: {"method": "GET|POST|PUT|DELETE", "path": "/projects/...", "data": {...}}
+    ├── POST .../proxy               body: {method, path, data?}              ← API générique (lister, tâches, milestones, etc.)
+    ├── POST .../scaffold            body: ScaffoldReq                         ← Création projet complet + jalons (1 appel atomique)
+    ├── POST .../delete-projects     body: {project_ids: [...]}               ← Suppression contrôlée (confirmed gate obligatoire)
+    ├── POST .../milestone.delete    body: {project_id, milestone_id}         ← Supprimer un jalon (⚠️ completion via REST impossible — voir anti-pattern #53)
+    ├── POST .../project.status      body: {project_id, status}               ← active|completed|archived
+    └── POST .../task.update         body: {project_id, task_id, ...}         ← statut/assigné/priorité/échéance
               │
-              └── zoho-connector (port 8000)
-                      ├── Gère OAuth2 (refresh token auto via Vault secret/neokube/infrastructure/zoho)
+              └── zoho-engine v2.0 (port 8000)
+                      ├── Gère OAuth2 : creds cache 10min Vault + token cache 3min + retry x3 backoff
+                      ├── _zoho_call() : 429 Retry-After + retry 5xx automatique
                       ├── Injecte le portal ID dans les chemins (/portal/neomniadotnet/...)
                       ├── Normalise les réponses (_inject_web_urls)
+                      ├── Guard 403 sur DELETE /projects/ en masse (protection anti-reset)
+                      ├── _normalize_milestone_payload() — source de vérité unique (owner, flag, start_date)
                       └── → api.zoho.com (Zoho Projects API v3)
 ```
+
+**`ScaffoldReq` — paramètres `/scaffold`** :
+
+| Champ | Type | Défaut | Description |
+|---|---|---|---|
+| `name` | str | — | Nom du projet (obligatoire) |
+| `description` | str | `""` | Objectifs + résumé CDC Notion |
+| `milestones` | list | `[]` | `[{name, flag?, start?, end?}]` — structure issue de Notion |
+| `end_date` | str | aucun | Date de fin projet (optionnel — YYYY-MM-DD) |
+| `template_id` | str | `""` | ID template Zoho (optionnel) |
+| `group_id` | str | `""` | ID portfolio/groupe (optionnel) |
+| `public` | bool | `True` | Visibilité client (défaut public) |
+
+**Flags milestone** : `"internal"` (jalons équipe) · `"external"` (jalons client visible) — aliases `"start"→"internal"`, `"end"→"external"` acceptés.
+**`owner`** : injecté par le connector depuis `ZOHO_OWNER_ID` (jamais passé par Leon).
 
 **Variable d'env** : `ZOHO_CONNECTOR_URL = "http://zoho-connector.connector-system.svc.cluster.local:8000"` (défaut hardcodé si absent du ConfigMap)
 
@@ -186,7 +208,7 @@ Le connector injecte automatiquement le portal ID (`neomniadotnet`). Leon utilis
 |---|---|---|
 | Lister projets | GET | `/projects/` |
 | Créer projet | POST | `/projects/` |
-| Supprimer projet | DELETE | `/projects/{project_id}/` |
+| Supprimer projet(s) | POST | `/delete-projects` (endpoint dédié — voir §Protocole suppression) |
 | Lister tâches | GET | `/projects/{project_id}/tasks/` |
 | Créer tâche | POST | `/projects/{project_id}/tasks/` |
 | Mettre à jour tâche | POST | `/projects/{project_id}/tasks/{task_id}/` |
@@ -200,23 +222,35 @@ Le connector injecte automatiquement le portal ID (`neomniadotnet`). Leon utilis
 #### Outils Zoho — Architecture en couches
 
 ```
-Outils dédiés (shortcuts)          zoho_api (proxy générique)
-─────────────────────────          ──────────────────────────
-zoho_list_projects                 Tout endpoint non couvert :
-zoho_list_tasks(project_id)          templates de projet
-zoho_create_task(...)                sous-projets (parent_id)
-zoho_update_task(...)                custom fields
-zoho_create_milestone(...)           budgets
-zoho_create_tasklist(...)            membres équipe (users)
-zoho_scaffold_project(...)           tags / labels
-zoho_delete_project(...)             rapports
-zoho_delete_task(...)                fichiers attachés
-zoho_delete_milestone(...)           commentaires
-zoho_list_milestones(project_id)     timesheet entries
-                │                           │
-                └───────────────────────────┘
-                        ZOHO_CONNECTOR_URL/proxy
+Outils dédiés (shortcuts)                  zoho_api (proxy générique)
+─────────────────────────                  ──────────────────────────
+zoho_list_projects                         Tout endpoint non couvert :
+zoho_list_tasks(project_id)                  templates de projet
+zoho_create_task(...)                        sous-projets (parent_id)
+zoho_update_task(...)                        custom fields
+zoho_create_milestone(...)                   budgets
+zoho_create_tasklist(...)                    membres équipe (users)
+zoho_scaffold_project(...)                   tags / labels
+zoho_delete_projects(ids, confirmed)         rapports      ← /delete-projects (confirmed gate)
+zoho_delete_task(...)                        fichiers attachés
+zoho_delete_milestone(...)                   commentaires
+zoho_list_milestones(project_id)             timesheet entries
+                │                                   │
+                └───────────────────────────────────┘
+                  zoho-connector: /proxy · /scaffold · /delete-projects
 ```
+
+#### Protocole suppression — RÈGLE OBLIGATOIRE
+
+Avant toute suppression de projet Zoho, Leon **doit** suivre le protocole en 3 étapes :
+
+1. Appeler `zoho_list_projects` → présenter la liste complète à l'utilisateur
+2. Obtenir une confirmation explicite projet par projet (jamais de suppression globale "tout effacer")
+3. Appeler `zoho_delete_projects(project_ids=[...], confirmed=True)` — le `confirmed=True` est le gate logiciel
+
+**Guard outil** : si `confirmed=False` (ou absent), l'outil retourne une erreur et ne passe pas au connector.
+**Guard connector** : `DELETE /projects/` en masse → HTTP 403 — refus systématique, indépendamment de l'agent.
+**Demande de suppression globale** = refus catégorique. Leon présente la liste et demande une sélection.
 
 #### Pattern d'usage `zoho_api`
 
@@ -227,11 +261,33 @@ Quand une opération n'est pas couverte par un outil dédié :
 
 **Ne jamais ajouter un nouvel outil dédié** si `zoho_api` peut couvrir le cas. Les outils dédiés existent uniquement pour les opérations à très haute fréquence qui bénéficient d'un formatage spécifique de la réponse (ex: `zoho_list_tasks` retourne une liste normalisée, pas le JSON brut Zoho).
 
-#### Règles R1–R5 connecteurs (CLAUDE-connector.md)
+#### Règles R1–R6 connecteurs (CLAUDE-connector.md)
 
 > **R1** — Un connector = source de vérité unique pour son API. Credentials, URL de base, headers : tout appartient au connector.
 > **R2** — Enrichir à la sortie (`_inject_web_urls` dans zoho-connector). Leon ne construit jamais d'URLs Zoho manuellement.
-> **R3** — Toujours utiliser `/proxy {method, path, data?}`.
+> **R3** — Utiliser l'endpoint approprié : `/proxy` pour les appels génériques, `/scaffold` pour la création projet complète, `/delete-projects` pour les suppressions.
+> **R6** — Les règles API (normalisation, guards, defaults) sont codées dans le connector. L'agent exprime l'intent sémantique uniquement. Jamais de règle business dans l'agent.
+
+---
+
+### Templates Process Neomnia — Index des structures Zoho
+
+Leon dispose d'un index de templates dans son system prompt (`## TEMPLATES PROCESS NEOMNIA`).
+Lors de la création d'un projet Zoho (ÉTAPE 5), Leon identifie le type et utilise la structure milestones+tasklists correspondante — jamais d'improvisation.
+
+| Type | Durée | Jalons (milestones) |
+|---|---|---|
+| Website vitrine | Variable | Phase 1 Brief & Collecte → Phase 2 Design → Phase 3 Développement → Phase 4 Recette → Phase 5 Go Live |
+| NeoSaaS RH | 10j | Phase 0 Brief → Phase 1 Setup → Phase 2 Build (6 tasklists) → Phase 3 Recette → Phase 4 Go Live |
+| NeoSaaS Agences | 7j | Phase 0 Brief → Phase 1 Setup → Phase 2 Build (4 tasklists) → Phase 3 Recette → Phase 4 Go Live |
+| NeoSaaS Formation | 10j | Phase 0 Brief → Phase 1 Setup → Phase 2 Build (5 tasklists) → Phase 3 Recette → Phase 4 Go Live |
+| NeoSaaS CRM générique | 7j | Phase 0 Brief → Phase 1 Setup → Phase 2 Build (3 tasklists) → Phase 3 Recette → Phase 4 Go Live |
+| Agent Métier NeoKube | 2j | Jour 1 Matin AgentSpec → Jour 1 PM Build → Jour 2 Matin Validation → Jour 2 PM Livraison |
+| RAG Data / Sécurité | 2j | Setup RAG → Indexation → Livraison |
+
+**Règle de sélection** : RH/congés → NeoSaaS RH · CRM/leads/agence → NeoSaaS Agences · OF/Qualiopi → NeoSaaS Formation · SaaS générique → NeoSaaS CRM · Agent IA client → Agent Métier · Site web → Website vitrine.
+
+**Source de vérité** : les structures sont extraites depuis les pages Notion process (URLs dans le configmap). Si une structure évolue dans Notion, mettre à jour le configmap Leon via Claude Code.
 
 ---
 
@@ -272,8 +328,9 @@ Leon utilise un classificateur LLM (antipattern #40 — jamais de string matchin
 ```python
 _LEON_INTENT_LABELS = ("greeting", "check_agents", "question", "task", "review")
 
-async def _classify_message_leon(msg: str) -> str:
-    # LLM_SCAN_MODEL (mistral, ~500ms, max 10 tokens)
+async def _classify_message_leon(msg: str, history=None) -> str:
+    # R9.13 — cascade interactive : LLM_CLASSIFY_MODEL (claude-sonnet) → LLM_CLASSIFY_FALLBACK (gpt-4o) → LLM_MODEL_REASONING (mistral)
+    # LLM_SCAN_MODEL (mistral) = réservé aux scans Temporal background, jamais à la classification interactive
     # → un label parmi les 5 ci-dessus, "task" par défaut
 ```
 
@@ -325,8 +382,10 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | Variable | Valeur | Usage |
 |---|---|---|
 | `LLM_MODEL` | `gpt-4o` | Conversations, clarifications, analyse ProjectSpec (TASK) |
-| `LLM_MODEL_REASONING` | `mistral` | Bascule automatique si 401/quota sur gpt-4o |
-| `LLM_SCAN_MODEL` | `mistral` | Meta-calls OWU, classification intent, fast-path |
+| `LLM_MODEL_REASONING` | `mistral` | Bascule automatique si 401/quota sur gpt-4o (dernier recours) |
+| `LLM_SCAN_MODEL` | `mistral` | Meta-calls OWU fast-path + scans Temporal background uniquement |
+| `LLM_CLASSIFY_MODEL` | `claude-sonnet` | Classification intent interactive — R9.13 (1er de la cascade) |
+| `LLM_CLASSIFY_FALLBACK` | `gpt-4o` | Fallback cascade R9.13 si claude-sonnet quota épuisé |
 | `LLM_SECONDARY` | `claude-sonnet` | Mode REVIEW — analyse documentaire Notion + normes (large context) |
 
 **Pas de Temporal pour la couche conversationnelle** — Temporal seulement pour `dispatch_project` (DevProjectWorkflow long).

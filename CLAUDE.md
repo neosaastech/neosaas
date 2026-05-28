@@ -204,7 +204,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
 | **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
-| **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.1 (REVIEW mode, notion_update_page, 5 intent labels, gpt-4o) |
+| **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.2 (REVIEW mode, notion_update_page, 5 intent labels, gpt-4o, zoho_delete_projects confirmed gate, R6) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
 | **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
@@ -243,8 +243,8 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 > Architecture complète, MCP servers, endpoints, règles R1–R5 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
 
-> **Leon v3.1 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Zephyr/scraping→Milo/comms→Nora) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
-> **Leon ↔ Zoho** : Leon passe **toujours** par `zoho-connector` (port 8000, `POST /proxy`). L'OAuth2 est transparent. `zoho_api(method, path, data?)` = proxy générique pour tout endpoint non couvert. Pattern : `zoho_pm_insights` → découverte endpoint → `zoho_api`. Architecture complète : **[CLAUDE-leon.md §Architecture Leon ↔ Zoho](CLAUDE-leon.md)**
+> **Leon v3.2 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Zephyr/scraping→Milo/comms→Nora ; `zoho_delete_projects` confirmed gate + protocole 3-étapes ; règle R6 connector) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
+> **Leon ↔ Zoho** : Leon passe **toujours** par `zoho-engine` v2.0 (K8s: `zoho-connector`, port 8000) — 7 endpoints : `/proxy` (générique), `/scaffold` (création projet+jalons atomique), `/delete-projects` (confirmed gate), `/milestone.delete` (⚠️ completion Zoho impossible via REST — anti-pattern #53), `/project.status`, `/task.update`. L'OAuth2 est transparent. `zoho_api(method, path, data?)` = proxy générique pour tout endpoint non couvert. Suppression = protocole 3 étapes obligatoire (`zoho_list_projects` → présenter liste → `zoho_delete_projects(confirmed=True)`). Architecture complète : **[CLAUDE-leon.md §Architecture Leon ↔ Zoho](CLAUDE-leon.md)**
 > **Méthodologie gestion de projet, normes Neomnia, template CDC, règles interview client** : **[CLAUDE-leon-process.md](CLAUDE-leon-process.md)**
 > **RAG agents** : écosystème Qdrant complet (collections, agents, fonctions) : **[CLAUDE-agents.md §RAG](CLAUDE-agents.md)** · Tableau collections + points : **[CLAUDE-cluster.md](CLAUDE-cluster.md)**
 > `leon-memory` (Leon) · `template-neosaas` + `design-knowledge` (Aria) · `design-knowledge` + `neomnia_core` (Zephyr) · `sre-charlotte-incidents` (Charlotte)
@@ -468,7 +468,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 | Agent | `LLM_MODEL` | `LLM_CLASSIFY_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | `LLM_CREATION_MODEL` |
 |---|---|---|---|---|---|---|
 | **Charlotte** SRE v4 | `claude-sonnet` ✅ | `claude-sonnet` → `gpt-4o` ✅ (R9.13) | `mistral` (background) | `gpt-4o` | `mistral` | `claude-opus` ✅ (R9.12) |
-| **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` → `gpt-4o` (REVIEW, cascade R9.8) | — | — |
+| **Leon** | `gpt-4o` (TASK) | `claude-sonnet` → `gpt-4o` → `mistral` ✅ (R9.13) | `mistral` (background scans) | `claude-sonnet` (REVIEW) | — | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | — |
 | **Aria** / **Nox** | `codestral` | — | — | — | — |
 | **Vera** | `mistral-large-2407` | — | — | — | — |
