@@ -1,6 +1,6 @@
 # CLAUDE-connector.md — Connector-system & MCP Servers
 
-## Architecture couches d'accès API (2026-05-13)
+## Architecture couches d'accès API (2026-05-27)
 
 ```
 [Agents Temporal]
@@ -10,12 +10,39 @@
       │       ├── k8s-mcp     → agent-system:8080/mcp       (Kubernetes API)
       │       └── mcp.neon.tech/sse                         (Neon API, remote)
       │
-      └─── Connectors Python (legacy, toujours actifs comme fallback)
-              └── zoho, vercel, penpot, openprovider, cloudflare, stalwart,
-                  google-discovery, crawlee, dataforseo
+      ├─── Engines métier (services domaine — règles process + normalisation)
+      │       └── zoho-engine v2.0 → déployé (K8s name: zoho-connector, DNS inchangé)
+      │
+      └─── Connectors Python (proxy léger + auth)
+              └── vercel, penpot, openprovider, cloudflare, stalwart,
+                  google-discovery, crawlee, dataforseo, github(legacy), neon(legacy)
 ```
 
-**Règle** : MCP = couche préférée pour GitHub, K8s, Neon. Connectors = couche de fallback et pour les APIs sans MCP standard (Zoho, Vercel OAuth, Penpot, etc.).
+**Règle** : MCP = couche préférée pour GitHub, K8s, Neon. Connectors = proxy léger pour APIs sans MCP. **Engines** = services métier avec logique propre (normalisation, règles process, API sémantique).
+
+---
+
+## zoho-engine v2.0 (2026-05-27)
+
+`zoho-connector` a évolué en **engine métier** tout en conservant le même K8s service name (`zoho-connector.connector-system.svc.cluster.local:8000`) — aucun caller n'a besoin d'être mis à jour.
+
+| Aspect | `*-connector` (les 8 autres) | `zoho-engine v2.0` |
+|---|---|---|
+| Rôle | Proxy + auth centralisée | Proxy **+** règles métier + résilience OAuth2 |
+| Logique interne | Stateless, pass-through | Normalisation, guards, retry, semantic endpoints |
+| API exposée | `/proxy` générique | 7 endpoints sémantiques |
+| Résilience | Aucune | Token cache 3min, creds cache 10min, retry x3 backoff, 429/5xx handling |
+
+### Nouveautés v2.0 vs v1.3
+
+- **`_get_creds()`** — cache Vault 10 min (séparé du token). Évite le flood de requêtes Vault.
+- **`_get_token()`** — cache 3 min (vs 45s), retry x3 avec backoff exponentiel (2s, 4s).
+- **`_zoho_call()`** — helper centralisé : gère 429 (`Retry-After`), retry 5xx une fois.
+- **`/scaffold`** — retourne maintenant `tasks_created`, `tasks_failed`, `errors[]`. Les échecs partiels sont visibles au lieu d'être silencieux.
+- **`/milestone.delete`** — endpoint sémantique dédié (remplace `/milestone.complete` — voir anti-pattern #53).
+- **`/project.status`** — endpoint sémantique dédié.
+- **`/task.update`** — endpoint sémantique dédié.
+- Supprimé : champ `public` dans `ScaffoldReq` (causait erreur 6832 — non supporté par l'API Zoho en création).
 
 ---
 
@@ -168,56 +195,140 @@ Un agent exprime une intention sémantique. Le connector traduit en appels API v
 
 ---
 
-## zoho-connector v1.2 — Contrat agent
+## zoho-engine v2.0 — Contrat agent
 
 Endpoint interne : `http://zoho-connector.connector-system.svc.cluster.local:8000`
+FastAPI title `zoho-engine`, version `2.0` — K8s service name inchangé.
 
 ### POST /scaffold — création projet complet
 
-Accepte un payload sémantique, retourne `{project_id, web_url, milestones: {name: id}, tasklists: {name: id}}`.
+Accepte un payload sémantique, retourne `{project_id, web_url, milestones, tasklists, tasks_created, tasks_failed, errors}`.
 
 ```json
 {
   "name": "Website Vitrine — Client XYZ",
-  "description": "...",
+  "description": "Objectifs + spécificités CDC depuis Notion",
   "start_date": "",        // MM-DD-YYYY — défaut: aujourd'hui
-  "end_date": "",          // MM-DD-YYYY — défaut: start_date
+  "end_date": "",          // MM-DD-YYYY — OPTIONNEL (projet sans échéance fixe possible)
+  "template_id": "",       // ID template Zoho (optionnel)
+  "group_id": "",          // ID groupe/portfolio (optionnel)
   "milestones": [
     {
       "name": "Phase 1 — Avant-Vente",
-      "flag": "internal",  // "internal" (équipe) | "external" (livrable client)
+      "flag": "internal",  // "internal" (livrable équipe) | "external" (livrable client)
       "start": "05-27-2026",
-      "end": "05-29-2026",
+      "end": "06-03-2026",
       "tasklists": [
-        { "name": "Cadrage client", "tasks": ["Réunion de lancement", "Validation brief"] }
+        { "name": "Lancement", "tasks": ["Organiser le kickoff", "Rédiger le brief"] },
+        { "name": "Gate de sortie", "tasks": ["Checklist validée"] }
       ]
     }
   ]
 }
 ```
 
-**Normalisations automatiques (les agents n'ont pas à les connaître) :**
-- `start_date`/`end_date` vides → date du jour
-- `flag: "start"` → `"internal"` ; `flag: "end"` → `"external"`
-- `owner` jalon → injecté automatiquement (`630459010`)
+**⚠️ Champ supprimé** : `public` — causait erreur Zoho 6832 ("Input Parameter Does Not Match the Pattern"). La visibilité se gère via l'UI Zoho uniquement.
+
+**Normalisations automatiques via `_normalize_milestone_payload` (source unique — agents n'ont pas à les connaître) :**
+- `owner` jalon → injecté automatiquement (`630459010` Charles, mono-compte actuel)
+- `flag` jalon → défaut `"internal"` si absent ; alias `"start"→"internal"`, `"end"→"external"`
+- `start_date`/`end_date` jalon vides → date du jour
+- `end_date` projet → **non defaulté** — un projet peut n'avoir pas d'échéance
 - Rate-limiting : 0.5s/jalon, 0.4s/tasklist, 0.3s/tâche
+- Résilience : chaque appel passe par `_zoho_call()` (429 + 5xx retry)
+
+**Réponse scaffold enrichie (v2.0)** :
+```json
+{
+  "project_id": "2114101000001737018",
+  "web_url": "https://projects.zoho.com/portal/neomniadotnet#zp/projects/2114101000001737018/",
+  "status": "scaffolded",
+  "milestones": {"Phase 1 — Avant-Vente": "2114101000001737051"},
+  "tasklists": {"Lancement": "2114101000001737054"},
+  "tasks_created": 3,
+  "tasks_failed": 0,
+  "errors": []
+}
+```
+
+### POST /milestone.delete — supprimer un jalon
+
+```json
+{ "project_id": "123456789", "milestone_id": "987654321" }
+```
+→ `{"project_id": "...", "milestone_id": "...", "status": "deleted"}`
+
+**⚠️ LIMITATION API ZOHO** : il est impossible de marquer un jalon comme `completed` via REST (champ `status` en lecture seule, calculé depuis les tâches liées). Voir anti-pattern #53. Pour "compléter" un jalon : fermer ses tâches via `/task.update` — Zoho le marque automatiquement.
+
+### POST /project.status — changer le statut d'un projet
+
+```json
+{ "project_id": "123456789", "status": "active" }
+```
+Valeurs : `"active"` | `"completed"` | `"archived"`. Toute autre valeur → 400.
+
+### POST /task.update — mettre à jour une tâche
+
+```json
+{
+  "project_id": "123456789",
+  "task_id": "987654321",
+  "status": "closed",
+  "person_responsible": "630459010",
+  "priority": "High",
+  "due_date": "06-15-2026"
+}
+```
+Tous les champs sont optionnels sauf `project_id` + `task_id`. Au moins un champ requis.
+
+**⚠️ BUG CONNU** : `status=closed` via `/task.update` est silencieusement ignoré par l'API Zoho — le connector retourne `{"updated": {"status": "closed"}}` sans vérifier la réponse Zoho. Le champ `status` dans le payload est ignoré par Zoho Projects v3.
+**Workaround** : utiliser `percent_complete=100` via `/proxy POST /projects/{id}/tasks/{task_id}/` → ferme effectivement la tâche (`status.type = "closed"`).
+```json
+{ "method": "POST", "path": "/projects/{project_id}/tasks/{task_id}/", "data": {"percent_complete": "100"} }
+```
+
+### POST /delete-projects — suppression contrôlée
+
+**Ne jamais utiliser `/proxy DELETE` pour supprimer des projets.** Endpoint dédié avec liste explicite.
+
+```json
+{ "project_ids": ["123456789", "987654321"] }
+```
+
+**Règles obligatoires AVANT d'appeler cet endpoint (enforcement Leon) :**
+1. Appeler `zoho_list_projects` → présenter la liste complète à l'utilisateur
+2. Obtenir une confirmation explicite projet par projet
+3. Seulement alors appeler `/delete-projects` avec les IDs confirmés
+
+`project_ids` vide → 400. Jamais de suppression sans validation humaine préalable.
 
 ### POST /proxy — passthrough générique
 
-Pour tout endpoint Zoho non couvert par `/scaffold`. Le proxy normalise aussi les payloads milestone automatiquement (flag + owner + dates).
+Pour tout endpoint Zoho non couvert par les endpoints sémantiques. Normalise automatiquement les jalons.
 
 ```json
 { "method": "POST|GET|PUT|PATCH|DELETE", "path": "/projects/.../...", "data": {} }
 ```
 
-**Champs Zoho à retenir (erreurs 6831/6832 si manquants) :**
+**Guard anti-destructif :** `DELETE /projects/` sans ID → **403 interdit**. Seul `/delete-projects` est autorisé pour les suppressions.
 
-| Entité | Champs requis | Notes |
+### Règles Zoho — champs requis par entité
+
+| Entité | Champs obligatoires | Injectés auto | Notes |
+|---|---|---|---|
+| Milestone | `name` | `owner`, `flag`, `start_date`, `end_date` | flag: `"internal"`/`"external"` uniquement |
+| Task | `name` | — | `priority` capitalisé : `"High"/"Medium"/"Low"` |
+| Tasklist | `name` | — | `milestone_id` à la création (PATCH après = erreur 6831) |
+| Project | `name` | — | `start_date` format MM-DD-YYYY ; `end_date` optionnel ; **pas de `public`** |
+
+### Erreurs Zoho connues
+
+| Code | Signification | Cause fréquente |
 |---|---|---|
-| Milestone | `name`, `start_date`, `end_date`, `flag`, `owner` | flag: `"internal"` ou `"external"` uniquement |
-| Task | `name` | `priority` capitalisé si fourni : `"High"/"Medium"/"Low"` |
-| Tasklist | `name` | `milestone_id` recommandé à la création (PATCH après = erreur 6831) |
-| Project | `name` | `start_date`/`end_date` format `MM-DD-YYYY` |
+| 6831 | Jalon non créé (silencieux) | `owner` ou `flag` manquant |
+| 6832 | "Input Parameter Does Not Match the Pattern" | `owner` au mauvais format (zpuid au lieu de user ID) ou champ non supporté (ex: `public`) |
+| 6891 | "Given URL is wrong" | Double portal dans le path ou endpoint inexistant |
+| 6500 | Conflit (ressource existe déjà) | → 409 levé par le connector |
 
 **Portal** : `809731782` (neomniadotnet) — **Owner ID** : `630459010` (Charles)
 **Base URL** : `https://projectsapi.zoho.com/restapi/portal/809731782`
