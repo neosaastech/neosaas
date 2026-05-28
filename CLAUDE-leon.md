@@ -526,7 +526,7 @@ Les LLMs ignorent les instructions de format en fin de prompt au profit de leur 
 |---|---|---|
 | **1 — Identification** | `zoho_list_projects` (si besoin) | Extraire project_id + TYPE (infra/webapp/design...) |
 | **2 — Contexte** | `surfsense_search`, `notion_search`, `notion_read_page`, `analyze_project_coherence` | Normes Neomnia + CDC Notion |
-| **3 — État Zoho complet** | `zoho_list_milestones`, `zoho_list_tasks`, `zoho_project_status` | + `cluster_status` si TYPE=INFRA |
+| **3 — État Zoho + cluster + services externes** | `zoho_list_milestones`, `zoho_list_tasks`, `zoho_project_status` | + `cluster_status` si TYPE=INFRA · + `delegate_to_charlotte(query)` si tâches référencent services externes (Scaleway, Neon, DNS) |
 | **4 — Analyse** | — | Patterns A/B/C → anomalies CRITIQUE/MINEUR/INFO |
 | **5 — Exécution** | `zoho_update_task`, `zoho_delete_milestone`, `zoho_delete_task` | Étapes A (non-destructif) → B (liste destructif) → C (question oui/non) |
 
@@ -542,7 +542,8 @@ Matching par **présence de mot-clé** dans le nom (pas correspondance exacte).
 
 **Pattern C — TÂCHES DONE-MAIS-OPEN**
 Pour projets INFRA : croiser les tâches Open avec `cluster_status` (Phase 3). Si le nom de la tâche contient un composant visible dans `cluster_status` (namespace, deployment, service) → done-mais-open → fermer directement (Étape A, sans confirmation).
-Si `cluster_status` indisponible → passer sans bloquer.
+Pour tâches référençant des services EXTERNES (Scaleway, Neon, DNS) : appeler `delegate_to_charlotte('état de [service]')` — Charlotte vérifie l'état réel et retourne si le service est actif/opérationnel.
+Si `cluster_status` ou Charlotte indisponibles → passer sans bloquer.
 
 #### Séquence Phase 5 (Exécution)
 
@@ -606,6 +607,7 @@ if any(message.strip().startswith(p) for p in _OWU_META_PREFIXES):
 | L10 | Instructions de format AUDIT_SYSTEM_PROMPT ignorées si en fin de prompt | Les LLMs suivent les instructions en tête de prompt. `## RÈGLES DE SORTIE — ABSOLUES` doit être la **première section** du prompt, avant toute description de mission. Symptôme : gpt-4o produit "Prochaines étapes recommandées" malgré l'instruction "INTERDIT". |
 | L11 | Pattern C (done-mais-open) détecte 0 tâches sans état cluster réel | L'heuristique "verbe au début du nom" échoue si les noms de tâches ne commencent pas par un verbe. Seul `cluster_status` (Phase 3) permet une détection fiable pour les projets INFRA : composant dans le nom de tâche + composant visible dans `cluster_status` = done. |
 | L12 | IDs Zoho perdus entre Phase 3 et Phase 5 — suppressions "not found" | Le LLM ne porte pas fiablement des IDs numériques sur 5 phases de raisonnement. Solution : re-fetcher `zoho_list_milestones` + `zoho_list_tasks` APRÈS confirmation "oui", puis chercher TOUTES les occurrences par nom et supprimer chaque ID trouvé. Même nom = plusieurs IDs = plusieurs suppressions nécessaires. |
+| L13 | Leon appelle directement Scaleway/Neon/services externes — fuite de crédentials | Leon n'a pas les tokens Scaleway (`SCW_SECRET_KEY`) et n'est pas la source de vérité infra. Pattern correct : `delegate_to_charlotte('état de [service]')` — Charlotte a `scaleway_api` + les credentials via Vault. Ne jamais ajouter `SCW_SECRET_KEY` au ConfigMap Leon. |
 
 ---
 
