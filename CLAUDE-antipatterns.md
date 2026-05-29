@@ -1368,15 +1368,12 @@ Le LLM distingue naturellement `"as-tu analysé la page Notion ?"` (question dan
 
 ---
 
-### 55. Zoho OAuth — scope `ZohoProjects.bugs.ALL` manquant au setup initial
+### 55. Zoho OAuth — scope `ZohoProjects.bugs.ALL` manquant au setup initial ✅ RÉSOLU 2026-05-29
 
-Le refresh token Zoho dans Vault (`secret/neokube/infrastructure/zoho`) a été généré sans le scope `ZohoProjects.bugs.ALL`. Résultat : `POST /projects/{id}/bugs/` → 403 "Invalid OAuth scope".
+Le refresh token Zoho initial n'avait pas le scope `ZohoProjects.bugs.ALL`. Résultat : `POST /projects/{id}/bugs/` → 403 "Invalid OAuth scope".
 
-**Scopes actuels** : `ZohoCRM.modules.ALL`, `ZohoProjects.portals/projects/tasks/milestones/tasklists.ALL`, `ZohoBooks.fullaccess.all`, `ZohoSign.documents.ALL`
-**Scope manquant** : `ZohoProjects.bugs.ALL` (module Issues/Bugs)
+**Fix appliqué** : nouveau token généré via Zoho API Console Self Client (app `1000.ONY9I6H42LISFPE6AEBV961CAIYMTX`) avec tous les scopes + `ZohoProjects.bugs.ALL`. Vault mis à jour (`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`). zoho-connector redémarré.
 
-**Contournement** : créer via `POST /projects/{id}/tasks/` avec `[BUG]` dans le titre — apparaît dans la vue Tasks, pas Issues.
+**Scopes actifs** : `ZohoCRM.modules.ALL ZohoCRM.settings.ALL ZohoProjects.portals/projects/tasks/milestones/tasklists/bugs.ALL ZohoBooks.fullaccess.all ZohoSign.documents.ALL`
 
-**Fix définitif** : `kubectl port-forward -n connector-system svc/zoho-connector 8000:8000` puis `GET http://localhost:8000/oauth/authorize` → ouvrir auth_url → Accept → le callback `/oauth/callback` met Vault à jour automatiquement, pas de redémarrage.
-
-**À faire lors du prochain re-auth Zoho** (pas une urgence — les tâches fonctionnent).
+**Piège découvert** : Self Client Zoho génère des codes liés à l'app qui les crée — échanger avec un autre client_id → `invalid_code` immédiat. Toujours vérifier que le client_id de la console correspond à celui dans Vault (`secret/neokube/infrastructure/zoho → ZOHO_CLIENT_ID`).
