@@ -1377,3 +1377,12 @@ Le refresh token Zoho initial n'avait pas le scope `ZohoProjects.bugs.ALL`. Rés
 **Scopes actifs** : `ZohoCRM.modules.ALL ZohoCRM.settings.ALL ZohoProjects.portals/projects/tasks/milestones/tasklists/bugs.ALL ZohoBooks.fullaccess.all ZohoSign.documents.ALL`
 
 **Piège découvert** : Self Client Zoho génère des codes liés à l'app qui les crée — échanger avec un autre client_id → `invalid_code` immédiat. Toujours vérifier que le client_id de la console correspond à celui dans Vault (`secret/neokube/infrastructure/zoho → ZOHO_CLIENT_ID`).
+
+### 56. Zoho Projects `/bugs/` — form-encoded obligatoire (pas JSON)
+
+`POST /projects/{id}/bugs/` retourne 400 "Input Parameter Missing" si le corps est envoyé en JSON. L'API Zoho bugs exige `application/x-www-form-urlencoded`.
+
+**Via le connector** (Charlotte → `_zoho_api` → `/proxy` → `_zoho_call`) : automatiquement form-encoded (`kwargs["data"] = data`). Pas de problème.
+**En appel direct** (`httpx.post(..., json=payload)`) : 400. Utiliser `data=payload` à la place.
+
+**Règle** : tout appel direct à l'API Zoho Projects doit utiliser `data=` (form-encoded), jamais `json=`. Passer par le connector `/proxy` évite ce piège.
