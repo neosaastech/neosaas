@@ -1386,3 +1386,87 @@ Le refresh token Zoho initial n'avait pas le scope `ZohoProjects.bugs.ALL`. Rés
 **En appel direct** (`httpx.post(..., json=payload)`) : 400. Utiliser `data=payload` à la place.
 
 **Règle** : tout appel direct à l'API Zoho Projects doit utiliser `data=` (form-encoded), jamais `json=`. Passer par le connector `/proxy` évite ce piège.
+
+### 57. Pseudo-code outil en réponse textuelle — `notion_update_page(<ID_PAGE_NOTION>, ...)`
+
+Un agent (Leon v4.0) utilisant `_conv_llm` (sans tool_call) dans un handler d'intent retourne du pseudo-code syntaxique au lieu d'une synthèse lisible. Exemple observé :
+```
+notion_update_page(
+  page_id="<ID_PAGE_NOTION>",
+  content="### État du Cluster..."
+)
+```
+
+**Causes** :
+1. `_conv_llm` n'a pas accès aux outils réels — le LLM "simule" ce qu'il ferait.
+2. Le system prompt mentionne des outils par nom → le LLM croit devoir les appeler sous forme textuelle.
+3. Placeholder inventé `<ID_PAGE_NOTION>` : le LLM ne connaît pas l'ID et le fabrique.
+
+**Fix** : deux règles dans le system prompt du handler concerné :
+```
+RÈGLE ABSOLUE : ne génère JAMAIS de pseudo-code du type `notion_update_page(...)`.
+Si une action doit être faite → décris-la en langage naturel.
+RÈGLE : n'invente JAMAIS d'ID Notion/Zoho. Si inconnu → indique '[À résoudre via zoho_list_projects]'.
+```
+Et dans SYSTEM_PROMPT global : section `## RÈGLE ANTI-PSEUDO-CODE`.
+
+**Distinction** : `_conv_llm` = synthèse conversationnelle (pas de tools). `run_agent` = ReAct loop (tools réels). Ne jamais mettre un LLM en mode "synthèse" avec des noms d'outils dans le prompt sans ces deux règles.
+
+### 58. `billing_status` → erreur 6831 "Input Parameter Missing" sur Zoho timelog
+
+L'API Zoho Projects `/projects/{id}/tasks/{id}/logs/` attend le champ `bill_status` (pas `billing_status`).
+
+**Symptôme** : `{"response":{"error":"Input Parameter Missing","code":6831}}` sur `POST /logs/`.
+**Cause** : documentation Zoho incohérente — les réponses GET contiennent `billing_type`, mais le POST attend `bill_status`.
+**Valeurs** : `"Billable"` | `"Non Billable"`.
+
+**Fix zoho-engine v2.6** :
+```python
+billing_status = "Billable" if _is_billable(project_id) else "Non Billable"
+payload = {"date": log_date, "hours": time_str, "bill_status": billing_status}
+```
+
+**Règle** : pour tout champ Zoho Projects, vérifier le nom exact avec un GET de la ressource avant d'écrire — les noms GET ≠ POST sont fréquents dans cette API (ex: `billing_type` en lecture, `bill_status` en écriture).
+
+**Anti-pattern associé** : erreur 6403 si on tente de logger du temps sur une tâche fermée (percent_complete=100). Fix : vérifier avant, ou utiliser `/task.close` qui gère les deux atomiquement.
+
+### 59. Zoho Projects API — filtres GET ignorés en URL query string
+
+`GET /projects/{id}/tasks/?status=notcompleted` → Zoho ignore le paramètre et retourne toutes les tâches (73 au lieu de 18).
+
+**Cause** : l'API Zoho Projects v3 attend les filtres de requête GET en **form-encoded body** (`data=`), pas en URL query string (`params=`). C'est non-standard mais documenté nulle part.
+
+**Fix dans `_zoho_call`** :
+```python
+# AVANT (cassé) :
+if method == "GET":
+    kwargs["params"] = data or {}  # URL query string → ignoré par Zoho
+
+# APRÈS (correct) :
+if method == "GET":
+    kwargs["data"] = data or {}    # form-encoded body → respecté par Zoho
+```
+
+**Valeurs valides pour `status`** : `notcompleted` | `closed` | `all`
+
+**Symptôme silencieux** : Zoho retourne 200 avec toutes les tâches — pas d'erreur, juste les filtres ignorés.
+
+### 60. Tâches Zoho `start_date = end_date` — durée apparente 0 ou 1 jour
+
+Quand `/batch.create` reçoit une `due_date` pour une tâche, le code initial faisait `start_date = end_date = due_date`. Résultat : toutes les tâches semblent durer 1 jour dans le Gantt de Zoho, même celles qui représentent une semaine de travail.
+
+**Fix dans `BatchTask`** :
+```python
+class BatchTask(BaseModel):
+    due_date: str = ""      # end_date cible
+    duration_days: int = 3  # durée estimée (défaut 3j crédible)
+
+# Dans le handler batch.create :
+_end   = datetime.strptime(task.due_date, "%m-%d-%Y")
+_start = _end - timedelta(days=max(1, task.duration_days - 1))
+task_payload["start_date"] = _start.strftime("%m-%d-%Y")
+task_payload["end_date"]   = task.due_date
+```
+
+**Règle** : Ne jamais forcer `start_date = end_date` sur des tâches. Soit on ne met pas de dates (backlog), soit on fournit une durée réaliste. Les tâches sans dates sont valides dans Zoho et préférables pour le backlog.
+**Règle temps** : les dates Zoho = planning Gantt. Le temps facturable = `log.time` avec heures réelles. Les deux sont indépendants.
