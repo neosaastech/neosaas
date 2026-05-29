@@ -412,14 +412,16 @@ Toute issue créée par un agent doit respecter ce standard. Implémenté dans `
 
 ### Champs obligatoires
 
-| Champ | Valeur | Source |
-|---|---|---|
-| `title` | Préfixe `[Agent]` — ex. `[Charlotte] Description` | agent name |
-| `team` | `Neokube` (équipe fixe pour tous les agents) | fixe |
-| `tag` | Slug de l'agent créateur — ex. `charlotte`, `leon` | `AGENT_NAME` env |
-| `reviewer_tag` | `leon` — Leon valide toutes les issues agents | fixe |
-| `due_date` | Calculée selon severity (voir tableau) | severity → deadline |
-| `milestone` | Jalon actif du projet — défaut `sprint-courant` | projet Zoho |
+| Champ | Via API | Valeur | Note |
+|---|---|---|---|
+| `title` | ✅ | Préfixe `[Agent]` — ex. `[Charlotte] Description` | Seul marqueur agent fiable par API |
+| `due_date` | ✅ | Calculée selon severity (voir tableau) | Implémenté automatiquement |
+| `severity` | ✅ | critical / major / minor / feature / enhancement | Détermine due_date |
+| `priority` | ✅ | High / Medium / Low | |
+| `assignee` | ✅ | `ZOHO_OWNER_ID` par défaut | |
+| `tag` | ❌ ignoré | — | Silencieusement ignoré par l'API Zoho Projects |
+| `reviewer` | ❌ ignoré | — | Silencieusement ignoré par l'API Zoho Projects |
+| `milestone_id` | ❌ ignoré | — | Ignoré à la création — endpoint PATCH séparé requis (non implémenté) |
 
 ### Calcul date d'échéance par severity
 
