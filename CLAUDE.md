@@ -419,9 +419,12 @@ Toute issue créée par un agent doit respecter ce standard. Implémenté dans `
 | `severity` | ✅ | critical / major / minor / feature / enhancement | Détermine due_date |
 | `priority` | ✅ | High / Medium / Low | |
 | `assignee` | ✅ | `ZOHO_OWNER_ID` par défaut | |
-| `tag` | ❌ ignoré | — | Silencieusement ignoré par l'API Zoho Projects |
-| `reviewer` | ❌ ignoré | — | Silencieusement ignoré par l'API Zoho Projects |
-| `milestone_id` | ❌ ignoré | — | Ignoré à la création — endpoint PATCH séparé requis (non implémenté) |
+| `tag` | ❌ n'existe pas | — | Concept absent du modèle Zoho Projects bugs |
+| `reviewer` | ❌ n'existe pas | — | Concept absent du modèle Zoho Projects bugs |
+| `milestone_id` | ❌ ignoré | — | Ignoré à la création — non exposé en écriture via API REST |
+| `GROUP_NAME` / team | ❌ lecture seule | — | Lisible mais non settable via API. IDs connus : **Neokube** `2114101000001751022` · **SSII** `2114101000001544001` |
+
+> **Règle d'équipe** : issues agents infrastructure NeoKube → équipe **Neokube**. Issues projets clients (web, scraping…) → équipe **SSII**. À appliquer manuellement dans l'UI jusqu'à support API Zoho.
 
 ### Calcul date d'échéance par severity
 
