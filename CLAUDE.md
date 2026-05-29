@@ -406,6 +406,54 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ---
 
+## Politique issues Zoho — Agents NeoKube
+
+Toute issue créée par un agent doit respecter ce standard. Implémenté dans `zoho_create_issue` (Charlotte) et `_zoho_issue()` (Leon).
+
+### Champs obligatoires
+
+| Champ | Valeur | Source |
+|---|---|---|
+| `title` | Préfixe `[Agent]` — ex. `[Charlotte] Description` | agent name |
+| `team` | `Neokube` (équipe fixe pour tous les agents) | fixe |
+| `tag` | Slug de l'agent créateur — ex. `charlotte`, `leon` | `AGENT_NAME` env |
+| `reviewer_tag` | `leon` — Leon valide toutes les issues agents | fixe |
+| `due_date` | Calculée selon severity (voir tableau) | severity → deadline |
+| `milestone` | Jalon actif du projet — défaut `sprint-courant` | projet Zoho |
+
+### Calcul date d'échéance par severity
+
+| Severity | Cas | Délai | Exemple |
+|---|---|---|---|
+| `critical` | Sécurité, accès compromis | **+1 jour** | clé API exposée |
+| `major` | Bug bloquant fonctionnalité | **+3 jours** | outil broken |
+| `minor` | Bug non bloquant | **+7 jours** | formulation LLM |
+| `feature` | Amélioration / nouveau comportement | **+30 jours** | programme amélioration continue |
+| `enhancement` | Refactor / optimisation | **+90 jours** | restructuration architecture |
+
+### Format appel `zoho_create_issue`
+
+```python
+zoho_create_issue(
+    project_id  = "2114101000001543041",   # projet Neokube
+    title       = "[Charlotte] Titre descriptif",
+    description = "...",
+    severity    = "minor",     # critical|major|minor|feature|enhancement
+    creator     = "charlotte", # agent créateur → tag automatique
+)
+# due_date, team, reviewer_tag calculés automatiquement par le tool
+```
+
+### Règles de classification
+
+- **`critical`** : problème sécurité, credential exposé, accès non autorisé → ntfy `urgent` en parallèle
+- **`major`** : outil broken, workflow bloqué, données incorrectes → ntfy `high`
+- **`minor`** : comportement sous-optimal, UX dégradée, formulation LLM → ntfy `default`
+- **`feature`** : programme d'amélioration, nouveau comportement souhaité → pas de ntfy
+- **`enhancement`** : refactor, architecture, perf → pas de ntfy
+
+---
+
 ## Pièges connus — Anti-patterns à éviter
 
 > Code + exemples complets : **[CLAUDE-antipatterns.md](CLAUDE-antipatterns.md)**
