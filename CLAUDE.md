@@ -407,6 +407,23 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ---
 
+## Orchestration Claude Code — Rôles et workflow (établi 2026-05-30)
+
+**Claude Code = master orchestrateur**. Il brief, délègue, vérifie. Il n'exécute directement que ce qu'aucun agent ne peut faire (modifier le code de Leon ou Charlotte eux-mêmes — auto-modification interdite).
+
+| Action | Acteur | Mécanisme |
+|---|---|---|
+| Zoho PM (jalons, tâches, issues, clôture, suivi) | **Leon** | `POST leon:8181/mission` |
+| NeoKube infra (K8s, ConfigMaps, code agents, deploy) | **Charlotte** | `POST charlotte:8383/mission` |
+| Projets clients (web app, API, CI/CD, design) | **Leon → Dispatcher → Camille/Guillaume/Alain/Vera** | `POST leon:8181/mission` |
+| Code de Leon ou Charlotte eux-mêmes | **Claude Code** | Edit ConfigMap + kubectl replace + rollout restart |
+| Bug détecté sur un agent | **Leon crée issue Zoho** severity=major → **Charlotte exécute le fix** | Zoho issue `[Agent] Titre` assignée à Charlotte |
+
+**Règle de bug** : tout dysfonctionnement agent détecté → Leon crée l'issue Zoho (`[NomAgent] Description`) → Charlotte reçoit et corrige → Leon ferme l'issue.
+**Transition NeoStudio** : au fur et à mesure, les briefs Claude Code → Leon et Claude Code → Charlotte passeront par NeoStudio (interface chat multi-agents).
+
+---
+
 ## Politique issues Zoho — Agents NeoKube
 
 Toute issue créée par un agent doit respecter ce standard. Implémenté dans `zoho_create_issue` (Charlotte ✅, Leon ✅ 2026-05-29).
