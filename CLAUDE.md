@@ -159,6 +159,18 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 ### Politique LLM & Embeddings
 **100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
+
+**Budgets LiteLLM — limites QUOTIDIENNES obligatoires** (`budget_duration=1d`) :
+
+| Agent | Budget/jour | Modèle principal |
+|---|---|---|
+| Charlotte | **5 $** | mistral → claude-sonnet (fallback) |
+| Leon | **2 $** | gpt-4o |
+| Camille / Guillaume / Alain / Dispatcher / Neo / NeoStudio | **1 $** | codestral / mistral |
+| Vera / Penpot / Domi / Milo / Nora / Zephyr | **0.5 $** | mistral |
+| **Plafond total** | **18 $/jour** | — |
+
+**Règle** : toujours `budget_duration=1d` — jamais `1mo`. Un dérapage en session intensive (boucle de dispatch, sessions concurrentes) peut brûler le budget mensuel en une journée. Le reset quotidien automatique protège. **Alert ntfy** dès 80% du budget → tâche `[Charlotte] Alertes budget LiteLLM` ouverte (2026-05-30).
 **Modèle embeddings** : `paraphrase-multilingual-mpnet-base-v2` (768 dims) — servi par **embed-service K8s interne** (`embed-service.rag-system:8080`, 100% local, gratuit)
 **Alias LiteLLM** : `nomic-embed-text` → embed-service interne (primaire) · `oai-embed-small` → OpenAI fallback · `huggingface-embed` → HuggingFace fallback
 **HuggingFace** : clé `HUGGINGFACE_API_KEY` dans Vault `secret/neokube/llm-api-keys` + `cockpit-secrets`. Connectivité OK via `router.huggingface.co`. Ancienne URL `api-inference.huggingface.co` **NXDOMAIN** depuis 2026-05 (domaine supprimé). Crédits gratuits mensuels — HTTP 402 si épuisés.
