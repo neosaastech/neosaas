@@ -511,6 +511,7 @@ zoho_create_issue(
 | 51 | Question réflexive → CLARIFYING loop | Label `reflection` dans classifieur — réponse directe oui/non, pas de relance |
 | 52 | Overrides classifieur qui se contredisent | Supprimer tous les overrides sauf `_in_active_clarif` — passer contexte au LLM |
 | 53 | `zoho_milestone_complete` ignoré | Zoho calcule statut jalon depuis tâches — fermer tâches liées, pas le jalon directement |
+| 61 | Milestone Zoho non fermable via API | `status` milestone = read-only calculé par Zoho. Aucun champ API (`status`, `status_id`, `milestone_status`, `closed`) ne le modifie. Seule voie : lier les tasklists au milestone via l'UI Zoho. Leon doit détecter la complétion (toutes tâches Closed) et envoyer une ntfy + créer une issue `feature` `[Leon] Jalon à fermer manuellement`. |
 | 54 | Git push ≠ déployé | Pas de GitOps auto — `git push` + `kubectl apply/replace` obligatoire |
 | 56 | Zoho `/bugs/` form-encoded | `data=` pas `json=` pour appels directs |
 | 57 | Pseudo-code outil dans `_conv_llm` | `_conv_llm` = synthèse sans tools — `RÈGLE ANTI-PSEUDO-CODE` dans le prompt |
