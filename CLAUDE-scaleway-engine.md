@@ -19,12 +19,12 @@ L'API Scaleway est aujourd'hui accessible **uniquement depuis Charlotte** (crede
 **Solution** : `scaleway-engine` dans `connector-system` — même architecture que `zoho-engine v2.0`.
 
 ```
-Agents (Charlotte / Dispatcher / Domi / Leon / Aria / Nox)
+Agents (Charlotte / Dispatcher / Domi / Leon / Camille / Guillaume / Alain)
     │
     └── POST http://scaleway-engine.connector-system.svc.cluster.local:8012/{endpoint}
             │
             ├── Vault (/vault/secrets/scaleway) → SCW_SECRET_KEY + SCW_ORG_ID
-            ├── RBAC par agent (header X-Agent-Id)
+            ├── RBAC par agent (header X-Agent-Id) — résolution alias automatique
             └── https://api.scaleway.com
 ```
 
@@ -58,22 +58,25 @@ connector-system (ports 8000–8012)
 
 L'engine vérifie le header `X-Agent-Id` à chaque requête. Toute requête sans ce header → 401.
 
-| Endpoint | Charlotte | Dispatcher | Domi | Leon | Aria | Nox | Autres |
-|---|---|---|---|---|---|---|---|
-| `GET /health` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `GET /projects` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `GET /projects/{id}` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| `POST /projects` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `DELETE /projects/{id}` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `GET /billing` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `GET /instances` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `GET /iam` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| `POST /proxy` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Endpoint | Charlotte | Dispatcher | Domi | Leon | Camille | Guillaume | Alain | Vera | Autres |
+|---|---|---|---|---|---|---|---|---|---|
+| `GET /health` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `GET /projects` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `GET /projects/{id}` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `POST /projects` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `DELETE /projects/{id}` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `GET /billing` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `GET /instances` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `GET /iam` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `POST /proxy` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 **Charlotte** : accès complet — elle reste maître de l'infrastructure Scaleway.
 **Dispatcher/Domi** : création de projets Scaleway pour les projets clients (pipeline).
 **Leon** : lecture + création projet (audit et planification).
-**Aria/Nox** : lecture seule (contexte déploiement — quel projet Scaleway utiliser).
+**Camille/Guillaume/Alain** : lecture seule (contexte déploiement — quel projet Scaleway utiliser).
+
+**Système d'alias** : le moteur résout automatiquement les anciens noms via `_AGENT_ALIASES`.
+`aria → camille`, `nox → guillaume`. Les deux noms sont acceptés dans `X-Agent-Id`.
 
 ---
 
