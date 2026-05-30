@@ -423,6 +423,24 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 **Règle de bug** : tout dysfonctionnement agent détecté → Leon crée l'issue Zoho (`[NomAgent] Description`) → Charlotte reçoit et corrige → Leon ferme l'issue.
 **Transition NeoStudio** : au fur et à mesure, les briefs Claude Code → Leon et Claude Code → Charlotte passeront par NeoStudio (interface chat multi-agents).
 
+### Convention de nommage — Tâches et issues Zoho destinées à un agent
+
+**Format obligatoire** : `[NomAgent] Description courte — détail`
+
+```
+✅ [Charlotte] embed nomic-embed-text — LiteLLM connexion échoue
+✅ [Leon] zoho_create_task — start_date=end_date HTTP 400
+✅ [Charlotte] Temporal Nondeterminism — SREScanWorkflow
+❌ Charlotte — embed nomic-embed-text (pas de crochets → non scannable)
+❌ Fix embed Charlotte (pas de préfixe structuré)
+```
+
+**Pourquoi** : Charlotte scanne les tâches Zoho préfixées `[Charlotte]` pour s'auto-assigner les missions. Leon fait de même pour `[Leon]`. Sans les crochets, la tâche est invisible pour l'agent.
+
+**Règle Claude Code** : toute tâche créée pour un agent = préfixe `[NomAgent]` obligatoire.
+**Règle Leon** : `zoho_create_task(name="[Charlotte] ...")` ou `zoho_create_task(name="[Leon] ...")` selon l'exécutant.
+**Agents valides** : `[Charlotte]` `[Leon]` `[Camille]` `[Guillaume]` `[Alain]` `[Vera]` `[Domi]`
+
 ---
 
 ## Politique issues Zoho — Agents NeoKube
