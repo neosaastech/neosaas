@@ -1470,3 +1470,52 @@ task_payload["end_date"]   = task.due_date
 
 **Règle** : Ne jamais forcer `start_date = end_date` sur des tâches. Soit on ne met pas de dates (backlog), soit on fournit une durée réaliste. Les tâches sans dates sont valides dans Zoho et préférables pour le backlog.
 **Règle temps** : les dates Zoho = planning Gantt. Le temps facturable = `log.time` avec heures réelles. Les deux sont indépendants.
+
+---
+
+### 61. Zoho timelog — 403 Forbidden = scope OAuth manquant, pas un conflit
+
+Appel `POST /projects/{pid}/tasks/{tid}/logs/` retourne HTTP 403 avec `code: 6500`.
+Le zoho-engine interprétait 6500 comme "conflit ressource" — c'est faux. 6500 sur un 403 = **scope OAuth absent**.
+
+**Scope manquant** : `ZohoProjects.timesheets.ALL` — non inclus dans le token actuel.
+
+**Comportement observé par test (2026-05-30)** :
+- `actual_hours` reste vide après clôture de tâche sans timelog préalable
+- Zoho ne calcule PAS le temps effectif automatiquement à la fermeture
+- Le temps réel doit être loggé AVANT la clôture via `/logs/` avec le bon scope OAuth
+
+**Fix zoho-engine** : distinguer 403 de 6500 dans `_zoho_call` — 403 = permission refusée, pas conflit.
+
+```python
+# Dans _zoho_call, avant le check 6500 :
+if r.status_code == 403:
+    raise HTTPException(403, f"Zoho 403 Forbidden — scope OAuth manquant? {r.text[:200]}")
+```
+
+**Fix OAuth** : régénérer le token Self Client avec scope `ZohoProjects.timesheets.ALL` ajouté.
+
+---
+
+### 62. Zoho durée Gantt — modèle réel vs planning
+
+**Appris par test (2026-05-30)** :
+
+| Champ | Comportement réel |
+|---|---|
+| `duration` (Gantt) | Calculé automatiquement = `end_date - start_date` en jours ouvrés |
+| `duration_type` | Toujours `days` — pas de granularité heure dans le Gantt |
+| `estimated_hours` | Non supporté via API v3 Zoho Projects (ignoré silencieusement) |
+| `actual_hours` | Alimenté par les timelogs (`/logs/`) — NE se calcule PAS automatiquement |
+| Fermeture tâche | `percent_complete=100` — n'enregistre PAS de temps réel |
+
+**Règle** : Pour avoir `actual_hours` dans Zoho, il faut obligatoirement poster un timelog AVANT de fermer la tâche. Le scope `ZohoProjects.timesheets.ALL` est requis.
+
+**Pour afficher une durée réaliste dans le Gantt** : seule solution = fixer des `start_date` + `end_date` cohérents. La durée est toujours en jours entiers (minimum 1).
+
+**Exemple** — tâche estimée à 2h dans un sprint d'une journée :
+```python
+# Correct : 1 jour dans le Gantt (minimum Zoho), effort réel dans description
+{'start_date': '05-30-2026', 'end_date': '05-30-2026', 'description': 'Estimé ~2h'}
+# À éviter : ne pas mettre [~2h] dans le nom — pollution visuelle sans valeur
+```
