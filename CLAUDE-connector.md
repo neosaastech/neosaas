@@ -11,7 +11,7 @@
       │       └── mcp.neon.tech/sse                         (Neon API, remote)
       │
       ├─── Engines métier (services domaine — règles process + normalisation + RBAC)
-      │       ├── zoho-engine v2.0    → déployé  (K8s: zoho-connector:8000)
+      │       ├── zoho-engine v2.0    → déployé  (K8s: zoho-engine:8000)
       │       └── scaleway-engine v1.0 → à déployer (K8s: scaleway-engine:8012)
       │
       └─── Connectors Python (proxy léger + auth)
@@ -25,16 +25,18 @@
 
 ---
 
-## zoho-engine v2.0 (2026-05-27)
+## zoho-engine v2.1 (2026-05-29)
 
-`zoho-connector` a évolué en **engine métier** tout en conservant le même K8s service name (`zoho-connector.connector-system.svc.cluster.local:8000`) — aucun caller n'a besoin d'être mis à jour.
+`zoho-engine` a évolué en **engine métier** tout en conservant le même K8s service name (`zoho-engine.connector-system.svc.cluster.local:8000`) — aucun caller n'a besoin d'être mis à jour.
 
-| Aspect | `*-connector` (les 8 autres) | `zoho-engine v2.0` |
+| Aspect | `*-connector` (les 8 autres) | `zoho-engine v2.1` |
 |---|---|---|
 | Rôle | Proxy + auth centralisée | Proxy **+** règles métier + résilience OAuth2 |
 | Logique interne | Stateless, pass-through | Normalisation, guards, retry, semantic endpoints |
-| API exposée | `/proxy` générique | 7 endpoints sémantiques |
+| API exposée | `/proxy` générique | 9 endpoints sémantiques |
 | Résilience | Aucune | Token cache 3min, creds cache 10min, retry x3 backoff, 429/5xx handling |
+
+**Règle d'architecture** : toute nouvelle opération Zoho multi-agents doit d'abord être ajoutée comme endpoint sémantique dans zoho-engine — jamais embarquée dans le script d'un agent. Les agents font des appels HTTP simples, la logique métier (champs corrects, status_id, calculs dates) reste dans le connector.
 
 ### Nouveautés v2.0 vs v1.3
 
@@ -94,7 +96,7 @@ Chaque connector est un pod `python:3.12-slim` dans `connector-system`. Tous lis
 
 | Connector | Port | Vault path | Clés |
 |---|---|---|---|
-| `zoho-connector` | 8000 | `secret/neokube/infrastructure/zoho` | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNTS_SERVER`, `ZOHO_PORTAL_ID` |
+| `zoho-engine` | 8000 | `secret/neokube/infrastructure/zoho` | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNTS_SERVER`, `ZOHO_PORTAL_ID` |
 | `github-connector` | 8001 | `secret/neokube/infrastructure/github` | `GITHUB_TOKEN` |
 | `vercel-connector` | 8002 | `secret/neokube/infrastructure/vercel` | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` |
 | `neon-connector` | 8003 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` |
@@ -183,7 +185,7 @@ kubectl rollout restart deploy/agent-charlotte -n agent-system
 Credentials, URL de base, headers obligatoires, post-processing : tout appartient au connector. Un agent ne doit jamais lire un secret d'API directement ni construire une URL vers l'API externe.
 
 **R2 — Enrichir à la sortie, pas dans les agents**
-Toute normalisation (renommage de champs, injection d'URLs web, casting de types) se fait dans le connector avant le `return`. Voir `_inject_web_urls()` dans `zoho-connector` v1.1 comme référence.
+Toute normalisation (renommage de champs, injection d'URLs web, casting de types) se fait dans le connector avant le `return`. Voir `_inject_web_urls()` dans `zoho-engine` v1.1 comme référence.
 
 **R3 — Toujours exposer `/health` et `/proxy`**
 `/health` doit être libre (probes K8s). `/proxy` reçoit `{method, path, data?}` et redirige vers l'API externe. Endpoints spécialisés en bonus si nécessaire.
@@ -201,7 +203,7 @@ Un agent exprime une intention sémantique. Le connector traduit en appels API v
 
 ## zoho-engine v2.0 — Contrat agent
 
-Endpoint interne : `http://zoho-connector.connector-system.svc.cluster.local:8000`
+Endpoint interne : `http://zoho-engine.connector-system.svc.cluster.local:8000`
 FastAPI title `zoho-engine`, version `2.0` — K8s service name inchangé.
 
 ### POST /scaffold — création projet complet
@@ -290,6 +292,35 @@ Tous les champs sont optionnels sauf `project_id` + `task_id`. Au moins un champ
 ```json
 { "method": "POST", "path": "/projects/{project_id}/tasks/{task_id}/", "data": {"percent_complete": "100"} }
 ```
+
+### POST /issue.create — créer un bug/issue
+
+Gouvernance centralisée : calcul `due_date` par severity, préfixage titre `[Creator]`, POST correct vers Zoho.
+
+```json
+{
+  "project_id": "2114101000001543041",
+  "title": "Titre de l'issue",
+  "description": "",
+  "severity": "minor",
+  "priority": "Medium",
+  "creator": "charlotte"
+}
+```
+→ `{"issue_id": "...", "title": "[Charlotte] Titre", "severity": "minor", "due_date": "MM-DD-YYYY", "project_id": "...", "web_url": "..."}`
+
+**Délais par severity** : `critical` +1j · `major` +3j · `minor` +7j · `feature` +30j · `enhancement` +90j
+
+### POST /issue.close — clôturer un bug/issue
+
+Poste un commentaire de résolution (si fourni) puis passe le statut à **Clôturé** (status_id `2114101000000046089`). Utilise `POST + status_id` — l'API Zoho v3 ignore `statusname` et rejette `PUT` sur les bugs.
+
+```json
+{ "project_id": "2114101000001543041", "issue_id": "2114101000001749111", "resolution": "Traité et résolu." }
+```
+→ `{"issue_id": "...", "project_id": "...", "status": "closed"}`
+
+**⚠️ Piège API** : `statusname=Closed/Fermé/Clôturé` ignoré. `PUT` retourne 6500. Seul `POST + status_id` fonctionne.
 
 ### POST /delete-projects — suppression contrôlée
 

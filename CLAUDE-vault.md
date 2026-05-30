@@ -61,7 +61,7 @@ kubectl create secret docker-registry ghcr-pull-secret \
 | `secret/neokube/infrastructure/github` | `GITHUB_TOKEN` | github-connector (8001) |
 | `secret/neokube/infrastructure/vercel` | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | vercel-connector (8002) |
 | `secret/neokube/infrastructure/neon` | `NEON_API_KEY` | neon-connector (8003) |
-| `secret/neokube/infrastructure/zoho` | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNTS_SERVER`, `ZOHO_PORTAL_ID` | zoho-connector (8000) → `leon-zoho-secrets` + `zoho-secrets` (agent-system) [manuels] |
+| `secret/neokube/infrastructure/zoho` | `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_ACCOUNTS_SERVER`, `ZOHO_PORTAL_ID` | zoho-engine (8000) → `leon-zoho-secrets` + `zoho-secrets` (agent-system) [manuels] |
 | `secret/neokube/infrastructure/penpot` | `PENPOT_EMAIL`, `PENPOT_PASSWORD` | penpot-connector (8004) |
 | `secret/neokube/infrastructure/openprovider` | `OPENPROVIDER_USERNAME`, `OPENPROVIDER_PASSWORD` | openprovider-connector (8005) |
 | `secret/neokube/infrastructure/scaleway` | `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`, `SCW_ORG_ID`, `SCW_DEFAULT_PROJECT_ID`, `SCW_DEFAULT_REGION/ZONE`, `SCW_TEM_SMTP_HOST/PORT/USER/PASS` | Charlotte (Vault agent injection), stalwart relay, CronJobs billing/audit (via `scaleway-billing-secret`) |

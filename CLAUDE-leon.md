@@ -161,7 +161,7 @@ async def _handle_scraping_mission(spec, session_id):
 
 ### Architecture Leon ↔ Zoho — Comment Leon parle à Zoho
 
-**Règle fondamentale** : Leon ne parle **jamais** directement à l'API Zoho. Tout passe par `zoho-engine` v2.0 (K8s service name: `zoho-connector`, port 8000).
+**Règle fondamentale** : Leon ne parle **jamais** directement à l'API Zoho. Tout passe par `zoho-engine` v2.0 (K8s service name: `zoho-engine`, port 8000).
 
 ```
 Leon (agent-system)
@@ -198,7 +198,7 @@ Leon (agent-system)
 **Flags milestone** : `"internal"` (jalons équipe) · `"external"` (jalons client visible) — aliases `"start"→"internal"`, `"end"→"external"` acceptés.
 **`owner`** : injecté par le connector depuis `ZOHO_OWNER_ID` (jamais passé par Leon).
 
-**Variable d'env** : `ZOHO_CONNECTOR_URL = "http://zoho-connector.connector-system.svc.cluster.local:8000"` (défaut hardcodé si absent du ConfigMap)
+**Variable d'env** : `ZOHO_ENGINE_URL = "http://zoho-engine.connector-system.svc.cluster.local:8000"` (défaut hardcodé si absent du ConfigMap)
 
 **`leon_zoho_refresh_token` est un no-op** — il retourne `""`. L'authentification OAuth2 est entièrement gérée par le connector. Leon ne manipule aucun token Zoho.
 
@@ -239,7 +239,7 @@ zoho_delete_milestone(...)                   commentaires
 zoho_list_milestones(project_id)             timesheet entries
                 │                                   │
                 └───────────────────────────────────┘
-                  zoho-connector: /proxy · /scaffold · /delete-projects
+                  zoho-engine: /proxy · /scaffold · /delete-projects
 ```
 
 #### Protocole suppression — RÈGLE OBLIGATOIRE
@@ -266,7 +266,7 @@ Quand une opération n'est pas couverte par un outil dédié :
 #### Règles R1–R6 connecteurs (CLAUDE-connector.md)
 
 > **R1** — Un connector = source de vérité unique pour son API. Credentials, URL de base, headers : tout appartient au connector.
-> **R2** — Enrichir à la sortie (`_inject_web_urls` dans zoho-connector). Leon ne construit jamais d'URLs Zoho manuellement.
+> **R2** — Enrichir à la sortie (`_inject_web_urls` dans zoho-engine). Leon ne construit jamais d'URLs Zoho manuellement.
 > **R3** — Utiliser l'endpoint approprié : `/proxy` pour les appels génériques, `/scaffold` pour la création projet complète, `/delete-projects` pour les suppressions.
 > **R6** — Les règles API (normalisation, guards, defaults) sont codées dans le connector. L'agent exprime l'intent sémantique uniquement. Jamais de règle business dans l'agent.
 
@@ -731,7 +731,8 @@ Leon a des **compétences techniques** pour piloter les projets (comprendre une 
 | Milo — Data/Scraping agent | ✅ Déployé | Port 8491 — actif v1.0 |
 | Zephyr — UX/Design agent | ✅ Déployé | Port 8492 — actif v2.0 |
 | Nora — Account Manager agent | ✅ Déployé | Port 8493 — actif v1.0 |
-| `zoho_api` proxy générique | ✅ Code + déployé | Activity `leon_zoho_api` → `ZOHO_CONNECTOR_URL/proxy`. Pattern : `zoho_pm_insights` → endpoint → `zoho_api`. |
+| `zoho_api` proxy générique | ✅ Code + déployé | Activity `leon_zoho_api` → `ZOHO_ENGINE_URL/proxy`. Pattern : `zoho_pm_insights` → endpoint → `zoho_api`. |
+| `zoho_create_issue` | ✅ Code 2026-05-29 | Crée issue Zoho — due_date auto par sévérité, préfixe [Leon]. Action `create_issue` dans `LeonZohoWorkflow`. |
 | Intent `audit` — inspection 3 axes + corrections auto | ✅ Code | `AUDIT_SYSTEM_PROMPT` + `audit_mode=True` + MAD pre-load/post-store. Patterns A/B/C. `cluster_status` Phase 3 pour INFRA. |
 | R9.13 — cascade classify LLM interactive | ✅ Code | `LLM_CLASSIFY_MODEL=claude-sonnet` → `LLM_CLASSIFY_FALLBACK=gpt-4o` → `LLM_MODEL_REASONING=mistral` |
-| Polling Zoho `agent: leon` | ❌ À implémenter | Boucle C à ajouter dans `leon.py` |
+| Zoho-observer Boucle D — issue routing | ✅ Code 2026-05-29 | Scan `/bugs/` toutes les 5 min. SSII → Leon `/mission`. Neokube/unknown → Charlotte `/mission`. Ntfy urgent si critical >1h. |

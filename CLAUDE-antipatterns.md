@@ -179,7 +179,7 @@ url = f"https://projects.zoho.com/portal/neomniadotnet#zp/projects/{p['id']}/"
 url = f"https://projects.zoho.com/portal/{ZOHO_PORTAL_NAME}#zp/projects/{pid}/"
 
 # CORRECT — le connector injecte web_url dans chaque réponse
-# configmap-zoho-connector.yaml  ← un seul endroit
+# configmap-zoho-engine.yaml  ← un seul endroit
 p["web_url"] = f"{WEB_BASE}#zp/projects/{pid}/"
 
 # Les agents lisent simplement :
@@ -1372,7 +1372,7 @@ Le LLM distingue naturellement `"as-tu analysé la page Notion ?"` (question dan
 
 Le refresh token Zoho initial n'avait pas le scope `ZohoProjects.bugs.ALL`. Résultat : `POST /projects/{id}/bugs/` → 403 "Invalid OAuth scope".
 
-**Fix appliqué** : nouveau token généré via Zoho API Console Self Client (app `1000.ONY9I6H42LISFPE6AEBV961CAIYMTX`) avec tous les scopes + `ZohoProjects.bugs.ALL`. Vault mis à jour (`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`). zoho-connector redémarré.
+**Fix appliqué** : nouveau token généré via Zoho API Console Self Client (app `1000.ONY9I6H42LISFPE6AEBV961CAIYMTX`) avec tous les scopes + `ZohoProjects.bugs.ALL`. Vault mis à jour (`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`). zoho-engine redémarré.
 
 **Scopes actifs** : `ZohoCRM.modules.ALL ZohoCRM.settings.ALL ZohoProjects.portals/projects/tasks/milestones/tasklists/bugs.ALL ZohoBooks.fullaccess.all ZohoSign.documents.ALL`
 

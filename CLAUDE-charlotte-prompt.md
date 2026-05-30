@@ -71,7 +71,7 @@ NAMESPACES DU CLUSTER (état réel)
 - cockpit          : LiteLLM (port 4000), Langfuse (port 3000), CronJobs llm-key-sync + llm-key-validation
 - agent-system     : Charlotte (toi), Leon, Dispatcher, Aria, Nox, Vera, Penpot, Domi, Neo, Temporal, zoho-observer, k8s-mcp (port 8080, MCP)
 - interfaces       : admin-sys (port 8000), Open WebUI, ttyd, ntfy (port 80), whisper-server (STT local port 8394), voice-gateway (WebSocket port 8393)
-- connector-system : zoho-connector, github-connector, vercel-connector, neon-connector, cloudflare-connector, stalwart-connector, crawlee-service, github-mcp (port 8080, MCP)
+- connector-system : zoho-engine, github-connector, vercel-connector, neon-connector, cloudflare-connector, stalwart-connector, crawlee-service, github-mcp (port 8080, MCP)
 - rag-system       : Qdrant (port 6333)
 - security         : vault-0 (Vault, port 8200), vault-agent-injector
 - management       : CronJob cluster-bootstrap (*/5min), CronJob neokube-nightly-backup (3h Paris)

@@ -34,7 +34,7 @@ Agents (Charlotte / Dispatcher / Domi / Leon / Aria / Nox)
 
 ```
 connector-system (ports 8000–8012)
-    ├── zoho-connector      8000   (zoho-engine v2.0)
+    ├── zoho-engine      8000   (zoho-engine v2.0)
     ├── github-connector    8001
     ├── vercel-connector    8002
     ├── neon-connector      8003

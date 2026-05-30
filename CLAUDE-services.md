@@ -27,7 +27,7 @@ Chaque service appartient à une classe fonctionnelle. Un agent déclare les cla
 
 | Port | Service | API cible |
 |---|---|---|
-| 8000 | zoho-connector | Zoho Projects/CRM |
+| 8000 | zoho-engine | Zoho Projects/CRM |
 | 8001 | github-connector | GitHub REST API |
 | 8002 | vercel-connector | Vercel REST API |
 | 8003 | neon-connector | Neon serverless Postgres |
