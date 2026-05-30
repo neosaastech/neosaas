@@ -288,10 +288,20 @@ Valeurs : `"active"` | `"completed"` | `"archived"`. Toute autre valeur → 400.
 Tous les champs sont optionnels sauf `project_id` + `task_id`. Au moins un champ requis.
 
 **⚠️ BUG CONNU** : `status=closed` via `/task.update` est silencieusement ignoré par l'API Zoho — le connector retourne `{"updated": {"status": "closed"}}` sans vérifier la réponse Zoho. Le champ `status` dans le payload est ignoré par Zoho Projects v3.
-**Workaround** : utiliser `percent_complete=100` via `/proxy POST /projects/{id}/tasks/{task_id}/` → ferme effectivement la tâche (`status.type = "closed"`).
+**Workaround** : utiliser `/task.close` (endpoint sémantique dédié, atomique) ou `percent_complete=100` via `/proxy`.
+
+### POST /task.close — clôture atomique centralisée
+
+**C'est l'endpoint à utiliser pour toute clôture de tâche. Jamais modifier les agents pour fermer leurs propres tâches — c'est le zoho-observer qui appelle `/task.close` après dispatch.**
+
 ```json
-{ "method": "POST", "path": "/projects/{project_id}/tasks/{task_id}/", "data": {"percent_complete": "100"} }
+{ "project_id": "123456789", "task_id": "987654321", "hours": 0.5, "notes": "Dispatché à Charlotte — auto" }
 ```
+→ `{"closed": true, "task_id": "...", "log": {"logged": true, "duration": "0:30"}}`
+
+- Guard : si déjà fermée → `{"closed": false, "reason": "already_closed"}`
+- `hours=0` → pas de timelog, juste la clôture
+- Utilise `percent_complete=100` en interne (seule méthode qui fonctionne avec Zoho v3)
 
 ### POST /issue.create — créer un bug/issue
 
