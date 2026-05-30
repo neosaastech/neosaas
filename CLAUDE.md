@@ -531,7 +531,7 @@ zoho_create_issue(
 | 61 | Milestone Zoho — `status` doit être un entier | `POST /projects/{id}/milestones/{mid}/status/` avec `data={"status": 2}` (int) — `2`=completed, `1`=notcompleted. Les strings (`"completed"`, `"Completed"`) retournent 6832. Scope requis : `ZohoProjects.milestones.UPDATE`. Leon doit appeler cet endpoint dès que toutes les tâches du milestone sont Closed. |
 | 62 | FastAPI catch-all `/{path:path}` intercepte `/health` | Toujours définir les routes spécifiques (`/health`, `/billing`…) **avant** le wildcard `/{path:path}`. FastAPI résout dans l'ordre de déclaration. |
 | 63 | FastAPI `method: str` en query param dans route catch-all | `request.method` donne la méthode HTTP réelle. Ne jamais ajouter `method: str` comme paramètre de fonction — FastAPI l'interprète comme query param obligatoire. Pattern correct : `async def proxy(path: str, request: Request, x_agent_id: str = Header(...))`. |
-| 54 | Git push ≠ déployé | Pas de GitOps auto — `git push` + `kubectl apply/replace` obligatoire |
+| 54 | Git push ≠ déployé | Pas de GitOps auto — `git push` + `kubectl apply/replace` obligatoire. Après mise à jour configmap, `kubectl rollout restart` obligatoire pour que le pod recharge. Vérifier avec `kubectl exec pod -- cat /app/config.yaml` que la config mountée correspond bien au configmap K8s. |
 | 56 | Zoho `/bugs/` form-encoded | `data=` pas `json=` pour appels directs |
 | 57 | Pseudo-code outil dans `_conv_llm` | `_conv_llm` = synthèse sans tools — `RÈGLE ANTI-PSEUDO-CODE` dans le prompt |
 | 58 | `billing_status` → 6831 Zoho timelog | Champ = `bill_status`. Erreur 6403 si tâche déjà fermée. |
