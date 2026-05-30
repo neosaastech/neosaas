@@ -159,8 +159,9 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 ### Politique LLM & Embeddings
 **100% API externes** (Gemini, Mistral, OpenAI, Anthropic) — aucun LLM local dans le cluster.
-**Modèle embeddings** : `paraphrase-multilingual-mpnet-base-v2` (HuggingFace Inference API, 768 dims, gratuit)
-**Alias LiteLLM** : `nomic-embed-text` — **Secret** : `HUGGINGFACE_API_KEY` dans `cockpit-secrets`
+**Modèle embeddings** : `paraphrase-multilingual-mpnet-base-v2` (768 dims) — servi par **embed-service K8s interne** (`embed-service.rag-system:8080`, 100% local, gratuit)
+**Alias LiteLLM** : `nomic-embed-text` → embed-service interne (primaire) · `oai-embed-small` → OpenAI fallback · `huggingface-embed` → HuggingFace fallback
+**HuggingFace** : clé `HUGGINGFACE_API_KEY` dans Vault `secret/neokube/llm-api-keys` + `cockpit-secrets`. Connectivité OK via `router.huggingface.co`. Ancienne URL `api-inference.huggingface.co` **NXDOMAIN** depuis 2026-05 (domaine supprimé). Crédits gratuits mensuels — HTTP 402 si épuisés.
 
 ### Interfaces web locales
 | URL | Service |
