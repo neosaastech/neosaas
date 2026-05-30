@@ -20,7 +20,9 @@ NeoStudio est l'**atelier de développement multi-agent de NeoKube**. Une UI cha
 │           apps/engine (Bun + Hono + SQLite)                 │
 │  ghcr.io/neomnia/neostudio:latest                        │
 │                                                             │
+│  POST /api/v1/auth/login              Login → JWT 7j (AUTH_PASSWORD)│
 │  GET  /api/v1/agents                  AgentProvider ConfigMap│
+│  GET  /api/v1/session?agentId=        Liste sessions (filtre optionnel)│
 │  POST /api/v1/session/start           Crée session + workspace│
 │  POST /api/v1/session/:id/message     Ajoute message user   │
 │  GET  /api/v1/session/:id/stream      SSE tokens agent      │
@@ -68,7 +70,7 @@ Liste dynamique via `NEOSTUDIO_AGENTS_CONFIG` (ConfigMap K8s) — modifiable san
 | **Ports** | Engine : 4242 · UI : 3000 |
 | **URL locale** | `http://neostudio.neokube.local` |
 | **URL publique** | `https://neostudio.neokube.fr` |
-| **Vault path** | `secret/neokube/apps/neostudio` → JWT_SECRET, LITELLM_API_KEY, GITHUB_TOKEN |
+| **Vault path** | `secret/neokube/apps/neostudio` → JWT_SECRET, AUTH_PASSWORD, LITELLM_API_KEY, GITHUB_TOKEN |
 | **GitOps** | `~/Kubinote-GitOps/apps/interfaces/base/` (5 fichiers neostudio-*) |
 | **imagePullSecret** | `ghcr-neostudio` (dans namespace `interfaces`) |
 
@@ -85,25 +87,36 @@ Liste dynamique via `NEOSTUDIO_AGENTS_CONFIG` (ConfigMap K8s) — modifiable san
 ## Architecture UI — pages et composants clés
 
 ```
-apps/ui/src/app/
-├── agents/
-│   ├── page.tsx                        # Grille agents (GET /api/v1/agents)
-│   ├── components/
-│   │   ├── AgentsHeader.tsx
-│   │   ├── AgentCard.tsx
-│   │   └── AgentPromptInput.tsx        # Crée session + envoie premier message → redirect
-│   └── [agentId]/
-│       └── session/[sessionId]/
-│           ├── page.tsx                # ← LOGIQUE PRINCIPALE (streaming, SSE activité, état)
-│           └── components/
-│               ├── SessionPageContent.tsx  # Layout tabs + fetch diff on activation
-│               ├── SessionChat.tsx         # Messages + typing indicator + CopyButton
-│               ├── SessionHeader.tsx
-│               ├── SessionTabs.tsx         # 4 onglets : chat / activité (badge violet) / diff (badge amber) / terminal
-│               ├── SessionDiff.tsx         # FileDiffTool par fichier modifié (vrais contenus git)
-│               ├── ActivityFeed.tsx        # Timeline SSE en temps réel (session.start/step/file.write/…)
-│               ├── SessionTerminal.tsx     # iframe → http://ttyd.neokube.local
-│               └── FollowUpInput.tsx       # Input follow-up + streaming
+apps/ui/src/
+├── lib/
+│   └── auth.ts                         # getToken / setToken / clearToken / authFetch (Bearer + 401→/login)
+├── components/
+│   └── workspace/
+│       ├── WorkspaceSidebar.tsx        # Sidebar persistante — agents + sessions récentes + status dots
+│       └── AuthGuard.tsx               # Vérifie token localStorage → spinner → redirect /login si absent
+├── app/
+│   ├── login/
+│   │   └── page.tsx                    # Page login — form mot de passe → POST /api/v1/auth/login → JWT
+│   └── agents/
+│       ├── layout.tsx                  # AuthGuard + sidebar (w-56) + main area
+│       ├── page.tsx                    # Dashboard multi-agents — grille AgentDashboardCard (GET /api/v1/agents + sessions)
+│       ├── components/
+│       │   ├── AgentsHeader.tsx        # Conservé (dev local), non utilisé en prod (sidebar = branding)
+│       │   ├── AgentCard.tsx
+│       │   ├── AgentDashboardCard.tsx  # Card agent — stats sessions, badge running pulsant, dernier lien
+│       │   └── AgentPromptInput.tsx    # Crée session + envoie premier message → redirect
+│       └── [agentId]/
+│           └── session/[sessionId]/
+│               ├── page.tsx            # LOGIQUE PRINCIPALE + panneau droit ActivityFeed permanent
+│               └── components/
+│                   ├── SessionPageContent.tsx  # Center panel : tabs chat / diff / terminal
+│                   ├── SessionChat.tsx         # Messages + typing indicator + CopyButton
+│                   ├── SessionHeader.tsx
+│                   ├── SessionTabs.tsx         # 3 onglets : chat / diff (badge amber) / terminal
+│                   ├── SessionDiff.tsx         # FileDiffTool par fichier modifié (vrais contenus git)
+│                   ├── ActivityFeed.tsx        # Timeline SSE en temps réel — panneau droit (xl:flex)
+│                   ├── SessionTerminal.tsx     # iframe → http://ttyd.neokube.local
+│                   └── FollowUpInput.tsx       # Input follow-up + streaming
 
 apps/desktop/                           # Phase 4 — App desktop Linux
 ├── main.js                             # Electron BrowserWindow → NEOSTUDIO_URL
@@ -193,7 +206,8 @@ LITELLM_PROXY_URL=http://litellm.neokube.local
 LITELLM_API_KEY=sk-neostudio-engine
 DEFAULT_LLM_MODEL=mistral/mistral-large-latest
 GITHUB_TOKEN=ghp_xxx
-JWT_SECRET=xxx
+JWT_SECRET=dev-secret-local
+# AUTH_PASSWORD=mot-de-passe  # Laisser vide en dev local = auth désactivée (toujours autorisé)
 ```
 
 ---
@@ -208,8 +222,11 @@ JWT_SECRET=xxx
 | **D** | UI Chat amélioré — identité agent/user, typing indicator, fix streaming | ✅ 2026-05-23 |
 | **1** | ~~Intégration UI Superset~~ | ❌ Abandonné (2026-05-23) |
 | **2** | Live Activity View + git workspace + Terminal + Diff + copy button | ✅ 2026-05-23 |
+| **2.7** | Dashboard Multi-Projets — grille cards agents avec statut, sessions, dernière activité | ✅ 2026-05-23 |
+| **2.9** | Board UI 3-panels — sidebar nav + chat center + activity feed permanent | ✅ 2026-05-23 |
 | **3** | Déploiement auto — GitHub Action → admin-sys via `ops.neokube.fr` | ✅ 2026-05-23 |
 | **4** | App desktop Linux — `.AppImage` + `.deb` (Electron, `apps/desktop/`) | ✅ 2026-05-23 |
+| **4-auth** | Auth JWT — login page + middleware engine + authFetch UI + Vault AUTH_PASSWORD | ✅ 2026-05-23 |
 
 ---
 
@@ -247,7 +264,7 @@ JWT_SECRET=xxx
 **Terminal tab**
 
 - `SessionTerminal.tsx` : iframe vers `http://ttyd.neokube.local`
-- Onglet "Terminal" dans `SessionTabs` (4ème onglet)
+- Onglet "Terminal" dans `SessionTabs` (3ème onglet — l'onglet "Activité" est dans le panneau droit permanent en Phase 2.9)
 
 **Diff tab réel**
 
@@ -258,6 +275,79 @@ JWT_SECRET=xxx
 **Copy button**
 
 - `CopyButton` sur chaque message (assistant + user) — visible au hover, feedback checkmark 1.5s
+
+---
+
+### Détail Phase 2.7 — Dashboard Multi-Projets (✅ 2026-05-23)
+
+**Objectif** : transformer `/agents` d'un simple listing en un vrai tableau de bord avec statut et métriques par agent.
+
+**`AgentDashboardCard`** :
+- Stats calculées côté client à partir de la liste sessions (pas de nouvel endpoint)
+- Badge "En cours" pulsant (vert) si `running > 0`
+- Compteur sessions total + running
+- Lien vers la dernière session (si elle existe)
+- Boutons "Ouvrir" → `/agents/{id}` et "+" → nouvelle session (AgentPromptInput)
+
+**`agents/page.tsx`** (refactorisé complet) :
+- Fetch parallèle : `GET /api/v1/agents` + `GET /api/v1/session`
+- Skeleton 4 cartes `animate-pulse` pendant le chargement
+- Grille responsive : `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3`
+- Header : compteur agents + sessions total + badge sessions running
+
+**Engine** : `GET /api/v1/session?agentId=` ajouté — filtre optionnel par agent (utilisé aussi par la page `[agentId]`).
+
+---
+
+### Détail Phase 2.9 — Board UI 3-Panels (✅ 2026-05-23)
+
+**Architecture** :
+```
+┌──────────────┬──────────────────────────────┬──────────────────────┐
+│ SIDEBAR w-56 │       CHAT CENTER (flex-1)   │ ACTIVITY FEED  w-72  │
+│              │                              │  (xl:flex, hidden <xl│
+│  NeoStudio   │  [SessionHeader]             │                      │
+│  ─────────── │  ─────────────────────────── │  ▶ session.start     │
+│  Charlotte ● │  tabs: chat | diff | terminal│  → step: analyse…    │
+│  Leon        │  ─────────────────────────── │  ✎ file.write        │
+│  ├ session 1 │  [messages]                  │  …                   │
+│  └ session 2 │                              │                      │
+│  Aria        │  [FollowUpInput]             │                      │
+└──────────────┴──────────────────────────────┴──────────────────────┘
+```
+
+**Changements** :
+- `agents/layout.tsx` : layout persistant — sidebar + `{children}` (main area)
+- `WorkspaceSidebar` : liste agents (fetch `/api/v1/agents`), sessions récentes par agent (5 max), status dots (vert/gris/rouge), navigation active via `usePathname`
+- Session `page.tsx` : rendu 3-panels — center `SessionPageContent` + right `ActivityFeed`
+- `SessionTabs` : 3 onglets (chat, diff, terminal) — plus d'onglet "Activité"
+- `ActivityFeed` permanent dans le panneau droit (`xl:flex hidden`) avec badge compteur live
+- Suppression de `AgentsHeader` des pages agents (le branding est dans la sidebar)
+
+---
+
+### Détail Phase 4-auth — Auth JWT (✅ 2026-05-23)
+
+**Objectif** : protéger l'Engine et l'UI sans bloquer le développement local.
+
+**Pattern opt-in** : l'auth est activée uniquement si `AUTH_PASSWORD` est défini dans l'env. Si absent → toutes les requêtes passent (dev mode). Si défini → JWT requis sur tous les endpoints sauf `/api/v1/health` et `/api/v1/auth/login`.
+
+**Engine** :
+- `apps/engine/src/routes/auth.ts` : `POST /api/v1/auth/login` — compare `password` à `AUTH_PASSWORD`, retourne JWT signé avec `JWT_SECRET` (expiry 7 jours, algo HS256)
+- `apps/engine/src/middleware/auth.ts` : `authMiddleware` — vérifie le header `Authorization: Bearer <token>` via `verify()` Hono/JWT
+- `apps/engine/src/index.ts` : middleware global `app.use('*', authMiddleware)` + route `/api/v1/auth`
+
+**UI** :
+- `src/lib/auth.ts` : `getToken / setToken / clearToken` (localStorage key `neostudio-token`) + `authFetch` (drop-in pour `fetch`, injecte le Bearer, redirige vers `/login` sur 401)
+- `src/app/login/page.tsx` : formulaire mot de passe → `POST /api/v1/auth/login` → `setToken(token)` → redirect `/agents`
+- `src/components/workspace/AuthGuard.tsx` : vérifie `getToken()` au mount — spinner pendant la vérification, redirect `/login` si absent
+- `agents/layout.tsx` : wrappé dans `<AuthGuard>` — protège toutes les routes `/agents/*`
+
+**Vault** :
+- `secret/neokube/apps/neostudio` : `AUTH_PASSWORD` ajouté via `vault kv patch`
+- `deployment-neostudio.yaml` : template Vault exporte `AUTH_PASSWORD` en plus de `JWT_SECRET`
+
+**Migration authFetch** : 7 fichiers mis à jour — `agents/page.tsx`, `agents/[agentId]/page.tsx`, `session/[sessionId]/page.tsx`, `SessionPageContent.tsx`, `FollowUpInput.tsx`, `AgentPromptInput.tsx`, `WorkspaceSidebar.tsx`.
 
 ---
 
@@ -359,3 +449,80 @@ NEOSTUDIO_URL=https://neostudio.neokube.fr ./NeoStudio-0.1.0.AppImage
 | UI-14 | electron-builder ne supporte pas les versions semver avec `^` | `"electron": "^31.7.6"` → `Cannot compute electron version` à la build. Fix : version exacte sans caret `"electron": "31.7.6"`. |
 | UI-15 | electron-builder + monorepo npm workspaces → `ENOENT 7zip-bin` | `apps/*` dans les workspaces → npm hisse `7zip-bin` à la racine → electron-builder ne le trouve pas. Fix : (1) lister explicitement les workspaces sans `apps/desktop` dans le root `package.json` ; (2) ajouter `workspaces=false` dans `apps/desktop/.npmrc`. |
 | UI-16 | `.deb` electron-builder exige `homepage` dans `package.json` | `Error: Please specify project homepage` au build deb. Fix : ajouter `"homepage": "https://..."` dans `apps/desktop/package.json`. AppImage n'a pas cette contrainte. |
+| UI-17 | `fetch()` direct sans Bearer → 401 silencieux après activation de l'auth | Dès que `AUTH_PASSWORD` est défini dans l'env Engine, tous les appels `fetch()` directs retournent 401 sans message d'erreur visible. Fix : remplacer chaque `fetch(...)` par `authFetch(...)` (depuis `@/lib/auth`). `authFetch` injecte le Bearer et redirige vers `/login` automatiquement sur 401. Checklist : `grep -r "fetch(" apps/ui/src --include="*.tsx" | grep -v authFetch` doit retourner 0 résultat (hors lib/auth.ts lui-même). |
+| UI-18 | WebSocket browser ne supporte pas les headers `Authorization` | `new WebSocket(url)` ignore tout header custom. Pour le terminal ttyd proxy, passer le JWT via query param : `?token=<jwt>`. Le moteur valide ce param dans le handler `fetch()` avant l'upgrade. Ne jamais mettre le token dans l'URL de production sans HTTPS (TLS obligatoire). |
+
+---
+
+## Workflow : Ticket Notion → Session NeoStudio → PR GitHub
+
+Flux de développement standard avec NeoStudio comme interface de l'agent développeur.
+
+### 1. Préparation
+
+```bash
+# Créer ou récupérer un ticket Notion → obtenir la spec
+# Ouvrir NeoStudio : http://neostudio.neokube.local
+# Choisir l'agent : Aria (frontend), Nox (backend), ou Dispatcher (full-stack)
+```
+
+### 2. Démarrer une session
+
+Via `POST /api/v1/session/start` ou bouton "+" dans la sidebar :
+
+```json
+{
+  "agentId": "aria",
+  "repoPath": "/data/workspaces/<session-id>",
+  "model": "codestral"
+}
+```
+
+Le workspace git est initialisé automatiquement dans `/data/workspaces/<session-id>`.
+
+### 3. Développer
+
+1. **Chat** — envoyer la spec à l'agent. Il génère le code via `POST /:id/workspace/file`
+2. **Activity Feed** — voir en temps réel les fichiers créés/modifiés (panel droit)
+3. **Terminal** — `POST /:id/exec` ou WebSocket ttyd proxy pour exécuter des commandes
+4. **Diff** — onglet Diff ou accordéon panel droit pour voir les changements git
+
+### 4. Révision & commit
+
+```bash
+# Dans le terminal NeoStudio (session workspace)
+git add .
+git commit -m "feat: <description>"
+git push origin <branch>
+```
+
+### 5. Créer la PR GitHub
+
+```bash
+gh pr create --title "<titre>" --body "<description>" --base main
+```
+
+### 6. Déploiement
+
+Push sur `main` → GitHub Actions CI → build image → deploy K8s automatique.
+
+---
+
+### Git worktrees (isolation par branche)
+
+Pour travailler sur plusieurs tâches en parallèle sans conflit :
+
+```bash
+# Via API Engine
+POST /api/v1/worktree
+{
+  "repoPath": "/data/workspaces/<session-id>",
+  "branchName": "feat/nouvelle-feature",
+  "worktreePath": "/data/worktrees/feat-nouvelle-feature"
+}
+
+GET  /api/v1/worktree?repoPath=/data/workspaces/<session-id>
+DELETE /api/v1/worktree/<branch-name>?repoPath=/data/workspaces/<session-id>
+```
+
+Chaque worktree est un checkout isolé de la même base git — les agents peuvent travailler en parallèle sur des branches différentes sans `stash`.
