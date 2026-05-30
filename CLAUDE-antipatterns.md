@@ -1519,3 +1519,31 @@ if r.status_code == 403:
 {'start_date': '05-30-2026', 'end_date': '05-30-2026', 'description': 'Estimé ~2h'}
 # À éviter : ne pas mettre [~2h] dans le nom — pollution visuelle sans valeur
 ```
+
+---
+
+### 63. Zoho — impossible de rouvrir une tâche fermée via API REST
+
+**Appris par test (2026-05-30)** :
+
+Une tâche fermée (`percent_complete=100`) ne peut pas être rouverte via l'API Zoho Projects v3.
+
+```
+POST /projects/{pid}/tasks/{tid}/ data={percent_complete: 0}
+→ HTTP 403 {"title":"CANNOT_OPEN_TASK","message":"This task cannot be logged"}
+```
+
+De même : il est impossible de poster un timelog sur une tâche fermée (code 6403 "Time cannot be logged for closed tasks").
+
+**Règles concrètes** :
+1. Logger le temps (`/logs/`) **avant** `percent_complete=100` — c'est ce que fait `/task.close`
+2. Ne jamais fermer une tâche sans avoir loggué le temps réel au préalable
+3. Si le timelog est supprimé d'une tâche fermée → perdu définitivement, impossible à corriger via API
+4. Seule correction possible : interface web Zoho
+
+**Comportement `task.close`** (correct) :
+```
+POST /logs/  ← étape 1 (task encore open)
+POST /tasks/{tid}/ percent_complete=100  ← étape 2 (fermeture)
+```
+L'ordre est atomique et irréversible via API. Vérifier `hours > 0` et `hours = temps_réel_en_minutes / 60` avant d'appeler `/task.close`.

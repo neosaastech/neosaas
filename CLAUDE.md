@@ -145,7 +145,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (tunnel, 2 replicas) |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (v2.11.0), **whisper-server** (STT local port 8394), **voice-gateway** (WS port 8393), **media-gateway** (préprocessing multimodal CLASS A port 8395) |
-| `agent-system` | Charlotte SRE, Leon, Dispatcher, Aria, Nox, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
+| `agent-system` | Charlotte SRE, Leon, Dispatcher, **Camille**, **Guillaume**, **Alain**, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
 | `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **notion**(8011), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
@@ -206,9 +206,10 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
 | **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.3 (REVIEW mode, notion_update_page, 8 intent labels dont `audit`, R9.13 classify cascade claude-sonnet→gpt-4o, zoho_delete_projects confirmed gate, R6, `delegate_to_charlotte` read-only audit) |
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
-| **Aria** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
-| **Nox** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
-| **Vera** | QA Reviewer — analyse spec + output Aria/Nox/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
+| **Camille** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
+| **Guillaume** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
+| **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | Temporal | 8494 | `dispatcher` | **à créer v1.0** |
+| **Vera** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `dispatcher` | active v1.0 (v2.0 à implémenter : scaleway-engine) |
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
@@ -248,7 +249,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 > **Leon ↔ Zoho** : Leon passe **toujours** par `zoho-engine` v2.0 (K8s: \`zoho-engine\`, port 8000) — 7 endpoints : `/proxy` (générique), `/scaffold` (création projet+jalons atomique), `/delete-projects` (confirmed gate), `/milestone.delete` (⚠️ completion Zoho impossible via REST — anti-pattern #53), `/project.status`, `/task.update`. L'OAuth2 est transparent. `zoho_api(method, path, data?)` = proxy générique pour tout endpoint non couvert. Suppression = protocole 3 étapes obligatoire (`zoho_list_projects` → présenter liste → `zoho_delete_projects(confirmed=True)`). Architecture complète : **[CLAUDE-leon.md §Architecture Leon ↔ Zoho](CLAUDE-leon.md)**
 > **Méthodologie gestion de projet, normes Neomnia, template CDC, règles interview client** : **[CLAUDE-leon-process.md](CLAUDE-leon-process.md)**
 > **RAG agents** : écosystème Qdrant complet (collections, agents, fonctions) : **[CLAUDE-agents.md §RAG](CLAUDE-agents.md)** · Tableau collections + points : **[CLAUDE-cluster.md](CLAUDE-cluster.md)**
-> `leon-memory` (Leon) · `template-neosaas` + `design-knowledge` (Aria) · `design-knowledge` + `neomnia_core` (Zephyr) · `sre-charlotte-incidents` (Charlotte)
+> `leon-memory` (Leon) · `template-neosaas` + `design-knowledge` (Camille) · `design-knowledge` + `neomnia_core` (Zephyr) · `sre-charlotte-incidents` (Charlotte)
 > Script ré-indexation Leon : `~/scripts/index_leon_process.py`
 
 Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body?}` — credentials depuis Vault auto.
@@ -260,9 +261,9 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 | Serveur | Namespace | Endpoint | Agents |
 |---|---|---|---|
-| `github-mcp` | `connector-system` | `:8080/mcp` (streamable-http) | Aria, Nox, Dispatcher |
+| `github-mcp` | `connector-system` | `:8080/mcp` (streamable-http) | Camille, Guillaume, Alain, Dispatcher |
 | `k8s-mcp` | `agent-system` | `:8080/mcp` (streamable-http) | Charlotte |
-| `mcp.neon.tech` | remote | `https://mcp.neon.tech/sse` | Nox |
+| `mcp.neon.tech` | remote | `https://mcp.neon.tech/sse` | Guillaume |
 
 ---
 
@@ -274,8 +275,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 |---|---|---|---|
 | **Exploration** | Charlotte | Mention projet → `project_health_check` | Bilan ✅/❌ Zoho/GitHub/Vercel/Penpot/Notion |
 | **Planification** | Leon | Brief → dialogue 10 tours → `dispatch_project` | ProjectSpec 13 champs + projet Zoho structuré |
-| **Production** | Dispatcher+Aria+Nox+Penpot+Domi+Vera | `POST /trigger` ou Zoho "Prêt pour production" | 2 repos GitHub, Vercel deploy, Neon branch, Penpot design, domaine |
-| **Design→Code** | Charlotte + Dispatcher + Aria v2.0 | `dispatch_design_deploy(penpot_project_id)` | Branche GitHub `design/penpot-export-{id}` + Vercel preview |
+| **Production** | Dispatcher+Camille+Guillaume+Alain+Penpot+Domi+Vera | `POST /trigger` ou Zoho "Prêt pour production" | 2 repos GitHub, CI/CD, Vercel deploy, Neon branch, Penpot design, domaine |
+| **Design→Code** | Charlotte + Dispatcher + Camille v2.0 | `dispatch_design_deploy(penpot_project_id)` | Branche GitHub `design/penpot-export-{id}` + Vercel preview |
 
 **Gaps** : ~~trigger Zoho status → production~~ ✅ · ~~mapper Zoho→ProjectSpec~~ ✅ · ~~email enrichi étape par étape~~ ✅ (tous résolus 2026-05-12)
 
@@ -330,7 +331,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 **Images** : Engine `ghcr.io/charlesvdd/neostudio:latest` · UI `ghcr.io/charlesvdd/neostudio-ui:latest` — CI/CD : push main → build auto, déploiement K8s manuel (`kubectl rollout restart`)
 
 **Stack** : Engine Bun/Hono :4242 ✅ · UI Next.js 15 custom :3000 ✅ (Phase D — chat avec identité agent + typing indicator)
-**Agents exposés** : Charlotte · Leon · Aria · Nox · Vera · Dispatcher (via `NEOSTUDIO_AGENTS_CONFIG` ConfigMap)
+**Agents exposés** : Charlotte · Leon · Camille · Guillaume · Vera · Dispatcher (via `NEOSTUDIO_AGENTS_CONFIG` ConfigMap)
 **Note** : intégration fork superset-sh/superset abandonnée (UI desktop-first, données mockées — voir CLAUDE-neostudio.md)
 
 ---
@@ -388,8 +389,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 ### Scores de référence (agent_eval.py, 2026-05-06)
 | Agent | Score | Agent | Score |
 |---|---|---|---|
-| Dispatcher | 10.0/10 | Aria | 9.1/10 |
-| Domi | 9.7/10 | Nox | 8.9/10 |
+| Dispatcher | 10.0/10 | Camille | 9.1/10 |
+| Domi | 9.7/10 | Guillaume | 8.9/10 |
 | Penpot | 9.6/10 | Neo | 8.5/10 |
 | Vera | 9.2/10 | Leon | 8.2/10 |
 | Charlotte | 9.17/10 | — | — |
@@ -413,7 +414,7 @@ Toute issue créée par un agent doit respecter ce standard. Implémenté dans `
 ### Orchestration automatique — Zoho-observer Boucle D (v3.0, déployée 2026-05-29)
 
 `zoho-observer` scanne les bugs Zoho ouverts toutes les **5 min** (300s) :
-- `ASSOCIATED_TEAMS.id == 2114101000001544001` (SSII) → `POST leon:8181/mission` — Leon orchestre vers Zephyr/Milo/Dispatcher/Nora/Aria/Nox
+- `ASSOCIATED_TEAMS.id == 2114101000001544001` (SSII) → `POST leon:8181/mission` — Leon orchestre vers Zephyr/Milo/Dispatcher/Nora/Camille/Guillaume/Alain
 - `ASSOCIATED_TEAMS.id == 2114101000001751022` (Neokube) ou team inconnue → `POST charlotte:8383/mission`
 - Issue `critical` non traitée depuis >1h → ntfy `urgent`
 - Commentaire `🤖` = déjà dispatché (idempotence cross-redémarrage)
@@ -528,7 +529,7 @@ zoho_create_issue(
 | **Charlotte** SRE v4 | `claude-sonnet` ✅ | `claude-sonnet` → `gpt-4o` ✅ (R9.13) | `mistral` (background) | `gpt-4o` | `mistral` | `claude-opus` ✅ (R9.12) |
 | **Leon** | `gpt-4o` (TASK) | `claude-sonnet` → `gpt-4o` → `mistral` ✅ (R9.13) | `mistral` (background scans) | `claude-sonnet` (REVIEW) | — | — |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | — |
-| **Aria** / **Nox** | `codestral` | — | — | — | — |
+| **Camille** / **Guillaume** / **Alain** | `codestral` | — | — | `mistral` (Alain fallback) | — |
 | **Vera** | `mistral-large-2407` | — | — | — | — |
 | **Penpot** / **Domi** | `mistral` ⚠️ | — | — | — | — |
 | **Neo** | `mistral-large-2407` | — | — | — | — |

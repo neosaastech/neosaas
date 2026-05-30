@@ -46,15 +46,16 @@ Chaque agent NeoKube possède une **identité complète et cohérente** à trave
 | **Vera** | `vera@neokube.fr` | ✅ | `vera-sa` | aucun | ❌ gap | `vera` | — |
 | **Domi** | `domi@neokube.fr` | ✅ | `domi-sa` | aucun | ❌ gap | `domi` | — |
 | **Neo** | `neo@neokube.fr` | ✅ SMTP+IMAP | `neo-sa` | aucun | ❌ gap | `neo` | **✅ master** |
-| **Aria** | — | ❌ gap | `aria-sa` | aucun | ❌ gap | `aria` | — |
-| **Nox** | — | ❌ gap | `nox-sa` | aucun | ❌ gap | `nox` | — |
+| **Camille** | — | ❌ gap | `camille-sa` | aucun | ❌ gap | `camille` | — |
+| **Guillaume** | — | ❌ gap | `guillaume-sa` | aucun | ❌ gap | `guillaume` | — |
+| **Alain** | — | ❌ gap | `alain-sa` | aucun | ❌ gap | `alain` | — |
 | **Penpot** | — | — | `penpot-sa` | aucun | ❌ gap | `penpot` | — |
 
 > **Agents OWU-facing** — toute interaction humaine passe exclusivement par Open WebUI :
 > - **Charlotte** : Pipe SSE `charlotte_sre` — `/mission/stream` (Pattern A). Interface toujours `"openwebui"`.
 > - **Neo** : endpoint OpenAI-compat `/v1/chat/completions` (Pattern B). Agent maître côté humain, accès tous connectors + polling IMAP `neo@neokube.fr`.
 >
-> Les autres agents (Aria, Nox, Vera, Penpot, Domi, Dispatcher, Leon) sont des workers Temporal ou des services HTTP internes — ils ne sont **jamais** exposés directement à l'utilisateur via OWU.
+> Les autres agents (Camille, Guillaume, Alain, Vera, Penpot, Domi, Dispatcher, Leon) sont des workers Temporal ou des services HTTP internes — ils ne sont **jamais** exposés directement à l'utilisateur via OWU.
 
 ### Règle : cohérence identité sur les 5 dimensions
 
@@ -146,14 +147,15 @@ Les policies vivent dans le ConfigMap `agent-policies` (namespace `agent-system`
 | Charlotte | ✅ | ✅ | |
 | Leon | ✅ | ✅ | |
 | Dispatcher | ✅ | ✅ | |
-| Aria | ❌ | ❌ | **Gap — à ajouter** |
-| Nox | ❌ | ❌ | **Gap — à ajouter** |
+| Camille | ❌ | ❌ | **Gap — à ajouter** |
+| Guillaume | ❌ | ❌ | **Gap — à ajouter** |
+| Alain | ❌ | ❌ | **À créer (v1.0)** |
 | Vera | ❌ | ❌ | **Gap — à ajouter** |
 | Penpot | ❌ | ❌ | **Gap — à ajouter** |
 | Domi | ❌ | ❌ | **Gap — à ajouter** |
 | Neo | ❌ | ❌ | **Gap — à ajouter** |
 
-> Priorité : Aria et Nox en premier (accès GitHub/Vercel/Neon = surface large).
+> Priorité : Camille, Guillaume et Alain (accès GitHub/Vercel/Neon = surface large).
 
 ---
 
@@ -193,7 +195,7 @@ Les erreurs sont tracées vers Langfuse (event `output_guard`).
 | `leon` | `summary` | `summary: str`, `actions: list`, `next_steps: list` |
 | `charlotte` | `answer`, `session_id` | `answer: str`, `steps: list`, `session_id: str` |
 
-Agents sans schéma (Dispatcher, Aria, Nox, Vera, Penpot, Domi, Neo) : `valid=true` par défaut.
+Agents sans schéma (Dispatcher, Camille, Guillaume, Alain, Vera, Penpot, Domi, Neo) : `valid=true` par défaut.
 Pour ajouter un schéma, modifier `SCHEMAS` dans `output_guard.py` (ConfigMap `sidecar-scripts`).
 
 ---
@@ -431,8 +433,9 @@ async def _guard_output(agent: str, output: dict) -> dict:
 | Charlotte | `sre_health`, `severity` | `_langfuse_score()` + `_langfuse_resolve_trace_id()` | ✅ résolution par trace_name |
 | Leon | — | non implémenté | — |
 | Dispatcher | — | non implémenté | — |
-| Aria | — | non implémenté | — |
-| Nox | — | non implémenté | — |
+| Camille | — | non implémenté | — |
+| Guillaume | — | non implémenté | — |
+| Alain | — | non implémenté | — |
 | Vera | — | non implémenté | — |
 | Penpot | — | non implémenté | — |
 | Domi | — | non implémenté | — |
@@ -540,15 +543,16 @@ ProjectSpec validé par Dispatcher
 | Charlotte | `agent-sre-sa` (agent-system) | `agent-sre-role` — lecture + remédiation, secrets read-only |
 | Leon | `leon-sa` (agent-system) | read-only `agent-system` (get/list/watch pods, services, deployments) |
 | Dispatcher | `dispatcher-sa` (agent-system) | **aucun binding** — pas d'accès K8s |
-| Aria | `aria-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
-| Nox | `nox-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
+| Camille | `camille-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
+| Guillaume | `guillaume-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
+| Alain | `alain-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
 | Vera | `vera-sa` (agent-system) | **aucun binding** — pas d'accès K8s, pas de kubectl |
 | Penpot | `penpot-sa` (agent-system) | **aucun binding** — opérations via penpot-connector |
 | admin-sys | `admin-sys-agent` (interfaces) | `admin-sys-executor` — lecture universelle + mutations workloads/config/RBAC/batch/namespaces |
 
 > **Supprimé le 2026-04-26** : `ClusterRoleBinding agent-sre-cluster-admin` (Charlotte n'a plus `cluster-admin`).
 > **Ajouté le 2026-04-27** : `ClusterRole admin-sys-executor` + binding sur `admin-sys-agent` SA.
-> **Posture Aria/Nox/Vera/Penpot/Dispatcher** : pas de kubectl dans les pods, toutes les opérations infra passent par les connectors via token Vault.
+> **Posture Camille/Guillaume/Alain/Vera/Penpot/Dispatcher** : pas de kubectl dans les pods, toutes les opérations infra passent par les connectors via token Vault.
 
 ---
 
@@ -580,7 +584,7 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 | `check_service_version` | Version courante vs dernière disponible (DockerHub/GitHub API) | Obligatoire avant toute mise à jour |
 | `helm_upgrade` | Helm upgrade via admin-sys `/helm` | Uniquement traefik et vault |
 | `test_agent_stream` | Smoke test streaming SSE d'un agent OWU-facing — compte les chunks SSE reçus (>3 = OK) | Étape 6 du protocole de correction code agents |
-| `trigger_dispatcher_workflow` | Délègue un workflow au Dispatcher Temporal : `dev_project` (lance `DevProjectWorkflow` complet Aria+Nox+Vera+deploy) ou `check_status` (liste les workflows actifs) | Charlotte délègue le pipeline métier sans l'absorber |
+| `trigger_dispatcher_workflow` | Délègue un workflow au Dispatcher Temporal : `dev_project` (lance `DevProjectWorkflow` complet Camille+Guillaume+Alain+Vera+deploy) ou `check_status` (liste les workflows actifs) | Charlotte délègue le pipeline métier sans l'absorber |
 | `signal_workflow` | Envoie un signal à un `DevProjectWorkflow` en attente : `approve` (déclenche déploiement Vercel) ou `reject` (annule) | Relais de l'approbation humaine vers Temporal |
 | `kustomize_apply` | Build kustomize depuis `/gitops/<rel_path>` + POST YAML à admin-sys `/apply` — déploiement immédiat sans attendre le CronJob bootstrap | Installation complète d'un service (après write_file + git_push) |
 | `web_fetch` | GET HTTP public avec httpx (timeout 20s, follow_redirects) — retourne le texte tronqué à `max_chars` (défaut 8000) | Lookup Docker Hub, docs officielles, GitHub raw avant installation |
@@ -641,7 +645,7 @@ JAMAIS oublier git_push — sans ça le fix est reverté en <5 min par cluster-b
    - **Runtime** : `write_file` et `apply_gitops_fix` appellent `_is_charlotte_file(path)` — bloque si `"charlotte" in path` ou `"sre-script" in path` ou `basename in {"serviceaccount-sre.yaml", "sre_agent.py"}` → retourne `❌ AUTO-MODIFICATION BLOQUÉE` + ntfy (priorité high)
    - **Prompt** : `RÈGLE AUTO-MODIFICATION — ABSOLUE` + `RÈGLE ANTI-BOUCLE` (stop tour 4/8 sans écriture → `ask_clarification` structuré + ntfy)
    - **Comportement attendu** : Charlotte s'arrête dès la 1ère tentative bloquée, appelle `ask_clarification` en expliquant ce que l'humain doit appliquer manuellement via GitOps. Elle ne boucle pas.
-   - **Périmètre exact** : tous les fichiers contenant "charlotte" ou "sre-script" dans le path, `serviceaccount-sre.yaml`, `sre_agent.py`. Les fichiers des autres agents (Neo, Nox, Leon…) ne sont **PAS** bloqués. Voir antipattern #34.
+   - **Périmètre exact** : tous les fichiers contenant "charlotte" ou "sre-script" dans le path, `serviceaccount-sre.yaml`, `sre_agent.py`. Les fichiers des autres agents (Neo, Guillaume, Leon…) ne sont **PAS** bloqués. Voir antipattern #34.
 7. **RBAC pods/exec** — `pods/exec create` ajouté au ClusterRole `agent-sre-role` (2026-05-13) — requis pour `kubectl exec` / `test_agent_stream`.
 
 ### Gotchas opérationnels Charlotte (2026-05-07)
@@ -759,6 +763,116 @@ Charlotte retourne une question — PydanticAI s'arrête naturellement sans `bre
 
 ---
 
+## Alain — DevOps Projet (v1.0, spec 2026-05-30)
+
+**Rôle** : Configure le pipeline CI/CD et les variables d'environnement pour chaque projet applicatif produit par l'Équipe Projet. Il intervient **après** Camille (frontend) et Guillaume (backend) ont créé les repos.
+
+### Frontière
+
+| Domaine | Alain ✅ | Hors périmètre ❌ |
+|---|---|---|
+| GitHub Actions (.github/workflows/) | ✅ | Création du repo → Camille/Guillaume |
+| Vercel env vars | ✅ | Création projet Vercel → Camille |
+| Neon connection strings (lecture) | ✅ | Création branch Neon → Guillaume |
+| Dockerfile.prod + docker-compose.staging | ✅ | Code applicatif → Camille/Guillaume |
+| Infra NeoKube cluster (K8s, DNS, Scaleway) | ❌ | Charlotte |
+| Secrets Vault NeoKube | ❌ | Charlotte |
+| Domaines DNS | ❌ | Charlotte/Domi |
+
+**Leon v5 délègue à Alain pour** : "CI/CD", "pipeline déploiement", "variables d'environnement", "infra projet", "Docker", "secrets projet"
+
+### Paramètres techniques
+
+| Paramètre | Valeur |
+|---|---|
+| Port | `8494` |
+| Runtime | Temporal (Class B, NS `dispatcher`) |
+| SA | `alain-sa` (agent-system) |
+| LLM_MODEL | `codestral` |
+| LLM_FALLBACK | `mistral` |
+| Image | `ghcr.io/charlesvdd/neostudio:latest` |
+| Tool-validator | policy `alain` dans `configmap-agent-policies.yaml` |
+
+### Outils Phase 1
+
+| Outil | Via | Opération |
+|---|---|---|
+| Écrire `.github/workflows/` | GitHub MCP `:8080/mcp` | `push_files` |
+| Lire fichiers repo | GitHub MCP `:8080/mcp` | `get_file_contents`, `get_ref` |
+| Configurer Vercel env vars | vercel-connector `:8002` | `POST /proxy path=/v10/projects/{id}/env` |
+| Lire Vercel env vars | vercel-connector `:8002` | `GET /proxy path=/v10/projects/{id}/env` |
+| Obtenir Neon conn string | neon-connector `:8003` | `GET /proxy path=/connection_uri?branch={}&database={}` |
+
+### Variables d'environnement K8s
+
+```yaml
+AGENT_NAME: alain
+LLM_MODEL: codestral
+LLM_FALLBACK: mistral
+GITHUB_MCP_URL: http://github-mcp.connector-system.svc.cluster.local:8080/mcp
+VERCEL_CONNECTOR_URL: http://vercel-connector.connector-system.svc.cluster.local:8002
+NEON_CONNECTOR_URL: http://neon-connector.connector-system.svc.cluster.local:8003
+TEMPORAL_HOST: temporal.agent-system.svc.cluster.local:7233
+TEMPORAL_NAMESPACE: dispatcher
+TASK_QUEUE: alain-queue
+```
+
+### Activité principale : `alain_setup_cicd`
+
+**Input** (depuis ProjectSpec via Dispatcher) :
+```python
+{
+  "frontend_repo": "neomnia/{slug}-frontend",
+  "backend_repo": "neomnia/{slug}-backend",
+  "vercel_project_id": "...",
+  "neon_branch_url": "postgresql://...",
+  "api_public_url": "https://{slug}-api.neomnia.net",
+  "env_vars": {}  # variables supplémentaires optionnelles
+}
+```
+
+**Output** :
+```python
+{
+  "ci_frontend_url": "https://github.com/neomnia/{slug}-frontend/actions",
+  "ci_backend_url": "https://github.com/neomnia/{slug}-backend/actions",
+  "env_configured": True,
+  "vercel_env_count": 3
+}
+```
+
+**Étapes internes** :
+1. Récupère la Neon connection string via neon-connector
+2. Pousse `.github/workflows/ci.yml` (frontend Next.js : install → lint → build → vercel-deploy)
+3. Pousse `.github/workflows/ci.yml` (backend FastAPI : pip install → pytest → docker build)
+4. Configure Vercel env vars : `NEXT_PUBLIC_API_URL`, `DATABASE_URL`
+5. Retourne le résumé
+
+### Intégration dans DevProjectWorkflow
+
+```
+→ Dispatcher : [PARALLEL]
+    Camille  : GitHub repo frontend + Vercel project
+    Guillaume: GitHub repo backend + Neon branch
+    Penpot   : projet design
+    Domi     : provision domaine
+→ Alain : [séquentiel, après Camille + Guillaume]
+    alain_setup_cicd(frontend_repo, backend_repo, vercel_project_id, neon_branch_url)
+→ Vera : vera_review (analyse spec + output Camille/Guillaume/Alain/Penpot)
+```
+
+**Note** : Alain est appelé après la phase parallèle car il dépend des outputs de Camille (vercel_project_id) et Guillaume (neon_branch_url). Si l'un des deux échoue, Alain est skippé.
+
+### Template code — base Camille/Guillaume
+
+Alain utilise la même base que `camille_agent.py` / `guillaume_agent.py` :
+- Temporal activity worker
+- PydanticAI agent avec MCPServerStreamableHTTP (GitHub MCP)
+- HTTP calls directs vers vercel-connector et neon-connector
+- MAD v2.0 : `{name}-memory` Qdrant + `_agent_learn()` post-mission
+
+---
+
 ## DevProjectWorkflow — flux complet
 
 ```
@@ -777,11 +891,12 @@ Brief (Slack #produit / Open WebUI)
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PRODUCTION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   → Dispatcher : validate_spec (tous les champs obligatoires)
   → Dispatcher : [PARALLEL]
-      Aria   : GitHub repo (template-nextjs) + Vercel project
-      Nox    : GitHub repo (template-fastapi) + Neon branch (NeoBridge)
-      Penpot : projet Penpot + duplication fichier template
-      Domi   : provision domaine (subdomain {slug}.neomnia.net ou achat Openprovider)
-  → Vera : vera_review (analyse spec + output Aria/Nox/Penpot)
+      Camille : GitHub repo (template-nextjs) + Vercel project
+      Guillaume: GitHub repo (template-fastapi) + Neon branch (NeoBridge)
+      Penpot  : projet Penpot + duplication fichier template
+      Domi    : provision domaine (subdomain {slug}.neomnia.net ou achat Openprovider)
+  → Alain : [séquentiel après Camille+Guillaume] CI/CD + env vars Vercel + Neon conn string
+  → Vera : vera_review (analyse spec + output Camille/Guillaume/Alain/Penpot)
   → Dispatcher : notify_approval (signal humain attendu 24h)
   → [Approbation humaine]
   → Dispatcher : deploy (rollout final)
@@ -794,9 +909,9 @@ Brief (Slack #produit / Open WebUI)
   Charlotte : dispatch_design_deploy(penpot_project_id="<uuid>")
               → POST dispatcher:8484/trigger-penpot
   → Dispatcher : PenpotToVercelWorkflow
-      Aria (aria_export_penpot)    : exporte design Penpot via penpot-connector
-      Aria (aria_generate_nextjs)  : génère Next.js (page.tsx, composants, CSS) via codestral
-      Aria (aria_push_to_github)   : push sur branche design/penpot-export-{id[:8]}
+      Camille (camille_export_penpot)    : exporte design Penpot via penpot-connector
+      Camille (camille_generate_nextjs)  : génère Next.js (page.tsx, composants, CSS) via codestral
+      Camille (camille_push_to_github)   : push sur branche design/penpot-export-{id[:8]}
   → Dispatcher : redeploy Vercel (vercel-connector) — preview deploy branche
   → Dispatcher : ntfy notification mission-done
 ```
@@ -823,8 +938,9 @@ Chaque agent a son propre profil LLM dans son deployment K8s. **Jamais de modèl
 | **Charlotte** SRE v4.0 | `claude-sonnet` ✅ | `mistral` | `gpt-4o` | `mistral` | `claude-opus` ✅ (R9.12) | `claude-sonnet` |
 | **Leon** | `gpt-4o` (TASK) | `mistral` (intent) | `claude-sonnet` (REVIEW) | — | — | `gpt-4o` |
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | — | `gemini-flash` |
-| **Aria** Frontend | `codestral` | — | — | — | — | `codestral` |
-| **Nox** Backend | `codestral` | — | — | — | — | `codestral` |
+| **Camille** Frontend | `codestral` | — | — | — | — | `codestral` |
+| **Guillaume** Backend | `codestral` | — | — | — | — | `codestral` |
+| **Alain** DevOps | `codestral` | — | — | `mistral` | — | `codestral` |
 | **Vera** QA | `mistral-large-2407` | — | — | — | — | `mistral-large-2407` |
 | **Penpot** Design | `mistral` | — | — | — | — | `gemini-flash` |
 | **Domi** Domain | `mistral` ⚠️ | — | — | — | — | `gemini-flash` |
@@ -919,7 +1035,7 @@ Chaque agent a une ou plusieurs collections Qdrant dédiées. Règle : **ne jama
 | Agent | Collections | Type de requête | Moment d'injection |
 |---|---|---|---|
 | **Leon** | `leon-memory` | Normes CDC, process interview, expériences REVIEW | Avant génération spec (mode REVIEW) |
-| **Aria** | `template-neosaas` + `design-knowledge` | Patterns code Next.js, principes UX composants | Dans `system_prompt` de `aria_generate_nextjs` |
+| **Camille** | `template-neosaas` + `design-knowledge` | Patterns code Next.js, principes UX composants | Dans `system_prompt` de `camille_generate_nextjs` |
 | **Zephyr** | `design-knowledge` + `neomnia_core` | Heuristiques UX par livrable + contexte agence | Dans `prod_user` étape 3 production |
 | **Charlotte** | `sre-charlotte-incidents` + `charlotte-conversations` + **`neokube-architecture`** | Incidents passés + session memory + **docs infra NeoKube** | Automatique via PydanticAI / `_load_pydantic_history` + RAG docs au démarrage mission |
 | **Dispatcher** | `pm-decisions` | Décisions projets archivées | Post-workflow (write, pas read) |
