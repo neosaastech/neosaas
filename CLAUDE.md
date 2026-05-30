@@ -208,7 +208,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
 | **Camille** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.0 (GitHub MCP) |
 | **Guillaume** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.0 (GitHub+Neon MCP) |
-| **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | Temporal | 8494 | `dispatcher` | **à créer v1.0** |
+| **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | Temporal | 8494 | `dispatcher` | active v1.0 (Temporal worker + /mission) |
 | **Vera** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
 | **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `dispatcher` | active v1.0 (v2.0 à implémenter : scaleway-engine) |
