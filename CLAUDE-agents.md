@@ -707,6 +707,34 @@ Charlotte v4 dispose d'un **pré-classificateur 5 classes** (`_classify_message`
 #### Flux de routing
 
 ```
+## Schéma MissionRequest — TOUS LES AGENTS
+
+**Champ body obligatoire : `message` (pas `mission`).** Confusion fréquente avec le nom de l'endpoint `/mission`.
+
+```json
+POST /mission
+{
+  "message":    "Description de la mission (string, obligatoire)",
+  "session_id": "uuid optionnel — pour continuer une session existante",
+  "interface":  "openwebui | claude-code | zoho-observer (optionnel)",
+  "context":    {} // champs additionnels passés en contexte (optionnel)
+}
+```
+
+**Champs contexte Zoho (ajoutés par zoho-observer) :**
+```json
+{
+  "zoho_project_id": "...",
+  "zoho_task_id":    "...",   // → agent doit fermer la tâche après traitement
+  "zoho_issue_id":   "...",   // → agent doit fermer l'issue après traitement
+  "zoho_task_name":  "..."
+}
+```
+
+**Règle** : ne jamais envoyer `{"mission": ...}` — le champ s'appelle `message`. L'endpoint est `/mission`, le champ est `message`.
+
+---
+
 POST /mission/stream {message, session_id, interface}
   → _load_pydantic_history(session_id)       ← Qdrant charlotte-conversations
   → intent = await _classify_message(message) ← LLM_SCAN_MODEL (mistral, ~500ms)
