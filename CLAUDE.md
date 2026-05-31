@@ -95,8 +95,14 @@ bash ~/scripts/pull-charlotte-prompt.sh
 # Ré-indexer la collection neokube-architecture dans Qdrant
 python3 ~/scripts/index-architecture-docs.py
 
-# Vérifier l'état de la collection
+# Ré-indexer les collections KB dev (k8s-knowledge, temporal-knowledge, python-agent-patterns, dev-process)
+python3 ~/scripts/index_kb_knowledge.py
+
+# Vérifier l'état des collections
 curl -s http://qdrant.neokube.local/collections/neokube-architecture | python3 -m json.tool
+for col in k8s-knowledge temporal-knowledge python-agent-patterns dev-process; do
+  echo "$col: $(curl -s http://qdrant.neokube.local/collections/$col | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"result\",{}).get(\"points_count\",\"?\"))')" points
+done
 ```
 
 ### Périmètre écriture Charlotte
