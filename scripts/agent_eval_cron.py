@@ -30,13 +30,13 @@ AGENT_KEYS = {
     "alain":      os.getenv("LITELLM_KEY_ALAIN",      ""),
     "dispatcher": os.getenv("LITELLM_KEY_DISPATCHER", ""),
     "domi":       os.getenv("LITELLM_KEY_DOMI",       ""),
-    "penpot":     os.getenv("LITELLM_KEY_PENPOT",     ""),
+    # penpot supprimé — microservice sans LLM (penpot-engine v1.0)
 }
 
 AGENT_MODELS = {
     "leon": "gpt-4o", "charlotte": "mistral", "vera": "mistral-large-2407",
     "neo": "mistral-large-2407", "camille": "codestral", "guillaume": "codestral", "alain": "codestral",
-    "dispatcher": "mistral", "domi": "mistral", "penpot": "mistral",
+    "dispatcher": "mistral", "domi": "mistral",
 }
 
 LANGFUSE_PROMPTS = {
@@ -55,7 +55,6 @@ FALLBACK_PROMPTS = {
     "alain": "Tu es Alain, DevOps Projet chez NeoKube. Tu t'exécutes après Camille (frontend) et Guillaume (backend). Tes 3 tâches : (1) créer workflows CI/CD GitHub Actions (lint → test → build → deploy), (2) injecter les variables d'environnement dans Vercel (NEON_DATABASE_URL, API_URL, etc.) via vercel-connector, (3) injecter la Neon connection string de Guillaume dans le projet Vercel. Scope variables : production + preview.",
     "dispatcher": "Tu es Dispatcher, orchestrateur DevProjectWorkflow. Flux exact : (1) validate_spec, (2) parallel[Camille+Guillaume+Alain+Penpot+Domi, return_exceptions=True], (3) Vera QA, (4) signal humain bloquant (approval/reject, 24h timeout), (5) deploy. RÈGLES : Penpot/Domi sont NON-BLOQUANTS — si Penpot échoue, le workflow CONTINUE. Vera 'rejected' = avertissement QA seulement, PAS un arrêt du workflow — le signal humain décide. Tu n'accèdes jamais directement au cluster K8s.",
     "domi": "Tu es Domi, Domain Infrastructure Manager chez NeoKube. Deux modes : subdomain (CNAME {slug}.neomnia.net → Cloudflare, gratuit) ou register (achat domaine via Openprovider, zone CF + NS update). Après signal humain 'approved' dans le workflow : tu lies le domaine au projet Vercel avec domi_link_vercel_domain (POST /projects/{id}/domains via vercel-connector). Alertes renouvellement : domaine expire < 30j → alerte ntfy urgent + tentative auto-renouvellement via openprovider-connector.",
-    "penpot": "Tu es Penpot, Design Scaffolder chez NeoKube. URL livraison : https://design.neokube.fr. Processus création client : 1) get-projects pour vérifier les doublons, 2) create-project dans la team Neomnia Studio, 3) duplicate-file depuis le fichier template pour avoir les composants de base. Formats : desktop 1440px + mobile 375px. delete-project = soft-delete (7j récupérable, visible dans get-projects). Hard-delete = SQL uniquement.",
 }
 
 SCENARIOS = {
@@ -130,14 +129,6 @@ SCENARIOS = {
          "Doit mentionner : alerte ntfy urgent (< 30j). Tentative de renouvellement via openprovider-connector."),
         ("Après que le signal humain 'approved' a été reçu dans le workflow, quelle action DNS fais-tu avec Vercel ?",
          "Doit mentionner : lier le domaine au projet Vercel (domi_link_vercel_domain). Via vercel-connector. Exécuté après le signal humain. Explication du pourquoi (après deploy car le projet Vercel doit exister)."),
-    ],
-    "penpot": [
-        ("Comment crées-tu un projet Penpot pour un nouveau client ? Décris les 3 étapes dans l'ordre.",
-         "1) get-projects pour vérifier que le projet n'existe pas déjà (doublons). 2) create-project dans Neomnia Studio team. 3) duplicate-file depuis le template de base. Ordre correct et les 3 étapes présentes."),
-        ("Pourquoi utilises-tu https://design.neokube.fr comme URL de livraison et pas penpot.neokube.local ?",
-         "URL publique accessible au client (via Cloudflare Tunnel). penpot.neokube.local est LAN uniquement, inaccessible au client."),
-        ("Un projet Penpot a été supprimé par erreur hier. Comment le récupérer ? Qu'est-ce qu'un soft-delete ?",
-         "delete-project = soft-delete : le projet n'est pas vraiment supprimé, il reste visible dans get-projects pendant 7 jours. Pour récupérer : utiliser get-projects et confirmer qu'il est encore là. Hard-delete = suppression SQL définitive."),
     ],
 }
 
