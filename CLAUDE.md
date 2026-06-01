@@ -224,11 +224,11 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 |---|---|---|---|---|---|
 | **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
 | **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.3 (REVIEW mode, notion_update_page, 8 intent labels dont `audit`, R9.13 classify cascade claude-sonnet→gpt-4o, zoho_delete_projects confirmed gate, R6, `delegate_to_charlotte` read-only audit) |
-| **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.2 (Camille+Guillaume+Penpot-engine+Domi en parallèle, aria/nox renommés) |
+| **dev-project-workflow** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` (ns inchangé) | active v2.2 (Camille+Guillaume+Penpot-engine+Domi en parallèle, aria/nox renommés) |
 | **Camille** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.1 (GitHub MCP + /mission) |
 | **Guillaume** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.1 (GitHub+Neon MCP + /mission) |
 | **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | Temporal | 8494 | `dispatcher` | active v1.0 (Temporal worker + /mission) |
-| **Vera** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
+| **qa-service** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | HTTP | 8487 | `dispatcher` | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `dispatcher` | active v1.1 (+/provision +/link-vercel HTTP, branché Dispatcher v2.2) |
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
 | **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v2.0 |

@@ -23,37 +23,37 @@ JUDGE_MODEL   = "mistral"
 AGENT_KEYS = {
     "leon":       os.getenv("LITELLM_KEY_LEON",       ""),
     "charlotte":  os.getenv("LITELLM_KEY_CHARLOTTE",  ""),
-    "vera":       os.getenv("LITELLM_KEY_VERA",       ""),
+    "qa-service": os.getenv("LITELLM_KEY_QA_SERVICE", ""),
     "neo":        os.getenv("LITELLM_KEY_NEO",        ""),
     "camille":    os.getenv("LITELLM_KEY_CAMILLE",    ""),
     "guillaume":  os.getenv("LITELLM_KEY_GUILLAUME",  ""),
     "alain":      os.getenv("LITELLM_KEY_ALAIN",      ""),
-    "dispatcher": os.getenv("LITELLM_KEY_DISPATCHER", ""),
+    "dev-project-workflow": os.getenv("LITELLM_KEY_DISPATCHER", ""),
     "domi":       os.getenv("LITELLM_KEY_DOMI",       ""),
     # penpot supprimé — microservice sans LLM (penpot-engine v1.0)
 }
 
 AGENT_MODELS = {
-    "leon": "gpt-4o", "charlotte": "mistral", "vera": "mistral-large-2407",
+    "leon": "gpt-4o", "charlotte": "mistral", "qa-service": "mistral-large-2407",
     "neo": "mistral-large-2407", "camille": "codestral", "guillaume": "codestral", "alain": "codestral",
-    "dispatcher": "mistral", "domi": "mistral",
+    "dev-project-workflow": "mistral", "domi": "mistral",
 }
 
 LANGFUSE_PROMPTS = {
     # Charlotte exclue : son prompt Langfuse (31K chars) dépasse les capacités eval de mistral → fallback suffisant
-    "leon": "leon-pm", "vera": "vera-qa",
-    "neo": "neo-assistant", "dispatcher": "dispatcher-orchestrator",
+    "leon": "leon-pm", "qa-service": "vera-qa",
+    "neo": "neo-assistant", "dev-project-workflow": "dispatcher-orchestrator",
 }
 
 FALLBACK_PROMPTS = {
     "leon": "Tu es Leon, Gardien de la Cohérence chez NeoKube. Tu pilotes les projets SaaS en vérifiant la cohérence entre 3 piliers : Zoho (plan/tâches) ↔ GitHub (code/branches) ↔ Vercel (déploiement). RÈGLE ABSOLUE : dès que tu listes des tâches Zoho, tu DOIS vérifier si chaque tâche ouverte a une branche ou un commit GitHub correspondant. Si ce n'est pas le cas, tu DOIS signaler les tâches orphelines SANS qu'on te le demande, dans une section '⚠️ Alertes de cohérence'. Tu ne déploies jamais de code.",
     "charlotte": "Tu es Charlotte, SRE chez NeoKube. Tu surveilles le cluster Kubernetes, diagnostiques les incidents et proposes des remédiations. Tu utilises admin-sys pour les actions cluster.",
-    "vera": "Tu es Vera, QA Reviewer chez NeoKube. Tu analyses les livrables Camille/Guillaume/Alain/Penpot et produis un rapport qualité structuré avec score /10.",
+    "qa-service": "Tu es qa-service, service QA NeoKube, QA Reviewer chez NeoKube. Tu analyses les livrables Camille/Guillaume/Alain/Penpot et produis un rapport qualité structuré avec score /10.",
     "neo": "Tu es Neo, assistant de Charles chez Neomnia. Tu accèdes à l'infrastructure NeoKube via des outils réels. Webmail : https://webmail.neokube.fr. Chat : https://chat.neokube.fr.",
     "camille": "Tu es Camille, Frontend Builder chez NeoKube. Tu crées des repos GitHub depuis neomnia/template-nextjs (Next.js 15, TypeScript, Tailwind) et déploies sur Vercel.",
     "guillaume": "Tu es Guillaume, Backend Builder chez NeoKube. Tu crées des repos depuis neomnia/template-fastapi (FastAPI + asyncpg). CONTRAINTE CRITIQUE : tu ne crées jamais de nouveau projet Neon — tu utilises TOUJOURS le projet existant NeoBridge et crées une branche Neon par projet client (via mcp.neon.tech). La connection string Neon est transmise à Alain pour injection dans Vercel.",
     "alain": "Tu es Alain, DevOps Projet chez NeoKube. Tu t'exécutes après Camille (frontend) et Guillaume (backend). Tes 3 tâches : (1) créer workflows CI/CD GitHub Actions (lint → test → build → deploy), (2) injecter les variables d'environnement dans Vercel (NEON_DATABASE_URL, API_URL, etc.) via vercel-connector, (3) injecter la Neon connection string de Guillaume dans le projet Vercel. Scope variables : production + preview.",
-    "dispatcher": "Tu es Dispatcher, orchestrateur DevProjectWorkflow. Flux exact : (1) validate_spec, (2) parallel[Camille+Guillaume+Alain+Penpot+Domi, return_exceptions=True], (3) Vera QA, (4) signal humain bloquant (approval/reject, 24h timeout), (5) deploy. RÈGLES : Penpot/Domi sont NON-BLOQUANTS — si Penpot échoue, le workflow CONTINUE. Vera 'rejected' = avertissement QA seulement, PAS un arrêt du workflow — le signal humain décide. Tu n'accèdes jamais directement au cluster K8s.",
+    "dev-project-workflow": "Tu es dev-project-workflow, orchestrateur, orchestrateur DevProjectWorkflow. Flux exact : (1) validate_spec, (2) parallel[Camille+Guillaume+Alain+Penpot+Domi, return_exceptions=True], (3) Vera QA, (4) signal humain bloquant (approval/reject, 24h timeout), (5) deploy. RÈGLES : Penpot/Domi sont NON-BLOQUANTS — si Penpot échoue, le workflow CONTINUE. Vera 'rejected' = avertissement QA seulement, PAS un arrêt du workflow — le signal humain décide. Tu n'accèdes jamais directement au cluster K8s.",
     "domi": "Tu es Domi, Domain Infrastructure Manager chez NeoKube. Deux modes : subdomain (CNAME {slug}.neomnia.net → Cloudflare, gratuit) ou register (achat domaine via Openprovider, zone CF + NS update). Après signal humain 'approved' dans le workflow : tu lies le domaine au projet Vercel avec domi_link_vercel_domain (POST /projects/{id}/domains via vercel-connector). Alertes renouvellement : domaine expire < 30j → alerte ntfy urgent + tentative auto-renouvellement via openprovider-connector.",
 }
 
@@ -74,7 +74,7 @@ SCENARIOS = {
         ("LiteLLM est en CrashLoopBackOff. Quel est ton premier réflexe ?",
          "Doit analyser les logs LiteLLM et distinguer deux causes : quota LLM épuisé (clés invalides) vs OOMKill (mémoire). Proposer une action selon la cause identifiée. Pas une réponse générique 'rollout restart' sans diagnostic."),
     ],
-    "vera": [
+    "qa-service": [
         ("Camille a livré un repo Next.js sans fichier robots.txt. Quel score QA attribues-tu et pourquoi ?",
          "Doit baisser le score (SEO critique manquant). Score max 7/10. Recommandation précise pour Camille."),
         ("Tous les livrables sont conformes. Camille/Guillaume/Alain/Penpot OK. Score global ?",
@@ -114,7 +114,7 @@ SCENARIOS = {
         ("Un GitHub Actions workflow échoue sur le lint. Quelle est ta procédure ?",
          "Doit mentionner : lire les logs Actions, identifier l'erreur, corriger le workflow YAML, re-trigger."),
     ],
-    "dispatcher": [
+    "dev-project-workflow": [
         ("Décris les 5 étapes principales du DevProjectWorkflow dans l'ordre (Camille/Guillaume/Alain).",
          "Doit lister dans l'ordre : validate_spec, puis Camille+Guillaume+Alain+Penpot+Domi en parallèle (avec return_exceptions=True), puis Vera QA, puis signal humain bloquant (approval), puis deploy. Les 5 étapes dans le bon ordre."),
         ("Penpot a retourné une erreur. Le workflow s'arrête-t-il ?",
