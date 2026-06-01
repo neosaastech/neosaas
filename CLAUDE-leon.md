@@ -33,10 +33,10 @@ Leon ne hardcode aucune valeur métier. Toute connaissance provient d'une source
 |---|---|
 | Clarification des besoins métier | Exécution technique directe (code, infra) |
 | Création et structuration du ProjectSpec | Surveillance cluster K8s (→ Charlotte) |
-| Dispatch vers sous-agents spécialisés | Déploiements Vercel (→ Aria via Dispatcher) |
-| Suivi Zoho Projects (jalons, tâches) | Requêtes SQL directes (→ Nox) |
-| Communication client (via Nora) | Design Penpot (→ Zephyr → Penpot agent) |
-| Cohérence Zoho ↔ GitHub ↔ Vercel | — |
+| Dispatch direct vers sous-agents (asyncio.gather) | Requêtes SQL directes (→ Guillaume) |
+| Suivi Zoho Projects (jalons, tâches, milestone_closed) | Modifications infra K8s (→ Charlotte) |
+| Communication client (via Nora à chaque jalon) | — |
+| Orchestration SSII bout en bout (J0 → J3) | — |
 
 Leon **ne délègue pas à Charlotte pour le pipeline métier** — Charlotte est SRE cluster, pas chef de projet.
 **Exception audit** : `delegate_to_charlotte(query)` est un outil **read-only** utilisé uniquement en MODE AUDIT (Phase 3) pour interroger l'état de services externes (Scaleway, Neon, DNS) que Leon ne peut pas accéder directement pour des raisons de sécurité (credentials Vault réservés à Charlotte).
@@ -46,16 +46,17 @@ La délégation inverse existe : Charlotte → Leon via `delegate_sre_task` pour
 
 ### Équipe — Sous-agents orchestrés par Leon
 
-| Agent | Rôle | Spécialité | Port | Statut |
+| Agent | Rôle | Spécialité | Port | Dispatché par Leon à |
 |---|---|---|---|---|
-| **Aria** | Frontend Builder | Next.js + Vercel + Penpot export | 8485 | actif v3.0 (GitHub MCP) |
-| **Milo** | Data/Scraping Specialist | Collecte web, pipelines data, volumétrie | 8491 | **actif v1.0** |
-| **Zephyr** | UX/Design Strategist | Audit UX, wireframes, guidelines, interface Penpot | 8492 | **actif v2.0** |
-| **Nora** | Account Manager / Client | Communication client, comptes-rendus, suivi satisfaction | 8493 | **actif v1.0** |
-| **Nox** | Backend Builder | FastAPI + Neon — appelé via Dispatcher | 8486 | actif v3.0 |
-| **Dispatcher** | Orchestrateur pipeline | DevProjectWorkflow complet (Aria+Nox+Penpot+Domi+Vera) | 8484 | actif v2.0 |
+| **Camille** | Frontend Builder | Next.js + Vercel + GitHub MCP | 8485 | Jalons 1, 2, 3 |
+| **Guillaume** | Backend Builder | FastAPI + Neon + GitHub MCP | 8486 | Jalons 1, 2 |
+| **Alain** | DevOps | CI/CD GitHub Actions + env vars Vercel | 8494 | Jalons 1, 3 |
+| **Domi** | Domain Manager | DNS Cloudflare + projet Scaleway | 8489 | Jalon 1 |
+| **Zephyr** | UX/Design Strategist | Audit UX, wireframes, Penpot | 8492 | Jalon 1 |
+| **Milo** | Data/Scraping Specialist | Collecte web, pipelines data | 8491 | Mission dédiée |
+| **Nora** | Account Manager | Communication client, emails jalon | 8493 | Après chaque jalon clôturé |
 
-**Principe de délégation** : Leon interroge le sous-agent approprié via `POST /mission` (HTTP simple, sans Temporal). Temporal est réservé aux workflows longs (DevProjectWorkflow via Dispatcher).
+**Principe de délégation** : Leon dispatche via `asyncio.gather(*[POST agent/mission for agent in agents], return_exceptions=True)`. Pas de Temporal, pas de Dispatcher intermédiaire. Le retour d'exceptions partielles est obligatoire (anti-pattern #2).
 
 ---
 
@@ -80,7 +81,19 @@ La délégation inverse existe : Charlotte → Leon via `delegate_sre_task` pour
   → Suit le résultat via Zoho (commentaire 🤖) ou réponse directe
 ```
 
-**Règle absolue** : `dispatch_project` ne peut être appelé qu'en état `READY_TO_DISPATCH`. En `INTAKE` ou `CLARIFYING`, Leon répond avec des questions, jamais avec un plan inventé.
+**Règle absolue** : `zoho_scaffold_project` ne peut être appelé qu'en état `READY_TO_DISPATCH`. En `INTAKE` ou `CLARIFYING`, Leon répond avec des questions, jamais avec un plan inventé.
+
+**Intent `milestone_closed`** : ajouté en v4.0 (2026-06-01). Reçu depuis zoho-observer. Leon ne pose pas de question — il agit directement selon le mapping `milestone_index → agents`.
+
+```python
+# Mapping milestone_index → agents à dispatcher
+MILESTONE_AGENTS = {
+    0: ["nora"],                                          # Prévente clôturé
+    1: ["camille", "guillaume", "alain", "domi", "zephyr"],  # Setup clôturé
+    2: ["camille", "guillaume"],                          # Dev clôturé
+    3: ["camille", "alain"],                              # Go live clôturé
+}
+```
 
 ---
 
@@ -269,6 +282,48 @@ Quand une opération n'est pas couverte par un outil dédié :
 > **R2** — Enrichir à la sortie (`_inject_web_urls` dans zoho-engine). Leon ne construit jamais d'URLs Zoho manuellement.
 > **R3** — Utiliser l'endpoint approprié : `/proxy` pour les appels génériques, `/scaffold` pour la création projet complète, `/delete-projects` pour les suppressions.
 > **R6** — Les règles API (normalisation, guards, defaults) sont codées dans le connector. L'agent exprime l'intent sémantique uniquement. Jamais de règle business dans l'agent.
+
+---
+
+### Outils GitHub & Vercel — Architecture Phase 1b
+
+Leon accède directement à GitHub et Vercel via les connectors HTTP (Phase 1b — plus d'appels directs). Les credentials sont transparents (gérés par chaque connector depuis Vault).
+
+**Variables d'env** :
+- `GITHUB_CONNECTOR_URL = "http://github-connector.connector-system.svc.cluster.local:8001"`
+- `VERCEL_CONNECTOR_URL = "http://vercel-connector.connector-system.svc.cluster.local:8002"`
+
+#### Outils GitHub (via github-connector :8001/proxy)
+
+| Outil LLM | Activity Temporal | Description |
+|---|---|---|
+| `github_list_repos` | `leon_github_list_repos` | Liste les repos d'une org GitHub |
+| `github_create_repo` | `leon_github_create_repo` | Crée un repo depuis un template (owner/template) |
+| `github_rename_occurrences` | `leon_github_rename_occurrences` | Renomme les occurrences d'un nom dans tous les fichiers du repo |
+| `github_list_files` | `leon_github_list_files` | Liste les fichiers d'un répertoire (org/repo/path/branch) |
+| `github_read_file` | `leon_github_read_file` | Lit le contenu d'un fichier (org/repo/path/branch) |
+| `github_write_file` | `leon_github_write_file` | Crée ou modifie un fichier (commit + push) |
+| `github_create_branch` | `leon_github_create_branch` | Crée une branche depuis une base |
+| `github_create_pr` | `leon_github_create_pr` | Ouvre une Pull Request head→base |
+
+**Org principale** : `neosaastech` (défaut). Repos connus : `template-nextjs`, `template-fastapi`, `Neosaas-app`.
+
+#### Outils Vercel (via vercel-connector :8002/proxy)
+
+| Outil LLM | Activity Temporal | Description |
+|---|---|---|
+| `vercel_list_projects` | `leon_vercel_list_projects` | Liste les projets Vercel avec dernier déploiement |
+| `vercel_get_deployments` | `leon_vercel_get_deployments` | Historique des déploiements d'un projet |
+| `vercel_get_logs` | `leon_vercel_get_build_logs` | Logs de build d'un déploiement |
+| `vercel_redeploy` | `leon_vercel_redeploy` | Relance un déploiement (CONFIRMER avant) |
+| `vercel_create_project` | `leon_vercel_create_project` | Crée un projet Vercel lié à un repo GitHub |
+| `vercel_learn` | `leon_vercel_learn_deployment` | Apprend d'un déploiement → Qdrant `dev-experience` |
+
+**Collection RAG** : `dev-experience` (Qdrant) — Leon indexe les patterns de déploiement Vercel pour améliorer ses recommandations.
+
+#### Règle d'usage
+
+Leon ne duplique pas les outils que Camille/Guillaume/Alain utilisent pour créer les repos initiaux (ils passent par github-mcp:8080). Les outils GitHub/Vercel de Leon servent à **surveiller, corriger, et orchestrer** les projets existants — pas à faire le travail de build initial.
 
 ---
 
@@ -736,3 +791,5 @@ Leon a des **compétences techniques** pour piloter les projets (comprendre une 
 | Intent `audit` — inspection 3 axes + corrections auto | ✅ Code | `AUDIT_SYSTEM_PROMPT` + `audit_mode=True` + MAD pre-load/post-store. Patterns A/B/C. `cluster_status` Phase 3 pour INFRA. |
 | R9.13 — cascade classify LLM interactive | ✅ Code | `LLM_CLASSIFY_MODEL=claude-sonnet` → `LLM_CLASSIFY_FALLBACK=gpt-4o` → `LLM_MODEL_REASONING=mistral` |
 | Zoho-observer Boucle D — issue routing | ✅ Code 2026-05-29 | Scan `/bugs/` toutes les 5 min. SSII → Leon `/mission`. Neokube/unknown → Charlotte `/mission`. Ntfy urgent si critical >1h. |
+| GitHub tools via github-connector (Phase 1b) | ✅ Code 2026-06-01 | 8 outils LLM : `github_list_repos`, `github_create_repo`, `github_rename_occurrences`, `github_list_files`, `github_read_file`, `github_write_file`, `github_create_branch`, `github_create_pr`. Org `neosaastech` par défaut. |
+| Vercel tools via vercel-connector (Phase 1b) | ✅ Code 2026-06-01 | 6 outils LLM : `vercel_list_projects`, `vercel_get_deployments`, `vercel_get_logs`, `vercel_redeploy`, `vercel_create_project`, `vercel_learn`. Collection RAG `dev-experience`. |
