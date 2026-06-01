@@ -170,7 +170,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 | Agent | Budget/jour | Modèle principal |
 |---|---|---|
-| Charlotte | **5 $** | mistral → claude-sonnet (fallback) |
+| Charlotte | **15 $** | mistral → claude-sonnet (fallback) |
 | Leon | **2 $** | gpt-4o |
 | Camille / Guillaume / Alain / Dispatcher / Neo / NeoStudio | **1 $** | codestral / mistral |
 | Vera / Domi / Milo / Nora / Zephyr | **0.5 $** | mistral |
