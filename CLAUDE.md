@@ -151,8 +151,8 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (tunnel, 2 replicas) |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (v2.11.0), **whisper-server** (STT local port 8394), **voice-gateway** (WS port 8393), **media-gateway** (préprocessing multimodal CLASS A port 8395) |
-| `agent-system` | Charlotte SRE, Leon, Dispatcher, **Camille**, **Guillaume**, **Alain**, Vera, Penpot, **Domi**, Temporal, zoho-discovery, zoho-observer |
-| `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), penpot(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **notion**(8011), **github-mcp**(8080 MCP streamable-http) |
+| `agent-system` | Charlotte SRE, Leon, Dispatcher, **Camille**, **Guillaume**, **Alain**, Vera, **Domi**, Temporal, zoho-discovery, zoho-observer |
+| `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), **penpot-engine**(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **notion**(8011), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
 | `management` | CronJob cluster-bootstrap (Temporal NS uniquement), neokube-nightly-backup |
@@ -173,7 +173,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | Charlotte | **5 $** | mistral → claude-sonnet (fallback) |
 | Leon | **2 $** | gpt-4o |
 | Camille / Guillaume / Alain / Dispatcher / Neo / NeoStudio | **1 $** | codestral / mistral |
-| Vera / Penpot / Domi / Milo / Nora / Zephyr | **0.5 $** | mistral |
+| Vera / Domi / Milo / Nora / Zephyr | **0.5 $** | mistral |
 | **Plafond total** | **18 $/jour** | — |
 
 **Règle** : toujours `budget_duration=1d` — jamais `1mo`. Un dérapage en session intensive (boucle de dispatch, sessions concurrentes) peut brûler le budget mensuel en une journée. Le reset quotidien automatique protège. **Alert ntfy** dès 80% du budget → tâche `[Charlotte] Alertes budget LiteLLM` ouverte (2026-05-30).
@@ -224,13 +224,12 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 |---|---|---|---|---|---|
 | **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
 | **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.3 (REVIEW mode, notion_update_page, 8 intent labels dont `audit`, R9.13 classify cascade claude-sonnet→gpt-4o, zoho_delete_projects confirmed gate, R6, `delegate_to_charlotte` read-only audit) |
-| **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.0 |
+| **Dispatcher** | Orchestre DevProjectWorkflow complet | Temporal | 8484 | `dispatcher` | active v2.2 (Camille+Guillaume+Penpot-engine+Domi en parallèle, aria/nox renommés) |
 | **Camille** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | Temporal | 8485 | `dispatcher` | active v3.1 (GitHub MCP + /mission) |
 | **Guillaume** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | Temporal | 8486 | `dispatcher` | active v3.1 (GitHub+Neon MCP + /mission) |
 | **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | Temporal | 8494 | `dispatcher` | active v1.0 (Temporal worker + /mission) |
 | **Vera** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | Temporal | 8487 | `dispatcher` | active v1.0 |
-| **Penpot** | Design Scaffolder — crée projet Penpot + duplique template | Temporal | 8488 | `dispatcher` | active v1.0 |
-| **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `dispatcher` | active v1.0 (v2.0 à implémenter : scaleway-engine) |
+| **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `dispatcher` | active v1.1 (+/provision +/link-vercel HTTP, branché Dispatcher v2.2) |
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
 | **Zephyr** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v2.0 |
 | **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8493 | — | actif v1.0 |
@@ -568,6 +567,9 @@ zoho_create_issue(
 | 61 | Milestone Zoho — `status` doit être un entier | `POST /projects/{id}/milestones/{mid}/status/` avec `data={"status": 2}` (int) — `2`=completed, `1`=notcompleted. Les strings (`"completed"`, `"Completed"`) retournent 6832. Scope requis : `ZohoProjects.milestones.UPDATE`. Leon doit appeler cet endpoint dès que toutes les tâches du milestone sont Closed. |
 | 62 | FastAPI catch-all `/{path:path}` intercepte `/health` | Toujours définir les routes spécifiques (`/health`, `/billing`…) **avant** le wildcard `/{path:path}`. FastAPI résout dans l'ordre de déclaration. |
 | 63 | FastAPI `method: str` en query param dans route catch-all | `request.method` donne la méthode HTTP réelle. Ne jamais ajouter `method: str` comme paramètre de fonction — FastAPI l'interprète comme query param obligatoire. Pattern correct : `async def proxy(path: str, request: Request, x_agent_id: str = Header(...))`. |
+| 66 | **Modification code agent — TOUJOURS via `/agent-modify` (admin-sys v6.2)** | Incident 2026-05-31 : Charlotte a modifié leon.py directement via `kubectl replace` sans validation syntaxe → IndentationError + CrashLoopBackOff Leon. **Règle absolue** : toute modification d'un script agent passe par `POST admin-sys:8000/agent-modify {agent, configmap, filename, content}`. Ce endpoint : (1) valide la syntaxe Python via `ast.parse` AVANT d'appliquer, (2) pose un verrou — un seul agent modifiable à la fois, (3) rollback automatique si le pod crashe dans les 90s. `kubectl replace` direct sur un `*-script` configmap = INTERDIT pour Charlotte. |
+| 65 | **Renommage agent — propagation obligatoire aux dépendants** | Incident 2026-05-31 : Camille/Guillaume déployés >30 jours mais Dispatcher toujours câblé sur `aria-queue`/`nox-queue` → workflow Temporal bloqué indéfiniment en prod. **Checklist obligatoire à chaque renommage d'agent** : (1) nouveau pod+configmap ✅ (2) Dispatcher config+script (`*_QUEUE`, activités Temporal, rapport) ✅ (3) MANIFESTE Charlotte (prompt Langfuse) ✅ (4) CLAUDE.md table agents ✅ (5) Supprimer ancien configmap orphelin ✅. Charlotte doit vérifier `kubectl get configmap -n agent-system \| grep <ancien-nom>` après tout renommage. |
+| 64 | **RÈGLE CRITIQUE Charlotte — rag-system INTERDIT hors apply_gitops_fix** | Incident 2026-05-31 : Charlotte a modifié `embed-service` directement via kubectl (image `python:3.12-slim`, limites mémoire) → divergence GitOps silencieuse → OOMKill → classification sémantique cassée pendant plusieurs heures. **Règle absolue** : tout changement sur `rag-system` (embed-service, qdrant) passe OBLIGATOIREMENT par `apply_gitops_fix`. `kubectl patch/replace/apply` direct sur ce namespace = INTERDIT. Image de référence : `ghcr.io/neomnia/neokube-agent-base:latest`. |
 | 54 | Git push ≠ déployé | Pas de GitOps auto — `git push` + `kubectl apply/replace` obligatoire. Après mise à jour configmap, `kubectl rollout restart` obligatoire pour que le pod recharge. Vérifier avec `kubectl exec pod -- cat /app/config.yaml` que la config mountée correspond bien au configmap K8s. |
 | 56 | Zoho `/bugs/` form-encoded | `data=` pas `json=` pour appels directs |
 | 57 | Pseudo-code outil dans `_conv_llm` | `_conv_llm` = synthèse sans tools — `RÈGLE ANTI-PSEUDO-CODE` dans le prompt |
@@ -588,7 +590,7 @@ zoho_create_issue(
 | **Dispatcher** | `mistral` ⚠️ | — | — | — | — |
 | **Camille** / **Guillaume** / **Alain** | `codestral` | — | — | `mistral` (Alain fallback) | — |
 | **Vera** | `mistral-large-2407` | — | — | — | — |
-| **Penpot** / **Domi** | `mistral` ⚠️ | — | — | — | — |
+| **Domi** | `mistral` ⚠️ | — | — | — | — |
 | **Neo** | `mistral-large-2407` | — | — | — | — |
 
 ⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
