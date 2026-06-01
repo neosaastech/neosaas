@@ -51,7 +51,7 @@ NeoStudio est l'**atelier de développement multi-agent de NeoKube**. Une UI cha
 |---|---|---|---|---|
 | Charlotte | `charlotte` | SRE — Cluster K8s, Scaleway, Vault | claude-sonnet | `POST /mission/stream` (SSE `{type:"token",text}`) |
 | Leon | `leon` | Chef de Production — spec Notion, dispatch | gpt-4o | `POST /v1/chat/completions` (OpenAI stream) |
-| Aria | `aria` | Frontend Builder — GitHub + Vercel + Penpot | codestral | LiteLLM `/v1/chat/completions` |
+| Camille | `camille` | Frontend Builder — GitHub + Vercel + Penpot | codestral | LiteLLM `/v1/chat/completions` |
 | Nox | `nox` | Backend Builder — GitHub + Neon | codestral | LiteLLM `/v1/chat/completions` |
 | Vera | `vera` | QA Reviewer | mistral-large | LiteLLM `/v1/chat/completions` |
 | Dispatcher | `dispatcher` | Orchestrateur DevProjectWorkflow | mistral | LiteLLM `/v1/chat/completions` |
@@ -208,6 +208,161 @@ DEFAULT_LLM_MODEL=mistral/mistral-large-latest
 GITHUB_TOKEN=ghp_xxx
 JWT_SECRET=dev-secret-local
 # AUTH_PASSWORD=mot-de-passe  # Laisser vide en dev local = auth désactivée (toujours autorisé)
+```
+
+---
+
+## Process Charlotte — Ajouter un endpoint à NeoStudio Engine
+
+> **Source de vérité** : `charlesvdd/neostudio` sur GitHub (repo privé).
+> Charlotte utilise le **GitHub MCP** (connector-system:8080) pour lire et modifier le code.
+
+### Authentification NeoStudio Engine
+
+```
+POST /api/v1/auth/login
+Body: {"password": "<AUTH_PASSWORD depuis Vault secret/neokube/apps/neostudio>"}
+Retour: {"token": "<JWT valide 7j>"}
+
+Tous les autres endpoints : Authorization: Bearer <JWT>
+JWT_SECRET : Vault secret/neokube/apps/neostudio → JWT_SECRET
+```
+
+**Pattern pour tester un endpoint depuis Charlotte :**
+```bash
+# Via admin-sys kubectl exec
+kubectl exec -n interfaces deploy/neostudio-engine -- \
+  wget -qO- --post-data='{"password":"<AUTH_PASSWORD>"}' \
+  --header='Content-Type:application/json' \
+  http://localhost:4242/api/v1/auth/login
+```
+
+### Ajouter un endpoint Engine (Bun/Hono TypeScript)
+
+```
+Repo : charlesvdd/neostudio (branche main)
+Fichier à modifier : apps/engine/src/index.ts (ou créer apps/engine/src/routes/<nom>.ts)
+```
+
+**Procédure complète (via GitHub MCP) :**
+
+1. **Lire la structure existante** :
+   ```
+   GitHub MCP : get_file_contents(owner="neomnia", repo="neostudio", path="apps/engine/src/index.ts")
+   ```
+
+2. **Comprendre le pattern Hono** :
+   ```typescript
+   // Pattern type d'un endpoint Engine
+   app.get('/api/budgets', authMiddleware, async (c) => {
+     // Logique ici
+     return c.json({ data: result, error: null })
+   })
+   ```
+
+3. **Créer ou modifier le fichier** :
+   ```
+   GitHub MCP : create_or_update_file(
+     owner="neomnia", repo="neostudio",
+     path="apps/engine/src/routes/budgets.ts",
+     content="<code TypeScript base64>",
+     message="feat(engine): add GET /api/budgets — LiteLLM budget panel",
+     branch="main"
+   )
+   ```
+
+4. **Vérifier que le CI/CD se déclenche** :
+   ```
+   GitHub MCP : list_workflow_runs(owner="neomnia", repo="neostudio") → vérifier "ci.yml" en cours
+   ```
+
+5. **Attendre la fin du build** (~3-5 min) puis redéployer :
+   ```bash
+   kubectl rollout restart deployment/neostudio-engine -n interfaces
+   kubectl rollout status deployment/neostudio-engine -n interfaces --timeout=120s
+   ```
+
+6. **Vérifier l'endpoint** :
+   ```bash
+   # Obtenir un JWT d'abord
+   TOKEN=$(kubectl exec -n interfaces deploy/neostudio-engine -- \
+     wget -qO- --post-data='{"password":"$AUTH_PASSWORD"}' \
+     --header='Content-Type:application/json' \
+     http://localhost:4242/api/v1/auth/login | python3 -c "import json,sys; print(json.load(sys.stdin).get('token',''))")
+   
+   # Tester
+   kubectl exec -n interfaces deploy/neostudio-engine -- \
+     wget -qO- --header="Authorization: Bearer $TOKEN" \
+     http://localhost:4242/api/NOUVEAU_ENDPOINT
+   ```
+
+### Template endpoint GET /api/budgets (LiteLLM)
+
+```typescript
+// apps/engine/src/routes/budgets.ts
+import { Hono } from 'hono'
+import { authMiddleware } from '../middleware/auth'
+
+const router = new Hono()
+
+router.get('/budgets', authMiddleware, async (c) => {
+  const litellmUrl = process.env.LITELLM_PROXY_URL || 'http://litellm.cockpit.svc.cluster.local:4000'
+  const masterKey = process.env.LITELLM_MASTER_KEY || process.env.LITELLM_API_KEY || ''
+  
+  try {
+    // Lister les clés
+    const listResp = await fetch(`${litellmUrl}/key/list?page=1&size=50`, {
+      headers: { Authorization: `Bearer ${masterKey}` }
+    })
+    const { keys } = await listResp.json()
+    
+    // Récupérer info par clé (agents uniquement)
+    const agents = []
+    for (const keyHash of keys) {
+      const infoResp = await fetch(`${litellmUrl}/key/info?key=${keyHash}`, {
+        headers: { Authorization: `Bearer ${masterKey}` }
+      })
+      const { info } = await infoResp.json()
+      const alias = info?.key_alias || ''
+      if (!alias.startsWith('agent-')) continue
+      
+      agents.push({
+        name: alias.replace('agent-', ''),
+        spend: info.spend || 0,
+        max_budget: info.max_budget || 0,
+        pct: info.max_budget ? Math.round((info.spend || 0) / info.max_budget * 100) : 0,
+        budget_reset_at: info.budget_reset_at,
+        model: info.models?.[0] || 'unknown'
+      })
+    }
+    
+    return c.json({ data: agents.sort((a,b) => b.pct - a.pct), error: null })
+  } catch (e: any) {
+    return c.json({ data: null, error: e.message }, 500)
+  }
+})
+
+export default router
+```
+
+**Enregistrer dans index.ts** :
+```typescript
+import budgetsRouter from './routes/budgets'
+app.route('/api', budgetsRouter)
+```
+
+### Modifier l'UI NeoStudio (Next.js 15)
+
+Même process GitHub MCP mais sur `apps/ui/src/` :
+- Composants : `apps/ui/src/components/`
+- Pages : `apps/ui/src/app/`
+- API calls : via `authFetch` (wrapper sur fetch + JWT Bearer auto)
+
+```typescript
+// Exemple appel depuis l'UI
+import { authFetch } from '@/lib/auth'
+const res = await authFetch('/api/budgets')
+const { data } = await res.json()
 ```
 
 ---
