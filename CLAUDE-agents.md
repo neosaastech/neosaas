@@ -482,6 +482,57 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 
 ---
 
+## Joseph v3.0 — UX/Design Strategist & Figma (2026-06-09)
+
+**Port** : 8492 · **Namespace** : agent-system · **Modèle** : `mistral-large-2407` (analyse) + `gpt-4o` (production) · **OWU** : pipe `joseph_design` (global)
+
+### Architecture
+
+Deux chemins d'exécution :
+- **ReAct agent** (`run_agent` + `stream_agent`) — requêtes interactives avec outils, streaming SSE
+- **Pipeline 3 étapes** (`run_joseph_pipeline`) — livrables Leon (LIVRABLE_TYPE header) : Analyse→Validation→Production
+
+**Routing `/mission`** : détecte `LIVRABLE_TYPE:` → pipeline · sinon → ReAct agent
+
+**Streaming `/mission/stream`** : SSE events `start · thinking · tool_start · tool_done · done` — consommé par le pipe OWU pour afficher les actions en temps réel.
+
+### Outils (6 Figma + 4 UX/Penpot)
+
+| Outil | Backend | Rôle |
+|---|---|---|
+| `figma_get_file(file_key)` | figma-engine:8013 | Structure fichier, pages, frames |
+| `figma_get_components(file_key)` | figma-engine:8013 | Bibliothèque composants |
+| `figma_to_slides(file_key, page?, max_frames?)` | figma-engine GET /design/{key}/to-slides | **Présentation Reveal.js** — URL publique `figma.neokube.fr` |
+| `figma_extract_design_tokens(file_key)` | figma-engine:8013 | Palette couleurs, typo, effets |
+| `figma_export_frames(file_key, node_ids, format?)` | figma-engine:8013 | Export images JPG/PNG/SVG |
+| `figma_visual_audit(file_key, node_id, focus?)` | figma-engine + Pixtral | Audit graphique visuel LLM |
+| `ux_audit_url(url, focus?)` | crawlee-service:8009/crawl | Scrape + données brutes → LLM principal fait l'audit |
+| `penpot_list_projects/files/create_project` | penpot-connector:8004 | Gestion projets Penpot |
+| `generate_wireframe_spec` | LLM interne | Spec wireframe textuelle Markdown |
+| `generate_design_guidelines` | LLM interne | Charte design (couleurs, typo, ton) |
+
+**Règle anti-pattern #67** : les outils ne doivent pas appeler de LLM en interne. `ux_audit_url` retourne des données brutes (page_content + instruction) — le LLM principal fait la synthèse.
+
+### Connexions
+
+- **CRAWLEE_CONNECTOR_URL** : `http://crawlee-service.connector-system.svc.cluster.local:8009` (attention : service = `crawlee-service`, pas `crawlee-connector`)
+- **FIGMA_ENGINE_URL** : `http://figma-engine.connector-system.svc.cluster.local:8013`
+- **Token Figma** : Vault `secret/neokube/apps/figma` — compte admin temporaire, expire **2026-09-07** → issue Zoho `[Charlotte]` créée pour renouvellement
+
+### Utilisation depuis OWU
+
+Sélectionner **"Joseph — Design & Figma"** · Messages naturels en français · Les étapes s'affichent en temps réel · Jamais de noms de fonctions internes dans les réponses.
+
+```
+Exemples :
+"Analyse ce fichier Figma : https://www.figma.com/design/{key}/"
+"Génère une présentation depuis la page X"
+"Fais un audit UX de https://..."
+"Extrais la charte graphique de ce fichier Figma"
+```
+
+---
+
 ## Charlotte SRE — Architecture interne (v4.0)
 
 `SREScanWorkflow` tourne toutes les `SRE_SCAN_INTERVAL_S` secondes (**1800s = 30 min**) via un Temporal Schedule.
@@ -489,23 +540,31 @@ Endpoint correct : `POST /api/public/dataset-items` (Langfuse v2.95).
 | Bloc | Étapes | Activités clés |
 |---|---|---|
 | **A — Scan** | 1. Temporal failures · 2. Pod health · 3. Backup status · 4. LLM key status · 5. Vectorisation | `sre_scan_temporal_failures`, `sre_scan_pod_health`, `sre_verify_backup`, `sre_check_llm_key_status` |
-| **B — Remédiation** | 6. Auto-restart agents CrashLoop | `sre_auto_restart_agents` |
-| **C — Sévérité** | 7. Sévérité rule-based (critical/warning/info) · score Langfuse `cluster_health_score` · **ntfy granulaire par événement** | `sre_ntfy_alert`, `sre_push_langfuse_score` |
-| **D — Reporting** | 8. Matrice agents · document incident/health si sévérité ≥ warning | `sre_agent_health_matrix`, `sre_document_incident`, `sre_document_health_report` |
-| **E — Eval Watch** | 9. Poll scores Langfuse (1 cycle sur `EVAL_WATCH_EVERY_N`=6) → ntfy + llm-key-sync si dégradation | `sre_check_eval_scores` |
-| **F — Self-Improvement** | Workflow hebdomadaire indépendant (dimanche 3h UTC) — collecte conversations sous-optimales → analyse Mistral → rapport Zoho + ntfy | `sre_collect_conversation_samples`, `sre_analyze_quality_patterns`, `sre_publish_improvement_report` |
-| **G — Image Versions** | Workflow hebdomadaire (dimanche 2h UTC) — scan toutes images K8s vs Docker Hub · ntfy par catégorie : major (high) / minor / patch · **déclenchable manuellement** via `trigger_image_update_scan` | `sre_scan_image_versions` |
+| **B — Remédiation** | 6. Auto-restart agents CrashLoop/OOMKilled · 6b. Escalade Zoho `[ClaudeCode]` si pod non-remédiable ≥ 6h | `sre_auto_restart_agents` |
+| **C — Sévérité + ntfy** | 7. Sévérité rule-based (critical/warning/info) · ntfy **toutes raisons** (rate-limit 6h pour persisants) · score Langfuse | `sre_ntfy_alert`, `sre_push_langfuse_score` |
+| **D — Analyse LLM + Remédiation** | 8. Si severity=warning\|critical → LLM raisonne sur l'état réel → exécute `scope=auto` via admin-sys → escalade `scope=human` ntfy | `sre_analyze_with_llm`, `sre_execute_recommendations` |
+| **E — Reporting** | 9. Matrice agents · document incident/health si sévérité ≥ warning | `sre_agent_health_matrix`, `sre_document_incident`, `sre_document_health_report` |
+| **F — Eval Watch** | 10. Poll scores Langfuse (1 cycle sur `EVAL_WATCH_EVERY_N`=6) → ntfy + llm-key-sync si dégradation | `sre_check_eval_scores` |
+| **G — Self-Improvement** | Workflow hebdomadaire (dimanche 3h UTC) — collecte conversations → analyse Mistral → rapport Zoho + ntfy | `sre_collect_conversation_samples`, `sre_analyze_quality_patterns` |
+| **H — Daily Briefing** | Workflow quotidien (7h UTC = 8h Paris) — scroll Qdrant `indexed_at` + `timestamp` 24h → résumé LLM → Zoho + ntfy | `sre_daily_briefing` |
 
-**ntfy granulaire (Bloc C)** — une alerte par événement réel :
-- Temporal failure → `sre_ntfy_alert` par namespace
-- Pod OOMKilled/CrashLoopBackOff → `sre_ntfy_alert` par pod
+**ntfy granulaire (Bloc C)** — une alerte par événement, toutes raisons :
+- Temporal failure → `sre_ntfy_alert` urgent/high par namespace
+- Pod dégradé (OOMKilled/CrashLoop/ImagePullBackOff/Pending/NotReady/Error) → `sre_ntfy_alert` par pod · rate-limit : alerte si age < 90min OU age % 360 < 30 (rappel 1/6h)
 - Backup FAILED/ERROR/STALE → `sre_ntfy_alert`
-- Provider LLM quota_exceeded/error → `sre_ntfy_alert` par provider (**Gemini exclu**)
-- Auto-restart → `sre_ntfy_alert` par agent
-- Drift ESCALATE → `sre_ntfy_alert` urgent ; drift corrigé → `sre_ntfy_alert` default
+- Provider LLM quota_exceeded/error → `sre_ntfy_alert` par provider
+- Remédiation auto appliquée → `sre_ntfy_alert` default (confirmation)
+- Intervention humaine requise → `sre_ntfy_alert` high
+
+**Principe d'action (Bloc D)** — Charlotte observe, raisonne, agit. Pas de couche abstraite intermédiaire :
+- LLM (`mistral`, `LLM_SCAN_MODEL`) analyse l'état complet du cluster + RAG incidents passés
+- Retourne des recommandations structurées : `kubectl_args` (liste d'args directs) + `scope: auto|human`
+- `scope=auto` → `sre_execute_recommendations` exécute via admin-sys (verbes autorisés : patch, rollout, annotate, delete pod)
+- `scope=human` → ntfy high "👤 Intervention requise" avec diagnostic complet
+- Résultat binaire : OK ou FAILED — pas de retry, pas de fallback complexe
 
 Variables importantes : `SRE_SCAN_INTERVAL_S` (**1800**), `EVAL_WATCH_EVERY_N` (6), `EVAL_SCORE_THRESHOLD` (7.0).
-> `LLM_ANALYZE_EVERY_N` supprimé — `sre_analyze_with_llm` retiré en 2026-05-19 (redondant, coûteux). Sévérité désormais rule-based.
+> Historique : `sre_analyze_with_llm` avait été retiré le 2026-05-19 (jugé redondant/coûteux quand il tournait à chaque scan). Re-branché le 2026-06-08 uniquement sur `severity=warning|critical` avec `mistral` (cheap) — les 3 bugs qui rendaient Charlotte silencieuse pendant 3 jours (ntfy filter, daily briefing timestamp, LLM déconnecté) ont été corrigés simultanément.
 
 ### Flux Leon → Charlotte
 
@@ -562,7 +621,7 @@ ProjectSpec validé par Dispatcher
 
 Charlotte v4.0 dispose de deux couches d'outils K8s, toutes exposées nativement via PydanticAI :
 
-1. **41 outils `@charlotte_agent.tool`** — wrappers fins sur `_mission_execute_tool` (guards de sécurité inchangés)
+1. **42 outils `@charlotte_agent.tool`** — wrappers fins sur `_mission_execute_tool` (guards de sécurité inchangés)
 2. **Outils K8s MCP** (`k8s_pods_list`, `k8s_events_list`, `k8s_resources_scale`, etc.) — passés via `toolsets=[MCPServerStreamableHTTP(MCP_K8S_URL)]` à chaque `Agent.run()`
 
 Le serveur K8s MCP (`ghcr.io/containers/kubernetes-mcp-server`) expose 19-20 outils nommés `k8s_*`. Charlotte les appelle directement — les types et arguments sont validés par le protocole MCP.
@@ -571,6 +630,7 @@ Charlotte a accès aux outils suivants pour agir sur le cluster :
 
 | Outil | Rôle | Usage |
 |---|---|---|
+| `get_agent_info(name)` | **Registre officiel des agents** — retourne rôle, port, runtime, LLM, configmap depuis `_AGENT_REGISTRY` (dict Python hardcodé). **Ne jamais appeler Notion/Qdrant pour ça.** | "quel est le rôle de Vera", "sur quel port tourne Nora", "quel LLM utilise Alain" |
 | `run_kubectl` | kubectl via admin-sys — read + mutations. **`exec`/`cp`/`port-forward` bloqués. `delete` autorisé.** | Diagnostic, get pods, logs, delete pods éphémères |
 | `kubectl_apply` | Applique un manifest YAML arbitraire via admin-sys `/apply` (≠ GitOps) | Pods éphémères de maintenance, Jobs, ressources temporaires |
 | `restart_deployment` | `kubectl rollout restart` ciblé | Restart sans modifier le manifest |
@@ -707,6 +767,88 @@ Charlotte v4 dispose d'un **pré-classificateur 5 classes** (`_classify_message`
 #### Flux de routing
 
 ```
+## Règle universelle — Cycle de vie d'une tâche Zoho (tous agents)
+
+**Applicable à** : Charlotte, Leon, Camille, Guillaume, Alain, Domi, Joseph, Milo, Nora — tout agent qui reçoit ou exécute une tâche Zoho Projects.
+
+Cette règle définit le protocole standard de traitement d'une tâche, quelle que soit l'origine (zoho-observer, mission humaine, dispatch Leon).
+
+### Cycle obligatoire en 5 étapes
+
+```
+ÉTAPE 1 — LIRE
+  GET zoho-engine /proxy → lire la tâche complète
+  Extraire : nom, description, contexte, dépendances
+
+ÉTAPE 2 — EXÉCUTER
+  Traiter le travail décrit dans la description
+  Conserver les résultats (URLs, IDs, statuts, erreurs)
+
+ÉTAPE 3 — COMMENTER
+  POST zoho-engine /proxy → /tasks/{id}/comments/
+  Contenu obligatoire : date/heure, actions réalisées, résultats concrets,
+  erreurs éventuelles, lien vers artefacts (GitHub, Vercel, Penpot...)
+  Format : "🤖 {Agent} — {action} — {résultat}"
+
+ÉTAPE 4 — FERMER
+  POST zoho-engine /task.update percent_complete=100
+  Ne fermer QU'APRÈS avoir posté le commentaire
+
+ÉTAPE 5 — VÉRIFIER LA TASKLIST
+  GET zoho-engine /proxy → /tasklists/{tl_id}/tasks/
+  Si toutes les tâches sont à 100% :
+    → Commenter la tasklist "✅ Release {nom} complète — {date}"
+    → GET tasklists suivante → si existe : lire première tâche ouverte
+    → Si aucune tasklist suivante : notifier Leon (mission accomplie)
+  Sinon : passer à la tâche suivante ouverte de la tasklist
+```
+
+### Règles strictes
+
+- **Jamais de fermeture sans commentaire** — le commentaire est la traçabilité
+- **Jamais de commentaire vide** — au minimum : ce qui a été fait et le résultat
+- **Jamais de fermeture si ÉTAPE 2 a échoué** — commenter l'échec, laisser ouverte, alerter Leon
+- **Toujours utiliser zoho-engine** — jamais l'API Zoho directement (pas d'OAuth à gérer)
+- **web_url depuis zoho-engine** — ne jamais construire les URLs manuellement (anti-pattern ref)
+
+### Implémentation dans le code agent
+
+```python
+async def process_zoho_task(project_id: str, task_id: str, tasklist_id: str):
+    # 1. Lire
+    task = await zoho_engine_proxy("GET", f"projects/{project_id}/tasks/{task_id}/")
+
+    # 2. Exécuter (logique métier propre à l'agent)
+    result = await execute_task(task)
+
+    # 3. Commenter
+    comment = f"🤖 {AGENT_NAME} — {task['name']} — {'✅ OK' if result['ok'] else '❌ ERREUR'}\n{result['detail']}"
+    await zoho_engine_proxy("POST", f"projects/{project_id}/tasks/{task_id}/comments/",
+                            data={"content": comment})
+
+    # 4. Fermer si succès
+    if result["ok"]:
+        await zoho_engine_task_update(project_id, task_id, percent_complete=100)
+
+    # 5. Vérifier tasklist
+    await check_tasklist_complete(project_id, tasklist_id)
+```
+
+### Vérification de tasklist complète
+
+```python
+async def check_tasklist_complete(project_id: str, tasklist_id: str):
+    tasks = await zoho_engine_proxy("GET", f"projects/{project_id}/tasklists/{tasklist_id}/tasks/")
+    all_done = all(t.get("percent_complete") == "100" for t in tasks.get("tasks", []))
+    if all_done:
+        await zoho_engine_proxy("POST", f"projects/{project_id}/tasklists/{tasklist_id}/comments/",
+                                data={"content": f"✅ Tasklist complète — {datetime.now():%d/%m/%Y %H:%M}"})
+        # Notifier Leon pour la suite
+        await delegate("leon", f"Tasklist {tasklist_id} du projet {project_id} est complète. Quelle est la prochaine ?")
+```
+
+---
+
 ## Schéma MissionRequest — TOUS LES AGENTS
 
 **Champ body obligatoire : `message` (pas `mission`).** Confusion fréquente avec le nom de l'endpoint `/mission`.
@@ -1056,7 +1198,7 @@ Capacité de charge confirmée : contexte réel ≈ 25–30K tokens (system prom
 
 > Tableau complet des collections Qdrant (dims, points, modèle) : **[CLAUDE-cluster.md](CLAUDE-cluster.md)**
 
-Chaque agent a une ou plusieurs collections Qdrant dédiées. Règle : **ne jamais interroger la collection d'un autre agent sans coordination** (ex : Zephyr ne lit pas `sre-charlotte-incidents`).
+Chaque agent a une ou plusieurs collections Qdrant dédiées. Règle : **ne jamais interroger la collection d'un autre agent sans coordination** (ex : Joseph ne lit pas `sre-charlotte-incidents`).
 
 ### Carte RAG → Agent
 
@@ -1064,7 +1206,7 @@ Chaque agent a une ou plusieurs collections Qdrant dédiées. Règle : **ne jama
 |---|---|---|---|
 | **Leon** | `leon-memory` | Normes CDC, process interview, expériences REVIEW | Avant génération spec (mode REVIEW) |
 | **Camille** | `template-neosaas` + `design-knowledge` | Patterns code Next.js, principes UX composants | Dans `system_prompt` de `camille_generate_nextjs` |
-| **Zephyr** | `design-knowledge` + `neomnia_core` | Heuristiques UX par livrable + contexte agence | Dans `prod_user` étape 3 production |
+| **Joseph** | `design-knowledge` + `neomnia_core` | Heuristiques UX par livrable + contexte agence | Dans `prod_user` étape 3 production · Figma file_key → figma-engine |
 | **Charlotte** | `sre-charlotte-incidents` + `charlotte-conversations` + **`neokube-architecture`** | Incidents passés + session memory + **docs infra NeoKube** | Automatique via PydanticAI / `_load_pydantic_history` + RAG docs au démarrage mission |
 | **Dispatcher** | `pm-decisions` | Décisions projets archivées | Post-workflow (write, pas read) |
 | **Neo** | `neo-memory` | Mémoire assistant | Session memory |
@@ -1149,7 +1291,7 @@ Notion (base interne)
   → SurfSense : réservé recherche documentaire externe
 
 neomnia_core (SharePoint, 260k pts)
-  → contexte agence généraliste — utile pour Zephyr (livrable charte/guidelines)
+  → contexte agence généraliste — utile pour Joseph (livrable charte/guidelines)
   → score seuil > 0.3 : filtre les résultats hors-sujet
 ```
 

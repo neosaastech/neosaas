@@ -216,13 +216,13 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 > Charlotte internals, RBAC, admin-sys API, DevProjectWorkflow, R9, Checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
-> **Charlotte SRE v4.0 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 41 outils, guards inchangés) + protocole de remédiation sécurisé : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Charlotte SRE v4.1 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 41 outils, guards inchangés) + protocole de remédiation sécurisé + **SREScanWorkflow Bloc D actif** (sre_analyze_with_llm branché, sre_execute_recommendations, ntfy toutes raisons) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 > **Charlotte = maître NeoKube** — elle est responsable de TOUTE l'infrastructure : cluster K8s, cloud Scaleway (billing, dépenses, sécurité IAM, rotation clés API, MFA, projets), monitoring (Grafana/Prometheus/Loki), GitOps, Vault, agents déployés. **Frontière claire** : Charlotte gère l'infrastructure — Leon gère les projets métier nouveaux (site web, API, scraping external). Ne jamais renvoyer vers Leon pour une question infrastructure/Scaleway.
 
 | Agent | Rôle | Runtime | Port | Temporal NS | Status |
 |---|---|---|---|---|---|
-| **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→G. | Temporal | 8383 | `sre-charlotte` | active v4.0 (PydanticAI, FallbackModel, MCP natif) |
+| **Charlotte** | **Maître NeoKube** — SRE cluster K8s + infrastructure cloud Scaleway (billing, sécurité IAM, rotation clés, MFA) + monitoring + GitOps + Vault. Blocs SRE A→H. | Temporal | 8383 | `sre-charlotte` | active v4.1 (PydanticAI, FallbackModel, MCP natif, Bloc D LLM actif) |
 | **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.4 (REVIEW mode, notion_update_page, 8 intent labels dont `audit`, R9.13 classify cascade claude-sonnet→gpt-4o, zoho_delete_projects confirmed gate, R6, `delegate_to_charlotte` read-only audit, **GitHub tools** via github-connector: list/create/read/write/branch/PR, **Vercel tools** via vercel-connector: list/deploy/logs/create) |
 | **Camille** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | FastAPI | 8485 | — | active v3.1 (GitHub MCP + /mission, dispatché par Leon) |
 | **Guillaume** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | FastAPI | 8486 | — | active v3.1 (GitHub+Neon MCP + /mission, dispatché par Leon) |
@@ -230,7 +230,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | **qa-service** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | HTTP | 8487 | — | active v1.0 |
 | **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `domi` | active v1.1 (migration NS dispatcher→domi en cours) |
 | **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
-| **Joseph** | UX/Design Strategist — audit UX, wireframes, interface Penpot | FastAPI | 8492 | — | actif v2.0 |
+| **Joseph** | UX/Design Strategist — audit UX, wireframes, Penpot + **Figma** (get_file, to_slides, design_tokens, visual_audit) | FastAPI | 8492 | — | actif v3.0 (OWU pipe `joseph_design`, figma-engine branché) |
 | **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8493 | — | actif v1.0 |
 | **admin-sys** | K8s executor — kubectl délégué par Charlotte | FastAPI | 8000 | — | active v6.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
@@ -414,9 +414,10 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 
 ---
 
-## Penpot — Gestion des projets et fichiers
+## Penpot & Figma — Design
 
-> Documentation complète (structure projets, URLs, gotchas, RAG design) : **[CLAUDE-penpot.md](CLAUDE-penpot.md)**
+> Penpot (structure projets, URLs, gotchas, RAG design) : **[CLAUDE-penpot.md](CLAUDE-penpot.md)**
+> Figma engine (architecture, webhooks, indexation 50+ fichiers, Joseph v3.0) : **[CLAUDE-figma-engine.md](CLAUDE-figma-engine.md)**
 
 **URL publique** : `https://design.neokube.fr` — **Team** : `Neomnia Studio` (ID `82052e4a-914a-8123-8007-d697aa5fd265`)
 **URL de livraison** : `https://design.neokube.fr/workspace?project-id={id}&file-id={id}` (session requise)
@@ -486,157 +487,37 @@ Documentation complète : **[CLAUDE-github-engine.md §Mécanisme ClaudeCode](CL
 
 ## Politique issues Zoho — Agents NeoKube
 
-Toute issue créée par un agent doit respecter ce standard. Implémenté dans `zoho_create_issue` (Charlotte ✅, Leon ✅ 2026-05-29).
+> Standard complet (champs obligatoires, severity→due_date, format `zoho_create_issue`, Boucle D zoho-observer, règles d'équipe SSII/Neokube) : **[CLAUDE-agents.md §Politique issues Zoho](CLAUDE-agents.md)**
 
-### Orchestration automatique — Zoho-observer Boucle D (v3.0, déployée 2026-05-29)
-
-`zoho-observer` scanne les bugs Zoho ouverts toutes les **5 min** (300s) :
-- `ASSOCIATED_TEAMS.id == 2114101000001544001` (SSII) → `POST leon:8181/mission` — Leon orchestre vers Joseph/Milo/Dispatcher/Nora/Camille/Guillaume/Alain
-- `ASSOCIATED_TEAMS.id == 2114101000001751022` (Neokube) ou team inconnue → `POST charlotte:8383/mission`
-- Issue `critical` non traitée depuis >1h → ntfy `urgent`
-- Commentaire `🤖` = déjà dispatché (idempotence cross-redémarrage)
-
-### Champs obligatoires
-
-| Champ | Via API | Valeur | Note |
-|---|---|---|---|
-| `title` | ✅ | Préfixe `[Agent]` — ex. `[Charlotte] Description` | Seul marqueur agent fiable par API |
-| `due_date` | ✅ | Calculée selon severity (voir tableau) | Implémenté automatiquement |
-| `severity` | ✅ | critical / major / minor / feature / enhancement | Détermine due_date |
-| `priority` | ✅ | High / Medium / Low | |
-| `assignee` | ✅ | `ZOHO_OWNER_ID` par défaut | |
-| `tag` | ❌ n'existe pas | — | Concept absent du modèle Zoho Projects bugs |
-| `reviewer` | ❌ n'existe pas | — | Concept absent du modèle Zoho Projects bugs |
-| `milestone_id` | ❌ ignoré | — | Ignoré à la création — non exposé en écriture via API REST |
-| `GROUP_NAME` / team | ❌ lecture seule | — | Lisible mais non settable via API. IDs connus : **Neokube** `2114101000001751022` · **SSII** `2114101000001544001` |
-
-> **Règle d'équipe** : issues agents infrastructure NeoKube → équipe **Neokube**. Issues projets clients (web, scraping…) → équipe **SSII**. À appliquer manuellement dans l'UI jusqu'à support API Zoho.
-
-### Calcul date d'échéance par severity
-
-| Severity | Cas | Délai | Exemple |
-|---|---|---|---|
-| `critical` | Sécurité, accès compromis | **+1 jour** | clé API exposée |
-| `major` | Bug bloquant fonctionnalité | **+3 jours** | outil broken |
-| `minor` | Bug non bloquant | **+7 jours** | formulation LLM |
-| `feature` | Amélioration / nouveau comportement | **+30 jours** | programme amélioration continue |
-| `enhancement` | Refactor / optimisation | **+90 jours** | restructuration architecture |
-
-### Format appel `zoho_create_issue`
-
-```python
-zoho_create_issue(
-    project_id  = "2114101000001543041",   # projet Neokube
-    title       = "[Charlotte] Titre descriptif",
-    description = "...",
-    severity    = "minor",     # critical|major|minor|feature|enhancement
-    creator     = "charlotte", # agent créateur → tag automatique
-)
-# due_date, team, reviewer_tag calculés automatiquement par le tool
-```
-
-### Règles de classification
-
-- **`critical`** : problème sécurité, credential exposé, accès non autorisé → ntfy `urgent` en parallèle
-- **`major`** : outil broken, workflow bloqué, données incorrectes → ntfy `high`
-- **`minor`** : comportement sous-optimal, UX dégradée, formulation LLM → ntfy `default`
-- **`feature`** : programme d'amélioration, nouveau comportement souhaité → pas de ntfy
-- **`enhancement`** : refactor, architecture, perf → pas de ntfy
+**Règle critique** : préfixe `[NomAgent]` obligatoire dans le titre — seul marqueur scannable par les agents. IDs équipes : **Neokube** `2114101000001751022` · **SSII** `2114101000001544001`.
 
 ---
 
 ## Pièges connus — Anti-patterns à éviter
 
-> Code + exemples complets : **[CLAUDE-antipatterns.md](CLAUDE-antipatterns.md)**
+> Référence complète (66 anti-patterns, code + exemples) : **[CLAUDE-antipatterns.md](CLAUDE-antipatterns.md)**
 
-| # | Piège | Règle courte |
-|---|---|---|
-| 1 | Vercel `repoId` | `int`, pas `str` |
-| 2 | `asyncio.gather` Temporal | `return_exceptions=True` pour activités optionnelles |
-| 3 | ProjectSpec nouveau champ | 3 endroits : schema Leon + dict spec + `validate_spec setdefault` |
-| 4 | `os.getenv()` en prod | Variable active → dans le ConfigMap |
-| 5 | ConfigMap modifié | `kubectl rollout restart` obligatoire |
-| 6 | SMTP Stalwart | `stalwart-mail:587`, PAS `stalwart-web` |
-| 7 | `_embed()` HuggingFace | Retourne 768 scalaires séparés — détecter `isinstance(first, list)` |
-| 8 | URLs agents | Construire dans le connector, jamais dans l'agent |
-| 14 | Heap limit ≠ OOMKilled | `FATAL Reached heap limit` ≠ Exit 137 — `NODE_OPTIONS=--max-old-space-size` |
-| 15 | Patch live sans GitOps push | `kubectl patch` seul = divergence permanente — Charlotte utilise `apply_gitops_fix` |
-| 16 | Ancien nom de pod | `kubectl get pod <ancien>` → NotFound — utiliser `-l app=` |
-| 17 | CM sre-script > 262 KB | `kubectl apply` échoue — utiliser `kubectl replace`. git commit ≠ déployé. |
-| 18 | Label `app=agent-charlotte` | N'existe pas — `kubectl get pods -n agent-system \| grep charlotte` |
-| 22 | `kubectl replace` écrase les clés CM | Replace remplace **tout** le CM — toujours inclure toutes les clés existantes |
-| 23 | Outil ad-hoc Charlotte | Primitives génériques + RAG, jamais `maintenance_pod(pvc=...)` |
-| 24 | Contexte ReAct trop gros | 2500 chars max par résultat d'outil |
-| 25 | Pod périmé dans `kubectl logs` | Vérifier existence pod avant `kubectl logs` |
-| 26 | Guard Charlotte auto-restart partiel | Guard `if charlotte` dans **toutes** les activités Temporal, pas seulement l'interactif |
-| 27 | Events K8s périmés = problèmes actuels | Events persist 1h après mort — croiser avec liste live pods |
-| 28 | Faux streaming SSE | `_build_sse(full_reply)` = tout d'un coup — Pattern A : `_llm_call_stream` + tokens |
-| 29 | `{var}` dans f-string system prompt | `{{var}}` pour littéral, `{var}` pour variable Python |
-| 31 | `raise` dans `async with` MCP | Wrappé en `ExceptionGroup` — stocker erreur, lever après la sortie du context manager |
-| 32 | LLM silencieux sur quota | HTTP 402 → fallback + ntfy, pas `""` silencieux |
-| 33 | Charlotte auto-modification | `_is_charlotte_file()` dans `write_file` + `apply_gitops_fix` — bloc + ntfy |
-| 38 | Troncature brute contexte | `_compress_tool_result()` LLM extrait anomalies < 400 chars |
-| 40 | String matching intent | Utiliser `_classify_message()` LLM — jamais hardcoder `"accès"`, `"as-tu"` |
-| 43 | RÈGLE CRITIQUE Charlotte trop vague | Lister explicitement les domaines IN-scope (billing Scaleway = Charlotte, pas Leon) |
-| 44 | Mistral Cloudflare → tool calls XML | `FallbackModel(claude-sonnet → gpt-4o → mistral)` sur path interactive |
-| 45 | `kubectl get secret` → fuite clé | Guard `[SECRET_REDACTED]` dans `run_kubectl` + `RÈGLE SÉCURITÉ ABSOLUE` prompt |
-| 46 | Notion API `rich_text` vide | Filtrer blocs vides, chunk 90/requête, `_md_clean()` strip Markdown |
-| 47 | Validation UI avant action tiers | R-TAR : agir direct + URL dans réponse — pas de confirmation sauf action destructive |
-| 48 | `{a,b}` set literal dans f-string | `{{a,b}}` — `{a,b}` = Python set → `NameError` |
-| 49 | Confirmation courte → `greeting` | Pré-check : ≤ 60 chars + affirmatif + historique → forcer `task` |
-| 50 | Analyse fictive sur résultat vide | `RÈGLE ANTI-HALLUCINATION` : interdit analyser si résultat outil vide |
-| 51 | Question réflexive → CLARIFYING loop | Label `reflection` dans classifieur — réponse directe oui/non, pas de relance |
-| 52 | Overrides classifieur qui se contredisent | Supprimer tous les overrides sauf `_in_active_clarif` — passer contexte au LLM |
-| 53 | `zoho_milestone_complete` ignoré | Zoho calcule statut jalon depuis tâches — fermer tâches liées, pas le jalon directement |
-| 61 | Milestone Zoho — `status` doit être un entier | `POST /projects/{id}/milestones/{mid}/status/` avec `data={"status": 2}` (int) — `2`=completed, `1`=notcompleted. Les strings (`"completed"`, `"Completed"`) retournent 6832. Scope requis : `ZohoProjects.milestones.UPDATE`. Leon doit appeler cet endpoint dès que toutes les tâches du milestone sont Closed. |
-| 62 | FastAPI catch-all `/{path:path}` intercepte `/health` | Toujours définir les routes spécifiques (`/health`, `/billing`…) **avant** le wildcard `/{path:path}`. FastAPI résout dans l'ordre de déclaration. |
-| 63 | FastAPI `method: str` en query param dans route catch-all | `request.method` donne la méthode HTTP réelle. Ne jamais ajouter `method: str` comme paramètre de fonction — FastAPI l'interprète comme query param obligatoire. Pattern correct : `async def proxy(path: str, request: Request, x_agent_id: str = Header(...))`. |
-| 66 | **Modification code agent — TOUJOURS via `/agent-modify` (admin-sys v6.2)** | Incident 2026-05-31 : Charlotte a modifié leon.py directement via `kubectl replace` sans validation syntaxe → IndentationError + CrashLoopBackOff Leon. **Règle absolue** : toute modification d'un script agent passe par `POST admin-sys:8000/agent-modify {agent, configmap, filename, content}`. Ce endpoint : (1) valide la syntaxe Python via `ast.parse` AVANT d'appliquer, (2) pose un verrou — un seul agent modifiable à la fois, (3) rollback automatique si le pod crashe dans les 90s. `kubectl replace` direct sur un `*-script` configmap = INTERDIT pour Charlotte. |
-| 65 | **Renommage agent — propagation obligatoire aux dépendants** | Incident 2026-05-31 : Camille/Guillaume déployés >30 jours mais Dispatcher toujours câblé sur `aria-queue`/`nox-queue` → workflow Temporal bloqué indéfiniment en prod. **Checklist obligatoire à chaque renommage d'agent** : (1) nouveau pod+configmap ✅ (2) Dispatcher config+script (`*_QUEUE`, activités Temporal, rapport) ✅ (3) MANIFESTE Charlotte (prompt Langfuse) ✅ (4) CLAUDE.md table agents ✅ (5) Supprimer ancien configmap orphelin ✅. Charlotte doit vérifier `kubectl get configmap -n agent-system \| grep <ancien-nom>` après tout renommage. |
-| 64 | **RÈGLE CRITIQUE Charlotte — rag-system INTERDIT hors apply_gitops_fix** | Incident 2026-05-31 : Charlotte a modifié `embed-service` directement via kubectl (image `python:3.12-slim`, limites mémoire) → divergence GitOps silencieuse → OOMKill → classification sémantique cassée pendant plusieurs heures. **Règle absolue** : tout changement sur `rag-system` (embed-service, qdrant) passe OBLIGATOIREMENT par `apply_gitops_fix`. `kubectl patch/replace/apply` direct sur ce namespace = INTERDIT. Image de référence : `ghcr.io/neomnia/neokube-agent-base:latest`. |
-| 54 | Git push ≠ déployé | Pas de GitOps auto — `git push` + `kubectl apply/replace` obligatoire. Après mise à jour configmap, `kubectl rollout restart` obligatoire pour que le pod recharge. Vérifier avec `kubectl exec pod -- cat /app/config.yaml` que la config mountée correspond bien au configmap K8s. |
-| 56 | Zoho `/bugs/` form-encoded | `data=` pas `json=` pour appels directs |
-| 57 | Pseudo-code outil dans `_conv_llm` | `_conv_llm` = synthèse sans tools — `RÈGLE ANTI-PSEUDO-CODE` dans le prompt |
-| 58 | `billing_status` → 6831 Zoho timelog | Champ = `bill_status`. Erreur 6403 si tâche déjà fermée. |
-| 59 | Zoho GET filtres ignorés | URL query string ignoré — `data=` form-encoded obligatoire même pour GET |
-| 60 | Durées tâches Zoho `start=end` | `duration_days` dans `BatchTask` (défaut 3j) — `start = end - (days-1)` |
+**Règles absolues à ne jamais oublier** :
+- `kubectl replace` sur un `*-script` configmap → **INTERDIT pour Charlotte** — passer par `/agent-modify` (admin-sys v6.2, validation syntaxe + rollback auto)
+- Tout changement `rag-system` → **`apply_gitops_fix` obligatoire** — `kubectl patch/apply/replace` direct = divergence GitOps silencieuse
+- `git push` ≠ déployé — `kubectl apply/replace` + `rollout restart` obligatoires
+- `kubectl get secret` → guard `[SECRET_REDACTED]` — ne jamais exposer de valeur en clair
 
 ---
 
 ## Règle R9 — Gouvernance LLM par agent
 
-> Règles complètes (R9.1–R9.11), profils LLM, pattern d'appel, checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> Table complète (R9.1–R9.13, profils LLM par agent, cascade FallbackModel, R9.12 creation model) : **[CLAUDE-agents.md §Règle R9](CLAUDE-agents.md)**
 
-| Agent | `LLM_MODEL` | `LLM_CLASSIFY_MODEL` | `LLM_SCAN_MODEL` | `LLM_SECONDARY` | `LLM_FALLBACK` | `LLM_CREATION_MODEL` |
-|---|---|---|---|---|---|---|
-| **Charlotte** SRE v4 | `claude-sonnet` ✅ | `claude-sonnet` → `gpt-4o` ✅ (R9.13) | `mistral` (background) | `gpt-4o` | `mistral` | `claude-opus` ✅ (R9.12) |
-| **Leon** | `gpt-4o` (TASK) | `claude-sonnet` → `gpt-4o` → `mistral` ✅ (R9.13) | `mistral` (background scans) | `claude-sonnet` (REVIEW) | — | — |
-| **Dispatcher** | `mistral` ⚠️ | — | — | — | — |
-| **Camille** / **Guillaume** / **Alain** | `codestral` | — | — | `mistral` (Alain fallback) | — |
-| **Vera** | `mistral-large-2407` | — | — | — | — |
-| **Domi** | `mistral` ⚠️ | — | — | — | — |
-| **Neo** | `mistral-large-2407` | — | — | — | — |
-
-⚠️ = fallback temporaire (Gemini épuisé pour Dispatcher/Domi).
-**Charlotte v4 — cascade LLM (R9.10)** : classification `_classify_message()` → `mistral` (LLM_SCAN_MODEL, cheap, 10 tokens) · ReAct agent `charlotte_agent.run()` → `FallbackModel(claude-sonnet → gpt-4o → mistral)` · claude-sonnet = créatif + tool calling fiable · gpt-4o = fallback quota · mistral = last resort.
-**R9.12 — Création ultra-large** : si le message contient des keywords de création explicites (agent/outil/service + verbe d'action), `charlotte_agent.run()` reçoit `model=_creation_model` (`claude-opus`). Le FallbackModel reste inchangé pour toutes les autres tâches. Contexte réel ≈ 25–30K tokens (system prompt 12K + tool defs 2K + résultats outils) — très en dessous du 200K context window d'Opus.
-**R9.13 — Classificateur intent interactif (claude-sonnet → gpt-4o)** : `_classify_message()` utilise `LLM_CLASSIFY_MODEL=claude-sonnet` (compréhension documentaire, French, contexte implicite) avec fallback `LLM_CLASSIFY_FALLBACK=gpt-4o` si quota épuisé. `LLM_SCAN_MODEL=mistral` reste réservé aux scans Temporal background (background, pas interactif). Séparation : classification interactive = qualité de raisonnement ; scans background = coût/volume.
+**Résumé** : Charlotte = `claude-sonnet` (interactif) → `gpt-4o` → `mistral` · scan background = `mistral` · création = `claude-opus`. Leon = `gpt-4o`. Autres agents = `codestral`/`mistral`.
 
 ---
 
 ## Checklist — Intégration d'un nouvel agent NeoKube
 
-> **Norme classes services + agents + processus dev** : **[CLAUDE-services.md](CLAUDE-services.md)** — référence obligatoire avant toute création.
-> **Charlotte (pleine autonomie)** : `create_agent(name, description, runtime, port, model)` — 12 étapes auto (spec+code+**MAD**+Qdrant+LiteLLM key+K8s+OWU+eval-nightly). Ports libres : 8494-8499.
-> Guide complet (4 types d'agents, interview, Pattern A/B, arbre de décision) : **[CLAUDE-create-agent.md](CLAUDE-create-agent.md)**
-> Checklist manuelle (agents Temporal complexes) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
-> **Cadre normatif MAD (Mémoire · Apprentissage · Documentation)** — 9 règles obligatoires pour tout agent : **[CLAUDE-agent-learning.md](CLAUDE-agent-learning.md)**
+> Guide complet (classes A→E, interview, Pattern A/B, 12 étapes auto, MAD) : **[CLAUDE-create-agent.md](CLAUDE-create-agent.md)** · **[CLAUDE-agents.md](CLAUDE-agents.md)** · **[CLAUDE-agent-learning.md](CLAUDE-agent-learning.md)**
 
-**Classes d'agents** : CLASS A (conversational, OWU→media-gateway) · CLASS B (builder, Temporal) · CLASS C (infrastructure SRE) · CLASS D (connector/observer) · **CLASS E (documentation, /trigger+/status, pipeline read→synthesize→write, sans OWU)**
-**Étapes auto (CreateAgentWorkflow)** : 1. AgentSpec YAML → 2. Vault → 3. LiteLLM virtual key → 4. K8s (NS+SA+RBAC+CM+Deploy+Svc) → 5. Code MAD v2.0 (CLASS A ou E) → 6. Policy → **6c. Qdrant `{name}-memory` (M1)** → 7. Registry → 8a/8b. OWU (CLASS A seulement) → 9. Langfuse
-
-**Règles MAD (condition de mise en production)** :
-M1 Collection Qdrant · M2 Session memory · M3 Long-term memory · A1 `_agent_learn()` post-mission · A2 Correction proactive Charlotte · A3 CharlotteImprovementWorkflow hebdo · D1 Identité Langfuse · D2 Score `mission_quality` · D3 ntfy + Zoho
+**Raccourci** : `create_agent(name, description, runtime, port, model)` — Charlotte crée en autonomie. Ports libres : 8494-8499.
 
 ---
 

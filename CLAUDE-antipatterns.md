@@ -1547,3 +1547,33 @@ POST /logs/  ← étape 1 (task encore open)
 POST /tasks/{tid}/ percent_complete=100  ← étape 2 (fermeture)
 ```
 L'ordre est atomique et irréversible via API. Vérifier `hours > 0` et `hours = temps_réel_en_minutes / 60` avant d'appeler `/task.close`.
+
+---
+
+### 67. Anti-pattern double-LLM dans un outil agent
+
+**Contexte** : Joseph v3.0, test T7.1 (2026-06-09).
+
+Un outil (`ux_audit_url`) appelait un LLM en interne pour générer l'audit, puis retournait le texte formaté. Quand le scraping échouait (DNS `[Errno -2]`), le LLM secondaire générait une réponse vide, et le LLM principal inventait une explication ("problème DNS possible") au lieu de signaler l'erreur réelle.
+
+**Double problème** :
+1. L'erreur réelle (mauvais nom de service K8s `crawlee-connector` au lieu de `crawlee-service`) était masquée
+2. Le LLM principal ignorait le résultat de l'outil et produisait une réponse hallucination
+
+**Règle** : un outil ne doit JAMAIS appeler un LLM en interne.
+- ✅ **Outil = données brutes** : scrape le contenu, retourne `{url, page_content, instruction}`
+- ✅ **LLM principal = synthèse** : reçoit les données, produit le rapport
+- ❌ **INTERDIT** : `tool → LLM interne → réponse pré-formatée` — le résultat est ignoré ou écrase le contexte
+
+**Fix appliqué** :
+```python
+# AVANT (anti-pattern) : outil appelle LLM, retourne audit formaté
+return {"audit": llm_response, "url": url}
+
+# APRÈS (correct) : outil retourne données brutes + instruction
+return {"url": url, "page_content": scraped_text[:4000],
+        "instruction": "Produis un audit UX basé sur ce contenu réel..."}
+# → le LLM principal fait la synthèse avec tout le contexte disponible
+```
+
+**Corollaire** : toujours vérifier les noms de services K8s dans les configmaps agents. `crawlee-connector` ≠ `crawlee-service`. Un DNS error silencieux dans un outil peut masquer une erreur de config pendant des semaines.

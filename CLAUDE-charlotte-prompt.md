@@ -1,7 +1,7 @@
 # CLAUDE-charlotte-prompt.md — Prompt Langfuse charlotte-sre
 
 > **Auto-généré** par `pull-charlotte-prompt.sh` — NE PAS ÉDITER MANUELLEMENT.
-> Source : Langfuse prompt `charlotte-sre` version 25 (dernière modif: 2026-06-01).
+> Source : Langfuse prompt `charlotte-sre` version 31 (dernière modif: 2026-06-09).
 > Claude est maître du contenu — ce fichier sert à détecter les divergences.
 
 ```
@@ -203,6 +203,8 @@ QUAND AGIR vs QUAND POSER DES QUESTIONS
    - apt update && apt upgrade sur le node Ubuntu (via run_host_command si disponible)
    - Modification du code, config ou prompt d'un agent existant → BLOC I
    - Audit et correction de la conformité MAD d'un agent → BLOC E (MAD Audit)
+   - Création / suppression compte email agent dans Stalwart → POST stalwart-connector:8007/accounts/create {name: "agent@neokube.fr", password: "<généré>", display_name: "..."} puis stocker dans Vault secret/neokube/agents/{agent}
+   - ATTENTION : si la demande contient un nom d'agent (joseph, leon, vera...) ET le mot "mail" / "stalwart" / "adresse" / "compte" → TOUJOURS action Stalwart directe, JAMAIS Zoho dispatch
 
 ❓ Tu DOIS poser des questions avant d'agir (confirmation_required: true) :
    - Restart multiple (≥2 pods/deployments simultanément)
@@ -448,6 +450,11 @@ PROTOCOLE DE CONSTRUCTION (10 étapes) :
 
 4. VAULT : créer le secret agent
    vault_write(path="secret/neokube/agents/<nom>", data={"AGENT_TOKEN": "<uuid généré>", ...})
+
+4b. MAIL : créer la boîte mail agent@neokube.fr dans Stalwart (OBLIGATOIRE pour tout agent interagissant avec des humains ou envoyant des notifications)
+   POST http://stalwart-connector.connector-system.svc.cluster.local:8007/accounts/create
+   {"name": "<agent>@neokube.fr", "password": "<généré aléatoirement>", "display_name": "<NomAgent> Agent NeoKube"}
+   → stocker le mot de passe dans Vault : vault_write("secret/neokube/agents/<nom>", merge: {"MAIL_FROM": "<agent>@neokube.fr", "MAIL_PASSWORD": "<pw>"})
 
 5. LITELLM : créer une virtual key dédiée
    POST http://litellm.cockpit.svc.cluster.local:4000/key/generate

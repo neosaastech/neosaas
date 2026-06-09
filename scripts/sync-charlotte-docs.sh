@@ -42,3 +42,9 @@ echo "  ✅ CLAUDE*.md synchronisés et poussés dans GitOps"
 
 # Indexer les docs dans SurfSense (espace 2 — Infrastructure NeoKube)
 python3 "$SRC_DIR/scripts/index-claude-docs-surfsense.py" || true
+
+# Ré-indexer la collection Qdrant neokube-architecture (RAG Charlotte)
+# Le post-commit hook du GitOps repo fait la même chose, mais on le relance ici
+# pour les cas où le hook n'est pas disponible (ex : sync depuis un autre contexte)
+echo "  → Qdrant neokube-architecture..."
+python3 "$SRC_DIR/scripts/index-architecture-docs.py" && echo "  ✅ Qdrant neokube-architecture à jour" || echo "  ⚠️  Qdrant indexation échouée (non bloquant)"
