@@ -496,6 +496,8 @@ Deux chemins d'exécution :
 
 **Streaming `/mission/stream`** : SSE events `start · thinking · tool_start · tool_done · done` — consommé par le pipe OWU pour afficher les actions en temps réel.
 
+> ⚠️ **Contrat d'interface obligatoire** — le pipe `joseph_design` (valve `USE_STREAM=True`) appelle **toujours** `/mission/stream`. Si cet endpoint est absent, Joseph ne répond plus dans OWU sans aucune erreur visible (404 silencieux). Après toute édition du configmap, vérifier : `grep "@app.post" configmap-joseph-script.yaml` doit retourner `/mission`, `/mission/stream` et `/v1/chat/completions`. Voir anti-pattern #68.
+
 ### Outils (6 Figma + 4 UX/Penpot)
 
 | Outil | Backend | Rôle |
@@ -1942,6 +1944,8 @@ if _used_tools and len(final) > 50:
 | **Leon** | `leon:8181` | ❌ | ✅ mot-par-mot | ❌ | ⚠️ à migrer |
 
 **Règle pour tout nouvel agent OWU-facing** : implémenter les 3 éléments du Pattern A (outils visibles + heartbeat + tokens progressifs). Le pattern Charlotte v4 est la référence.
+
+**Règle critique — endpoints obligatoires** (anti-pattern #68) : tout agent avec un pipe OWU `USE_STREAM=True` doit exposer `POST /mission/stream`. L'absence de cet endpoint produit un **silence total** côté OWU (404 non visible). Après chaque édition de configmap : `grep "@app.post" configmap-{agent}-script.yaml` doit retourner les 3 routes `/mission` + `/mission/stream` + `/v1/chat/completions`.
 
 ---
 

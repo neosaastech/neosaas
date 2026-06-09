@@ -1577,3 +1577,38 @@ return {"url": url, "page_content": scraped_text[:4000],
 ```
 
 **Corollaire** : toujours vérifier les noms de services K8s dans les configmaps agents. `crawlee-connector` ≠ `crawlee-service`. Un DNS error silencieux dans un outil peut masquer une erreur de config pendant des semaines.
+
+---
+
+### 68. Endpoint `/mission/stream` absent — silence total côté OWU
+
+**Contexte** : Joseph v3.0, session 2026-06-09.
+
+Le configmap `configmap-joseph-script.yaml` avait perdu l'endpoint `POST /mission/stream` lors d'une mise à jour précédente. Le pipe OWU `joseph_design` (valve `USE_STREAM=True` par défaut) appelle **toujours** `/mission/stream`. Résultat : 404 silencieux — l'utilisateur ne reçoit aucune réponse, aucune erreur visible dans OWU.
+
+**Pourquoi c'est silencieux** : le pipe attrape l'exception `requests.exceptions` mais pas les 404 HTTP — la réponse 404 est parsée comme un event SSE vide, retournant `"Pas de réponse."` après timeout.
+
+**Règle** : tout agent avec un pipe OWU `USE_STREAM=True` **doit** implémenter `/mission/stream`. C'est un **contrat d'interface non négociable**.
+
+**Endpoints obligatoires pour tout agent OWU-facing** :
+
+| Endpoint | Obligatoire | Rôle |
+|---|---|---|
+| `GET /health` | ✅ | Probe K8s liveness |
+| `POST /mission` | ✅ | Appel bloquant (Leon, Charlotte fallback) |
+| `POST /mission/stream` | ✅ si pipe USE_STREAM | SSE events `start/thinking/done` |
+| `POST /v1/chat/completions` | ✅ si modèle OWU direct | Compatibilité OpenAI |
+
+**Vérification avant tout déploiement d'un agent OWU** :
+```bash
+# Vérifier que les routes sont bien enregistrées dans le script
+grep -E "@app\.(get|post)" configmap-{agent}-script.yaml
+
+# Tester l'endpoint stream en live
+kubectl -n agent-system exec deployment/{agent} -- \
+  curl -s -X POST http://localhost:{port}/mission/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message":"test"}' --max-time 5
+```
+
+**Fix appliqué** : `/mission/stream` ajouté avec SSE events `start → thinking (4s interval) → done` — `asyncio.create_task` pour exécuter l'agent en background pendant que les thinking events sont streamés.
