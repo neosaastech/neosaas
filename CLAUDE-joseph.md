@@ -71,7 +71,7 @@ POST /mission { message, context?, session_id? }
 | `penpot_list_files(project_id)` | penpot-engine:8004 | Fichiers d'un projet |
 | `penpot_create_project(name)` | penpot-engine:8004 | Nouveau projet |
 | `penpot_export_design(file_id, format?)` | penpot-engine:8004 | Export tokens CSS/Tailwind depuis un fichier Penpot |
-| `penpot_capture_full_site(url, project_name, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **⭐ PRINCIPAL** — Capture TOUTES les pages publiques d'un site (nav-links + dom-to-shapes × N) → 1 fichier par page dans le projet |
+| `penpot_capture_full_site(url, project_name, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **⭐ PRINCIPAL** — Capture TOUTES les pages publiques d'un site → **1 fichier `00_Source Import`** avec N pages Penpot (Desktop 1440px + Mobile 375px par page) |
 | `penpot_site_to_shapes(url, project_name, file_name?, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **DOM capture UNE page** — URL → shapes Penpot éditables 1:1 |
 | `penpot_site_to_wireframe(url, project_name?)` | crawlee:8009 + penpot-engine:8004 | URL → wireframe vectoriel par sections (1 page) |
 | `penpot_build_structured(project_name, pages, ...)` | penpot-engine:8004 `/wireframe.build` | **Wireframes depuis un brief** (pas d'URL existante) — Desktop+Mobile + Design System |
@@ -127,20 +127,47 @@ Convertit n'importe quelle URL en fichier Penpot avec N shapes éditables (rects
      → workspace_url livré
 ```
 
+### Convention projet Penpot — Structure 5 fichiers
+
+Un projet Penpot = 1 produit ou client. Il contient des **fichiers spécialisés**, pas un monolithe.
+
+```
+Neomnia Studio (team)
+  └── NeoSaaS Tech (project_name)
+        ├── 00_Source Import    ← penpot_capture_full_site — capture brute du site existant
+        ├── 01_UX Flows         ← parcours utilisateurs, décisions, scénarios métier
+        ├── 02_Wireframes       ← penpot_build_structured — structures basse fidélité
+        ├── 03_UI Screens       ← maquettes finales, composants, responsive
+        └── 90_Archive          ← explorations ou anciennes versions
+```
+
+| Fichier | Quand | Outil |
+|---|---|---|
+| `00_Source Import` | Dès qu'un site existant est fourni | `penpot_capture_full_site` |
+| `01_UX Flows` | Après analyse des parcours utilisateurs | frames manuelles ou brief structuré |
+| `02_Wireframes` | Brief validé, structure alignée équipe | `penpot_build_structured` |
+| `03_UI Screens` | Wireframes validés, avant développement | `penpot_build_structured` + design tokens réels |
+| `90_Archive` | Versions précédentes à conserver | renommage manuel dans Penpot |
+
+**Règles** :
+- `00_Source Import` = matière brute, ne jamais retoucher. Les insights UX vont dans `01_UX Flows`.
+- `penpot_build_structured` va toujours dans `02_Wireframes` ou `03_UI Screens`, jamais dans `00_Source Import`.
+- `project_name` = nom court du produit/client (ex: `"NeoSaaS Tech"`) — stable sur toute la durée.
+
 ### Quand utiliser quel outil
 
-| Besoin | Outil |
-|---|---|
-| **Importer un site existant COMPLET** (toutes pages) | **`penpot_capture_full_site`** ← outil principal |
-| Capturer UNE page existante 1:1 | `penpot_site_to_shapes` |
-| Wireframe depuis un BRIEF (pas d'URL) | `penpot_build_structured` |
-| Détecter les pages d'un site | `detect_site_pages` |
-| Ajouter Design System à un fichier existant | `penpot_add_design_system` |
-| Ajouter Composants à un fichier existant | `penpot_add_components` |
-| Référence visuelle rapide (non éditable) | `penpot_import_site` |
-| Extraire tokens CSS/Tailwind d'un fichier Penpot | `penpot_export_design` |
-| Analyser un design Figma existant | `figma_extract_design_tokens` |
-| Présentation / pitch deck depuis Figma | `figma_to_slides` |
+| Besoin | Outil | Fichier cible |
+|---|---|---|
+| **Importer un site existant COMPLET** (toutes pages) | **`penpot_capture_full_site`** ← outil principal | `00_Source Import` |
+| Capturer UNE page existante 1:1 | `penpot_site_to_shapes` | `00_Source Import` |
+| Wireframes basse fidélité depuis un brief | `penpot_build_structured` | `02_Wireframes` |
+| Maquettes haute fidélité | `penpot_build_structured` + tokens réels | `03_UI Screens` |
+| Détecter les pages d'un site | `detect_site_pages` | — |
+| Ajouter Design System à un fichier existant | `penpot_add_design_system` | `03_UI Screens` |
+| Ajouter Composants à un fichier existant | `penpot_add_components` | `03_UI Screens` |
+| Extraire tokens CSS/Tailwind d'un fichier Penpot | `penpot_export_design` | — |
+| Analyser un design Figma existant | `figma_extract_design_tokens` | — |
+| Présentation / pitch deck depuis Figma | `figma_to_slides` | — |
 
 ### `penpot_build_structured` — Wireframes structurés multi-pages
 
@@ -185,6 +212,52 @@ penpot_build_structured(
     add_components=False,
     include_mobile=True,
 )
+```
+
+### `penpot_capture_full_site` — Pipeline détaillé
+
+```
+1. POST crawlee/nav-links(url)
+     → liste toutes les pages publiques (nav/header links)
+
+2. penpot-engine project.create(project_name)
+     → find-or-create projet (idempotent)
+
+3. penpot-engine proxy create-file("00_Source Import")
+     → UN seul fichier, page par défaut récupérée
+
+4. update-file mod-page(page_1 → "Home")
+   + update-file add-page × N-1 (une par page détectée)
+     → structure de pages Penpot créée
+
+5. Pour chaque page × 2 viewports (1440px Desktop, 375px Mobile) :
+     a. crawlee dom-to-shapes(url, viewport_width)
+          → filtre cookie/RGPD, Règle 5 inputs/textarea/select
+     b. upload images (<img src>, SVG PNG, background-image)
+     c. construire artboard + shapes (x_offset=0 Desktop, x_offset=1540 Mobile)
+     d. get-file (revn fraîche) + update-file (batch)
+
+6. Retourne workspace_url → UN fichier "00_Source Import"
+     avec N pages Penpot, 2 artboards par page
+```
+
+**Paramètres** :
+```python
+penpot_capture_full_site(
+    url="https://www.neosaas.tech",
+    project_name="NeoSaaS Tech",
+    max_shapes=400,  # par viewport (défaut 400)
+)
+```
+
+**Retour** :
+```json
+{
+  "project_id": "...", "file_id": "...",
+  "workspace_url": "https://design.neokube.fr/workspace?...",
+  "pages_captured": 11, "pages_failed": 0,
+  "message": "✅ 11/11 pages dans '00_Source Import' (projet 'NeoSaaS Tech').\n🖥️ Desktop (0px) + 📱 Mobile (décalage 1540px) par page."
+}
 ```
 
 ### Limitations connues V1 (2026-06-10)

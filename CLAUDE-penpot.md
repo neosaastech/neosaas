@@ -190,15 +190,36 @@ Génère l'URL de livraison Penpot.
 
 ---
 
-## Structure de projets — Convention
+## Structure de projets — Convention 5 fichiers
+
+**1 projet Penpot = 1 produit ou client**. À l'intérieur, 5 fichiers spécialisés (pas un seul fichier monolithique).
+
+```
+Neomnia Studio (team)
+  └── NeoSaaS Tech (project_name)
+        ├── 00_Source Import    ← capture brute du site existant (penpot_capture_full_site)
+        ├── 01_UX Flows         ← parcours utilisateurs, décisions, scénarios métier
+        ├── 02_Wireframes       ← structures basse fidélité (penpot_build_structured)
+        ├── 03_UI Screens       ← maquettes finales, composants, responsive
+        └── 90_Archive          ← explorations ou anciennes versions
+```
+
+| Fichier | Outil Joseph | Moment |
+|---|---|---|
+| `00_Source Import` | `penpot_capture_full_site` | Matière brute — premier artefact |
+| `01_UX Flows` | frames manuelles ou brief | Après analyse des parcours |
+| `02_Wireframes` | `penpot_build_structured` | Brief validé |
+| `03_UI Screens` | `penpot_build_structured` + tokens | Wireframes validés |
+| `90_Archive` | renommage manuel | Versions précédentes |
+
+**Projets réservés** :
 
 | Projet | Équipe | Usage |
 |---|---|---|
-| `{Titre client} — Design` | Neomnia Studio | Un projet par client — créé par penpot-engine |
 | `Drafts` | Neomnia Studio | Brouillons manuels + **template-maquette-base** — ne pas supprimer |
 | `Drafts` | Default | Brouillons personnels — ne pas toucher |
 
-**Règle** : un seul projet actif par client dans "Neomnia Studio". `/project.scaffold` vérifie les doublons via le `zoho_project_id` dans le nom.
+**Règle** : un seul projet actif par produit dans "Neomnia Studio". `project_name` = nom court du produit (ex: `"NeoSaaS Tech"`), sans suffixe `— Design` ni `— Wireframes`.
 
 ---
 
@@ -481,8 +502,15 @@ Même structure de requête que `/design-system.add`.
 
 ### Requête
 ```json
-{"url": "https://client.fr", "max_shapes": 300, "timeout": 90000}
+{
+  "url": "https://client.fr",
+  "max_shapes": 500,
+  "timeout": 90000,
+  "viewport_width": 1440
+}
 ```
+
+`viewport_width` : `1440` (desktop, défaut) ou `375` (mobile). Ajuste aussi la hauteur viewport (`375px → 844px`).
 
 ### Réponse
 ```json
@@ -496,12 +524,13 @@ Même structure de requête que `/design-system.add`.
     { "type": "rect",      "kind": "nav",     "x": 0,    "y": 0,   "w": 1440, "h": 89,  "fill": "#1c1c2e", "zIndex": 100 },
     { "type": "rect",      "kind": "image",   "x": 104,  "y": 16,  "w": 56,   "h": 56,  "fill": "#e0e0e0", "src": "https://client.fr/assets/logo.png" },
     { "type": "text",      "kind": "button",  "x": 1157, "y": 32,  "w": 179,  "h": 22,  "text": "Démarrer un projet", "textAlign": "center", "fontSize": 16, "color": "#ffffff" },
-    { "type": "image_png", "kind": "svg",     "x": 35,   "y": 35,  "w": 18,   "h": 18,  "fill": "#888888", "pngBase64": "iVBOR..." }
+    { "type": "image_png", "kind": "svg",     "x": 35,   "y": 35,  "w": 18,   "h": 18,  "fill": "#888888", "pngBase64": "iVBOR..." },
+    { "type": "input",     "kind": "input",   "x": 200,  "y": 400, "w": 320,  "h": 40,  "fill": "#F9F9F9", "borderColor": "#CCCCCC", "text": "Votre email", "borderRadius": 6 }
   ]
 }
 ```
 
-### Les 4 Règles de capture DOM
+### Les 5 Règles de capture DOM
 
 | Règle | Condition | Shape produite | Notes |
 |---|---|---|---|
@@ -509,6 +538,18 @@ Même structure de requête que `/design-system.add`.
 | **2** | Nœud texte direct sur l'élément | `text` avec `textAlign`, `fontSize`, `color` | `y` compensé par `paddingTop` CSS |
 | **3** | Tag `<img>` avec `src` | `rect` avec `src` URL complète | Joseph la télécharge et upload en `fill-image` |
 | **4** | Tag `<svg>` entre 8px et 200px | `rect` marqué `kind:svg` + screenshot Playwright | Upload PNG → `fill-image` Penpot |
+| **5** | Tag `<input>`, `<textarea>`, `<select>` (hors `type=hidden`) | `input` avec `fill`, `borderColor`, `text` (placeholder) | Rendu dans Joseph : rect bordé + texte placeholder gris `#AAAAAA` |
+
+### Filtre cookie/RGPD (actif depuis 2026-06-10)
+
+Les éléments dont `class` ou `id` contient l'un des patterns suivants sont **silencieusement ignorés** avant toute règle de capture :
+
+```
+cookie | consent | gdpr | cc-window | cc-banner | cookielaw
+cookie-banner | cky- | tarteaucitron | didomi | onetrust
+```
+
+Ces bandeaux ne doivent pas apparaître dans les fichiers Penpot livrés. Si un bandeau passe quand même (class non standard), il peut être isolé dans `90_Archive`.
 
 ### Logique anti-fantômes — `isCoveredByChildren()`
 
@@ -531,12 +572,13 @@ const lum = (R*299 + G*587 + B*114) / 1000;
 fill = lum > 128 ? '#1c1c2e' : '#f8f9fa';  // texte clair → fond sombre
 ```
 
-### Éléments filtrés
+### Éléments filtrés (hors cookie)
 
 - `rect.y < 0` : éléments hors page (décors SVG off-screen)
 - `rect.w < 8 || rect.h < 8` : éléments invisibles
 - SVG > 200×200px : considérés comme décors de fond, pas des icônes
 - `display:none`, `visibility:hidden`, `opacity < 0.1`
+- `input[type=hidden]` : champs cachés ignorés
 
 ---
 
@@ -608,14 +650,16 @@ fill = lum > 128 ? '#1c1c2e' : '#f8f9fa';  // texte clair → fond sombre
 
 **Matrice d'outils** :
 
-| Besoin | Joseph tool | Backend |
-|---|---|---|
-| Capturer site existant 1:1 | `penpot_site_to_shapes` | crawlee `/dom-to-shapes` + penpot-engine `/proxy` |
-| Wireframe épuré 1 page | `penpot_site_to_wireframe` | crawlee `/dom-extract` + Joseph buildeur |
-| **Wireframes structurés multi-pages** | **`penpot_build_structured`** | **penpot-engine `/wireframe.build`** |
-| Design System générique (avec wireframes) | `penpot_build_structured(add_design_system=True)` | penpot-engine `/wireframe.build` |
-| Design System sur fichier existant | `penpot_add_design_system(file_id)` | penpot-engine `/design-system.add` |
-| Composants sur fichier existant | `penpot_add_components(file_id)` | penpot-engine `/components.add` |
+| Besoin | Joseph tool | Backend | Fichier cible |
+|---|---|---|---|
+| **Capturer site entier COMPLET** (toutes pages) | **`penpot_capture_full_site`** | crawlee `/nav-links` + `/dom-to-shapes` + penpot `/proxy` | `00_Source Import` |
+| Capturer UNE page existante 1:1 | `penpot_site_to_shapes` | crawlee `/dom-to-shapes` + penpot-engine `/proxy` | `00_Source Import` |
+| Wireframe épuré 1 page | `penpot_site_to_wireframe` | crawlee `/dom-extract` + Joseph buildeur | `02_Wireframes` |
+| **Wireframes structurés multi-pages** | **`penpot_build_structured`** | **penpot-engine `/wireframe.build`** | `02_Wireframes` |
+| Maquettes haute fidélité | `penpot_build_structured` + tokens réels | penpot-engine `/wireframe.build` | `03_UI Screens` |
+| Design System générique (avec wireframes) | `penpot_build_structured(add_design_system=True)` | penpot-engine `/wireframe.build` | `02_Wireframes` |
+| Design System sur fichier existant | `penpot_add_design_system(file_id)` | penpot-engine `/design-system.add` | `03_UI Screens` |
+| Composants sur fichier existant | `penpot_add_components(file_id)` | penpot-engine `/components.add` | `03_UI Screens` |
 
 **Roadmap post-arbitrage** :
 - ✅ Étape 1 — Builders penpot-engine `/wireframe.build` (2026-06-10)
