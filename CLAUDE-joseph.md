@@ -74,6 +74,8 @@ POST /mission { message, context?, session_id? }
 | `penpot_site_to_shapes(url, project_name, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **DOM capture** — URL → shapes Penpot éditables 1:1 |
 | `penpot_site_to_wireframe(url, project_name?)` | crawlee:8009 + penpot-engine:8004 | URL → wireframe vectoriel par sections (1 page) |
 | `penpot_build_structured(project_name, pages, ...)` | penpot-engine:8004 `/wireframe.build` | **Multi-pages** — wireframes structurés Desktop+Mobile + Design System optionnel |
+| `penpot_add_design_system(file_id, ...)` | penpot-engine:8004 `/design-system.add` | Ajoute page Design System à un fichier existant (palette, typo, grille, placeholders) |
+| `penpot_add_components(file_id, ...)` | penpot-engine:8004 `/components.add` | Ajoute page Composants à un fichier existant (boutons, nav, badges, formulaires) |
 
 ### UX / Contenu
 
@@ -81,6 +83,7 @@ POST /mission { message, context?, session_id? }
 |---|---|---|
 | `ux_audit_url(url, focus?)` | crawlee-service:8009/crawl | Scrape page → données brutes → LLM fait l'audit (anti-pattern : pas de LLM dans l'outil) |
 | `detect_site_pages(url)` | crawlee-service:8009/nav-links + LLM | Extrait les liens nav/header → LLM suggère pages + sections (workflow multi-pages) |
+| `rag_design_knowledge` | Qdrant `design-knowledge` (injecté auto) | **Actif en permanence dans le ReAct loop** — heuristiques UX, patterns sections, principes Neomnia |
 | `fetch_url(url)` | crawlee-service:8009 | Lecture page externe (requirements, landing client) |
 | `generate_wireframe_spec(brief)` | LLM interne | Spec wireframe textuelle Markdown |
 | `generate_design_guidelines(brief)` | LLM interne | Charte design (couleurs, typographie, ton) |
@@ -131,6 +134,8 @@ Convertit n'importe quelle URL en fichier Penpot avec N shapes éditables (rects
 | Wireframe épuré d'une seule page | `penpot_site_to_wireframe` |
 | **Wireframes multi-pages + Design System + Composants** | **`penpot_build_structured`** ← à préférer |
 | Détecter les pages d'un site (avant build multi-pages) | `detect_site_pages` |
+| Ajouter Design System à un fichier existant | `penpot_add_design_system` |
+| Ajouter Composants à un fichier existant | `penpot_add_components` |
 | Référence visuelle rapide (non éditable) | `penpot_import_site` |
 | Extraire tokens CSS/Tailwind d'un fichier Penpot | `penpot_export_design` |
 | Analyser un design Figma existant | `figma_extract_design_tokens` |
@@ -197,16 +202,38 @@ penpot_build_structured(
 
 ---
 
-## Collections RAG — Ce que Joseph lit
+## Collections RAG — Ce que Joseph lit et écrit
 
-| Collection | Contenu | Quand consulter |
-|---|---|---|
-| `design-knowledge` | Heuristiques UX par livrable, principes design Neomnia | Étape 3 production pipeline · toute mission design |
-| `neomnia_core` | Contexte agence, positionnement, valeurs, charte | Chartes graphiques, guidelines, livrables clients |
+| Collection | Points | Contenu | Accès |
+|---|---|---|---|
+| `design-knowledge` | 31+ | Heuristiques UX, patterns sections, principes Neomnia, **wireframes passés** | **Lecture auto** (ReAct loop + pipeline) · **Écriture** après chaque `penpot_build_structured` |
+| `neomnia_core` | 260 642 | Contexte agence, positionnement, valeurs, charte | Lecture pipeline uniquement (Étape 3 production) |
+
+**Architecture RAG Joseph (2026-06-10)** :
+
+```
+run_agent(message)
+  → _qdrant_search("design-knowledge", message, limit=3)   # recherche sémantique avant la 1ère itération
+  → injecte les hits dans le system prompt (## Références design (RAG))
+  → ReAct loop avec contexte enrichi
+
+penpot_build_structured() → résultat avec workspace_url
+  → asyncio.create_task(_store_build_memory())
+      → embed(résumé du build)
+      → upsert dans design-knowledge {source: "joseph-session"}
+      → Joseph apprend de ses propres livrables
+```
+
+**Contenu `design-knowledge` (source fiable) :**
+- `ux-heuristics` (10 chunks) — heuristiques Nielsen appliquées aux wireframes
+- `section-patterns` (9 chunks) — structures types par site (vitrine, SaaS, e-commerce, corporate, landing)
+- `neomnia-design` (5 chunks) — couleurs, ton, composants, grille Neomnia
+- `wireframe-principles` (7 chunks) — fidélité mid-fi, annotations, breakpoints, handoff
+- `joseph-session` (croissant) — wireframes réels réalisés, appris après chaque build
 
 **Règle** : Joseph ne consulte JAMAIS `sre-charlotte-incidents`, `leon-memory`, ou d'autres collections d'agents.
 
-**Comment Joseph retrouve ce fichier** : query Qdrant `design-knowledge` avec `"Joseph agent capabilities penpot figma outils"` → ce fichier doit apparaître dans les premiers résultats.
+**Script de re-indexation** : `python3 ~/scripts/index_joseph_knowledge.py` — recrée la collection avec les 31 chunks de base (les `joseph-session` sont perdus au flush).
 
 ---
 

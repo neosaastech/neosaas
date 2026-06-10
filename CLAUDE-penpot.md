@@ -440,6 +440,43 @@ Penpot  — fichier éditable avec N shapes dans un artboard 1440px
 
 ---
 
+## penpot-engine — Endpoints `/design-system.add` + `/components.add`
+
+**Déployés** : 2026-06-10 — Étape 4
+
+### `POST /design-system.add`
+
+Ajoute une page "Design System" à un **fichier Penpot existant**. Contenu : palette 8 couleurs, échelle typographique, grille 12 colonnes, placeholders images.
+
+```json
+{
+  "file_id": "uuid-du-fichier",
+  "primary": "#32AFB1",
+  "primary_dark": "#1E6363",
+  "dark": "#262626",
+  "light_bg": "#F8FFFE",
+  "site_name": "Studio"
+}
+```
+
+Réponse : `{file_id, page_id, page_label, workspace_url, objects_created}`
+
+### `POST /components.add`
+
+Ajoute une page "Composants" à un **fichier Penpot existant**. Contenu : boutons (5 variants), nav desktop + mobile, badges, formulaires (4 états).
+
+Même structure de requête que `/design-system.add`.
+
+### Différence avec `/wireframe.build`
+
+| Endpoint | Usage |
+|---|---|
+| `/wireframe.build` avec `add_design_system=True` | Crée wireframes **ET** DS en une seule opération (nouveau fichier) |
+| `/design-system.add` | Enrichit un fichier **existant** déjà créé |
+| `/components.add` | Enrichit un fichier **existant** déjà créé |
+
+---
+
 ## crawlee-service — Endpoint `/dom-to-shapes`
 
 ### Requête
@@ -576,13 +613,16 @@ fill = lum > 128 ? '#1c1c2e' : '#f8f9fa';  // texte clair → fond sombre
 | Capturer site existant 1:1 | `penpot_site_to_shapes` | crawlee `/dom-to-shapes` + penpot-engine `/proxy` |
 | Wireframe épuré 1 page | `penpot_site_to_wireframe` | crawlee `/dom-extract` + Joseph buildeur |
 | **Wireframes structurés multi-pages** | **`penpot_build_structured`** | **penpot-engine `/wireframe.build`** |
-| Design System générique | `penpot_build_structured(add_design_system=True)` | penpot-engine `/wireframe.build` |
+| Design System générique (avec wireframes) | `penpot_build_structured(add_design_system=True)` | penpot-engine `/wireframe.build` |
+| Design System sur fichier existant | `penpot_add_design_system(file_id)` | penpot-engine `/design-system.add` |
+| Composants sur fichier existant | `penpot_add_components(file_id)` | penpot-engine `/components.add` |
 
 **Roadmap post-arbitrage** :
 - ✅ Étape 1 — Builders penpot-engine `/wireframe.build` (2026-06-10)
 - ✅ Étape 2 — Joseph `penpot_build_structured` (2026-06-10)
 - ✅ Étape 3 — Multi-page conversationnel : crawlee `/nav-links` + Joseph `detect_site_pages` (2026-06-10)
-- ⏳ Étape 4 — Groupement spatial P1 (`group_shapes` post-traitement)
+- ✅ Étape 4 — Design System + Composants standalone : penpot-engine `/design-system.add` + `/components.add` + Joseph `penpot_add_design_system` + `penpot_add_components` (2026-06-10)
+- ⏳ Étape 5 — Groupement spatial P1 (`group_shapes` post-traitement)
 
 ---
 
