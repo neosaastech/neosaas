@@ -71,9 +71,10 @@ POST /mission { message, context?, session_id? }
 | `penpot_list_files(project_id)` | penpot-engine:8004 | Fichiers d'un projet |
 | `penpot_create_project(name)` | penpot-engine:8004 | Nouveau projet |
 | `penpot_export_design(file_id, format?)` | penpot-engine:8004 | Export tokens CSS/Tailwind depuis un fichier Penpot |
-| `penpot_site_to_shapes(url, project_name, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **DOM capture** — URL → shapes Penpot éditables 1:1 |
+| `penpot_capture_full_site(url, project_name, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **⭐ PRINCIPAL** — Capture TOUTES les pages publiques d'un site (nav-links + dom-to-shapes × N) → 1 fichier par page dans le projet |
+| `penpot_site_to_shapes(url, project_name, file_name?, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **DOM capture UNE page** — URL → shapes Penpot éditables 1:1 |
 | `penpot_site_to_wireframe(url, project_name?)` | crawlee:8009 + penpot-engine:8004 | URL → wireframe vectoriel par sections (1 page) |
-| `penpot_build_structured(project_name, pages, ...)` | penpot-engine:8004 `/wireframe.build` | **Multi-pages** — wireframes structurés Desktop+Mobile + Design System optionnel |
+| `penpot_build_structured(project_name, pages, ...)` | penpot-engine:8004 `/wireframe.build` | **Wireframes depuis un brief** (pas d'URL existante) — Desktop+Mobile + Design System |
 | `penpot_add_design_system(file_id, ...)` | penpot-engine:8004 `/design-system.add` | Ajoute page Design System à un fichier existant (palette, typo, grille, placeholders) |
 | `penpot_add_components(file_id, ...)` | penpot-engine:8004 `/components.add` | Ajoute page Composants à un fichier existant (boutons, nav, badges, formulaires) |
 
@@ -130,10 +131,10 @@ Convertit n'importe quelle URL en fichier Penpot avec N shapes éditables (rects
 
 | Besoin | Outil |
 |---|---|
-| Capturer un site existant 1:1 pour retouche | `penpot_site_to_shapes` |
-| Wireframe épuré d'une seule page | `penpot_site_to_wireframe` |
-| **Wireframes multi-pages + Design System + Composants** | **`penpot_build_structured`** ← à préférer |
-| Détecter les pages d'un site (avant build multi-pages) | `detect_site_pages` |
+| **Importer un site existant COMPLET** (toutes pages) | **`penpot_capture_full_site`** ← outil principal |
+| Capturer UNE page existante 1:1 | `penpot_site_to_shapes` |
+| Wireframe depuis un BRIEF (pas d'URL) | `penpot_build_structured` |
+| Détecter les pages d'un site | `detect_site_pages` |
 | Ajouter Design System à un fichier existant | `penpot_add_design_system` |
 | Ajouter Composants à un fichier existant | `penpot_add_components` |
 | Référence visuelle rapide (non éditable) | `penpot_import_site` |
