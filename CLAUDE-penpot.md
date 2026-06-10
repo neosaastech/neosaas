@@ -134,6 +134,60 @@ Génère l'URL de livraison Penpot.
 {"url": "https://design.neokube.fr/workspace?project-id=...&file-id=..."}
 ```
 
+### `POST /wireframe.build`
+**penpot-engine v2.0** — Crée un fichier Penpot structuré multi-pages avec builders programmatiques (portés depuis l'ancien penpot-agent v3.3).
+
+```json
+// Requête
+{
+  "project_name": "Client X — Wireframes",
+  "file_name": "Maquettes — Client X",
+  "pages": [
+    {
+      "key": "home", "url": "/", "label": "Accueil", "desktop_h": 1500, "mobile_h": 1300,
+      "sections": [
+        {"type": "hero",     "height": 460, "label": "Hero — Headline + CTA"},
+        {"type": "services", "height": 320, "label": "Nos services"},
+        {"type": "cta",      "height": 120, "label": "Demarrer un projet"}
+      ]
+    }
+  ],
+  "tokens": {
+    "primary": "#32AFB1", "primary_dark": "#1E6363", "dark": "#262626",
+    "light_bg": "#F8FFFE", "white": "#FFFFFF", "gray": "#888888",
+    "site_name": "Neomnia Studio", "site_domain": "neomnia.net"
+  },
+  "add_design_system": true,
+  "add_components": false,
+  "breakpoints": ["desktop", "mobile"]
+}
+
+// Réponse
+{
+  "project_id": "...", "file_id": "...",
+  "workspace_url": "https://design.neokube.fr/workspace?...",
+  "pages_created": 2,
+  "artboards_created": 2
+}
+```
+
+**Types de sections disponibles** :
+
+| Type | Rendu | Hauteur typique |
+|---|---|---|
+| `hero` | Fond light_bg + H1 placeholder + 2 CTA + image droite | 400–600px |
+| `content` | Fond blanc + accent bar gauche + texte placeholder | 200–400px |
+| `services` | 3 cards avec top-bar PRIMARY | 300–400px |
+| `cta` | Fond dark + bouton centré | 100–200px |
+| `form` | 4 champs + submit | 400–500px |
+| `grid2x2` | 4 cards en grille | 400–600px |
+| `grid3x3` | 6 cards en grille | 400–600px |
+| `custom` | Fond blanc + accent bar + label | variable |
+
+**Nav et footer** : générés automatiquement pour chaque artboard (non à spécifier dans sections).
+
+**Appelé par** : Joseph outil `penpot_build_structured` — jamais directement par un autre agent.
+
 ---
 
 ## Structure de projets — Convention
@@ -308,11 +362,284 @@ async def _penpot_scaffold(spec: ProjectSpec) -> dict:
 
 ---
 
-## Conversion bidirectionnelle Site ↔ Penpot
+## Conversion Site ↔ Penpot — Vue d'ensemble
 
-Deux directions sont implémentées via les outils Joseph. Les agents dev (Camille, Guillaume) utilisent ces outils pour convertir dans les deux sens.
+Trois outils Joseph couvrent les deux directions. Les agents dev (Camille, Guillaume) les utilisent pour travailler sur des sites clients.
 
-### Direction 1 : Site → Penpot (wireframe éditable)
+### Comparatif des outils
+
+| Outil | Résultat | Éditable | Fidélité | Usage |
+|---|---|---|---|---|
+| `penpot_import_site` | Screenshot PNG dans un frame | ❌ image fixe | Visuelle | Référence rapide |
+| `penpot_site_to_wireframe` | Shapes vectorielles par section | ✅ | Structurelle | Refonte from scratch |
+| `penpot_site_to_shapes` | Shapes DOM 1:1 (positions exactes) | ✅ | Haute (~80%) | Analyse / retouche d'un site existant |
+| `penpot_export_design` | CSS/Tailwind tokens depuis Penpot | — | — | Penpot → code Camille/Guillaume |
+
+---
+
+## `penpot_site_to_shapes` — URL → Shapes Penpot éditables
+
+### Ce que ça produit
+
+Un fichier Penpot avec **N shapes indépendantes éditables** (rects, textes, images) reproduisant la page réelle à l'échelle 1:1 dans un artboard de `viewport_width × page_height`.
+
+Chaque élément DOM significatif devient un objet Penpot distinct :
+- `rect` : fond coloré (nav, section, bouton, card)
+- `text` : contenu textuel avec police, taille, alignement
+- `rect + fill-image` : images `<img>` et icônes SVG (screenshots PNG uploadés)
+
+### Appel depuis Joseph
+
+```python
+penpot_site_to_shapes(url="https://client.fr", project_name="Client — import", max_shapes=300)
+# → {"project_id": "...", "file_id": "...", "shapes_created": 287,
+#    "workspace_url": "http://penpot.neokube.local/workspace?project-id=...&file-id=..."}
+```
+
+---
+
+## Architecture technique — Pipeline URL → Penpot
+
+```
+URL live
+  │
+  ▼
+crawlee-service  (Node.js/Express + Playwright Chromium headless)
+  POST /dom-to-shapes
+  │   1. page.goto(url) → networkidle
+  │   2. Scroll complet (lazy-load) → stop à 150px
+  │      (headers sticky/fixed ont leur fond opaque à ~100px de scroll)
+  │   3. page.evaluate() — JS dans le contexte navigateur :
+  │      - querySelectorAll('*') — parcours exhaustif du DOM
+  │      - getComputedStyle() → couleurs, polices, tailles résolues
+  │      - getBoundingClientRect() → position absolue dans le document
+  │      - isCoveredByChildren() → filtre anti-fantômes (containers redondants)
+  │      - 4 Règles de capture (voir §Règles ci-dessous)
+  │   4. Playwright screenshot par icône SVG (clip sur bounding box)
+  │
+  ▼  JSON plat : { shapes: [...], total_height, viewport_width, capture_scroll_y }
+  │
+  ▼
+Joseph  (Python/FastAPI — penpot_site_to_shapes)
+  │   1. POST /dom-to-shapes → récupère shapes[]
+  │   2. project.create + create-file → nouveau projet Penpot
+  │   3. Pré-upload images :
+  │      - shapes[kind=image, src] → GET src → POST /upload-image → _media_id
+  │      - shapes[type=image_png, pngBase64] → POST /upload-image → _media_id
+  │   4. Construit les add-obj Penpot :
+  │      - type=text → _pw_text() avec textAlign CSS natif
+  │      - type=rect + _media_id → fill-image (logo, icône PNG)
+  │      - type=rect → fill-color
+  │   5. update-file (batch) → un seul appel RPC Penpot
+  │
+  ▼
+Penpot  — fichier éditable avec N shapes dans un artboard 1440px
+```
+
+**Clé de l'approche** : Playwright charge la page avec un vrai navigateur (JS exécuté, CSS appliqué). `getComputedStyle()` + `getBoundingClientRect()` donnent les positions et couleurs **après rendu** — ce qu'aucun parser HTML statique ne peut faire.
+
+---
+
+## crawlee-service — Endpoint `/dom-to-shapes`
+
+### Requête
+```json
+{"url": "https://client.fr", "max_shapes": 300, "timeout": 90000}
+```
+
+### Réponse
+```json
+{
+  "url": "https://client.fr",
+  "viewport_width": 1440,
+  "total_height": 7109,
+  "capture_scroll_y": 150,
+  "count": 287,
+  "shapes": [
+    { "type": "rect",      "kind": "nav",     "x": 0,    "y": 0,   "w": 1440, "h": 89,  "fill": "#1c1c2e", "zIndex": 100 },
+    { "type": "rect",      "kind": "image",   "x": 104,  "y": 16,  "w": 56,   "h": 56,  "fill": "#e0e0e0", "src": "https://client.fr/assets/logo.png" },
+    { "type": "text",      "kind": "button",  "x": 1157, "y": 32,  "w": 179,  "h": 22,  "text": "Démarrer un projet", "textAlign": "center", "fontSize": 16, "color": "#ffffff" },
+    { "type": "image_png", "kind": "svg",     "x": 35,   "y": 35,  "w": 18,   "h": 18,  "fill": "#888888", "pngBase64": "iVBOR..." }
+  ]
+}
+```
+
+### Les 4 Règles de capture DOM
+
+| Règle | Condition | Shape produite | Notes |
+|---|---|---|---|
+| **1** | `backgroundColor` non-transparent **OU** `header/nav/fixed/sticky` forcé | `rect` avec `fill` hex | Anti-fantômes : skip si enfant couvre ≥80% surface |
+| **2** | Nœud texte direct sur l'élément | `text` avec `textAlign`, `fontSize`, `color` | `y` compensé par `paddingTop` CSS |
+| **3** | Tag `<img>` avec `src` | `rect` avec `src` URL complète | Joseph la télécharge et upload en `fill-image` |
+| **4** | Tag `<svg>` entre 8px et 200px | `rect` marqué `kind:svg` + screenshot Playwright | Upload PNG → `fill-image` Penpot |
+
+### Logique anti-fantômes — `isCoveredByChildren()`
+
+Un container `div/section` est ignoré si l'un de ses enfants directs avec fond solide couvre ≥80% de sa surface. Évite les shapes en doublon (parent + enfant de même taille et couleur).
+
+```javascript
+function isCoveredByChildren(el, rect) {
+  // Tags filtrés : div, section, article, main, aside, span
+  // Calcule overlap rect parent vs rect enfant (getBoundingClientRect)
+  // Retourne true si maxCoverage > 0.80
+}
+```
+
+### Couleur header transparent (backdrop-filter)
+
+Quand `backgroundColor` est transparent sur un `nav/header/fixed` (cas fréquent avec `backdrop-filter: blur()`), la couleur est déduite de la luminance du texte :
+
+```javascript
+const lum = (R*299 + G*587 + B*114) / 1000;
+fill = lum > 128 ? '#1c1c2e' : '#f8f9fa';  // texte clair → fond sombre
+```
+
+### Éléments filtrés
+
+- `rect.y < 0` : éléments hors page (décors SVG off-screen)
+- `rect.w < 8 || rect.h < 8` : éléments invisibles
+- SVG > 200×200px : considérés comme décors de fond, pas des icônes
+- `display:none`, `visibility:hidden`, `opacity < 0.1`
+
+---
+
+## État de fidélité V1 — Ce qui marche / Ce qui est limité
+
+### ✅ Résolu (V1 actuelle)
+
+| Point | Solution |
+|---|---|
+| Positions/couleurs CSS calculées | `getComputedStyle()` + `getBoundingClientRect()` post-rendu |
+| Headers sticky/fixed | Scroll à 150px + détection `isInFixedContainer()` |
+| Icônes SVG | Screenshot Playwright ciblé → PNG → `fill-image` Penpot |
+| Images `<img src>` (logos) | Download HTTP + upload `/upload-image` → `fill-image` |
+| Header transparent | Luminance texte → fond sombre/clair déduit |
+| Texte centré dans boutons | `y += paddingTop` ; `textAlign` CSS → `text-align` Penpot |
+| Éléments fantômes | `isCoveredByChildren()` filtre les containers redondants |
+
+### ⚠️ Limitations V1
+
+| Limitation | Cause | Impact |
+|---|---|---|
+| Bouton + texte = 2 objets séparés | Pas de groupement spatial | Déplacement bouton ≠ déplacement texte |
+| Polices custom remplacées par Inter | Penpot nécessite upload police | Rendu typographique approximatif |
+| JSON plat (pas de hiérarchie DOM) | `querySelectorAll('*')` linéaire | Pas de Frames/Groups Penpot par section |
+| Background-image CSS (certains logos) | `bgSrc` extrait mais pas toujours résolu | Logo manquant sur certains sites |
+| Animations CSS/JS | Penpot = outil statique | Impossible par conception |
+| SVGs multi-couches complexes | Screenshot PNG = rasterisation | Perte de qualité sur grands SVG |
+
+---
+
+## Architecture Joseph ↔ penpot-engine — Décision d'arbitrage (2026-06-10)
+
+**Principe retenu** : séparation stricte des responsabilités.
+- `penpot-engine` = constructeur déterministe (shapes, artboards, pages). Aucun LLM.
+- `Joseph` = stratège conversationnel (analyse UX, décisions sections, orchestration).
+- `crawlee-service` = extraction DOM (captures de sites existants).
+
+**Matrice d'outils** :
+
+| Besoin | Joseph tool | Backend |
+|---|---|---|
+| Capturer site existant 1:1 | `penpot_site_to_shapes` | crawlee `/dom-to-shapes` + penpot-engine `/proxy` |
+| Wireframe épuré 1 page | `penpot_site_to_wireframe` | crawlee `/dom-extract` + Joseph buildeur |
+| **Wireframes structurés multi-pages** | **`penpot_build_structured`** | **penpot-engine `/wireframe.build`** |
+| Design System générique | `penpot_build_structured(add_design_system=True)` | penpot-engine `/wireframe.build` |
+
+**Roadmap post-arbitrage** :
+- ✅ Étape 1 — Builders penpot-engine `/wireframe.build` (2026-06-10)
+- ✅ Étape 2 — Joseph `penpot_build_structured` (2026-06-10)
+- ⏳ Étape 3 — Multi-page scraping : `penpot_site_to_shapes` accepte `pages[]` + boucle N URLs
+- ⏳ Étape 4 — Groupement spatial P1 (`group_shapes` post-traitement)
+
+---
+
+## Roadmap V2 — Priorités d'amélioration
+
+### Priorité 1 — Groupement spatial bouton+texte (Joseph, post-traitement)
+
+**Complexité** : faible — modification uniquement de Joseph, pas de crawlee.
+
+Après réception du JSON plat de crawlee, détecter les textes contenus dans un rect (containment spatial) et créer un **Penpot Group** :
+
+```python
+def group_shapes(shapes):
+    groups = []
+    used = set()
+    for i, rect in enumerate(shapes):
+        if rect["type"] != "rect" or i in used: continue
+        children = [j for j, s in enumerate(shapes)
+                    if j != i and j not in used
+                    and s["x"] >= rect["x"] and s["y"] >= rect["y"]
+                    and s["x"]+s["w"] <= rect["x"]+rect["w"]
+                    and s["y"]+s["h"] <= rect["y"]+rect["h"]]
+        if children:
+            groups.append({"parent": i, "children": children})
+            used.update(children)
+    return groups
+```
+
+Chaque groupe → `type: "group"` Penpot. Les enfants ont leur `parent-id` → group UUID (pas le frame principal). Résultat : déplacer un bouton déplace son label.
+
+### Priorité 2 — SVG natif via outerHTML (crawlee + Joseph)
+
+**Complexité** : faible — remplacement du screenshot par l'injection SVG directe.
+
+Penpot accepte `type: "svg-raw"` avec le contenu SVG inline. Plus propre que PNG : pas de rasterisation, pas de scroll pour le screenshot.
+
+```javascript
+// crawlee — Règle 4, ajouter :
+svgHtml: el.outerHTML.slice(0, 8000),  // contenu SVG brut
+```
+
+```python
+# Joseph — pour shapes avec svgHtml :
+# Utiliser POST /proxy { path: "create-file-media-object-from-url" }
+# ou inject via type "svg-raw" dans add-obj
+```
+
+### Priorité 3 — DOM récursif → JSON hiérarchique (réécriture crawlee)
+
+**Complexité** : élevée — réécriture du `page.evaluate()` dans crawlee.
+
+Remplacer `querySelectorAll('*')` (liste plate) par un **parcours récursif depuis `document.body`** :
+
+```javascript
+function walkNode(el, depth = 0) {
+  if (depth > 12) return null;
+  const style = window.getComputedStyle(el);
+  if (!hasVisualSignificance(el, style)) return null;
+  return {
+    ...extractShape(el, style),
+    children: Array.from(el.children)
+      .map(child => walkNode(child, depth + 1))
+      .filter(Boolean)
+  };
+}
+```
+
+Dans Joseph : chaque nœud avec enfants → **Penpot Frame** (clip) ou **Group**. Les `parent-id` reflètent l'arbre DOM réel : `body > main > section > card > titre`. Résultat : la structure Penpot est navigable par section/composant.
+
+### Priorité 4 (optionnel) — Couche sémantique LLM pour les composants
+
+**Pour aller au-delà de la géométrie** : détecter que 4 structures identiques sont des variants d'un composant Penpot réutilisable.
+
+```
+crawlee (JSON plat)
+  → Script de structure (Priorités 1+2+3 — déterministe)
+  → LLM Semantic Mapping (claude-sonnet ou gpt-4o)
+      Prompt : "Voici un JSON de shapes Penpot. Identifie les patterns
+                répétés (cards, boutons, items de liste) et regroupe-les
+                en composants nommés avec leurs variants."
+  → JSON hiérarchique + composants Penpot
+  → Joseph → API Penpot
+```
+
+**Quand activer** : après Priorités 1-3 stables. Ajoute ~2-3s et coût LLM par conversion.
+
+---
+
+## `penpot_site_to_wireframe` — URL → Wireframe par sections
 
 **Outil Joseph** : `penpot_site_to_wireframe(url, project_name?)`
 
@@ -320,89 +647,56 @@ Deux directions sont implémentées via les outils Joseph. Les agents dev (Camil
 ```
 URL live
   → crawlee-service POST /dom-extract
-      (Playwright extrait CSS vars, computed styles, sections, typographie)
-  → Joseph mappe sections DOM → penpot_create_wireframe
-      (couleurs réelles depuis --primary-color, --brand, etc.)
-  → Wireframe Penpot avec shapes vectorielles éditables
-  → workspace_url livré
+      (CSS vars, computed styles, sections, typographie)
+  → Joseph mappe sections → shapes vectorielles abstraites
+  → Wireframe avec couleurs réelles (--primary-color, etc.)
 ```
 
-**Avantage sur `penpot_import_site`** : résultat éditable (shapes vectorielles vs image fixe). Idéal pour les refontes.
+**Usage** : moins fidèle que `penpot_site_to_shapes` mais plus épuré — idéal pour les refontes where on veut repartir sur une base propre.
 
 **`crawlee-service POST /dom-extract`** :
 ```json
-// Requête
-{"url": "https://exemple.fr", "timeout": 30000}
-
-// Réponse
-{
-  "url": "https://exemple.fr",
-  "title": "Exemple — Agence digitale",
-  "cssVars": {"--primary-color": "#32afb1", "--font-main": "'Inter', sans-serif"},
-  "colors": ["#32afb1", "#1a1a2e", "#ffffff", "#edb842"],
-  "typography": {
-    "heading": {"font": "Inter", "size": "48px", "weight": "700"},
-    "body": {"font": "Inter", "size": "16px"}
-  },
-  "sections": [
-    {"type": "nav", "links": ["Accueil","Services","Contact"], "bg": "#ffffff", "height": 80},
-    {"type": "hero", "title": "Agence digitale IA", "subtitle": "...", "height": 500},
-    {"type": "section", "title": "Nos services", "height": 350},
-    {"type": "footer", "bg": "#1a1a2e", "height": 120}
-  ]
-}
+{"url": "https://exemple.fr"}
+// → {"cssVars": {"--primary-color": "#32afb1"}, "colors": [...], "sections": [...]}
 ```
 
-### Direction 2 : Penpot → Code (tokens pour Camille/Guillaume)
+---
+
+## `penpot_export_design` — Penpot → Code
 
 **Outil Joseph** : `penpot_export_design(file_id, format?)`
 
-**Formats disponibles** :
-- `tokens` (défaut) : JSON couleurs + polices
-- `css` : variables CSS `:root { --color-1: #32afb1; ... }`
-- `tailwind` : config Tailwind `theme.extend.colors`
-- `full` : tout + liste des composants (frames)
+**Formats** : `tokens` · `css` · `tailwind` · `full`
 
 **Usage typique** :
 ```
 Joseph penpot_export_design(file_id, format="full")
-  → CSS variables + Tailwind config + composants
+  → CSS variables + Tailwind config
   → transmis à Camille (Next.js/Tailwind) via Leon
 ```
 
-### Comparatif des outils d'import site
+---
 
-| Outil | Résultat | Éditable | Couleurs réelles | Usage |
-|---|---|---|---|---|
-| `penpot_import_site` | Screenshot PNG dans un frame | ❌ image | Visuellement (non éditables) | Référence visuelle rapide |
-| `penpot_site_to_wireframe` | Shapes vectorielles | ✅ | ✅ extraites depuis CSS | Refonte, base de travail |
-| `penpot_create_wireframe` | Wireframe abstrait | ✅ | Tokens passés manuellement | Nouveau projet from scratch |
+## Bugs résolus (2026-06-09/10)
 
-### Bug connu — AccessDeniedException sur les nouveaux uploads
+### Assets 404 — PVC frontend non monté
 
-Le processus JVM Penpot ne peut pas créer de nouveaux sous-répertoires dans `/opt/data/assets/` (permission refusée en NIO). Les uploads de nouvelles images échouent silencieusement (DB record créé, fichier non écrit).
+Le Nginx du frontend (`penpot-frontend`) utilise `X-Accel-Redirect` pour servir les assets. Sans le montage du PVC `penpot-assets-pvc`, tous les assets retournaient 404.
 
-**Contournement** : utiliser `penpot_site_to_wireframe` (wireframe vectoriel, pas d'upload image) à la place de `penpot_import_site` pour les nouvelles importations tant que ce bug n'est pas résolu.
-
-**Diagnostic** :
-```bash
-kubectl logs -n penpot deployment/penpot-backend 2>&1 | grep -i "AccessDeniedException\|permission"
-```
-
-### Bug résolu — Assets 404 (2026-06-09)
-
-Le pod `penpot-frontend` n'avait pas le PVC `penpot-assets-pvc` monté. Le Nginx du frontend utilise `X-Accel-Redirect: /internal/assets/{uuid-path}` pour servir les fichiers — sans le montage, tous les assets retournaient 404.
-
-**Fix** : `deployment-penpot-frontend.yaml` — volume mount `penpot-assets-pvc` en `readOnly: true` sur `/opt/data/assets`.
+**Fix** : `deployment-penpot-frontend.yaml` — volume mount `penpot-assets-pvc` readOnly sur `/opt/data/assets`.
 
 **Architecture X-Accel-Redirect** :
 ```
 GET /assets/by-file-media-id/{fmo_id}
-  → Nginx proxy → penpot-backend:6060/assets/by-file-media-id/{fmo_id}
-  → Backend : DB lookup storage_object → 204 + X-Accel-Redirect: /internal/assets/{c7/f3/uuid}
-  → Nginx location /internal/assets { internal; alias /opt/data/assets; }
-  → Fichier servi directement depuis PVC
+  → Nginx proxy → penpot-backend:6060
+  → Backend : 204 + X-Accel-Redirect: /internal/assets/{c7/f3/uuid}
+  → Nginx : location /internal/assets { internal; alias /opt/data/assets; }
 ```
 
-**Chemin fichier** : `id->path(uuid)` = `{uuid[0:2]}/{uuid[2:4]}/{uuid[4:32]}` (sans tirets).
-Exemple : UUID `c7f3509a-6449-4d1b-b3bb-55ef98f978c7` → `/opt/data/assets/c7/f3/509a64494d1bb3bb55ef98f978c7`
+**Chemin fichier** : `{uuid[0:2]}/{uuid[2:4]}/{uuid[4:32]}` (UUID sans tirets).
+
+### Logo gris — import base64 dupliqué dans Joseph
+
+`import base64` existait à la fois en top-level (module) et localement dans le handler `github_get_readme`. Python traitait `base64` comme variable locale dans toute la fonction handler → `UnboundLocalError` silencieux lors de l'upload des logos.
+
+**Fix** : suppression de l'`import base64` local à la ligne 753 de `joseph.py`. Le module-level `import asyncio, base64, ...` (ligne 10) suffit.
