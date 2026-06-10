@@ -148,10 +148,35 @@ Génère l'URL de livraison Penpot.
 
 ---
 
-## URL de livraison — format correct
+## URL de livraison — formats valides
 
+Deux formats fonctionnent dans Penpot :
+
+### Format 1 — `project-id` (recommandé, utilisé par Joseph)
 ```
+http://penpot.neokube.local/workspace?project-id={project_id}&file-id={file_id}
 https://design.neokube.fr/workspace?project-id={project_id}&file-id={file_id}
+```
+Ouvre le fichier sur sa première page. `project-id` est requis pour que Penpot charge le bon contexte.
+
+### Format 2 — `team-id` + `page-id` (SPA hash routing)
+```
+http://penpot.neokube.local/#/workspace?team-id={team_id}&file-id={file_id}&page-id={page_id}
+```
+Ouvre directement une page spécifique. `team-id` = `82052e4a-914a-8123-8007-d697aa5fd265` (Neomnia Studio, constant).
+
+### Construction programmatique (Python, dans Joseph)
+```python
+PENPOT_PUBLIC  = "http://penpot.neokube.local"   # local
+PENPOT_PUBLIC  = "https://design.neokube.fr"       # public
+
+# Après project.create + create-file :
+workspace_url = f"{PENPOT_PUBLIC}/workspace?project-id={project_id}&file-id={file_id}"
+```
+
+### Récupérer project_id depuis file_id (SQL)
+```sql
+SELECT project_id FROM file WHERE id = '{file_id}';
 ```
 
 **Prérequis** : l'utilisateur doit être connecté à Penpot avant d'ouvrir ce lien. Le SPA affiche une "404" si la session est absente — ce n'est pas un bug d'URL.
@@ -280,3 +305,104 @@ async def _penpot_scaffold(spec: ProjectSpec) -> dict:
     )
     return r.json()  # {"project_id": "...", "file_id": "...", "workspace_url": "..."}
 ```
+
+---
+
+## Conversion bidirectionnelle Site ↔ Penpot
+
+Deux directions sont implémentées via les outils Joseph. Les agents dev (Camille, Guillaume) utilisent ces outils pour convertir dans les deux sens.
+
+### Direction 1 : Site → Penpot (wireframe éditable)
+
+**Outil Joseph** : `penpot_site_to_wireframe(url, project_name?)`
+
+**Pipeline** :
+```
+URL live
+  → crawlee-service POST /dom-extract
+      (Playwright extrait CSS vars, computed styles, sections, typographie)
+  → Joseph mappe sections DOM → penpot_create_wireframe
+      (couleurs réelles depuis --primary-color, --brand, etc.)
+  → Wireframe Penpot avec shapes vectorielles éditables
+  → workspace_url livré
+```
+
+**Avantage sur `penpot_import_site`** : résultat éditable (shapes vectorielles vs image fixe). Idéal pour les refontes.
+
+**`crawlee-service POST /dom-extract`** :
+```json
+// Requête
+{"url": "https://exemple.fr", "timeout": 30000}
+
+// Réponse
+{
+  "url": "https://exemple.fr",
+  "title": "Exemple — Agence digitale",
+  "cssVars": {"--primary-color": "#32afb1", "--font-main": "'Inter', sans-serif"},
+  "colors": ["#32afb1", "#1a1a2e", "#ffffff", "#edb842"],
+  "typography": {
+    "heading": {"font": "Inter", "size": "48px", "weight": "700"},
+    "body": {"font": "Inter", "size": "16px"}
+  },
+  "sections": [
+    {"type": "nav", "links": ["Accueil","Services","Contact"], "bg": "#ffffff", "height": 80},
+    {"type": "hero", "title": "Agence digitale IA", "subtitle": "...", "height": 500},
+    {"type": "section", "title": "Nos services", "height": 350},
+    {"type": "footer", "bg": "#1a1a2e", "height": 120}
+  ]
+}
+```
+
+### Direction 2 : Penpot → Code (tokens pour Camille/Guillaume)
+
+**Outil Joseph** : `penpot_export_design(file_id, format?)`
+
+**Formats disponibles** :
+- `tokens` (défaut) : JSON couleurs + polices
+- `css` : variables CSS `:root { --color-1: #32afb1; ... }`
+- `tailwind` : config Tailwind `theme.extend.colors`
+- `full` : tout + liste des composants (frames)
+
+**Usage typique** :
+```
+Joseph penpot_export_design(file_id, format="full")
+  → CSS variables + Tailwind config + composants
+  → transmis à Camille (Next.js/Tailwind) via Leon
+```
+
+### Comparatif des outils d'import site
+
+| Outil | Résultat | Éditable | Couleurs réelles | Usage |
+|---|---|---|---|---|
+| `penpot_import_site` | Screenshot PNG dans un frame | ❌ image | Visuellement (non éditables) | Référence visuelle rapide |
+| `penpot_site_to_wireframe` | Shapes vectorielles | ✅ | ✅ extraites depuis CSS | Refonte, base de travail |
+| `penpot_create_wireframe` | Wireframe abstrait | ✅ | Tokens passés manuellement | Nouveau projet from scratch |
+
+### Bug connu — AccessDeniedException sur les nouveaux uploads
+
+Le processus JVM Penpot ne peut pas créer de nouveaux sous-répertoires dans `/opt/data/assets/` (permission refusée en NIO). Les uploads de nouvelles images échouent silencieusement (DB record créé, fichier non écrit).
+
+**Contournement** : utiliser `penpot_site_to_wireframe` (wireframe vectoriel, pas d'upload image) à la place de `penpot_import_site` pour les nouvelles importations tant que ce bug n'est pas résolu.
+
+**Diagnostic** :
+```bash
+kubectl logs -n penpot deployment/penpot-backend 2>&1 | grep -i "AccessDeniedException\|permission"
+```
+
+### Bug résolu — Assets 404 (2026-06-09)
+
+Le pod `penpot-frontend` n'avait pas le PVC `penpot-assets-pvc` monté. Le Nginx du frontend utilise `X-Accel-Redirect: /internal/assets/{uuid-path}` pour servir les fichiers — sans le montage, tous les assets retournaient 404.
+
+**Fix** : `deployment-penpot-frontend.yaml` — volume mount `penpot-assets-pvc` en `readOnly: true` sur `/opt/data/assets`.
+
+**Architecture X-Accel-Redirect** :
+```
+GET /assets/by-file-media-id/{fmo_id}
+  → Nginx proxy → penpot-backend:6060/assets/by-file-media-id/{fmo_id}
+  → Backend : DB lookup storage_object → 204 + X-Accel-Redirect: /internal/assets/{c7/f3/uuid}
+  → Nginx location /internal/assets { internal; alias /opt/data/assets; }
+  → Fichier servi directement depuis PVC
+```
+
+**Chemin fichier** : `id->path(uuid)` = `{uuid[0:2]}/{uuid[2:4]}/{uuid[4:32]}` (sans tirets).
+Exemple : UUID `c7f3509a-6449-4d1b-b3bb-55ef98f978c7` → `/opt/data/assets/c7/f3/509a64494d1bb3bb55ef98f978c7`
