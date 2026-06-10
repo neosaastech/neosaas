@@ -80,6 +80,7 @@ POST /mission { message, context?, session_id? }
 | Outil | Backend | Rôle |
 |---|---|---|
 | `ux_audit_url(url, focus?)` | crawlee-service:8009/crawl | Scrape page → données brutes → LLM fait l'audit (anti-pattern : pas de LLM dans l'outil) |
+| `detect_site_pages(url)` | crawlee-service:8009/nav-links + LLM | Extrait les liens nav/header → LLM suggère pages + sections (workflow multi-pages) |
 | `fetch_url(url)` | crawlee-service:8009 | Lecture page externe (requirements, landing client) |
 | `generate_wireframe_spec(brief)` | LLM interne | Spec wireframe textuelle Markdown |
 | `generate_design_guidelines(brief)` | LLM interne | Charte design (couleurs, typographie, ton) |
@@ -129,6 +130,7 @@ Convertit n'importe quelle URL en fichier Penpot avec N shapes éditables (rects
 | Capturer un site existant 1:1 pour retouche | `penpot_site_to_shapes` |
 | Wireframe épuré d'une seule page | `penpot_site_to_wireframe` |
 | **Wireframes multi-pages + Design System + Composants** | **`penpot_build_structured`** ← à préférer |
+| Détecter les pages d'un site (avant build multi-pages) | `detect_site_pages` |
 | Référence visuelle rapide (non éditable) | `penpot_import_site` |
 | Extraire tokens CSS/Tailwind d'un fichier Penpot | `penpot_export_design` |
 | Analyser un design Figma existant | `figma_extract_design_tokens` |
@@ -147,9 +149,10 @@ Convertit n'importe quelle URL en fichier Penpot avec N shapes éditables (rects
 
 **Workflow conversationnel** :
 ```
-1. ux_audit_url(url)           → identifier couleurs, sections, nombre de pages
-2. Joseph propose les pages[]  → confirmer avec l'utilisateur
-3. penpot_build_structured()   → crée les artboards
+1. ux_audit_url(url)         → identifier couleurs, tokens (primary, dark, bg)
+2. detect_site_pages(url)    → liens nav Playwright → LLM suggère pages + sections
+3. Joseph présente la proposition à l'utilisateur (confirmation obligatoire)
+4. penpot_build_structured() → crée les artboards
 ```
 
 **Paramètres clés** :

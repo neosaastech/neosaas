@@ -503,6 +503,38 @@ fill = lum > 128 ? '#1c1c2e' : '#f8f9fa';  // texte clair → fond sombre
 
 ---
 
+## crawlee-service — Endpoint `/nav-links`
+
+**Déployé** : 2026-06-10 — utilisé par Joseph `detect_site_pages`
+
+### Requête
+```json
+{"url": "https://client.fr"}
+```
+
+### Réponse
+```json
+{
+  "url": "https://client.fr",
+  "domain": "client.fr",
+  "count": 6,
+  "links": [
+    {"href": "https://client.fr/",         "path": "/",         "text": "Accueil",  "in_nav": true},
+    {"href": "https://client.fr/services", "path": "/services", "text": "Services", "in_nav": true},
+    {"href": "https://client.fr/contact",  "path": "/contact",  "text": "Contact",  "in_nav": true}
+  ]
+}
+```
+
+### Comportement
+- Playwright charge la page (`waitUntil: 'load'`) — JavaScript exécuté, CSS calculé
+- Sélecteurs : `nav a, header a, [role=navigation] a`
+- Filtres : même domaine, pas d'ancres `#`, pas d'assets (images, pdf, js, css), pas de doublons
+- Tri : liens `in_nav` en premier, max 20 résultats
+- Utilisé par Joseph `detect_site_pages` → LLM propose pages + sections → `penpot_build_structured`
+
+---
+
 ## État de fidélité V1 — Ce qui marche / Ce qui est limité
 
 ### ✅ Résolu (V1 actuelle)
@@ -549,7 +581,7 @@ fill = lum > 128 ? '#1c1c2e' : '#f8f9fa';  // texte clair → fond sombre
 **Roadmap post-arbitrage** :
 - ✅ Étape 1 — Builders penpot-engine `/wireframe.build` (2026-06-10)
 - ✅ Étape 2 — Joseph `penpot_build_structured` (2026-06-10)
-- ⏳ Étape 3 — Multi-page scraping : `penpot_site_to_shapes` accepte `pages[]` + boucle N URLs
+- ✅ Étape 3 — Multi-page conversationnel : crawlee `/nav-links` + Joseph `detect_site_pages` (2026-06-10)
 - ⏳ Étape 4 — Groupement spatial P1 (`group_shapes` post-traitement)
 
 ---
