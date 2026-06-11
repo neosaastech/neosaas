@@ -383,18 +383,52 @@ async def _penpot_scaffold(spec: ProjectSpec) -> dict:
 
 ---
 
+## Outils Joseph — Référence complète (v2.5)
+
+### Capture & Construction
+
+| Outil | Résultat | Usage |
+|---|---|---|
+| `penpot_capture_full_site(url, project_name)` | Toutes les pages publiques en shapes DOM éditables 1:1 (desktop+mobile) | Import site existant complet |
+| `penpot_site_to_shapes(url, project_name)` | Shapes DOM 1:1 page unique | Analyse / retouche d'une page |
+| `penpot_capture_brand(url, project_name)` | Logo + palette réelle + typographie | Assets marque client |
+| `penpot_build_structured(project_name, pages, primary_color, ...)` | Wireframes multi-pages structurés (Desktop+Mobile) | Wireframes from brief |
+| `penpot_build_design_library(project_name, primary_color, dark_color, ...)` | Design System partagé (is-shared=true) : tokens brand, typos Geist, 80 icônes Lucide, composants | Charte graphique client |
+
+### Inspection & Lecture
+
+| Outil | Ce qu'il retourne | Usage |
+|---|---|---|
+| `penpot_read_file(file_id)` | Pages, frames, couleurs nommées, typographies, count composants | Inspecter un fichier existant |
+| `penpot_get_components(file_id)` | Liste composants par catégorie, counts assets | Inspecter une bibliothèque partagée |
+| `penpot_find_project(query)` | Candidats Qdrant + live API, file_id + workspace_url | Localiser un fichier avant modification |
+| `penpot_check_design_library(project_name)` | Statut ok/empty/missing + counts | Recettage pré-production |
+
+### Modification & Gestion
+
+| Outil | Ce qu'il fait | Usage |
+|---|---|---|
+| `penpot_find_project` → `existing_file_id` | Refresh en place : supprime les pages, reconstruit | Modifier un fichier sans en créer un nouveau |
+| `penpot_add_page(file_id, page_name)` | Ajoute une page sans reconstruire (non destructif) | Ajouter une section après coup |
+
+### Export & Livraison
+
+| Outil | Format | Usage |
+|---|---|---|
+| `penpot_export_frames(file_id, format, scale)` | PNG / SVG / PDF (base64 ou metadata + workspace URLs) | Livraison client, assets |
+| `penpot_export_design(file_id, format)` | CSS vars / Tailwind config / JSON tokens | Handoff dev (tokens visuels extraits des fills) |
+| `penpot_generate_spec(file_id)` | Markdown : tokens nommés + typographies + dimensions frames | Handoff dev structuré → Camille / Guillaume |
+| `penpot_to_slides(file_id, title)` | Présentation Reveal.js via microservice slides | Présenter un design en slides |
+
+### Analyse
+
+| Outil | Ce qu'il retourne | Usage |
+|---|---|---|
+| `penpot_visual_audit(file_id)` | Rapport Markdown + score /10 : cohérence tokens, typos, breakpoints | Audit qualité design |
+
+---
+
 ## Conversion Site ↔ Penpot — Vue d'ensemble
-
-Trois outils Joseph couvrent les deux directions. Les agents dev (Camille, Guillaume) les utilisent pour travailler sur des sites clients.
-
-### Comparatif des outils
-
-| Outil | Résultat | Éditable | Fidélité | Usage |
-|---|---|---|---|---|
-| `penpot_import_site` | Screenshot PNG dans un frame | ❌ image fixe | Visuelle | Référence rapide |
-| `penpot_site_to_wireframe` | Shapes vectorielles par section | ✅ | Structurelle | Refonte from scratch |
-| `penpot_site_to_shapes` | Shapes DOM 1:1 (positions exactes) | ✅ | Haute (~80%) | Analyse / retouche d'un site existant |
-| `penpot_export_design` | CSS/Tailwind tokens depuis Penpot | — | — | Penpot → code Camille/Guillaume |
 
 ---
 
@@ -789,6 +823,53 @@ URL live
 Joseph penpot_export_design(file_id, format="full")
   → CSS variables + Tailwind config
   → transmis à Camille (Next.js/Tailwind) via Leon
+```
+
+---
+
+## Pipeline Penpot → Développement & Production
+
+### État actuel (2026-06-11)
+
+**Ce qui fonctionne** — Joseph peut livrer à tout moment :
+
+```
+penpot_generate_spec(file_id)
+  → Markdown : tokens nommés + typographies + dimensions frames
+  → Prêt à passer à Camille (frontend) ou Guillaume (backend)
+
+penpot_export_design(file_id, format="tailwind")
+  → tailwind.config.js extrait automatiquement
+  → À appliquer manuellement ou via Camille
+```
+
+**Ce qui n'est pas encore implémenté** — gap documenté :
+
+`trigger_leon_workflow(design_deploy, penpot_id)` est référencé dans CLAUDE.md mais **Leon n'a pas de handler `design_deploy`**. La chaîne automatique Joseph → Leon → Camille (branche GitHub + Vercel preview) est planifiée, pas encore codée.
+
+### Plan de développement — Penpot → Code (à implémenter)
+
+> Détail complet dans **[CLAUDE-penpot-pipeline.md](CLAUDE-penpot-pipeline.md)**
+
+```
+Étape 1 — Joseph (disponible maintenant)
+  penpot_generate_spec(file_id)
+  → spec.md : tokens + typos + frames
+
+Étape 2 — Leon (à coder : intent design_deploy)
+  POST leon:8181/mission {intent: "design_deploy", penpot_file_id, project_name}
+  → appelle Joseph penpot_generate_spec + penpot_export_design(format="tailwind")
+  → dispatch à Camille avec le payload tokens
+
+Étape 3 — Camille (à coder : handler design tokens)
+  POST camille:8485/mission {intent: "apply_design_tokens", tokens, tailwind_config}
+  → git checkout -b design/penpot-{file_id[:8]}
+  → patch tailwind.config.js + globals.css
+  → git push + PR GitHub
+  → Vercel preview auto sur la PR
+
+Étape 4 — Email Leon → utilisateur
+  "Tokens Penpot appliqués — PR GitHub + Vercel preview disponible"
 ```
 
 ---
