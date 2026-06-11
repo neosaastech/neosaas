@@ -1,7 +1,7 @@
 # CLAUDE-penpot-pipeline.md — Plan de développement : Penpot → Code
 
-> Statut : **PLANIFIÉ** — gap documenté le 2026-06-11
-> Prérequis : Joseph V2.5 ✅ · penpot-engine V1.1 ✅ · Leon V3.4 ✅ · Camille V3.1 ✅
+> Statut : **DÉPLOYÉ** — 2026-06-11
+> Joseph V3.0 ✅ · penpot-engine V1.1 ✅ · Leon V3.4+ ✅ · Camille V3.2 ✅
 
 ---
 
@@ -181,9 +181,9 @@ Optionnel si l'utilisateur déclenche directement via Leon.
 | Leon `_delegate("camille", ...)` | ✅ existe | Ajouter intent `apply_design_tokens` |
 | Leon email | ✅ déployé | — |
 | Vercel CI/CD sur PR | ✅ configuré via Alain / Vercel connector | — |
-| `_patch_tailwind()` + `_patch_css_vars()` | ❌ à écrire | Dans `camille.py` |
-| Intent `design_deploy` dans Leon | ❌ à coder | Tâche 1 |
-| Intent `apply_design_tokens` dans Camille | ❌ à coder | Tâche 2 |
+| `_patch_tailwind()` + `_patch_css_vars()` | ✅ déployé | Dans `camille.py` — Camille v3.2 |
+| Intent `design_deploy` dans Leon | ✅ déployé | Tâche 1 — _call_joseph_tool + gather + email |
+| Intent `apply_design_tokens` dans Camille | ✅ déployé | Tâche 2 — branch + patch + PR |
 
 ---
 
