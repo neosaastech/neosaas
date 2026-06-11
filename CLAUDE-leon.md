@@ -793,3 +793,103 @@ Leon a des **compétences techniques** pour piloter les projets (comprendre une 
 | Zoho-observer Boucle D — issue routing | ✅ Code 2026-05-29 | Scan `/bugs/` toutes les 5 min. SSII → Leon `/mission`. Neokube/unknown → Charlotte `/mission`. Ntfy urgent si critical >1h. |
 | GitHub tools via github-connector (Phase 1b) | ✅ Code 2026-06-01 | 8 outils LLM : `github_list_repos`, `github_create_repo`, `github_rename_occurrences`, `github_list_files`, `github_read_file`, `github_write_file`, `github_create_branch`, `github_create_pr`. Org `neosaastech` par défaut. |
 | Vercel tools via vercel-connector (Phase 1b) | ✅ Code 2026-06-01 | 6 outils LLM : `vercel_list_projects`, `vercel_get_deployments`, `vercel_get_logs`, `vercel_redeploy`, `vercel_create_project`, `vercel_learn`. Collection RAG `dev-experience`. |
+
+---
+
+### Notifications email — Hiérarchie de communication
+
+**Leon est le point central de communication** — il informe `chvandendriessche@neomnia.net` après chaque action significative.
+
+**Compte email** : `leon@neokube.fr` — SMTP Stalwart interne (`stalwart-mail.stalwart.svc.cluster.local:587`)
+**Destinataire** : `MAIL_TO = chvandendriessche@neomnia.net` (configurable via `leon-config`)
+**Credentials** : `MAIL_FROM=leon@neokube.fr` · `MAIL_PASSWORD` dans `leon-config` K8s (Vault `secret/neokube/apps/stalwart` clé `LEON_PASSWORD` à créer)
+
+#### Déclencheurs automatiques
+
+| Événement | Sujet email | Déclencheur code |
+|---|---|---|
+| Pipeline projet lancé | `[Leon] Projet {title} — pipeline lancé` | `dispatch_project` tool call success |
+| Délégation agent terminée | `[Leon] {Agent} — mission terminée` | `_delegate()` pour Milo/Joseph/Camille/Guillaume |
+| Jalon Zoho clôturé | `[Leon] Jalon '{name}' — {projet}` | `_handle_milestone_closed` après gather agents |
+
+**Agents qui déclenchent email** : `_DELEGATE_NOTIFY = {"milo", "joseph", "camille", "guillaume"}`
+**Agents silencieux** : Nora (elle gère sa propre communication client), Charlotte (infra), Alain (DevOps interne)
+
+#### Contenu des emails
+
+**dispatch_project** — Pipeline lancé :
+```
+Projet     : <titre>
+Objectif   : <objectif>
+Type       : webapp / scraping / design
+Workflow ID: <temporal_id>
+
+Le Dispatcher Temporal orchestre :
+  • Camille  → GitHub frontend + Vercel preview
+  • Guillaume → GitHub backend + Neon branch
+  • Joseph   → fichier Penpot wireframes
+
+Critères d'acceptation :
+  - ...
+```
+
+**_delegate** — Agent terminé :
+```
+Agent       : Joseph / Camille / Guillaume / Milo
+Mission     : <brief[:300]>
+Résultat    : <summary[:600]>
+Liens produits : <URLs workspace/GitHub/Vercel>
+```
+
+**_handle_milestone_closed** — Jalon :
+```
+Projet     : <nom>
+Jalon      : <nom> (index 0→3)
+Statut     : dispatched / skipped
+
+✅ Camille : <summary>
+✅ Guillaume : <summary>
+❌ Joseph : <error>
+```
+
+#### Règle de hiérarchie — PRINCIPE FONDAMENTAL
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  UTILISATEUR (chvandendriessche@neomnia.net)             │
+│       ▲  ▲                                               │
+│       │  └─── Email Leon uniquement                      │
+│       │                                                   │
+│    LEON (Chef de Production)                             │
+│       │  briefing / dispatch / consolidation             │
+│       ├──────────────────────────────────────────        │
+│       │         │           │          │                 │
+│    Camille  Guillaume     Joseph      Milo               │
+│    (Frontend) (Backend)  (Design)  (Scraping)           │
+│       │         │           │          │                 │
+│       └─────────┴───────────┴──────────┘                 │
+│          résultats retournés à Leon via /mission         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Règle absolue** : les agents exécutifs (Camille, Guillaume, Joseph, Milo) **ne communiquent jamais directement avec l'utilisateur**. Ils retournent leur résultat à Leon via la réponse HTTP `/mission`, et c'est Leon qui consolide et informe.
+
+| Couche | Agent | Rôle communication |
+|---|---|---|
+| **Utilisateur** | `chvandendriessche@neomnia.net` | Reçoit uniquement depuis Leon |
+| **Orchestration** | **Leon** | Seul émetteur email vers l'utilisateur — brief + dispatch + consolidation |
+| **Exécution** | Camille · Guillaume · Joseph · Milo | Exécutent · retournent résultat JSON à Leon · pas de contact direct |
+| **Infrastructure** | Charlotte | Gère l'infra — hors du flux communication projet |
+| **Exception** | Nora | Peut envoyer emails **clients externes** uniquement si Leon le délègue explicitement |
+
+**Pourquoi cette règle** : éviter l'antagonisme de sources — l'utilisateur ne reçoit pas 4 emails différents d'agents différents sur le même projet. Leon est l'unique voix consolidée. Les agents n'ont pas de configuration `MAIL_TO` utilisateur dans leurs env vars.
+
+**ntfy vs email — deux canaux distincts** :
+
+| Canal | But | Émetteurs | Niveau |
+|---|---|---|---|
+| **Email** (`leon@neokube.fr`) | Communication projet — livrables, jalons, pipelines | **Leon uniquement** | Managérial |
+| **ntfy** `neokube-alerts` | Information admin NeoKube — actions sysadmin, alertes infra, événements agents | Tous agents | Admin sys |
+
+ntfy n'est pas de la communication projet — c'est de l'information système : "Joseph vient de capturer le site X", "Charlotte vient de fixer un pod", "budget LiteLLM à 80%". L'admin NeoKube surveille ntfy pour avoir une vue opérationnelle en temps réel. L'email Leon informe sur ce qui a été produit et livré. Les deux coexistent sans conflit.
+

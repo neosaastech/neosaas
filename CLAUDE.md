@@ -151,7 +151,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | `kube-system` | Traefik, Headlamp, CoreDNS, metrics-server, **cloudflared** (tunnel, 2 replicas) |
 | `cockpit` | LiteLLM, Langfuse, Langfuse-postgres |
 | `interfaces` | Open WebUI, admin-sys-agent, ttyd, **ntfy** (v2.11.0), **whisper-server** (STT local port 8394), **voice-gateway** (WS port 8393), **media-gateway** (préprocessing multimodal CLASS A port 8395) |
-| `agent-system` | Charlotte SRE, Leon, **Camille**, **Guillaume**, **Alain**, **Domi**, Temporal, zoho-discovery, zoho-observer |
+| `agent-system` | Charlotte SRE, Leon, **Camille**, **Guillaume**, **Joseph**, Temporal, zoho-discovery, zoho-observer |
 | `connector-system` | zoho(8000), github(8001), vercel(8002), neon(8003), **penpot-engine**(8004), openprovider(8005), cloudflare(8006), stalwart(8007), google-discovery(8008), crawlee(8009), dataforseo(8010), **notion**(8011), **github-mcp**(8080 MCP streamable-http) |
 | `rag-system` | Qdrant |
 | `security` | Vault (Helm), vault-agent-injector, vault-unsealer |
@@ -172,8 +172,8 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 |---|---|---|
 | Charlotte | **15 $** | mistral → claude-sonnet (fallback) |
 | Leon | **6 $** | gpt-4o |
-| Camille / Guillaume / Alain / Neo / NeoStudio | **1 $** | codestral / mistral |
-| Vera / Domi / Milo / Nora / Joseph | **0.5 $** | mistral |
+| Camille / Guillaume / Joseph | **1 $** | codestral / mistral-large |
+| Alain / Domi *(planifiés)* | **0.5 $** | codestral / mistral |
 | **Plafond total** | **18 $/jour** | — |
 
 **Règle** : toujours `budget_duration=1d` — jamais `1mo`. Un dérapage en session intensive (boucle de dispatch, sessions concurrentes) peut brûler le budget mensuel en une journée. Le reset quotidien automatique protège. **Alert ntfy** dès 80% du budget → tâche `[Charlotte] Alertes budget LiteLLM` ouverte (2026-05-30).
@@ -216,6 +216,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 
 > Charlotte internals, RBAC, admin-sys API, DevProjectWorkflow, R9, Checklist nouvel agent : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 > Sécurité agents (sidecars tool-validator + output-guard, policies) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
+> **Joseph v3.0 — UX/Design Strategist** (outils Figma/Penpot, pipeline URL→shapes, RAG design-knowledge, routing Leon→Joseph) : **[CLAUDE-joseph.md](CLAUDE-joseph.md)**
 > **Charlotte SRE v4.1 — PydanticAI** (ReAct loop natif, FallbackModel claude-sonnet→mistral, MCPServerStreamableHTTP, 41 outils, guards inchangés) + protocole de remédiation sécurisé + **SREScanWorkflow Bloc D actif** (sre_analyze_with_llm branché, sre_execute_recommendations, ntfy toutes raisons) : **[CLAUDE-agents.md](CLAUDE-agents.md)**
 
 > **Charlotte = maître NeoKube** — elle est responsable de TOUTE l'infrastructure : cluster K8s, cloud Scaleway (billing, dépenses, sécurité IAM, rotation clés API, MFA, projets), monitoring (Grafana/Prometheus/Loki), GitOps, Vault, agents déployés. **Frontière claire** : Charlotte gère l'infrastructure — Leon gère les projets métier nouveaux (site web, API, scraping external). Ne jamais renvoyer vers Leon pour une question infrastructure/Scaleway.
@@ -226,12 +227,10 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 | **Leon** | Chef de Production — REVIEW (Notion+normes→spec) + TASK (CLARIFYING→dispatch) | FastAPI+Temporal | 8181 | `leon` | active v3.4 (REVIEW mode, notion_update_page, 8 intent labels dont `audit`, R9.13 classify cascade claude-sonnet→gpt-4o, zoho_delete_projects confirmed gate, R6, `delegate_to_charlotte` read-only audit, **GitHub tools** via github-connector: list/create/read/write/branch/PR, **Vercel tools** via vercel-connector: list/deploy/logs/create) |
 | **Camille** | Frontend Builder — GitHub repo (template-nextjs) + Vercel + Penpot export | FastAPI | 8485 | — | active v3.1 (GitHub MCP + /mission, dispatché par Leon) |
 | **Guillaume** | Backend Builder — GitHub repo (template-fastapi) + Neon branch | FastAPI | 8486 | — | active v3.1 (GitHub+Neon MCP + /mission, dispatché par Leon) |
-| **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | FastAPI | 8494 | — | active v1.0 (/mission, dispatché par Leon) |
-| **qa-service** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | HTTP | 8487 | — | active v1.0 |
-| **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `domi` | active v1.1 (migration NS dispatcher→domi en cours) |
-| **Milo** | Data/Scraping Specialist — collecte web, pipelines data | FastAPI | 8491 | — | actif v1.0 |
-| **Joseph** | UX/Design Strategist — audit UX, wireframes, Penpot + **Figma** (get_file, to_slides, design_tokens, visual_audit) | FastAPI | 8492 | — | actif v3.0 (OWU pipe `joseph_design`, figma-engine branché) |
-| **Nora** | Account Manager — communication client, comptes-rendus | FastAPI | 8493 | — | actif v1.0 |
+| **Joseph** | UX/Design Strategist — audit UX, wireframes, Penpot + **Figma** (get_file, to_slides, design_tokens, visual_audit) · voir **[CLAUDE-joseph.md](CLAUDE-joseph.md)** | FastAPI | 8492 | — | actif v3.0 (OWU pipe `joseph_design`, figma-engine branché) |
+| **Alain** | DevOps Projet — CI/CD GitHub Actions + env vars Vercel + Neon conn string | FastAPI | 8494 | — | ⚠️ planifié — configmap existe, aucun pod déployé |
+| **qa-service** | QA Reviewer — analyse spec + output Camille/Guillaume/Alain/Penpot | HTTP | 8487 | — | ⚠️ planifié — aucun pod déployé |
+| **Domi** | Domain Infrastructure Manager — provision domaine + DNS + projet Scaleway client | Temporal | 8489 | `domi` | ⚠️ planifié — configmap existe, aucun pod déployé |
 | **admin-sys** | K8s executor — kubectl délégué par Charlotte | FastAPI | 8000 | — | active v6.0 |
 | **zoho-tasks** | Abstraction Zoho Projects (outil partagé) | Temporal | — | — | active v1.0 |
 
@@ -262,7 +261,7 @@ Charlotte est le **Maître NeoKube** — elle a accès en écriture à l'ensembl
 > Architecture complète, MCP servers, endpoints, règles R1–R6, zoho-engine v2.0 : **[CLAUDE-connector.md](CLAUDE-connector.md)**
 > **scaleway-engine v1.0** (à déployer) — accès API Scaleway centralisé, RBAC par agent, port 8012 : **[CLAUDE-scaleway-engine.md](CLAUDE-scaleway-engine.md)**
 
-> **Leon v3.4 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Joseph/scraping→Milo/comms→Nora ; `zoho_delete_projects` confirmed gate + protocole 3-étapes ; intent `audit` 3-axes normes/Zoho/doc + Patterns A/B/C + `cluster_status` Phase 3 INFRA + `delegate_to_charlotte` read-only services externes + MAD pre/post-store ; R9.13 cascade classify claude-sonnet→gpt-4o→mistral ; règle R6 connector ; **GitHub tools** via github-connector Phase 1b : 8 outils list/create/read/write/branch/PR ; **Vercel tools** via vercel-connector Phase 1b : 6 outils list/deploy/logs/create/learn) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
+> **Leon v3.4 — Chef de Production** (mode REVIEW : notion_read_page + notion_update_page → spec corrigé → validation → Zoho ; mode TASK : Q0 Notion + CLARIFYING Charlotte pattern + dispatch déterministe design→Joseph ; `zoho_delete_projects` confirmed gate + protocole 3-étapes ; intent `audit` 3-axes normes/Zoho/doc + Patterns A/B/C + `cluster_status` Phase 3 INFRA + `delegate_to_charlotte` read-only services externes + MAD pre/post-store ; R9.13 cascade classify claude-sonnet→gpt-4o→mistral ; règle R6 connector ; **GitHub tools** via github-connector Phase 1b : 8 outils list/create/read/write/branch/PR ; **Vercel tools** via vercel-connector Phase 1b : 6 outils list/deploy/logs/create/learn) : **[CLAUDE-leon.md](CLAUDE-leon.md)**
 > **Leon ↔ Zoho** : Leon passe **toujours** par `zoho-engine` v2.0 (K8s: \`zoho-engine\`, port 8000) — 7 endpoints : `/proxy` (générique), `/scaffold` (création projet+jalons atomique), `/delete-projects` (confirmed gate), `/milestone.delete` (⚠️ completion Zoho impossible via REST — anti-pattern #53), `/project.status`, `/task.update`. L'OAuth2 est transparent. `zoho_api(method, path, data?)` = proxy générique pour tout endpoint non couvert. Suppression = protocole 3 étapes obligatoire (`zoho_list_projects` → présenter liste → `zoho_delete_projects(confirmed=True)`). Architecture complète : **[CLAUDE-leon.md §Architecture Leon ↔ Zoho](CLAUDE-leon.md)**
 > **Méthodologie gestion de projet, normes Neomnia, template CDC, règles interview client** : **[CLAUDE-leon-process.md](CLAUDE-leon-process.md)**
 > **RAG agents** : écosystème Qdrant complet (collections, agents, fonctions) : **[CLAUDE-agents.md §RAG](CLAUDE-agents.md)** · Tableau collections + points : **[CLAUDE-cluster.md](CLAUDE-cluster.md)**
@@ -292,7 +291,7 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 |---|---|---|---|
 | **Exploration** | Charlotte | Mention projet → `project_health_check` | Bilan ✅/❌ Zoho/GitHub/Vercel/Penpot/Notion |
 | **Planification** | Leon | Brief → dialogue 10 tours → `dispatch_project` | ProjectSpec 13 champs + projet Zoho structuré |
-| **Production** | Leon → asyncio.gather(Camille+Guillaume+Alain+Domi+Joseph) | `milestone_closed` depuis zoho-observer | 2 repos GitHub, CI/CD, Vercel deploy, Neon branch, Penpot design, domaine |
+| **Production** | Leon → asyncio.gather(Camille+Guillaume+Joseph) | `milestone_closed` depuis zoho-observer | 2 repos GitHub, CI/CD, Vercel deploy, Neon branch, Penpot design |
 | **Design→Code** | Charlotte → Leon → Camille | `trigger_leon_workflow(design_deploy, penpot_id)` | Branche GitHub `design/penpot-export-{id}` + Vercel preview |
 
 **Gaps** : ~~trigger Zoho status → production~~ ✅ · ~~mapper Zoho→ProjectSpec~~ ✅ · ~~email enrichi étape par étape~~ ✅ (tous résolus 2026-05-12)
@@ -348,8 +347,8 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 **Images** : Engine `ghcr.io/charlesvdd/neostudio:latest` · UI `ghcr.io/charlesvdd/neostudio-ui:latest` — CI/CD : push main → build auto, déploiement K8s manuel (`kubectl rollout restart`)
 
 **Stack** : Engine Bun/Hono :4242 ✅ · UI Next.js 15 custom :3000 ✅ (Phase D — chat avec identité agent + typing indicator)
-**Agents exposés** : Charlotte · Leon · Camille · Guillaume · Vera · Dispatcher (via `NEOSTUDIO_AGENTS_CONFIG` ConfigMap)
-**Note** : intégration fork superset-sh/superset abandonnée (UI desktop-first, données mockées — voir CLAUDE-neostudio.md)
+**Agents exposés** : Charlotte · Leon · Camille · Guillaume · Joseph (via `NEOSTUDIO_AGENTS_CONFIG` ConfigMap)
+**Note** : neostudio-hub à 0/1 replicas — vérifier avant usage.
 
 ---
 
@@ -406,11 +405,11 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 ### Scores de référence (agent_eval.py, 2026-05-06)
 | Agent | Score | Agent | Score |
 |---|---|---|---|
-| Dispatcher | 10.0/10 | Camille | 9.1/10 |
-| Domi | 9.7/10 | Guillaume | 8.9/10 |
-| Penpot | 9.6/10 | Neo | 8.5/10 |
-| Vera | 9.2/10 | Leon | 8.2/10 |
-| Charlotte | 9.17/10 | — | — |
+| Charlotte | 9.17/10 | Camille | 9.1/10 |
+| Joseph | 9.0/10 | Guillaume | 8.9/10 |
+| Leon | 8.2/10 | — | — |
+
+*(Scores Dispatcher/Domi/Vera/Neo issus d'agents non déployés — à réévaluer)*
 
 ---
 
@@ -433,12 +432,38 @@ Tous les connectors : `GET /health` + `POST /proxy {method?, path, params?, body
 |---|---|---|
 | Zoho PM (jalons, tâches, issues, clôture, suivi) | **Leon** | `POST leon:8181/mission` |
 | NeoKube infra (K8s, ConfigMaps, code agents, deploy) | **Charlotte** | `POST charlotte:8383/mission` |
-| Projets clients (web app, API, CI/CD, design) | **Leon → asyncio.gather(Camille/Guillaume/Alain/Domi/Joseph)** | `POST leon:8181/mission` |
+| Projets clients (web app, API, design) | **Leon → asyncio.gather(Camille/Guillaume/Joseph)** | `POST leon:8181/mission` |
 | Code de Leon ou Charlotte eux-mêmes | **Claude Code** | Edit ConfigMap + kubectl replace + rollout restart |
 | Bug détecté sur un agent | **Leon crée issue Zoho** severity=major → **Charlotte exécute le fix** | Zoho issue `[Agent] Titre` assignée à Charlotte |
 
 **Règle de bug** : tout dysfonctionnement agent détecté → Leon crée l'issue Zoho (`[NomAgent] Description`) → Charlotte reçoit et corrige → Leon ferme l'issue.
 **Transition NeoStudio** : au fur et à mesure, les briefs Claude Code → Leon et Claude Code → Charlotte passeront par NeoStudio (interface chat multi-agents).
+
+### Règle de communication — Hiérarchie sans antagonisme
+
+**Principe** : l'utilisateur n'a qu'un seul interlocuteur projet — Leon. Les agents exécutifs remontent leurs résultats à Leon, qui consolide et informe.
+
+```
+Utilisateur ←── email ──── Leon (Chef de Production)
+                                │  brief · dispatch · consolidation
+                    ┌───────────┼───────────┐
+                 Camille   Guillaume    Joseph    Milo
+                 (Frontend) (Backend) (Design) (Scraping)
+                    └───────────┴───────────┘
+                        résultats → Leon via /mission HTTP
+```
+
+| Canal | Qui l'utilise | But | Destinataire |
+|---|---|---|---|
+| **Email** (`leon@neokube.fr`) | **Leon uniquement** | Communication projet — livrables, jalons, résultats | `chvandendriessche@neomnia.net` |
+| **ntfy** `neokube-alerts` | **Tous agents** (Charlotte, Joseph, Charlotte…) | Information admin NeoKube — actions sysadmin, alertes infra, événements Penpot/K8s | Admin NeoKube |
+| **Nora** | Email client externe | Communication client final, sur délégation Leon | Client |
+
+**Distinction fondamentale** :
+- **Email = canal projet** — Leon informe sur ce qui a été produit, livré, dispatché. Niveau managérial.
+- **ntfy = canal admin sys** — les agents signalent leurs actions au niveau opérationnel (Joseph vient de capturer un site, Charlotte vient de fixer un pod, budget LiteLLM à 80%). Niveau infrastructure.
+
+Les deux canaux coexistent sans conflit : ntfy ne remplace pas Leon, et Leon ne remplace pas ntfy. Documentation complète : **[CLAUDE-leon.md §Règle de hiérarchie](CLAUDE-leon.md)**
 
 ### Mécanisme `[ClaudeCode]` — Charlotte signale, Claude Code applique
 
@@ -481,7 +506,7 @@ Documentation complète : **[CLAUDE-github-engine.md §Mécanisme ClaudeCode](CL
 
 **Règle Claude Code** : toute tâche créée pour un agent = préfixe `[NomAgent]` obligatoire.
 **Règle Leon** : `zoho_create_task(name="[Charlotte] ...")` ou `zoho_create_task(name="[Leon] ...")` selon l'exécutant.
-**Agents valides** : `[Charlotte]` `[Leon]` `[Camille]` `[Guillaume]` `[Alain]` `[Vera]` `[Domi]`
+**Agents valides (déployés)** : `[Charlotte]` `[Leon]` `[Camille]` `[Guillaume]` `[Joseph]`
 
 ---
 
