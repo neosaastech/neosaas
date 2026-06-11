@@ -11,16 +11,20 @@
       │       └── mcp.neon.tech/sse                         (Neon API, remote)
       │
       ├─── Engines métier (services domaine — règles process + normalisation + RBAC)
-      │       ├── zoho-engine v2.0    → déployé  (K8s: zoho-engine:8000)
-      │       └── scaleway-engine v1.0 → à déployer (K8s: scaleway-engine:8012)
+      │       ├── zoho-engine v2.1      → déployé  (K8s: zoho-engine:8000)
+      │       ├── github-engine v2.0    → à déployer (K8s: github-engine:8001, remplace github-connector)
+      │       │     └── RBAC par agent — Leon est le gestionnaire des accès
+      │       └── scaleway-engine v1.0  → à déployer (K8s: scaleway-engine:8012)
       │
       └─── Connectors Python (proxy léger + auth)
               └── vercel, penpot, openprovider, cloudflare, stalwart,
-                  google-discovery, crawlee, dataforseo, github(legacy), neon(legacy)
+                  google-discovery, crawlee, dataforseo, neon(legacy)
+                  github-connector → DEPRECATED après migration github-engine
 ```
 
 **Règle** : MCP = couche préférée pour GitHub, K8s, Neon. Connectors = proxy léger pour APIs sans MCP. **Engines** = services métier avec logique propre (normalisation, règles process, RBAC par agent, API sémantique).
 
+> **github-engine v2.0** : RBAC multi-agent, Leon gestionnaire des accès, multi-org → **[CLAUDE-github-engine.md](CLAUDE-github-engine.md)**
 > **scaleway-engine** : documentation complète → **[CLAUDE-scaleway-engine.md](CLAUDE-scaleway-engine.md)**
 
 ---

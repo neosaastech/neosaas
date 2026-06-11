@@ -1,7 +1,18 @@
 # CLAUDE-penpot-pipeline.md — Plan de développement : Penpot → Code
 
 > Statut : **DÉPLOYÉ** — 2026-06-11
-> Joseph V3.0 ✅ · penpot-engine V1.1 ✅ · Leon V3.4+ ✅ · Camille V3.2 ✅
+> Joseph V3.0 ✅ · penpot-engine V1.1 ✅ · Leon V3.5 ✅ · Camille V3.3 ✅
+
+### Correctifs déployés — 2026-06-11
+
+| Fix | Composant | Problème résolu |
+|---|---|---|
+| **Recherche sémantique** | Joseph `penpot_find_project` | Remplacement keyword matching → embedding + Qdrant `/points/search` score > 0.25 |
+| **Fichiers non indexés visibles** | Joseph `penpot_find_project` | Merge Qdrant + liste live Penpot API (dédupliqué par `file_id`) |
+| **UUIDs dans la liste candidats** | Joseph `penpot_find_project` | Format `**nom** (projet) — \`uuid\`` — LLM peut résoudre sans halluciner |
+| **penpot-engine `/file.read`** | penpot-engine | Double `_WF_FEATURES` à la ligne 1513 → Penpot retournait HTTP 400. Clés camelCase (`pagesIndex`, `parentId`, `fontFamily`) corrigées |
+| **Org GitHub dynamique** | Camille `generate_pages_from_penpot` + `apply_design_tokens` | `repo_owner` extrait de `github_repo` (ex: `neosaastech/neosaas`) au lieu de `GITHUB_ORG = "neomnia"` hardcodé |
+| **Confirmation avant dispatch** | Leon `dispatch_design_and_backend` | Gate `confirmed` dans le handler : si `confirmed != True` → retourne récapitulatif (fichier, pages, repo, branche) et attend confirmation. Enforced dans le code, pas seulement le prompt |
 
 ---
 

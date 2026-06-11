@@ -129,7 +129,7 @@ GET  /status/{job_id}       → {"status": "running|done|error", "output": "..."
 
 ---
 
-## 2. Interview obligatoire — 7 questions procédurales
+## 2. Interview obligatoire — 8 questions procédurales
 
 Charlotte **doit** conduire cet interview avant tout `create_agent()`. Les questions non
 renseignées par l'utilisateur sont posées via `ask_clarification`.
@@ -230,6 +230,43 @@ Les sidecars lisent leurs configs depuis :
 
 ---
 
+### Q8 — Accès GitHub (github-engine RBAC)
+
+Quels repos GitHub cet agent doit-il accéder, et avec quel niveau ?
+
+**Cette question est posée même si l'agent n'utilise pas GitHub directement** — certains agents
+lisent des fichiers de config ou génèrent du code sans en avoir conscience initialement.
+
+| Niveau | Opérations |
+|---|---|
+| `read` | Lire fichiers, lister repos, voir workflows |
+| `write` | `read` + créer branches, pousser fichiers |
+| `pr` | `write` + créer et merger des Pull Requests |
+| `workflow` | `read` + déclencher GitHub Actions |
+| `admin` | Tout (Charlotte uniquement en règle générale) |
+
+**Réponses typiques par type d'agent** :
+- Agent frontend (ex: Camille) → `["*-frontend", "template-nextjs"]` + `["read", "write", "pr"]`
+- Agent backend (ex: Guillaume) → `["*-backend", "template-fastapi"]` + `["read", "write", "pr"]`
+- Agent design (ex: Joseph) → `["*"]` + `["read"]`
+- Agent DevOps (ex: Alain) → `["*"]` + `["read", "workflow"]`
+- Agent SRE/Infra (ex: Charlotte) → `["*"]` + `["read", "write", "pr", "workflow", "admin"]`
+- Agent conversationnel sans code → `[]` (pas d'accès GitHub)
+
+**Action Leon** : après `create_agent()`, Leon appelle `github_grant_access` pour enregistrer le RBAC :
+```python
+github_grant_access(
+    agent    = "{name}",
+    repos    = ["{pattern}"],
+    access   = ["{levels}"],
+    project_id = "{zoho_project_id}",   # optionnel, pour audit trail
+)
+```
+
+Si l'agent n'a pas besoin de GitHub : noter `github_access=[]` dans l'AgentSpec et passer cette étape.
+
+---
+
 ## 3. Arbre de décision
 
 ```
@@ -257,7 +294,12 @@ Demande de création d'agent
     │      └─ OWU + connectors sensibles → sidecars_enabled=True
     │         Service interne / test     → sidecars_enabled=False
     │
-    └─ → Résumé → Confirmation → create_agent()
+    ├─ Q8: Accès GitHub ?
+    │      └─ Agent frontend/backend/devops → github_grant_access (Leon, post-création)
+    │         Agent design/conversationnel  → read uniquement ou []
+    │         Agent SRE/infra               → admin (Charlotte)
+    │
+    └─ → Résumé → Confirmation → create_agent() → Leon : github_grant_access()
 ```
 
 ---
@@ -278,6 +320,7 @@ Demande de création d'agent
 | 8a | `sre_register_openwebui_pipe` | Pipe Open WebUI (Functions) |
 | 8b | `sre_register_openwebui_connection` | Connexion OpenAI-compat Open WebUI (Models) |
 | 9 | `sre_push_langfuse_score` | Trace Langfuse `agent_created` |
+| **10** | **`leon_github_grant_access`** | **Leon appelle `github_grant_access(agent, repos, access)` → RBAC github-engine mis à jour** |
 
 **Code généré (étape 5a)** : FastAPI minimal Pattern B basique + **template MAD complet** :
 `_session_memory_load/save` (M2) · `_memory_store` (M3) · `_agent_learn` (A1) ·
@@ -288,7 +331,49 @@ Pour Pattern A (PydanticAI) ou Worker Temporal : code métier à compléter via 
 
 ---
 
-## 5. Ce que Charlotte ne génère PAS (développement manuel requis)
+## 5. Décommissionnement d'un agent — processus complet
+
+Le décommissionnement est une **opération ordonnée** — pas juste un `kubectl scale --replicas=0`.
+Charlotte orchestre, Leon révoque les accès GitHub.
+
+### Étapes obligatoires
+
+| # | Acteur | Action | Vérification |
+|---|---|---|---|
+| 1 | **Charlotte** | `decommission_agent(agent_id)` → scale deployment 0 | Pod terminé |
+| 2 | **Leon** | `github_revoke_access(agent, repos=["*"])` → supprime RBAC github-engine | `GET /access.list?agent=` retourne `[]` |
+| 3 | **Charlotte** | Supprimer clé LiteLLM (`DELETE /key/{key}`) | Clé inactive |
+| 4 | **Charlotte** | Archiver collection Qdrant `{name}-memory` (snapshot Qdrant avant suppression) | Snapshot OK |
+| 5 | **Charlotte** | Retirer agent du ConfigMap `agent-registry` | Registry propre |
+| 6 | **Charlotte** | Retirer entrée `agent-policies.json` (outil-validator) | Policy absente |
+| 7 | **Charlotte** | Retirer agent du ConfigMap `agent-eval-cron` | Éval désactivée |
+| 8 | **Leon** | Clôturer les tâches Zoho ouvertes assignées à cet agent | Tâches `[NomAgent]` closed |
+| 9 | **Charlotte** | ntfy `agent_decommissioned` + Langfuse trace | Audit trail complet |
+
+### Commande Charlotte
+
+```python
+decommission_agent(
+    agent_id = "{name}",
+    reason   = "projet terminé / agent remplacé / etc.",
+)
+```
+
+**Règle** : Charlotte fait les étapes 1, 3-7, 9. Leon fait les étapes 2 et 8. La révocation GitHub (étape 2) est **bloquante** — si elle échoue, Charlotte alerte via ntfy et ne progresse pas.
+
+### Anti-pattern à éviter
+
+```
+❌ kubectl scale deployment/{agent} --replicas=0
+   → Agent down mais accès GitHub toujours actifs, clé LiteLLM active, RBAC non nettoyé
+
+✅ decommission_agent(agent_id) via Charlotte
+   → Séquence complète + révocation Leon + audit trail
+```
+
+---
+
+## 7. Ce que Charlotte ne génère PAS (développement manuel requis)
 
 | Élément | Raison | Référence |
 |---|---|---|
@@ -309,7 +394,7 @@ Pour Pattern A (PydanticAI) ou Worker Temporal : code métier à compléter via 
 
 ---
 
-## 6. Règles invariantes pour tout agent NeoKube
+## 8. Règles invariantes pour tout agent NeoKube
 
 Ces règles s'appliquent à TOUS les agents, quel que soit le type.
 
@@ -355,7 +440,7 @@ grep -c "_session_memory_load\|_memory_store\|_agent_learn\|_mission_score_send\
 
 ---
 
-## 7. Ports disponibles et conventions
+## 9. Ports disponibles et conventions
 
 **Ports libres** : 8494, 8495, 8496, 8497, 8498, 8499
 
@@ -380,7 +465,7 @@ grep -c "_session_memory_load\|_memory_store\|_agent_learn\|_mission_score_send\
 
 ---
 
-## 8. Commandes Charlotte
+## 10. Commandes Charlotte
 
 ```
 # Créer un agent CLASS A (interview + workflow automatique)
