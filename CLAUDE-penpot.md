@@ -843,33 +843,31 @@ penpot_export_design(file_id, format="tailwind")
   → À appliquer manuellement ou via Camille
 ```
 
-**Ce qui n'est pas encore implémenté** — gap documenté :
-
-`trigger_leon_workflow(design_deploy, penpot_id)` est référencé dans CLAUDE.md mais **Leon n'a pas de handler `design_deploy`**. La chaîne automatique Joseph → Leon → Camille (branche GitHub + Vercel preview) est planifiée, pas encore codée.
-
-### Plan de développement — Penpot → Code (à implémenter)
+### Pipeline Penpot → Code — **déployé le 2026-06-11** ✅
 
 > Détail complet dans **[CLAUDE-penpot-pipeline.md](CLAUDE-penpot-pipeline.md)**
 
 ```
-Étape 1 — Joseph (disponible maintenant)
-  penpot_generate_spec(file_id)
-  → spec.md : tokens + typos + frames
+Étape 1 — Joseph POST /tool (appel direct sans LLM)
+  penpot_generate_spec(file_id)          → spec.md tokens + typos + frames
+  penpot_export_design(file_id, "full")  → tailwind_config + css_block + tokens
 
-Étape 2 — Leon (à coder : intent design_deploy)
-  POST leon:8181/mission {intent: "design_deploy", penpot_file_id, project_name}
-  → appelle Joseph penpot_generate_spec + penpot_export_design(format="tailwind")
-  → dispatch à Camille avec le payload tokens
+Étape 2 — Leon intent design_deploy (déployé)
+  POST /v1/chat/completions
+  {"intent":"design_deploy","penpot_file_id":"<uuid>","github_repo":"org/repo","project_name":"..."}
+  → asyncio.gather(spec, tokens) via Joseph /tool
+  → dispatch à Camille
 
-Étape 3 — Camille (à coder : handler design tokens)
-  POST camille:8485/mission {intent: "apply_design_tokens", tokens, tailwind_config}
-  → git checkout -b design/penpot-{file_id[:8]}
-  → patch tailwind.config.js + globals.css
-  → git push + PR GitHub
-  → Vercel preview auto sur la PR
+Étape 3 — Camille intent apply_design_tokens (Camille v3.2, déployé)
+  POST camille:8485/mission {intent: "apply_design_tokens", github_repo, tailwind_config, css_block}
+  → create_branch design/penpot-{file_id[:8]}
+  → _patch_tailwind (inject brand: colors dans theme.extend)
+  → _patch_css_vars (merge :root vars dans globals.css)
+  → push_files + create_pull_request
+  → Vercel preview auto sur la PR (CI/CD existant)
 
-Étape 4 — Email Leon → utilisateur
-  "Tokens Penpot appliqués — PR GitHub + Vercel preview disponible"
+Étape 4 — Leon → email chvandendriessche@neomnia.net
+  "[Leon] Design tokens appliqués — PR + Vercel preview"
 ```
 
 ---

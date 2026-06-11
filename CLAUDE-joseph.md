@@ -378,7 +378,12 @@ Connexion : fichier cible → Assets → Libraries → '_Design System — NeoSa
 
 **V1 (2026-05-15)** — DOM shapes éditables 1:1, revn synchronisation get-file
 
-### Roadmap V3 — améliorations planifiées
+**V3.0 (2026-06-11)** — Endpoint direct `/tool` + pipeline Penpot→dev actif
+
+- `POST /tool {"tool": "<name>", "args": {...}}` : appel direct de n'importe quel outil (`_execute_tool`) sans passer par le LLM agent. Utilisé par Leon pour `penpot_generate_spec` et `penpot_export_design` en parallèle (`asyncio.gather`).
+- Leon peut maintenant déclencher le pipeline complet : `design_deploy` → Joseph `/tool` → Camille `apply_design_tokens` → PR GitHub + email.
+
+### Roadmap — améliorations planifiées
 
 **P1** — SVG outerHTML natif : `el.outerHTML` → `type: svg-raw` Penpot (vs screenshot PNG rasterisé)
 **P2** — DOM récursif : remplacer `querySelectorAll` par parcours arborescent → Frames/Groups par section sémantique (nav, main, footer…)

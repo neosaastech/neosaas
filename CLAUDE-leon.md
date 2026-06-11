@@ -384,7 +384,8 @@ Leon utilise un classificateur LLM (antipattern #40 — jamais de string matchin
 
 ```python
 _LEON_INTENT_LABELS = ("greeting", "check_agents", "reflection", "question",
-                        "task", "review", "rag_mission", "audit")
+                        "task", "review", "rag_mission", "audit",
+                        "surveiller", "milestone_closed", "task_done", "design_deploy")
 
 async def _classify_message_leon(msg: str, history=None) -> str:
     # R9.13 — cascade interactive : LLM_CLASSIFY_MODEL (claude-sonnet) → LLM_CLASSIFY_FALLBACK (gpt-4o) → LLM_MODEL_REASONING (mistral)
@@ -409,6 +410,7 @@ async def _classify_message_leon(msg: str, history=None) -> str:
 | `review` | Révision documentaire CDC Notion — LLM génère spec, Python écrit | `run_agent(initial_model=LLM_SECONDARY)` — pas de `_sanitize` |
 | `rag_mission` | Indexation/enrichissement collection Qdrant | Handler dédié `_rag_execute()` |
 | `audit` | Inspection complète projet 3 axes (normes+Zoho+doc) → corrections automatiques | `run_agent(system_prompt=AUDIT_SYSTEM_PROMPT, audit_mode=True)` — pas de `_sanitize`. MAD : pre-load `qdrant_search_leon` (audits passés) + post-store résultat |
+| `design_deploy` | **Machine-to-machine** — applique les tokens Penpot dans un repo GitHub | `asyncio.gather(penpot_generate_spec, penpot_export_design)` via Joseph `/tool` → `_delegate(camille, apply_design_tokens)` → email. Bypass classifier LLM (payload JSON `{"intent":"design_deploy",...}`). Champs requis : `penpot_file_id`, `github_repo`. |
 
 **Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Le LLM ne peut pas ignorer un résultat déjà dans le contexte.
 
@@ -772,7 +774,7 @@ Leon a des **compétences techniques** pour piloter les projets (comprendre une 
 | Meta-calls OWU fast-path | ✅ Code | `### Task:` → fast-path direct |
 | Multi-turn natif (historique complet) | ✅ Code | `run_agent(history=)` |
 | `_delegate()` helper HTTP | ✅ Code | vers Milo/Zephyr/Nora + ConnectError gracieux |
-| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 8 labels (greeting/check_agents/reflection/question/task/review/rag_mission/audit) |
+| Classificateur LLM d'intent (Pattern A) | ✅ Code | `_classify_message_leon()` — 12 labels (greeting/check_agents/reflection/question/task/review/rag_mission/audit/surveiller/milestone_closed/task_done/design_deploy) |
 | Mode REVIEW — orchestration déterministe | ✅ Code | Python lit Notion+normes → LLM génère spec → Python écrit Notion (sans décision LLM) |
 | Auto-dispatch Zoho après REVIEW | ✅ Code | `_find_zoho_project()` matching sémantique + `_zoho_sync()` create/link inline — lien dans la réponse |
 | Anti-hallucination "je ne peux pas accéder à Notion" | ✅ Code | LLM ne voit jamais l'outil notion_update_page — Python l'appelle directement |
