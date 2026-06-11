@@ -324,6 +324,22 @@ Connexion : fichier cible → Assets → Libraries → '_Design System — NeoSa
 
 ### Changelog
 
+**V2.5 (2026-06-11)** — Parité fonctionnelle Penpot / Figma
+
+7 nouveaux outils Penpot (équivalents des outils Figma existants) :
+
+| Outil | Équivalent Figma | Description |
+|---|---|---|
+| `penpot_read_file(file_id)` | `figma_get_file` | Structure complète : pages, frames, couleurs, typographies, composants |
+| `penpot_get_components(file_id)` | `figma_get_components` | Liste composants d'une bibliothèque partagée, groupés par catégorie |
+| `penpot_add_page(file_id, page_name)` | — | Ajoute une page sans reconstruire (non destructif) |
+| `penpot_export_frames(file_id, ...)` | `figma_export_frames` | Export PNG/SVG/PDF (async Penpot job) + fallback metadata |
+| `penpot_to_slides(file_id, title)` | `figma_to_slides` | Penpot → présentation Reveal.js via microservice slides |
+| `penpot_visual_audit(file_id)` | `figma_visual_audit` | Audit LLM : cohérence tokens, typos, breakpoints, score /10 |
+| `penpot_generate_spec(file_id)` | — | Spec développeur Markdown : tokens + typographies + frames (→ Camille/Guillaume) |
+
+**penpot-engine** : 4 nouveaux endpoints : `/file.read`, `/file.add-page`, `/components.list`, `/frames.export`
+
 **V2.4 (2026-06-11)** — Design System aux couleurs réelles du client
 
 - `penpot_build_design_library` : nouveaux paramètres `primary_color`, `dark_color`, `secondary_color` (hex optionnels)
