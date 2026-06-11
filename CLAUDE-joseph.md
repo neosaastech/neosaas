@@ -324,6 +324,15 @@ Connexion : fichier cible → Assets → Libraries → '_Design System — NeoSa
 
 ### Changelog
 
+**V2.4 (2026-06-11)** — Design System aux couleurs réelles du client
+
+- `penpot_build_design_library` : nouveaux paramètres `primary_color`, `dark_color`, `secondary_color` (hex optionnels)
+- Helper `_hex_to_hue_sat()` : extrait teinte+saturation depuis hex → génère la palette Tailwind brand (50→900) depuis la vraie couleur client
+- Helper `_guess_color_name()` : nommage automatique de la palette (red/orange/yellow/green/teal/blue/indigo/purple/pink)
+- Workflow câblé dans system prompt : `penpot_capture_brand` → `primary_color` → `penpot_build_design_library`
+- Message de résultat enrichi : affiche `primaire: #hex (nom)` + secondary + dark si fournis
+- Compatible `existing_file_id` : rebuild en place avec nouvelles couleurs
+
 **V2.3 (2026-06-11)** — Modification fichiers Penpot existants (refresh en place)
 
 - `penpot_find_project(query)` : recherche dans Qdrant `design-knowledge` (source=`penpot-state`) + fallback live API Penpot. Retourne candidats avec `file_id`, `workspace_url`, `page_ids`, date. Routing direct bypass LLM.
