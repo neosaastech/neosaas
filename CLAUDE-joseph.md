@@ -71,6 +71,8 @@ POST /mission { message, context?, session_id? }
 | `penpot_list_files(project_id)` | penpot-engine:8004 | Fichiers d'un projet |
 | `penpot_create_project(name)` | penpot-engine:8004 | Nouveau projet |
 | `penpot_export_design(file_id, format?)` | penpot-engine:8004 | Export tokens CSS/Tailwind depuis un fichier Penpot |
+| `penpot_check_design_library(project_name)` | penpot-engine:8004 | **⭐ RECETTAGE** — Vérifie l'état de la bibliothèque `_Design System` : présence, is-shared, colors>0, typos>0, pages peuplées. Retourne `ok`/`empty`/`missing` + recommandation. |
+| `penpot_build_design_library(project_name, file_name?)` | penpot-engine:8004 | Crée le fichier `_Design System` (is-shared=true) : 64 couleurs (tokens shadcn/ui + palettes Tailwind), 11 typographies Geist, 80 icônes Lucide SVG, composants référence (Button/Input/Badge/Card). |
 | `penpot_capture_full_site(url, project_name, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **⭐ PRINCIPAL** — Capture TOUTES les pages publiques d'un site → **1 fichier `00_Source Import`** avec N pages Penpot (Desktop 1440px + Mobile 375px par page) |
 | `penpot_site_to_shapes(url, project_name, file_name?, max_shapes?)` | crawlee:8009 + penpot-engine:8004 | **DOM capture UNE page** — URL → shapes Penpot éditables 1:1 |
 | `penpot_site_to_wireframe(url, project_name?)` | crawlee:8009 + penpot-engine:8004 | URL → wireframe vectoriel par sections (1 page) |
@@ -234,11 +236,19 @@ penpot_build_structured(
      a. crawlee dom-to-shapes(url, viewport_width)
           → filtre cookie/RGPD, Règle 5 inputs/textarea/select
      b. upload images (<img src>, SVG PNG, background-image)
-     c. construire artboard + shapes (x_offset=0 Desktop, x_offset=1540 Mobile)
-     d. get-file (revn fraîche) + update-file (batch)
+     c. construire shapes plates → _build_shapes_for_viewport()
+     d. _apply_spatial_groups() → rects conteneurs → Penpot groups
+          → filtre : type==rect, aire≥400px², largeur<90% vp_w
+          → tri par aire croissante (groupes précis d'abord)
+          → group.shapes = [container_uid] + members_uids
+          → children.parent-id = group_uuid
+     e. construire artboard, get-file (revn fraîche), update-file (batch)
 
-6. Retourne workspace_url → UN fichier "00_Source Import"
-     avec N pages Penpot, 2 artboards par page
+6. Scaffold automatique : créer 01_UX Flows, 02_Wireframes, 03_UI Screens, 90_Archive
+     si pas déjà présents dans le projet
+
+7. Retourne workspace_url → UN fichier "00_Source Import"
+     avec N pages Penpot, 2 artboards par page, shapes groupées spatialement
 ```
 
 **Paramètres** :
@@ -260,19 +270,94 @@ penpot_capture_full_site(
 }
 ```
 
-### Limitations connues V1 (2026-06-10)
+### `penpot_check_design_library` + `penpot_build_design_library` — Recettage bibliothèque
 
-- Bouton + texte = 2 objets Penpot séparés (pas groupés)
-- Polices custom remplacées par Inter
-- JSON plat (pas de hiérarchie Frames/Groups par section)
+**Principe** : avant tout travail de design production (wireframes, UI Screens), Joseph vérifie que la bibliothèque design est prête. C'est le **pré-vol** — la bibliothèque est le socle commun (couleurs, polices, composants).
+
+```
+penpot_check_design_library(project_name="NeoSaaS Tech v5")
+  │
+  ├── Projet trouvé ?  → NON : status=missing, liste les projets disponibles
+  ├── Fichier _Design System présent ?  → NON : status=missing
+  ├── is-shared=true ?  → NON : status=empty
+  ├── colors > 0 ?      → NON : status=empty
+  ├── typographies > 0 ? → NON : status=empty
+  └── pages peuplées (get-page > 1 objet) ?
+        → OUI sur ≥2 pages : status=ok ✅
+        → NON : status=empty
+```
+
+**Retour `ok`** :
+```
+✅ Bibliothèque '_Design System — NeoSaaS' prête. 64 couleurs · 11 typographies · 4/4 pages peuplées.
+Connexion : fichier cible → Assets → Libraries → '_Design System — NeoSaaS'.
+```
+
+**Retour `missing`/`empty`** :
+```
+❌ Aucun fichier '_Design System' dans 'NeoSaaS Tech'. Fichiers présents : [...].
+→ Lancer : penpot_build_design_library(project_name='NeoSaaS Tech')
+```
+
+**Contenu du `_Design System`** (créé par `penpot_build_design_library`) :
+- **Page Colors** : 64 couleurs (tokens shadcn/ui + palettes Tailwind orange/slate/red/green/blue) — visibles dans Assets panel Penpot
+- **Page Typography** : 11 styles Geist Sans (Display 72px → Caption 11px) — visibles dans Assets panel
+- **Page Icons — Lucide** : 80 icônes SVG 24×24 en grille (arrow, chevron, user, lock, file, mail, settings…)
+- **Page Components** : Button (5 variants), Input (5 états), Badge (4 variants), Card (3 types)
+
+**Routing direct (bypass LLM)** : `penpot_check_design_library` et `penpot_build_design_library` sont interceptés avant le ReAct loop — le nom de l'outil dans le message déclenche l'appel direct à `_execute_tool`. Pas de risque de confusion avec d'autres outils.
+
+**Pré-vol automatique post-capture** : `penpot_capture_full_site` exécute le check en fin de pipeline et retourne `design_library: "ok"|"empty"|"missing"` dans la réponse.
+
+**Appel depuis OWU ou Leon** :
+```
+"penpot_check_design_library project_name='NeoSaaS Tech v5'"
+"penpot_build_design_library project_name='NeoSaaS Tech v5'"
+```
+
+### Limitations connues V2 (2026-06-10)
+
+- Polices custom remplacées par Inter (Google Fonts non chargées en Playwright headless)
+- Groupement spatial basé sur containment géométrique — boutons non cliqués dans un rect large = faux-groupe possible
 - Animations CSS/JS impossibles (Penpot = outil statique)
+- Pages Login/SignUp/Contact peuvent échouer si anti-bot ou CSRF actif
 
-### Roadmap V2 — améliorations planifiées
+### Changelog
 
-**P1** — Groupement spatial post-traitement (Joseph) : détecter texte contenu dans un rect → Penpot Group
-**P2** — SVG outerHTML natif : `el.outerHTML` → `type: svg-raw` Penpot (vs screenshot PNG rasterisé)
-**P3** — DOM récursif : remplacer `querySelectorAll` par parcours arborescent → Frames/Groups par section
-**P4** — Couche LLM sémantique : détecter variants/composants répétés (après P1-P3 stables)
+**V2.3 (2026-06-11)** — Modification fichiers Penpot existants (refresh en place)
+
+- `penpot_find_project(query)` : recherche dans Qdrant `design-knowledge` (source=`penpot-state`) + fallback live API Penpot. Retourne candidats avec `file_id`, `workspace_url`, `page_ids`, date. Routing direct bypass LLM.
+- `_store_penpot_state()` : helper asyncio — stocke l'état d'un fichier dans `design-knowledge` avec `point_id` déterministe `uuid5(NAMESPACE_DNS, "penpot-state:{file_id}")`. Appelé à la fin de `penpot_capture_full_site`, `penpot_build_structured`, `penpot_build_design_library`.
+- `existing_file_id` : paramètre optionnel dans `penpot_build_structured`, `penpot_build_design_library`, `penpot_capture_full_site`. Quand fourni : skip create-project/create-file, add nouvelle page FIRST, delete old pages (règle Penpot ≥1 page), rebuild en place.
+- `penpot-engine` mis à jour : `WireframeBuildReq.existing_file_id` + branche refresh dans `wireframe_build()`.
+- Règle système prompt : `penpot_find_project` → confirmation utilisateur → `existing_file_id` OBLIGATOIRE avant toute modification. Aucun `del-page` sans confirmation explicite.
+
+**V2.2 (2026-06-11)** — Notifications ntfy + comptes agents
+- Helper `_ntfy()` ajouté au niveau module — fire-and-forget via `asyncio.create_task`
+- Notifications automatiques dans 4 handlers : `penpot_capture_full_site`, `penpot_build_structured`, `penpot_check_design_library` (si empty/missing, priorité high), `penpot_build_design_library`
+- Comptes documentés : `joseph@neokube.fr` (Stalwart, password dans Vault `secret/neokube/apps/stalwart`)
+- Vault Stalwart mis à jour : clés `JOSEPH_EMAIL` + `JOSEPH_PASSWORD` ajoutées
+
+**V2.1 (2026-06-11)** — Recettage bibliothèque design
+- `penpot_check_design_library` : diagnostic pré-vol (ok/empty/missing) — routing direct bypass LLM
+- `penpot_build_design_library` : crée `_Design System` (is-shared=true) : 64 couleurs + 11 typos Geist + 80 icônes Lucide + composants référence
+- Pré-vol automatique à la fin de `penpot_capture_full_site` (champ `design_library` dans la réponse)
+- Fix: `file.list` — paramètre `project_id` (underscore) corrigé
+
+**V2 (2026-06-10)** — Spatial grouping actif
+- `_apply_spatial_groups()` : rects conteneurs → Penpot groups (containment 3px tolérance, tri aire croissante)
+- Fix routing : shortcut explicite pour tout outil Penpot nommé dans le message (bypass regex `\bpenpot\b`)
+- Scaffold automatique : 01→03 + 90 créés à la fin de `penpot_capture_full_site`
+- Desktop + Mobile (375px, x_offset=1540) par page
+- Filtre cookie/RGPD + Règle 5 inputs/textarea
+
+**V1 (2026-05-15)** — DOM shapes éditables 1:1, revn synchronisation get-file
+
+### Roadmap V3 — améliorations planifiées
+
+**P1** — SVG outerHTML natif : `el.outerHTML` → `type: svg-raw` Penpot (vs screenshot PNG rasterisé)
+**P2** — DOM récursif : remplacer `querySelectorAll` par parcours arborescent → Frames/Groups par section sémantique (nav, main, footer…)
+**P3** — Couche LLM sémantique : détecter variants/composants répétés (après P2 stable)
 
 ---
 
@@ -308,6 +393,46 @@ penpot_build_structured() → résultat avec workspace_url
 **Règle** : Joseph ne consulte JAMAIS `sre-charlotte-incidents`, `leon-memory`, ou d'autres collections d'agents.
 
 **Script de re-indexation** : `python3 ~/scripts/index_joseph_knowledge.py` — recrée la collection avec les 31 chunks de base (les `joseph-session` sont perdus au flush).
+
+---
+
+## Comptes Joseph
+
+### Email — `joseph@neokube.fr`
+
+Joseph dispose d'un compte mail dédié sur le serveur Stalwart NeoKube.
+
+| Champ | Valeur |
+|---|---|
+| Email | `joseph@neokube.fr` |
+| Password | Vault `secret/neokube/apps/stalwart` → clé `JOSEPH_PASSWORD` |
+| SMTP | `stalwart-mail.stalwart.svc.cluster.local:587` (plaintext, start_tls=False) |
+| Rôle | Envoi de rapports de mission, notifications formelles |
+
+**Comptes agents NeoKube existants** : `no-reply@` · `leon@` · `aria@` · `domi@` · `nox@` · `vera@` · `neo@` · `joseph@` · `admin@neokube.fr`
+
+### Penpot — compte agent
+
+Le penpot-engine utilise le compte admin (`chvandendriessche@neomnia.net`) pour créer les fichiers. Un token dédié `PENPOT_AGENT_TOKEN` est disponible dans Vault `secret/neokube/infrastructure/penpot`. Pour tracer les actions Joseph dans Penpot : configurer le penpot-engine pour utiliser ce token via la variable `PENPOT_ACCESS_TOKEN`.
+
+---
+
+## Notifications ntfy — Actions Joseph
+
+Joseph envoie des notifications push ntfy automatiquement à chaque action significative (sans que l'agent LLM ait besoin de le décider).
+
+**Topic** : `neokube-alerts` · **Tags** : `joseph,penpot`
+
+| Action | Déclencheur | Priorité | Tags |
+|---|---|---|---|
+| Capture full site réussie | `penpot_capture_full_site` success | default | `joseph,penpot,camera` |
+| Wireframes créés | `penpot_build_structured` success | default | `joseph,penpot,art` |
+| Design Library incomplète | `penpot_check_design_library` → empty/missing | **high** | `joseph,penpot,warning` |
+| Design System créé | `penpot_build_design_library` success | default | `joseph,penpot,white_check_mark` |
+
+**Implémentation** : helper `_ntfy(title, msg, tags, priority)` au niveau module — appelé via `asyncio.create_task(_ntfy(...))` dans chaque handler, en parallèle du return. Ne bloque pas la réponse.
+
+Le `notify_leon` reste disponible comme outil LLM (envoi explicite de fin de mission dispatché par Leon).
 
 ---
 
