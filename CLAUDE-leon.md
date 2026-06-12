@@ -410,7 +410,7 @@ async def _classify_message_leon(msg: str, history=None) -> str:
 | `review` | Révision documentaire CDC Notion — LLM génère spec, Python écrit | `run_agent(initial_model=LLM_SECONDARY)` — pas de `_sanitize` |
 | `rag_mission` | Indexation/enrichissement collection Qdrant | Handler dédié `_rag_execute()` |
 | `audit` | Inspection complète projet 3 axes (normes+Zoho+doc) → corrections automatiques | `run_agent(system_prompt=AUDIT_SYSTEM_PROMPT, audit_mode=True)` — pas de `_sanitize`. MAD : pre-load `qdrant_search_leon` (audits passés) + post-store résultat |
-| `design_deploy` | **Machine-to-machine** — applique les tokens Penpot dans un repo GitHub | `asyncio.gather(penpot_generate_spec, penpot_export_design)` via Joseph `/tool` → `_delegate(camille, apply_design_tokens)` → email. Bypass classifier LLM (payload JSON `{"intent":"design_deploy",...}`). Champs requis : `penpot_file_id`, `github_repo`. |
+| `design_deploy` | **Machine-to-machine** — applique les tokens Penpot dans un repo GitHub | `_handle_design_deploy()` — bypass direct LLM dans `/mission` (comme `milestone_closed`). Joseph parallèle (spec + tokens) → `_delegate(camille, apply_design_tokens)` → email. **Ne jamais router vers `generate_pages_from_penpot`** (bug corrigé 2026-06-12). Champs requis : `penpot_file_id`, `github_repo`. |
 
 **Principe clé** (Pattern A) : pour `check_agents`, l'outil est pré-exécuté **avant** le LLM, et le résultat est injecté dans le message. Le LLM ne peut pas ignorer un résultat déjà dans le contexte.
 
