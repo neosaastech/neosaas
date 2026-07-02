@@ -158,8 +158,13 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       echo ""
 
       # ─── SEEDING: Calques de page /features (Pilier C) ───
+      # DATABASE_URL forcée en unpooled : page_layers vient d'être créée dans CETTE
+      # même exécution (Étape 3 ci-dessus) — la connexion poolée (pgbouncer) peut avoir
+      # un cache de schéma pas encore rafraîchi et renvoyer "relation does not exist"
+      # sur une table qui existe pourtant déjà (vu en prod : commit de la migration
+      # confirmé "Applied", puis échec immédiat du seed juste après, deux fois de suite).
       echo "🧱 Initialisation des calques de la page /features..."
-      if retry_with_backoff 2 3 "pnpm seed:page-layers"; then
+      if retry_with_backoff 2 3 "DATABASE_URL=\"$MIGRATION_DATABASE_URL\" pnpm seed:page-layers"; then
         echo "✅ Calques de page initialisés"
       else
         echo "⚠️  Seeding des calques de page échoué (non bloquant — /features garde son fallback statique)"
