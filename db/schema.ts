@@ -1668,3 +1668,19 @@ export type NewLlmUsageLog = typeof llmUsageLogs.$inferInsert
 export type OAuthConnection = typeof oauthConnections.$inferSelect
 export type NewOAuthConnection = typeof oauthConnections.$inferInsert
 
+// =============================================================================
+// RATE LIMITING - Auth abuse protection (login/register/password-reset)
+// =============================================================================
+
+/**
+ * One row per (action, identifier) — e.g. "login:ip:1.2.3.4" or "login:email:x@y.com".
+ * Fixed-window counter: count resets whenever windowStart is older than the window
+ * duration, instead of storing one row per attempt (keeps the table small, no cleanup
+ * job needed). See lib/rate-limit.ts.
+ */
+export const rateLimitAttempts = pgTable("rate_limit_attempts", {
+  identifier: text("identifier").primaryKey(),
+  count: integer("count").notNull().default(1),
+  windowStart: timestamp("window_start").defaultNow().notNull(),
+})
+
