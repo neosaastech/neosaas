@@ -157,22 +157,17 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       fi
       echo ""
 
-      # ─── SEEDING: Calques de page /features (Pilier C) ───
-      # page_layers vient d'être créée dans CETTE même exécution (Étape 3 ci-dessus).
-      # Passer DATABASE_URL en unpooled n'a PAS suffi (vérifié en prod, commit 2aba37f,
-      # échec identique) : ce n'est pas un cache pgbouncer, mais un délai de propagation
-      # sur le proxy HTTP de Neon lui-même — la table existe bien (migration confirmée
-      # "Applied") mais reste invisible quelques secondes à toute nouvelle requête HTTP,
-      # même via la connexion qui a servi à la créer. Backoff long (jusqu'à ~35s) pour
-      # laisser le temps à cette propagation, en plus de l'unpooled (ne peut pas nuire).
-      echo "🧱 Initialisation des calques de la page /features..."
-      sleep 5
-      if retry_with_backoff 4 5 "DATABASE_URL=\"$MIGRATION_DATABASE_URL\" pnpm seed:page-layers"; then
-        echo "✅ Calques de page initialisés"
-      else
-        echo "⚠️  Seeding des calques de page échoué (non bloquant — /features garde son fallback statique)"
-      fi
-      echo ""
+      # ─── SEEDING: Calques de page /features (Pilier C) — désactivé au build ───
+      # Retiré du pipeline automatique après 3 échecs en prod malgré unpooled +
+      # sleep 5 + backoff jusqu'à ~35s (commits 2aba37f, c779f14) : "relation
+      # page_layers does not exist" persiste même 20+ secondes après que
+      # migrate.ts a confirmé "Applied" sur cette même table, via la même
+      # connexion unpooled. Ce n'est donc pas un simple délai de propagation —
+      # cause exacte non identifiée (comportement du proxy HTTP Neon, pas un
+      # bug applicatif). Pas bloquant : /features a un fallback statique
+      # identique tant que la table est vide. Seeding à faire manuellement
+      # après déploiement : `pnpm seed:page-layers` (avec DATABASE_URL réelle),
+      # ou via /admin/pilotage (Pilier E) une fois cette PR mergée.
 
       # Correction des configurations email pour les environnements de prévisualisation/dev
       if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
