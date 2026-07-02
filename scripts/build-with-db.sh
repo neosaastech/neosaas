@@ -163,6 +163,15 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
           npx tsx scripts/fix-email-provider-defaults.ts
           echo "✅ Configurations email corrigées"
           echo ""
+
+          # ─── SEEDING: Compte admin de test (Preview/Dev uniquement — jamais en prod) ───
+          echo "🔐 Initialisation du compte admin de test (Preview/Dev)..."
+          if retry_with_backoff 2 3 "pnpm seed:dev-admin"; then
+            echo "✅ Compte admin de test prêt (admin@exemple.com / admin)"
+          else
+            echo "⚠️  Seeding admin de test échoué (non bloquant)"
+          fi
+          echo ""
       fi
 
     else
