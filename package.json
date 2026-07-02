@@ -17,6 +17,7 @@
     "db:studio": "drizzle-kit studio",
     "dev": "next dev",
     "lint": "eslint .",
+    "lint:layers": "tsx scripts/lint-layers.ts",
     "start": "next start",
     "seed:email-templates": "tsx scripts/seed-email-templates.ts",
     "seed:pages": "tsx scripts/sync-pages.ts",

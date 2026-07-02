@@ -25,6 +25,16 @@
     --ring: 30 61% 50%;
     --radius: 0.5rem;
 
+    /* Radius scale (Pilier G) — --radius reste la source pour Tailwind (borderRadius.lg/md/sm), ces alias sont pour un usage CSS direct hors Tailwind */
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+
+    /* Shadow scale (Pilier G) */
+    --shadow-flat: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-raised: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-floating: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
     /* NeoSaaS Brand Colors - Bronze Scale (Compatible with theme customization) */
     --brand-50: 30 100% 97%;
     --brand-100: 30 96% 92%;
@@ -74,6 +84,11 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 30 61% 55%;
+
+    /* Shadow scale (Pilier G) — dark mode : ombres plus marquées, fond sombre absorbe les ombres légères */
+    --shadow-flat: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-raised: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --shadow-floating: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
 
     /* NeoSaaS Brand Colors - Dark Mode (Better visibility) */
     --brand-50: 30 61% 10%;

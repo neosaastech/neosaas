@@ -96,6 +96,12 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      // Shadow scale (Pilier G — Normes de nommage & design tokens)
+      boxShadow: {
+        flat: "var(--shadow-flat)",
+        raised: "var(--shadow-raised)",
+        floating: "var(--shadow-floating)",
+      },
       // Typography system (uses CSS variables from theme)
       fontFamily: {
         sans: ["var(--font-family)", "system-ui", "sans-serif"],
