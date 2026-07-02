@@ -13,7 +13,10 @@ const IV_LENGTH = 16
 const TAG_LENGTH = 16
 
 function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET || 'default-key-change-in-production'
+  const key = process.env.ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET
+  if (!key) {
+    throw new Error('ENCRYPTION_KEY or NEXTAUTH_SECRET must be set to encrypt/decrypt LLM API keys')
+  }
   return crypto.scryptSync(key, 'salt', KEY_LENGTH)
 }
 

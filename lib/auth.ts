@@ -2,7 +2,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'your-secret-key-here-change-in-production';
+const JWT_SECRET = process.env.NEXTAUTH_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('NEXTAUTH_SECRET is not set — required to sign and verify JWTs');
+}
 const TOKEN_NAME = 'auth-token';
 
 export interface JWTPayload {

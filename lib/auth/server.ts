@@ -2,7 +2,10 @@ import { cookies } from "next/headers"
 import { jwtVerify } from "jose"
 import { redirect } from "next/navigation"
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || "your-secret-key-here-change-in-production"
+const JWT_SECRET = process.env.NEXTAUTH_SECRET
+if (!JWT_SECRET) {
+  throw new Error("NEXTAUTH_SECRET is not set — required to sign and verify JWTs")
+}
 
 export interface AuthUser {
   userId: string

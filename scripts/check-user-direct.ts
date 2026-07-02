@@ -5,7 +5,11 @@
 
 import { neon } from '@neondatabase/serverless';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require&channel_binding=require';
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error("❌ DATABASE_URL is required. Run: DATABASE_URL='...' npx tsx scripts/check-user-direct.ts");
+  process.exit(1);
+}
 
 async function checkUser() {
   try {

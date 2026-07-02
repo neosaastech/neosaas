@@ -6,9 +6,11 @@ import { eq } from "drizzle-orm"
 import { cookies } from "next/headers"
 import { SignJWT } from "jose"
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "your-secret-key-min-32-characters-long"
-)
+const jwtSecretEnv = process.env.JWT_SECRET
+if (!jwtSecretEnv) {
+  throw new Error("JWT_SECRET is not set — required to sign impersonation tokens")
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretEnv)
 
 export async function POST(request: NextRequest) {
   try {
