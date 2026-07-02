@@ -835,6 +835,28 @@ export type PageLayer = typeof pageLayers.$inferSelect
 export type NewPageLayer = typeof pageLayers.$inferInsert
 
 // =============================================================================
+// PILOT ACTIONS LOG - Declarative admin/agent actions (Pilier E — pilotage JSON)
+// =============================================================================
+
+/**
+ * Audit log for POST /api/admin/pilot/apply — every PilotAction batch applied,
+ * by a human admin or an agent (Leon, Charlotte, Claude Code...). See lib/pilot/actions.ts.
+ */
+export const pilotActionsLog = pgTable("pilot_actions_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  actorType: text("actor_type").notNull().default("human"), // 'human' | 'agent'
+  actions: jsonb("actions").notNull(), // full PilotAction[] payload applied
+  result: text("result").notNull(), // 'success' | 'partial' | 'failed'
+  errors: jsonb("errors"),
+  dryRun: boolean("dry_run").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+
+export type PilotActionsLog = typeof pilotActionsLog.$inferSelect
+export type NewPilotActionsLog = typeof pilotActionsLog.$inferInsert
+
+// =============================================================================
 // PLATFORM CONFIGURATION
 // =============================================================================
 
