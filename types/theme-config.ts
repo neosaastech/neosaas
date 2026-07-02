@@ -113,6 +113,11 @@ export interface ThemeConfig {
   
   // Mode
   mode: 'light' | 'dark' | 'auto'
+
+  // Si false, le bouton de bascule clair/sombre (components/common/theme-toggle.tsx)
+  // n'est plus rendu sur le site public — tous les visiteurs restent figés sur `mode`.
+  // Si true (défaut), les visiteurs peuvent changer de mode librement.
+  allowModeToggle?: boolean
   
   // Palettes de couleurs
   light: ColorPalette
@@ -149,6 +154,7 @@ export interface ThemeConfig {
 export const defaultTheme: ThemeConfig = {
   name: 'Default',
   mode: 'light',
+  allowModeToggle: true,
   iconLibrary: 'lucide',
   avatarStyle: 'avataaars',
   fontPairId: 'system',
@@ -218,8 +224,8 @@ export const defaultTheme: ThemeConfig = {
   },
   
   typography: {
-    fontFamily: 'var(--font-sans)',
-    fontFamilyHeading: 'var(--font-sans)',
+    fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+    fontFamilyHeading: 'var(--font-geist-sans), system-ui, sans-serif',
     fontFamilyMono: 'var(--font-mono)',
     fontSize: {
       xs: '0.75rem',
