@@ -3,6 +3,19 @@
  * Système de personnalisation des couleurs et styles du site
  */
 
+/**
+ * Where a heading/body font comes from (module Typographie complet, Pilier D).
+ * - 'system'  : value ignored, system font stack
+ * - 'google'  : value = famille Google Fonts (n'importe laquelle, pas juste GOOGLE_FONTS)
+ * - 'upload'  : value = data URI base64 du fichier de police uploadé
+ * - 'link'    : value = URL directe d'un fichier de police (.woff2/.woff/.ttf)
+ */
+export interface FontSource {
+  type: 'system' | 'google' | 'upload' | 'link'
+  value: string
+  label?: string
+}
+
 export interface ColorPalette {
   // Couleurs principales
   primary: string
@@ -114,9 +127,18 @@ export interface ThemeConfig {
   // Bibliothèque d'icônes active (Pilier D) — voir components/ui/icon.tsx
   iconLibrary?: 'lucide' | 'tabler' | 'heroicons'
 
-  // Paire de polices sélectionnée (Pilier D) — clé dans FONT_PAIRS (lib/theme/font-pairs.ts)
-  // 'custom' si typography.fontFamily/fontFamilyHeading ont été édités à la main
+  // Style d'avatar généré (Pilier D — module Iconographie) — voir lib/theme/avatar.ts
+  avatarStyle?: string
+
+  // Paire de polices "quick preset" sélectionnée (raccourci UI) — clé dans FONT_PAIRS
+  // (lib/theme/font-pairs.ts). 'custom' si heading/bodyFontSource ont été édités à la main.
   fontPairId?: string
+
+  // Source de police pour les titres / le corps de texte (Pilier D — module Typographie
+  // complet) — voir lib/theme/font-source.ts. Pilote typography.fontFamily/fontFamilyHeading
+  // (calculés depuis ces sources), qui restent le canal appliqué en CSS sans changement.
+  headingFontSource?: FontSource
+  bodyFontSource?: FontSource
 
   // Métadonnées
   createdAt?: Date
@@ -128,6 +150,7 @@ export const defaultTheme: ThemeConfig = {
   name: 'Default',
   mode: 'light',
   iconLibrary: 'lucide',
+  avatarStyle: 'avataaars',
   fontPairId: 'system',
 
   light: {

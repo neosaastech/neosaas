@@ -12,6 +12,7 @@ import { themeFontVariables } from "@/lib/theme/fonts"
 import { getPlatformConfig } from "@/lib/config"
 import { getThemeConfig } from "@/app/actions/theme-config"
 import { generateThemeCSS } from "@/lib/theme/generate-css"
+import { getGoogleFontsLinkHref } from "@/lib/theme/font-source"
 
 export async function generateMetadata() {
   try {
@@ -60,6 +61,7 @@ export default async function RootLayout({
 }) {
   const config = await getPlatformConfig()
   const themeConfig = await getThemeConfig()
+  const googleFontsHref = getGoogleFontsLinkHref(themeConfig.headingFontSource, themeConfig.bodyFontSource)
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -67,6 +69,7 @@ export default async function RootLayout({
         {config.customHeaderCode && (
           <div dangerouslySetInnerHTML={{ __html: config.customHeaderCode }} />
         )}
+        {googleFontsHref && <link rel="stylesheet" href={googleFontsHref} />}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />
       </head>
       <body className={`${GeistSans.className} ${themeFontVariables}`}>
