@@ -21,6 +21,9 @@ import { defaultTheme } from '@/types/theme-config'
 import { updateThemeConfig, resetThemeConfig, getThemeConfig } from '@/app/actions/theme-config'
 import { Icon, ICON_LIBRARIES, ICON_LIBRARY_LABELS, type IconLibrary } from '@/components/ui/icon'
 import { FONT_PAIRS, getFontPair } from '@/lib/theme/font-pairs'
+import { FontSourcePicker } from '@/components/admin/font-source-picker'
+import { resolveFontFamily } from '@/lib/theme/font-source'
+import { DICEBEAR_STYLES, DEFAULT_DICEBEAR_STYLE, getAvatarUrl } from '@/lib/theme/avatar'
 
 const ICON_PREVIEW_NAMES = ['home', 'user', 'settings', 'check', 'close']
 
@@ -194,6 +197,11 @@ export function ThemeSettings() {
     setTheme(prev => ({
       ...prev,
       fontPairId,
+      // Presets use the next/font pipeline (Pilier D v1), not the Google Fonts /
+      // upload / link sources below — clear those so the pickers show "System"
+      // rather than a stale source that no longer matches the applied font.
+      headingFontSource: undefined,
+      bodyFontSource: undefined,
       typography: {
         ...prev.typography,
         fontFamily: pair.fontFamily,
@@ -277,15 +285,15 @@ export function ThemeSettings() {
         </CardContent>
       </Card>
 
-      {/* Icons & Typography (Pilier D) */}
+      {/* Icons & Avatars (Pilier D) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Type className="h-5 w-5" />
-            Icons & Typography
+            Icons & Avatars
           </CardTitle>
           <CardDescription>
-            Choose the icon set and font pair used across the platform
+            Icon set for UI glyphs, avatar style for generated user/company avatars
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -319,37 +327,100 @@ export function ThemeSettings() {
           </div>
 
           <div className="space-y-2">
-            <Label>Font Pair</Label>
-            <Select value={theme.fontPairId ?? 'system'} onValueChange={updateFontPair}>
+            <Label>Avatar Style (DiceBear)</Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Generated per-user avatar fallback (identicon-style), not semantic UI icons.
+            </p>
+            <Select
+              value={theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE}
+              onValueChange={(style) => setTheme((prev) => ({ ...prev, avatarStyle: style }))}
+            >
               <SelectTrigger className="w-full md:w-64">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FONT_PAIRS.map((pair) => (
-                  <SelectItem key={pair.id} value={pair.id}>
-                    {pair.label}
+                {DICEBEAR_STYLES.map((style) => (
+                  <SelectItem key={style.id} value={style.id}>
+                    {style.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <div className="p-4 bg-muted rounded-lg space-y-1">
-              <p
-                className="text-xl font-semibold"
-                style={{ fontFamily: getFontPair(theme.fontPairId).fontFamilyHeading }}
-              >
-                Heading preview
-              </p>
-              <p
-                className="text-sm text-muted-foreground"
-                style={{ fontFamily: getFontPair(theme.fontPairId).fontFamily }}
-              >
-                Body text preview — the quick brown fox jumps over the lazy dog.
-              </p>
+            <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+              {['Alex', 'Sam', 'Jordan', 'Taylor'].map((seed) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={seed}
+                  src={getAvatarUrl(seed, theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE)}
+                  alt={seed}
+                  className="h-10 w-10 rounded-full bg-background"
+                />
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
       </div>
+
+      {/* Typography (Pilier D) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Type className="h-5 w-5" />
+            Typography
+          </CardTitle>
+          <CardDescription>
+            Heading and body fonts — Google Fonts, your own font file, or a direct link
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Quick presets</Label>
+            <div className="flex flex-wrap gap-2">
+              {FONT_PAIRS.map((pair) => (
+                <Button
+                  key={pair.id}
+                  type="button"
+                  variant={theme.fontPairId === pair.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => updateFontPair(pair.id)}
+                >
+                  {pair.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t">
+            <FontSourcePicker
+              label="Heading font"
+              role="heading"
+              value={theme.headingFontSource}
+              onChange={(source) =>
+                setTheme((prev) => ({
+                  ...prev,
+                  fontPairId: 'custom',
+                  headingFontSource: source,
+                  typography: { ...prev.typography, fontFamilyHeading: resolveFontFamily(source, 'heading') },
+                }))
+              }
+            />
+            <FontSourcePicker
+              label="Body font"
+              role="body"
+              value={theme.bodyFontSource}
+              onChange={(source) =>
+                setTheme((prev) => ({
+                  ...prev,
+                  fontPairId: 'custom',
+                  bodyFontSource: source,
+                  typography: { ...prev.typography, fontFamily: resolveFontFamily(source, 'body') },
+                }))
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Color Palettes */}
       <Card>

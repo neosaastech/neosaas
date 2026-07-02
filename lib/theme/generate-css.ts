@@ -5,11 +5,18 @@
  */
 
 import type { ThemeConfig } from '@/types/theme-config'
+import { getFontFaceCSS } from './font-source'
 
 /**
  * Générer le CSS du thème pour le SSR
  */
 export function generateThemeCSS(theme: ThemeConfig): string {
+  const fontFaces = [
+    getFontFaceCSS(theme.headingFontSource, 'heading'),
+    getFontFaceCSS(theme.bodyFontSource, 'body'),
+  ]
+    .filter(Boolean)
+    .join('\n  ')
   const lightColors = Object.entries(theme.light)
     .map(([key, value]) => {
       const cssVar = `--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`
@@ -53,6 +60,8 @@ export function generateThemeCSS(theme: ThemeConfig): string {
     : ''
 
   return `
+  ${fontFaces}
+
   :root {
     ${lightColors}
     ${typography}
