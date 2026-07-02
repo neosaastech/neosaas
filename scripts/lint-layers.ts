@@ -1,6 +1,6 @@
 /**
  * Enforces the Pilier G naming convention on lib/layers/registry.ts:
- * - layerType is kebab-case `{domaine}-{élément}`, no duplicates
+ * - layerType (registry key) is kebab-case `{domaine}-{élément}`
  * - propsSchema never uses a forbidden synonym of an already-named concept
  * - ctaLabel / ctaHref are always declared together, never alone
  *
@@ -22,27 +22,22 @@ function fail(message: string) {
 console.log("🔍 lint:layers — vérification de lib/layers/registry.ts")
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-if (layerRegistry.length === 0) {
-  console.log("  ℹ️  Registre vide — rien à vérifier (Pilier C pas encore démarré)")
+const entries = Object.entries(layerRegistry)
+
+if (entries.length === 0) {
+  console.log("  ℹ️  Registre vide — rien à vérifier")
 } else {
-  const seen = new Set<string>()
-
-  for (const layer of layerRegistry) {
-    if (!KEBAB_DOMAIN_ELEMENT.test(layer.layerType)) {
-      fail(`"${layer.layerType}" : layerType doit être en kebab-case (ex: "pricing-table")`)
+  for (const [layerType, layer] of entries) {
+    if (!KEBAB_DOMAIN_ELEMENT.test(layerType)) {
+      fail(`"${layerType}" : layerType doit être en kebab-case (ex: "pricing-table")`)
     }
-
-    if (seen.has(layer.layerType)) {
-      fail(`"${layer.layerType}" : layerType dupliqué dans le registre`)
-    }
-    seen.add(layer.layerType)
 
     const propNames = Object.keys(layer.propsSchema.shape)
 
     for (const propName of propNames) {
       const canonical = FORBIDDEN_PROP_SYNONYMS[propName]
       if (canonical) {
-        fail(`"${layer.layerType}".${propName} : nom interdit, utiliser "${canonical}" à la place`)
+        fail(`"${layerType}".${propName} : nom interdit, utiliser "${canonical}" à la place`)
       }
     }
 
@@ -50,13 +45,13 @@ if (layerRegistry.length === 0) {
       const hasA = propNames.includes(a)
       const hasB = propNames.includes(b)
       if (hasA !== hasB) {
-        fail(`"${layer.layerType}" : "${hasA ? a : b}" déclaré sans son binôme requis "${hasA ? b : a}"`)
+        fail(`"${layerType}" : "${hasA ? a : b}" déclaré sans son binôme requis "${hasA ? b : a}"`)
       }
     }
   }
 
   if (errors === 0) {
-    console.log(`  ✓ ${layerRegistry.length} calque(s) conformes à la convention`)
+    console.log(`  ✓ ${entries.length} calque(s) conformes à la convention`)
   }
 }
 
