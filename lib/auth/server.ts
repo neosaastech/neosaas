@@ -2,9 +2,12 @@ import { cookies } from "next/headers"
 import { jwtVerify } from "jose"
 import { redirect } from "next/navigation"
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET
-if (!JWT_SECRET) {
-  throw new Error("NEXTAUTH_SECRET is not set — required to sign and verify JWTs")
+function getJwtSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) {
+    throw new Error("NEXTAUTH_SECRET is not set — required to sign and verify JWTs")
+  }
+  return secret
 }
 
 export interface AuthUser {
@@ -28,7 +31,7 @@ export async function verifyAuth(): Promise<AuthUser | null> {
   }
 
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET)
+    const secret = new TextEncoder().encode(getJwtSecret())
     const { payload } = await jwtVerify(token, secret)
     return payload as AuthUser
   } catch (error) {

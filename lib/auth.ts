@@ -2,10 +2,14 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('NEXTAUTH_SECRET is not set — required to sign and verify JWTs');
+function getJwtSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET is not set — required to sign and verify JWTs');
+  }
+  return secret;
 }
+
 const TOKEN_NAME = 'auth-token';
 
 export interface JWTPayload {
@@ -34,7 +38,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Create a JWT token
  */
 export function createToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJwtSecret(), {
     expiresIn: '7d', // Token expires in 7 days
   });
 }
@@ -44,7 +48,7 @@ export function createToken(payload: JWTPayload): string {
  */
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, getJwtSecret()) as JWTPayload;
   } catch (error) {
     return null;
   }
