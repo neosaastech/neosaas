@@ -11,9 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2, Palette, RefreshCw, Sun, Moon, Monitor, Type } from 'lucide-react'
+import { Loader2, Palette, RefreshCw, Sun, Moon, Type } from 'lucide-react'
 import type { ThemeConfig, ColorPalette } from '@/types/theme-config'
 import { defaultTheme } from '@/types/theme-config'
 import { updateThemeConfig, resetThemeConfig, getThemeConfig } from '@/app/actions/theme-config'
@@ -240,6 +241,7 @@ export function ThemeSettings() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
       {/* Theme Mode */}
       <Card>
         <CardHeader>
@@ -251,36 +253,22 @@ export function ThemeSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Select
-            value={theme.mode}
-            onValueChange={(value: 'light' | 'dark' | 'auto') =>
-              setTheme(prev => ({ ...prev, mode: value }))
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">
-                <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4" />
-                  Light
-                </div>
-              </SelectItem>
-              <SelectItem value="dark">
-                <div className="flex items-center gap-2">
-                  <Moon className="h-4 w-4" />
-                  Dark
-                </div>
-              </SelectItem>
-              <SelectItem value="auto">
-                <div className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  Auto
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+            <div className="flex items-center gap-2">
+              <Sun className={`h-4 w-4 ${theme.mode === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
+              <span className="text-sm font-medium">Light</span>
+            </div>
+            <Switch
+              checked={theme.mode === 'dark'}
+              onCheckedChange={(checked) =>
+                setTheme(prev => ({ ...prev, mode: checked ? 'dark' : 'light' }))
+              }
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Dark</span>
+              <Moon className={`h-4 w-4 ${theme.mode === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -356,6 +344,7 @@ export function ThemeSettings() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Color Palettes */}
       <Card>
