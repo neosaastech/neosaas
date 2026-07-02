@@ -12,16 +12,22 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import type { FontSource } from "@/types/theme-config"
 import { GOOGLE_FONTS } from "@/lib/theme/google-fonts"
-import { resolveFontFamily } from "@/lib/theme/font-source"
 
 interface FontSourcePickerProps {
   label: string
   role: "heading" | "body"
   value: FontSource | undefined
   onChange: (source: FontSource) => void
+  /**
+   * The font-family currently applied (theme.typography.fontFamily/fontFamilyHeading).
+   * Distinct from `value`: a quick preset (Inter, Poppins+Inter...) sets this without
+   * going through a FontSource at all, so the preview must reflect the theme's actual
+   * active font, not just this picker's own google/upload/link selection.
+   */
+  activeFontFamily: string
 }
 
-export function FontSourcePicker({ label, role, value, onChange }: FontSourcePickerProps) {
+export function FontSourcePicker({ label, role, value, onChange, activeFontFamily }: FontSourcePickerProps) {
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [customFamily, setCustomFamily] = useState("")
   const [linkUrl, setLinkUrl] = useState(value?.type === "link" ? value.value : "")
@@ -155,7 +161,7 @@ export function FontSourcePicker({ label, role, value, onChange }: FontSourcePic
 
       <p
         className="text-lg pt-1"
-        style={{ fontFamily: resolveFontFamily(value, role) }}
+        style={{ fontFamily: activeFontFamily }}
       >
         {role === "heading" ? "Heading preview — Aa" : "Body text preview — the quick brown fox"}
       </p>

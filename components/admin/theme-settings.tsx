@@ -416,6 +416,7 @@ export function ThemeSettings() {
               label="Heading font"
               role="heading"
               value={theme.headingFontSource}
+              activeFontFamily={theme.typography.fontFamilyHeading}
               onChange={(source) =>
                 setTheme((prev) => ({
                   ...prev,
@@ -429,6 +430,7 @@ export function ThemeSettings() {
               label="Body font"
               role="body"
               value={theme.bodyFontSource}
+              activeFontFamily={theme.typography.fontFamily}
               onChange={(source) =>
                 setTheme((prev) => ({
                   ...prev,
