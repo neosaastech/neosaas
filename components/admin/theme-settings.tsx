@@ -259,27 +259,47 @@ export function ThemeSettings() {
             Display Mode
           </CardTitle>
           <CardDescription>
-            Choose the default display mode
+            Default mode, and whether visitors can switch it themselves
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-            <div className="flex items-center gap-2">
-              <Sun className={`h-4 w-4 ${theme.mode === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
-              <span className="text-sm font-medium">Light</span>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Default mode</Label>
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-2">
+                <Sun className={`h-4 w-4 ${theme.mode === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                <span className="text-sm font-medium">Light</span>
+              </div>
+              <Switch
+                checked={theme.mode === 'dark'}
+                onCheckedChange={(checked) => {
+                  const mode = checked ? 'dark' : 'light'
+                  setTheme(prev => ({ ...prev, mode }))
+                  // Preview only, applied on Save: the live public switch is
+                  // the site's own toggle (components/common/theme-toggle.tsx),
+                  // this control isn't a second one.
+                  setResolvedTheme(mode)
+                }}
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Dark</span>
+                <Moon className={`h-4 w-4 ${theme.mode === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
+              </div>
             </div>
-            <Switch
-              checked={theme.mode === 'dark'}
-              onCheckedChange={(checked) => {
-                const mode = checked ? 'dark' : 'light'
-                setTheme(prev => ({ ...prev, mode }))
-                // Bascule visible immédiatement, pas seulement après Save + reload
-                setResolvedTheme(mode)
-              }}
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Dark</span>
-              <Moon className={`h-4 w-4 ${theme.mode === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div>
+                <Label className="text-sm font-medium">Allow visitors to switch mode</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When off, the light/dark toggle is hidden site-wide and everyone stays on the default mode above.
+                </p>
+              </div>
+              <Switch
+                checked={theme.allowModeToggle ?? true}
+                onCheckedChange={(checked) => setTheme(prev => ({ ...prev, allowModeToggle: checked }))}
+              />
             </div>
           </div>
         </CardContent>

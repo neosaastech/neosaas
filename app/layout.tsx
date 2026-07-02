@@ -64,7 +64,7 @@ export default async function RootLayout({
   const googleFontsHref = getGoogleFontsLinkHref(themeConfig.headingFontSource, themeConfig.bodyFontSource)
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${themeFontVariables}`}>
       <head>
         {config.customHeaderCode && (
           <div dangerouslySetInnerHTML={{ __html: config.customHeaderCode }} />
@@ -72,7 +72,7 @@ export default async function RootLayout({
         {googleFontsHref && <link rel="stylesheet" href={googleFontsHref} />}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />
       </head>
-      <body className={`${GeistSans.className} ${themeFontVariables}`}>
+      <body className="font-sans">
         {config.gtmCode && (
           <noscript>
             <iframe
