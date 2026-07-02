@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/db"
 import { products } from "@/db/schema"
 import { eq } from "drizzle-orm"
+import { isObjectStorageConfigured, uploadObject, deleteObject, getPublicUrl } from "@/lib/storage/object-storage"
 
 /**
  * POST /api/products/image
@@ -67,7 +68,17 @@ export async function POST(request: NextRequest) {
 </svg>`.trim()
 
     const svgBuffer = Buffer.from(svgContent)
-    const imageUrl = `data:image/svg+xml;base64,${svgBuffer.toString('base64')}`
+
+    // Object storage is optional (see lib/storage/object-storage.ts) — when a bucket
+    // is configured (SCW_* env vars), upload the SVG there instead of inlining it as
+    // a base64 data URI in Postgres. Falls back to the original behavior otherwise.
+    let imageUrl: string
+    if (isObjectStorageConfigured()) {
+      const key = `products/${productId}/${Date.now()}.svg`
+      imageUrl = await uploadObject(key, svgBuffer, "image/svg+xml")
+    } else {
+      imageUrl = `data:image/svg+xml;base64,${svgBuffer.toString('base64')}`
+    }
 
     // Update product in database with SVG-wrapped image
     await db
@@ -108,10 +119,29 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // If the current image lives in object storage, delete it there too
+    if (isObjectStorageConfigured()) {
+      const [product] = await db
+        .select({ imageUrl: products.imageUrl })
+        .from(products)
+        .where(eq(products.id, productId))
+
+      const bucketUrl = product?.imageUrl
+      if (bucketUrl && bucketUrl.startsWith("http")) {
+        const publicUrlPrefix = getPublicUrl("")
+        if (publicUrlPrefix && bucketUrl.startsWith(publicUrlPrefix)) {
+          const key = bucketUrl.slice(publicUrlPrefix.length)
+          await deleteObject(key).catch((err) =>
+            console.error("[API] Failed to delete object from storage:", err)
+          )
+        }
+      }
+    }
+
     // Update product to remove image
     await db
       .update(products)
-      .set({ 
+      .set({
         imageUrl: null,
         updatedAt: new Date()
       })
