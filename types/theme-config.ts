@@ -110,7 +110,14 @@ export interface ThemeConfig {
   
   // Espacement et bordures
   spacing: SpacingConfig
-  
+
+  // Bibliothèque d'icônes active (Pilier D) — voir components/ui/icon.tsx
+  iconLibrary?: 'lucide' | 'tabler' | 'heroicons'
+
+  // Paire de polices sélectionnée (Pilier D) — clé dans FONT_PAIRS (lib/theme/font-pairs.ts)
+  // 'custom' si typography.fontFamily/fontFamilyHeading ont été édités à la main
+  fontPairId?: string
+
   // Métadonnées
   createdAt?: Date
   updatedAt?: Date
@@ -120,6 +127,8 @@ export interface ThemeConfig {
 export const defaultTheme: ThemeConfig = {
   name: 'Default',
   mode: 'light',
+  iconLibrary: 'lucide',
+  fontPairId: 'system',
 
   light: {
     // Primary - Bronze/copper color (NeoSaaS brand)
