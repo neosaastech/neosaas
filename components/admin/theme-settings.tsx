@@ -6,6 +6,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -115,6 +116,7 @@ export function ThemeSettings() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<ThemeConfig>(defaultTheme)
+  const { setTheme: setResolvedTheme } = useTheme()
 
   // Load the configuration
   useEffect(() => {
@@ -260,9 +262,12 @@ export function ThemeSettings() {
             </div>
             <Switch
               checked={theme.mode === 'dark'}
-              onCheckedChange={(checked) =>
-                setTheme(prev => ({ ...prev, mode: checked ? 'dark' : 'light' }))
-              }
+              onCheckedChange={(checked) => {
+                const mode = checked ? 'dark' : 'light'
+                setTheme(prev => ({ ...prev, mode }))
+                // Bascule visible immédiatement, pas seulement après Save + reload
+                setResolvedTheme(mode)
+              }}
             />
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Dark</span>
