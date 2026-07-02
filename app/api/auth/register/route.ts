@@ -6,6 +6,9 @@ import { eq, or } from "drizzle-orm"
 import { emailRouter, emailTemplateRepository } from "@/lib/email"
 import { randomBytes } from "crypto"
 import { getPlatformConfig } from "@/lib/config"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+
+const REGISTER_RATE_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 }; // 5 accounts / hour / IP
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +20,15 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error("[v0] Database URL validation failed:", dbError)
       return NextResponse.json({ error: "Database configuration error. Please contact support." }, { status: 500 })
+    }
+
+    const ip = getClientIp(request.headers)
+    const ipLimit = await checkRateLimit(`register:ip:${ip}`, REGISTER_RATE_LIMIT)
+    if (!ipLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many registration attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(ipLimit.retryAfterSeconds ?? 0) } }
+      )
     }
 
     const body = await request.json()

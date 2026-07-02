@@ -4,6 +4,9 @@ import { users, userRoles, roles, rolePermissions, permissions } from '@/db/sche
 import { verifyPassword, createToken, setAuthCookie } from '@/lib/auth';
 import { eq, or } from 'drizzle-orm';
 import { logSystemEvent } from '@/app/actions/logs';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+
+const LOGIN_RATE_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 }; // 5 attempts / 15 min
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +19,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
+      );
+    }
+
+    // Rate limit by IP (stops flooding from one source) and by email (stops
+    // targeted brute-force even from rotating IPs) — either limit can trip.
+    const ip = getClientIp(request.headers);
+    const [ipLimit, emailLimit] = await Promise.all([
+      checkRateLimit(`login:ip:${ip}`, LOGIN_RATE_LIMIT),
+      checkRateLimit(`login:email:${email}`, LOGIN_RATE_LIMIT),
+    ]);
+    if (!ipLimit.allowed || !emailLimit.allowed) {
+      const retryAfterSeconds = Math.max(ipLimit.retryAfterSeconds ?? 0, emailLimit.retryAfterSeconds ?? 0);
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
       );
     }
 

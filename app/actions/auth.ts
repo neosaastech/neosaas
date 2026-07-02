@@ -7,12 +7,28 @@ import { emailTemplateRepository, emailRouter } from '@/lib/email';
 import { createToken, verifyToken, hashPassword } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { notifyAdminClientAction } from '@/lib/notifications/admin-notifications';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+
+const RECOVER_PASSWORD_RATE_LIMIT = { max: 3, windowMs: 60 * 60 * 1000 }; // 3 / hour
 
 export async function recoverPassword(formData: FormData) {
   const email = formData.get('email') as string;
-  
+
   if (!email) {
     return { error: 'Email is required' };
+  }
+
+  const headersList = await headers();
+  const ip = getClientIp(headersList);
+  const [ipLimit, emailLimit] = await Promise.all([
+    checkRateLimit(`recover-password:ip:${ip}`, RECOVER_PASSWORD_RATE_LIMIT),
+    checkRateLimit(`recover-password:email:${email}`, RECOVER_PASSWORD_RATE_LIMIT),
+  ]);
+  if (!ipLimit.allowed || !emailLimit.allowed) {
+    // Same non-revealing framing as the "user not found" branch below —
+    // an attacker probing for valid emails shouldn't see a different
+    // response shape once rate limited.
+    return { success: true, message: 'If an account exists with this email, you will receive a password reset link.' };
   }
 
   try {
