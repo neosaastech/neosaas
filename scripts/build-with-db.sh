@@ -158,13 +158,16 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       echo ""
 
       # ─── SEEDING: Calques de page /features (Pilier C) ───
-      # DATABASE_URL forcée en unpooled : page_layers vient d'être créée dans CETTE
-      # même exécution (Étape 3 ci-dessus) — la connexion poolée (pgbouncer) peut avoir
-      # un cache de schéma pas encore rafraîchi et renvoyer "relation does not exist"
-      # sur une table qui existe pourtant déjà (vu en prod : commit de la migration
-      # confirmé "Applied", puis échec immédiat du seed juste après, deux fois de suite).
+      # page_layers vient d'être créée dans CETTE même exécution (Étape 3 ci-dessus).
+      # Passer DATABASE_URL en unpooled n'a PAS suffi (vérifié en prod, commit 2aba37f,
+      # échec identique) : ce n'est pas un cache pgbouncer, mais un délai de propagation
+      # sur le proxy HTTP de Neon lui-même — la table existe bien (migration confirmée
+      # "Applied") mais reste invisible quelques secondes à toute nouvelle requête HTTP,
+      # même via la connexion qui a servi à la créer. Backoff long (jusqu'à ~35s) pour
+      # laisser le temps à cette propagation, en plus de l'unpooled (ne peut pas nuire).
       echo "🧱 Initialisation des calques de la page /features..."
-      if retry_with_backoff 2 3 "DATABASE_URL=\"$MIGRATION_DATABASE_URL\" pnpm seed:page-layers"; then
+      sleep 5
+      if retry_with_backoff 4 5 "DATABASE_URL=\"$MIGRATION_DATABASE_URL\" pnpm seed:page-layers"; then
         echo "✅ Calques de page initialisés"
       else
         echo "⚠️  Seeding des calques de page échoué (non bloquant — /features garde son fallback statique)"
