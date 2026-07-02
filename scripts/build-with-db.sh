@@ -157,6 +157,15 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       fi
       echo ""
 
+      # ─── SEEDING: Calques de page /features (Pilier C) ───
+      echo "🧱 Initialisation des calques de la page /features..."
+      if retry_with_backoff 2 3 "pnpm seed:page-layers"; then
+        echo "✅ Calques de page initialisés"
+      else
+        echo "⚠️  Seeding des calques de page échoué (non bloquant — /features garde son fallback statique)"
+      fi
+      echo ""
+
       # Correction des configurations email pour les environnements de prévisualisation/dev
       if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
           echo "🔧 Correction des configurations email (Preview/Dev)..."

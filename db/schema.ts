@@ -812,6 +812,29 @@ export const pagePermissions = pgTable("page_permissions", {
 })
 
 // =============================================================================
+// PAGE LAYERS - Composable content blocks (Pilier C — page builder)
+// =============================================================================
+
+/**
+ * Page Layers - ordered content blocks composing a public page.
+ * layerType must match a key in lib/layers/registry.ts. props are validated
+ * against that layer's Zod schema at render time (see app/(public)/features/page.tsx).
+ */
+export const pageLayers = pgTable("page_layers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pagePath: text("page_path").notNull(), // e.g. "/features" — not unique, multiple layers per page
+  position: integer("position").notNull(), // display order within pagePath
+  layerType: text("layer_type").notNull(), // key in lib/layers/registry.ts
+  props: jsonb("props").notNull().default({}),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export type PageLayer = typeof pageLayers.$inferSelect
+export type NewPageLayer = typeof pageLayers.$inferInsert
+
+// =============================================================================
 // PLATFORM CONFIGURATION
 // =============================================================================
 
