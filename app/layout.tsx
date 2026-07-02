@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner"
 import "@/styles/globals.css"
 
 import { GeistSans } from 'geist/font/sans'
+import { themeFontVariables } from "@/lib/theme/fonts"
 import { getPlatformConfig } from "@/lib/config"
 import { getThemeConfig } from "@/app/actions/theme-config"
 import { generateThemeCSS } from "@/lib/theme/generate-css"
@@ -68,7 +69,7 @@ export default async function RootLayout({
         )}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />
       </head>
-      <body className={GeistSans.className}>
+      <body className={`${GeistSans.className} ${themeFontVariables}`}>
         {config.gtmCode && (
           <noscript>
             <iframe

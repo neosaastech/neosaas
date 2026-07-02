@@ -11,12 +11,17 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2, Palette, RefreshCw, Sun, Moon, Monitor } from 'lucide-react'
+import { Loader2, Palette, RefreshCw, Sun, Moon, Type } from 'lucide-react'
 import type { ThemeConfig, ColorPalette } from '@/types/theme-config'
 import { defaultTheme } from '@/types/theme-config'
 import { updateThemeConfig, resetThemeConfig, getThemeConfig } from '@/app/actions/theme-config'
+import { Icon, ICON_LIBRARIES, ICON_LIBRARY_LABELS, type IconLibrary } from '@/components/ui/icon'
+import { FONT_PAIRS, getFontPair } from '@/lib/theme/font-pairs'
+
+const ICON_PREVIEW_NAMES = ['home', 'user', 'settings', 'check', 'close']
 
 interface ColorInputProps {
   label: string
@@ -178,6 +183,23 @@ export function ThemeSettings() {
     }))
   }
 
+  const updateIconLibrary = (library: IconLibrary) => {
+    setTheme(prev => ({ ...prev, iconLibrary: library }))
+  }
+
+  const updateFontPair = (fontPairId: string) => {
+    const pair = getFontPair(fontPairId)
+    setTheme(prev => ({
+      ...prev,
+      fontPairId,
+      typography: {
+        ...prev.typography,
+        fontFamily: pair.fontFamily,
+        fontFamilyHeading: pair.fontFamilyHeading,
+      },
+    }))
+  }
+
   if (loading) {
     return (
       <Card>
@@ -219,6 +241,7 @@ export function ThemeSettings() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
       {/* Theme Mode */}
       <Card>
         <CardHeader>
@@ -230,38 +253,98 @@ export function ThemeSettings() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Select
-            value={theme.mode}
-            onValueChange={(value: 'light' | 'dark' | 'auto') =>
-              setTheme(prev => ({ ...prev, mode: value }))
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">
-                <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4" />
-                  Light
-                </div>
-              </SelectItem>
-              <SelectItem value="dark">
-                <div className="flex items-center gap-2">
-                  <Moon className="h-4 w-4" />
-                  Dark
-                </div>
-              </SelectItem>
-              <SelectItem value="auto">
-                <div className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  Auto
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+            <div className="flex items-center gap-2">
+              <Sun className={`h-4 w-4 ${theme.mode === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
+              <span className="text-sm font-medium">Light</span>
+            </div>
+            <Switch
+              checked={theme.mode === 'dark'}
+              onCheckedChange={(checked) =>
+                setTheme(prev => ({ ...prev, mode: checked ? 'dark' : 'light' }))
+              }
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Dark</span>
+              <Moon className={`h-4 w-4 ${theme.mode === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Icons & Typography (Pilier D) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Type className="h-5 w-5" />
+            Icons & Typography
+          </CardTitle>
+          <CardDescription>
+            Choose the icon set and font pair used across the platform
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label>Icon Library</Label>
+            <Select
+              value={theme.iconLibrary ?? 'lucide'}
+              onValueChange={(value: IconLibrary) => updateIconLibrary(value)}
+            >
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ICON_LIBRARIES.map((library) => (
+                  <SelectItem key={library} value={library}>
+                    {ICON_LIBRARY_LABELS[library]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+              {ICON_PREVIEW_NAMES.map((name) => (
+                <Icon
+                  key={name}
+                  name={name}
+                  library={theme.iconLibrary ?? 'lucide'}
+                  className="h-6 w-6 text-foreground"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Font Pair</Label>
+            <Select value={theme.fontPairId ?? 'system'} onValueChange={updateFontPair}>
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_PAIRS.map((pair) => (
+                  <SelectItem key={pair.id} value={pair.id}>
+                    {pair.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="p-4 bg-muted rounded-lg space-y-1">
+              <p
+                className="text-xl font-semibold"
+                style={{ fontFamily: getFontPair(theme.fontPairId).fontFamilyHeading }}
+              >
+                Heading preview
+              </p>
+              <p
+                className="text-sm text-muted-foreground"
+                style={{ fontFamily: getFontPair(theme.fontPairId).fontFamily }}
+              >
+                Body text preview — the quick brown fox jumps over the lazy dog.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      </div>
 
       {/* Color Palettes */}
       <Card>
