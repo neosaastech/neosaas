@@ -4,11 +4,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Mail, MapPin, Phone, Globe, ArrowLeft } from "lucide-react"
 
-export default function ContactPage() {
+export default async function ContactPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="container py-12 md:py-16">
       <div className="mb-8">
-        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <Link href={`/${locale}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Home
         </Link>

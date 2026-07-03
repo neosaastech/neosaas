@@ -11,7 +11,8 @@ export const metadata = {
   keywords: ["documentation", "docs", "guide", "tutorial", "API", "installation"],
 }
 
-export default function DocsPage() {
+export default async function DocsPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -289,7 +290,7 @@ export default function DocsPage() {
             Follow our installation guide to set up NeoSaaS in your Next.js project.
           </p>
         </div>
-        <Link href="/docs/installation">
+        <Link href={`/${locale}/docs/installation`}>
           <Button variant="outline" className="border-brand text-brand hover:bg-brand/10 bg-transparent">
             View Installation Guide <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
@@ -308,22 +309,22 @@ export default function DocsPage() {
           <CardContent>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/docs" className="text-brand hover:underline">
+                <Link href={`/${locale}/docs`} className="text-brand hover:underline">
                   Introduction
                 </Link>
               </li>
               <li>
-                <Link href="/docs/installation" className="text-muted-foreground hover:text-foreground">
+                <Link href={`/${locale}/docs/installation`} className="text-muted-foreground hover:text-foreground">
                   Installation
                 </Link>
               </li>
               <li>
-                <Link href="/docs/download" className="text-muted-foreground hover:text-foreground">
+                <Link href={`/${locale}/docs/download`} className="text-muted-foreground hover:text-foreground">
                   Download from GitHub
                 </Link>
               </li>
               <li>
-                <Link href="/docs/architecture" className="text-muted-foreground hover:text-foreground">
+                <Link href={`/${locale}/docs/architecture`} className="text-muted-foreground hover:text-foreground">
                   Architecture
                 </Link>
               </li>
@@ -339,19 +340,19 @@ export default function DocsPage() {
           <CardContent>
             <ul className="space-y-2">
               <li className="flex items-center justify-between">
-                <Link href="/docs/installation" className="text-sm hover:underline">
+                <Link href={`/${locale}/docs/installation`} className="text-sm hover:underline">
                   Getting Started with NeoSaaS
                 </Link>
                 <Badge variant="outline">Beginner</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <Link href="/docs/download" className="text-sm hover:underline">
+                <Link href={`/${locale}/docs/download`} className="text-sm hover:underline">
                   Download Latest Version from GitHub
                 </Link>
                 <Badge variant="outline">Essential</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <Link href="/docs/architecture" className="text-sm hover:underline">
+                <Link href={`/${locale}/docs/architecture`} className="text-sm hover:underline">
                   Understanding the Architecture
                 </Link>
                 <Badge variant="outline">Advanced</Badge>

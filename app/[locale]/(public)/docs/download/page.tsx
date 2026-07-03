@@ -11,7 +11,8 @@ export const metadata = {
   keywords: ["download", "GitHub", "source code", "clone", "repository"],
 }
 
-export default function DownloadPage() {
+export default async function DownloadPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -22,7 +23,7 @@ export default function DownloadPage() {
       </div>
 
       <div className="flex items-center space-x-2 text-sm">
-        <Link href="/docs" className="text-muted-foreground hover:text-foreground">
+        <Link href={`/${locale}/docs`} className="text-muted-foreground hover:text-foreground">
           Documentation
         </Link>
         <span className="text-muted-foreground">/</span>
@@ -192,7 +193,7 @@ export default function DownloadPage() {
         </Card>
 
         <div className="flex justify-between pt-4 border-t">
-          <Link href="/docs/installation">
+          <Link href={`/${locale}/docs/installation`}>
             <Button variant="outline" className="gap-1 bg-transparent">
               <ArrowLeft className="h-4 w-4" /> Installation
             </Button>

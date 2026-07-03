@@ -3,17 +3,48 @@ import type { NextRequest } from "next/server"
 import { db } from '@/db'
 import { platformConfig } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import { LOCALES } from '@/app/[locale]/layout'
 
 /**
  * Next.js 16 Proxy Configuration
- * 
+ *
  * This file replaces middleware.ts and should only contain:
  * - Network rewrites
  * - Simple redirects
  * - Header modifications
- * 
+ *
  * Complex logic (auth, validation) should be in server components/functions.
  */
+
+const DEFAULT_LOCALE = "fr"
+
+// Only the routes that actually moved under app/[locale]/(public) — auth,
+// admin, dashboard, api, and the (errors) pages stay unlocalized and must
+// never be redirected here, so this is a positive allowlist rather than a
+// negative exclusion (safer: a route this list forgets just 404s instead of
+// silently being redirected somewhere wrong).
+const PUBLIC_LOCALIZED_PREFIXES = [
+  "/book",
+  "/brand",
+  "/configuration",
+  "/dashboard-exemple",
+  "/demo",
+  "/docs",
+  "/features",
+  "/legacy",
+  "/legal",
+  "/pricing",
+  "/store",
+]
+
+function needsLocaleRedirect(path: string): boolean {
+  const alreadyLocalized = LOCALES.some((locale) => path === `/${locale}` || path.startsWith(`/${locale}/`))
+  if (alreadyLocalized) return false
+
+  const isPublicRoot = path === "/"
+  const isPublicPrefixed = PUBLIC_LOCALIZED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+  return isPublicRoot || isPublicPrefixed
+}
 
 // Cache for configuration (refreshed every 5 minutes)
 let cachedForceHttps = false
@@ -67,6 +98,15 @@ export async function proxy(request: NextRequest) {
     if (!path.includes(".") && !path.startsWith("/_next")) {
       return NextResponse.redirect(new URL("/maintenance", request.url))
     }
+  }
+
+  // i18n: bare public routes (no /fr or /en prefix) redirect to the default
+  // locale — e.g. /features -> /fr/features. Auth/admin/dashboard/api/errors
+  // routes are untouched (see PUBLIC_LOCALIZED_PREFIXES above).
+  if (needsLocaleRedirect(path)) {
+    const url = request.nextUrl.clone()
+    url.pathname = `/${DEFAULT_LOCALE}${path === "/" ? "" : path}`
+    return NextResponse.redirect(url)
   }
 
   return NextResponse.next()

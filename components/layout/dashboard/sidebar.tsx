@@ -8,42 +8,21 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useState } from "react"
 import { Menu, X } from 'lucide-react'
+import { useLocale } from "@/lib/i18n/use-locale"
 
 const navItems = [
-  {
-    title: "Dashboard",
-    href: "/dashboard-exemple",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Users",
-    href: "/dashboard-exemple/users",
-    icon: Users,
-  },
-  {
-    title: "Payments",
-    href: "/dashboard-exemple/payments",
-    icon: CreditCard,
-  },
-  {
-    title: "Email",
-    href: "/dashboard-exemple/email",
-    icon: Mail,
-  },
-  {
-    title: "Storage",
-    href: "/dashboard-exemple/storage",
-    icon: HardDrive,
-  },
-  {
-    title: "Analytics",
-    href: "/dashboard-exemple/analytics",
-    icon: BarChart4,
-  },
+  { title: "Dashboard", segment: "", icon: LayoutDashboard },
+  { title: "Users", segment: "/users", icon: Users },
+  { title: "Payments", segment: "/payments", icon: CreditCard },
+  { title: "Email", segment: "/email", icon: Mail },
+  { title: "Storage", segment: "/storage", icon: HardDrive },
+  { title: "Analytics", segment: "/analytics", icon: BarChart4 },
 ]
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const locale = useLocale()
+  const base = `/${locale}/dashboard-exemple`
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   return (
@@ -68,7 +47,7 @@ export function DashboardSidebar() {
       >
         <div className="flex h-full flex-col">
           <div className="border-b px-6 py-4">
-            <Link href="/dashboard-exemple" className="flex items-center gap-2">
+            <Link href={base} className="flex items-center gap-2">
               <div className="font-bold text-2xl tracking-tight">
                 <span className="text-foreground">Neo</span>
                 <span className="text-brand">SaaS</span>
@@ -81,9 +60,10 @@ export function DashboardSidebar() {
           <div className="flex-1 overflow-auto py-2">
             <nav className="grid items-start px-2 gap-1">
               {navItems.map((item, index) => {
-                const isActive = pathname === item.href
+                const href = `${base}${item.segment}`
+                const isActive = pathname === href
                 return (
-                  <Link key={index} href={item.href}>
+                  <Link key={index} href={href}>
                     <span
                       className={cn(
                         "group flex items-center rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
@@ -100,7 +80,7 @@ export function DashboardSidebar() {
           </div>
           <div className="border-t p-4">
             <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href="/">
+              <Link href={`/${locale}`}>
                 <Home className="mr-2 h-4 w-4" />
                 Back to Home
               </Link>

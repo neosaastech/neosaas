@@ -37,11 +37,16 @@ function StaticFallback() {
   )
 }
 
-export default async function FeaturesPage() {
+export default async function FeaturesPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   let layers: { id: string; layerType: string; props: unknown }[] = []
   try {
     layers = await db.query.pageLayers.findMany({
-      where: and(eq(pageLayers.pagePath, "/features"), eq(pageLayers.isActive, true)),
+      where: and(
+        eq(pageLayers.pagePath, "/features"),
+        eq(pageLayers.locale, locale),
+        eq(pageLayers.isActive, true),
+      ),
       orderBy: asc(pageLayers.position),
     })
   } catch (error) {

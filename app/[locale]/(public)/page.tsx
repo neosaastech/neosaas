@@ -16,7 +16,8 @@ export const metadata = {
   keywords: ["SaaS", "platform", "business", "startup", "subscription", "billing"],
 }
 
-export default function HomePage() {
+export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -48,7 +49,7 @@ export default function HomePage() {
                     Get Started <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-                <Link href="/features">
+                <Link href={`/${locale}/features`}>
                   <Button size="lg" variant="outline">
                     Explore Features
                   </Button>
@@ -394,7 +395,7 @@ export default function HomePage() {
                   Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/pricing">
+              <Link href={`/${locale}/pricing`}>
                 <Button
                   size="lg"
                   variant="outline"

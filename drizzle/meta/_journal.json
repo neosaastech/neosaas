@@ -43,6 +43,13 @@
       "when": 1783010767345,
       "tag": "0005_rate_limit_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783081235005,
+      "tag": "0006_fixed_mandarin",
+      "breakpoints": true
     }
   ]
 }

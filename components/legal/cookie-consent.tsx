@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import Image from "next/image"
+import { useLocale } from "@/lib/i18n/use-locale"
 
 interface CookieConsentProps {
   logo?: string | null
@@ -33,6 +34,7 @@ export function CookieConsent({
 }: CookieConsentProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [hide, setHide] = React.useState(false)
+  const locale = useLocale()
 
   React.useEffect(() => {
     // If explicitly disabled, ensure it's closed
@@ -108,7 +110,7 @@ export function CookieConsent({
               <h3 className="font-semibold leading-none tracking-tight">Cookie Preferences</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {displayMessage}
-                <Link href="/legal/privacy" className="ml-1 font-medium text-primary hover:underline">
+                <Link href={`/${locale}/legal/privacy`} className="ml-1 font-medium text-primary hover:underline">
                   Learn more
                 </Link>
               </p>

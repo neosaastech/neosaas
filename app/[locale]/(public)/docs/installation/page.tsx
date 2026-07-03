@@ -10,7 +10,8 @@ export const metadata = {
   keywords: ["installation", "setup", "configure", "deploy", "getting started"],
 }
 
-export default function InstallationPage() {
+export default async function InstallationPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -19,7 +20,7 @@ export default function InstallationPage() {
       </div>
 
       <div className="flex items-center space-x-2 text-sm">
-        <Link href="/docs" className="text-muted-foreground hover:text-foreground">
+        <Link href={`/${locale}/docs`} className="text-muted-foreground hover:text-foreground">
           Documentation
         </Link>
         <span className="text-muted-foreground">/</span>
@@ -261,7 +262,7 @@ export default function InstallationPage() {
             Félicitations ! Votre installation NeoSaaS est terminée. Une fois connecté avec vos identifiants 
             administrateur (<strong>admin@exemple.com</strong> / <strong>admin</strong>), vous pouvez commencer 
             à développer les services de votre projet directement depuis le dashboard. Consultez la{" "}
-            <Link href="/docs/architecture" className="text-brand hover:underline">
+            <Link href={`/${locale}/docs/architecture`} className="text-brand hover:underline">
               documentation d'architecture
             </Link>{" "}
             pour comprendre la structure de l'application.
@@ -269,12 +270,12 @@ export default function InstallationPage() {
         </Alert>
 
         <div className="flex justify-between pt-4 border-t">
-          <Link href="/docs">
+          <Link href={`/${locale}/docs`}>
             <Button variant="outline" className="gap-1 bg-transparent">
               <ArrowLeft className="h-4 w-4" /> Introduction
             </Button>
           </Link>
-          <Link href="/docs/download">
+          <Link href={`/${locale}/docs/download`}>
             <Button variant="outline" className="gap-1 bg-transparent">
               Download from GitHub <ArrowRight className="h-4 w-4" />
             </Button>

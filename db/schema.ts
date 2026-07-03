@@ -818,11 +818,17 @@ export const pagePermissions = pgTable("page_permissions", {
 /**
  * Page Layers - ordered content blocks composing a public page.
  * layerType must match a key in lib/layers/registry.ts. props are validated
- * against that layer's Zod schema at render time (see app/(public)/features/page.tsx).
+ * against that layer's Zod schema at render time (see app/[locale]/(public)/features/page.tsx).
+ * `locale` scopes rows per-language — the Payload sync adapter does a full
+ * replace of (pagePath, locale) on every publish, so fr and en content never
+ * collide (added 2026-07-03 to close the i18n gap: Payload could already
+ * author localized content, this table just couldn't hold more than one
+ * language's worth of it before).
  */
 export const pageLayers = pgTable("page_layers", {
   id: uuid("id").defaultRandom().primaryKey(),
   pagePath: text("page_path").notNull(), // e.g. "/features" — not unique, multiple layers per page
+  locale: text("locale").notNull().default("fr"),
   position: integer("position").notNull(), // display order within pagePath
   layerType: text("layer_type").notNull(), // key in lib/layers/registry.ts
   props: jsonb("props").notNull().default({}),

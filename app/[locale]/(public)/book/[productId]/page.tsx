@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AppointmentBooking } from '@/components/checkout/appointment-booking'
 import { Loader2, AlertCircle, ArrowLeft, Calendar, Star, Shield } from 'lucide-react'
 import Link from 'next/link'
+import { useLocale } from '@/lib/i18n/use-locale'
 
 interface Product {
   id: string
@@ -23,6 +24,7 @@ export default function BookAppointmentPage({
   params: Promise<{ productId: string }>
 }) {
   const { productId } = use(params)
+  const locale = useLocale()
   const router = useRouter()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -112,7 +114,7 @@ export default function BookAppointmentPage({
             Impossible de charger ce service de réservation.
           </p>
           <Link
-            href="/store"
+            href={`/${locale}/store`}
             className="inline-flex items-center gap-2 text-brand hover:underline"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -151,7 +153,7 @@ export default function BookAppointmentPage({
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Back link */}
         <Link
-          href="/store"
+          href={`/${locale}/store`}
           className="inline-flex items-center gap-2 text-gray-600 hover:text-brand transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -207,7 +209,7 @@ export default function BookAppointmentPage({
           productPrice={product.hourlyRate || product.price}
           currency={product.currency}
           onBook={handleBook}
-          onCancel={() => router.push('/store')}
+          onCancel={() => router.push(`/${locale}/store`)}
         />
 
         {/* Footer */}

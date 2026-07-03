@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Book } from "lucide-react"
+import { useLocale } from "@/lib/i18n/use-locale"
 
 interface DocsSidebarNavProps extends React.HTMLAttributes<HTMLElement> {
   items: {
@@ -64,23 +65,24 @@ export function DocsSidebarNav({ className, items, ...props }: DocsSidebarNavPro
 }
 
 export function DocsSidebar() {
+  const locale = useLocale()
   const items = [
     {
       title: "Getting Started",
-      href: "/docs",
+      href: `/${locale}/docs`,
       icon: Book,
       items: [
         {
           title: "Introduction",
-          href: "/docs",
+          href: `/${locale}/docs`,
         },
         {
           title: "Installation",
-          href: "/docs/installation",
+          href: `/${locale}/docs/installation`,
         },
         {
           title: "Download from GitHub",
-          href: "/docs/download",
+          href: `/${locale}/docs/download`,
         },
       ],
     },

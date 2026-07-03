@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, ArrowRight, DollarSign, Users, Gift } from "lucide-react"
 
-export default function AffiliatePage() {
+export default async function AffiliatePage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="container py-12 md:py-24">
       <div className="mb-8">
-        <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <Link href={`/${locale}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Home
         </Link>

@@ -9,28 +9,30 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Menu } from "lucide-react"
 import { Book } from "lucide-react"
+import { useLocale } from "@/lib/i18n/use-locale"
 
 export function DocsMobileNav() {
   const [open, setOpen] = React.useState(false)
   const pathname = usePathname()
+  const locale = useLocale()
 
   const items = [
     {
       title: "Getting Started",
-      href: "/docs",
+      href: `/${locale}/docs`,
       icon: Book,
       items: [
         {
           title: "Introduction",
-          href: "/docs",
+          href: `/${locale}/docs`,
         },
         {
           title: "Installation",
-          href: "/docs/installation",
+          href: `/${locale}/docs/installation`,
         },
         {
           title: "Download from GitHub",
-          href: "/docs/download",
+          href: `/${locale}/docs/download`,
         },
       ],
     },
@@ -88,7 +90,7 @@ export function DocsMobileNav() {
         </SheetContent>
       </Sheet>
       <div className="flex-1 text-center">
-        <Link href="/docs" className="text-lg font-semibold">
+        <Link href={`/${locale}/docs`} className="text-lg font-semibold">
           Docs
         </Link>
       </div>

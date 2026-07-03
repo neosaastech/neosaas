@@ -3,6 +3,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
+import { useLocale } from "@/lib/i18n/use-locale"
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -14,6 +15,7 @@ import {
 
 export function MainNav() {
   const pathname = usePathname()
+  const locale = useLocale()
 
   return (
     <div className="hidden md:flex">
@@ -27,7 +29,7 @@ export function MainNav() {
                   <NavigationMenuLink asChild>
                     <a
                       className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
-                      href="/features"
+                      href={`/${locale}/features`}
                     >
                       <div className="mb-2 mt-4 text-lg font-medium">Features</div>
                       <p className="text-sm leading-tight text-muted-foreground">
@@ -37,7 +39,7 @@ export function MainNav() {
                   </NavigationMenuLink>
                 </li>
                 <li>
-                  <Link href="/dashboard-exemple/analytics" legacyBehavior passHref>
+                  <Link href={`/${locale}/dashboard-exemple/analytics`} legacyBehavior passHref>
                     <NavigationMenuLink className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
                       <div className="text-sm font-medium leading-none">Analytics</div>
                       <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
@@ -47,7 +49,7 @@ export function MainNav() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/dashboard-exemple/users" legacyBehavior passHref>
+                  <Link href={`/${locale}/dashboard-exemple/users`} legacyBehavior passHref>
                     <NavigationMenuLink className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
                       <div className="text-sm font-medium leading-none">User Management</div>
                       <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
@@ -57,7 +59,7 @@ export function MainNav() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/dashboard-exemple/payments" legacyBehavior passHref>
+                  <Link href={`/${locale}/dashboard-exemple/payments`} legacyBehavior passHref>
                     <NavigationMenuLink className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground">
                       <div className="text-sm font-medium leading-none">Payments</div>
                       <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
@@ -70,11 +72,11 @@ export function MainNav() {
             </NavigationMenuContent>
           </NavigationMenuItem>
           <NavigationMenuItem>
-            <Link href="/pricing" legacyBehavior passHref>
+            <Link href={`/${locale}/pricing`} legacyBehavior passHref>
               <NavigationMenuLink
                 className={cn(
                   "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
-                  pathname === "/pricing" ? "bg-accent/50" : "",
+                  pathname === `/${locale}/pricing` ? "bg-accent/50" : "",
                 )}
               >
                 Pricing
@@ -82,11 +84,11 @@ export function MainNav() {
             </Link>
           </NavigationMenuItem>
           <NavigationMenuItem>
-            <Link href="/brand" legacyBehavior passHref>
+            <Link href={`/${locale}/brand`} legacyBehavior passHref>
               <NavigationMenuLink
                 className={cn(
                   "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
-                  pathname === "/brand" ? "bg-accent/50" : "",
+                  pathname === `/${locale}/brand` ? "bg-accent/50" : "",
                 )}
               >
                 Brand
@@ -94,11 +96,11 @@ export function MainNav() {
             </Link>
           </NavigationMenuItem>
           <NavigationMenuItem>
-            <Link href="/docs" legacyBehavior passHref>
+            <Link href={`/${locale}/docs`} legacyBehavior passHref>
               <NavigationMenuLink
                 className={cn(
                   "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
-                  pathname === "/docs" || pathname.startsWith("/docs/") ? "bg-accent/50" : "",
+                  pathname === `/${locale}/docs` || pathname.startsWith(`/${locale}/docs/`) ? "bg-accent/50" : "",
                 )}
               >
                 Documentation

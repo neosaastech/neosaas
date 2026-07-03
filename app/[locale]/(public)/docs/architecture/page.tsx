@@ -11,7 +11,8 @@ export const metadata = {
   keywords: ["architecture", "system design", "technical overview", "structure"],
 }
 
-export default function ArchitecturePage() {
+export default async function ArchitecturePage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -295,19 +296,19 @@ export default function ArchitecturePage() {
           </p>
           <div className="flex flex-col gap-2">
             <Link
-              href="/docs/download"
+              href={`/${locale}/docs/download`}
               className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
             >
               → Télécharger NeoSaaS depuis GitHub
             </Link>
             <Link
-              href="/docs/installation"
+              href={`/${locale}/docs/installation`}
               className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
             >
               → Guide d'installation complet
             </Link>
             <Link
-              href="/docs"
+              href={`/${locale}/docs`}
               className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
             >
               → Retour à l'introduction
