@@ -4,10 +4,12 @@ import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Moon, Sun } from "lucide-react"
+import { useThemeConfig } from "@/components/common/dynamic-theme-provider"
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const themeConfig = useThemeConfig()
 
   // Avoid hydration mismatch by only rendering after mount
   useEffect(() => {
@@ -16,6 +18,11 @@ export function ThemeToggle() {
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark")
+  }
+
+  // Admin can disable end-user mode switching entirely (ThemeConfig.allowModeToggle)
+  if (themeConfig?.allowModeToggle === false) {
+    return null
   }
 
   // Show a placeholder during SSR to avoid hydration mismatch

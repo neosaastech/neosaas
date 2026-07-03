@@ -105,7 +105,7 @@ export default function SupportPage() {
                   Complete guides and tutorials
                 </p>
                 <Button variant="link" className="p-0 h-auto mt-2" asChild>
-                  <Link href="/docs">
+                  <Link href="/fr/docs">
                     View documentation <ExternalLink className="ml-1 h-3 w-3" />
                   </Link>
                 </Button>

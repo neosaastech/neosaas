@@ -1,0 +1,42 @@
+/**
+ * Canonical prop vocabulary for page layers (Pilier G — Normes de nommage & design tokens).
+ * Every layer's propsSchema must reuse these names for these concepts — never invent a
+ * synonym. New concepts not covered here (e.g. `authorName`, `rating`) are fine to add;
+ * this list only locks down names that already have an established meaning, so the
+ * pilotage JSON / admin composition tooling (Pilier E) can build generic forms/validators
+ * instead of special-casing every layer.
+ */
+
+export const ALLOWED_PROP_NAMES = [
+  "title",
+  "subtitle",
+  "body",
+  "ctaLabel",
+  "ctaHref",
+  "items",
+  "imageUrl",
+] as const
+
+export type AllowedPropName = (typeof ALLOWED_PROP_NAMES)[number]
+
+/** Forbidden synonym → canonical name it duplicates. */
+export const FORBIDDEN_PROP_SYNONYMS: Record<string, AllowedPropName> = {
+  heading: "title",
+  titre: "title",
+  text1: "title",
+  buttonText: "ctaLabel",
+  buttonLabel: "ctaLabel",
+  link: "ctaHref",
+  url: "ctaHref",
+  data: "items",
+  list: "items",
+  entries: "items",
+  image: "imageUrl",
+  img: "imageUrl",
+  photo: "imageUrl",
+}
+
+/** ctaLabel and ctaHref must always be declared together, never alone. */
+export const REQUIRED_PROP_PAIRS: readonly [AllowedPropName, AllowedPropName][] = [
+  ["ctaLabel", "ctaHref"],
+]

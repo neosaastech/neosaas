@@ -157,11 +157,32 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       fi
       echo ""
 
+      # ─── SEEDING: Calques de page /features (Pilier C) — désactivé au build ───
+      # Retiré du pipeline automatique après 3 échecs en prod malgré unpooled +
+      # sleep 5 + backoff jusqu'à ~35s (commits 2aba37f, c779f14) : "relation
+      # page_layers does not exist" persiste même 20+ secondes après que
+      # migrate.ts a confirmé "Applied" sur cette même table, via la même
+      # connexion unpooled. Ce n'est donc pas un simple délai de propagation —
+      # cause exacte non identifiée (comportement du proxy HTTP Neon, pas un
+      # bug applicatif). Pas bloquant : /features a un fallback statique
+      # identique tant que la table est vide. Seeding à faire manuellement
+      # après déploiement : `pnpm seed:page-layers` (avec DATABASE_URL réelle),
+      # ou via /admin/pilotage (Pilier E) une fois cette PR mergée.
+
       # Correction des configurations email pour les environnements de prévisualisation/dev
       if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
           echo "🔧 Correction des configurations email (Preview/Dev)..."
           npx tsx scripts/fix-email-provider-defaults.ts
           echo "✅ Configurations email corrigées"
+          echo ""
+
+          # ─── SEEDING: Compte admin de test (Preview/Dev uniquement — jamais en prod) ───
+          echo "🔐 Initialisation du compte admin de test (Preview/Dev)..."
+          if retry_with_backoff 2 3 "pnpm seed:dev-admin"; then
+            echo "✅ Compte admin de test prêt (admin@exemple.com / admin)"
+          else
+            echo "⚠️  Seeding admin de test échoué (non bloquant)"
+          fi
           echo ""
       fi
 

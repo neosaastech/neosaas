@@ -8,9 +8,11 @@ import { Toaster } from "@/components/ui/sonner"
 import "@/styles/globals.css"
 
 import { GeistSans } from 'geist/font/sans'
+import { themeFontVariables } from "@/lib/theme/fonts"
 import { getPlatformConfig } from "@/lib/config"
 import { getThemeConfig } from "@/app/actions/theme-config"
 import { generateThemeCSS } from "@/lib/theme/generate-css"
+import { getGoogleFontsLinkHref } from "@/lib/theme/font-source"
 
 export async function generateMetadata() {
   try {
@@ -59,16 +61,18 @@ export default async function RootLayout({
 }) {
   const config = await getPlatformConfig()
   const themeConfig = await getThemeConfig()
+  const googleFontsHref = getGoogleFontsLinkHref(themeConfig.headingFontSource, themeConfig.bodyFontSource)
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${themeFontVariables}`}>
       <head>
         {config.customHeaderCode && (
           <div dangerouslySetInnerHTML={{ __html: config.customHeaderCode }} />
         )}
+        {googleFontsHref && <link rel="stylesheet" href={googleFontsHref} />}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />
       </head>
-      <body className={GeistSans.className}>
+      <body className="font-sans">
         {config.gtmCode && (
           <noscript>
             <iframe

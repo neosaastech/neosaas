@@ -164,9 +164,11 @@ export async function getProductById(id: string) {
 export async function upsertProduct(data: any) {
   try {
     const user = await getCurrentUser()
-    // TODO: Check for admin role properly
     if (!user) {
       return { success: false, error: "Unauthorized" }
+    }
+    if (!user.roles?.some((r) => r === 'admin' || r === 'super_admin')) {
+      return { success: false, error: "Unauthorized — admin role required" }
     }
 
     // DEBUG: Log incoming data for digital products
@@ -1799,9 +1801,10 @@ export async function markOrderAsShipped(params: {
     if (!user) {
       return { success: false, error: "Not authenticated" }
     }
+    if (!user.roles?.some((r) => r === 'admin' || r === 'super_admin')) {
+      return { success: false, error: "Unauthorized — admin role required" }
+    }
 
-    // TODO: Check if user is admin
-    
     // Get the order
     const order = await db.query.orders.findFirst({
       where: eq(orders.id, params.orderId),

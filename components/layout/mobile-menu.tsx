@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, Lock } from "lucide-react"
 import { type JWTPayload } from "@/lib/auth"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { useLocale } from "@/lib/i18n/use-locale"
 
 interface MobileMenuProps {
   user?: JWTPayload | null
@@ -12,6 +13,7 @@ interface MobileMenuProps {
 
 export function MobileMenu({ user }: MobileMenuProps) {
   const { siteName } = usePlatformConfig()
+  const locale = useLocale()
 
   return (
     <Sheet>
@@ -30,25 +32,25 @@ export function MobileMenu({ user }: MobileMenuProps) {
         </div>
         <div className="flex flex-col gap-6 px-2 py-6">
           <nav className="flex flex-col space-y-4">
-            <Link href="/" className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}`} className="text-lg font-medium hover:text-brand">
               Home
             </Link>
-            <Link href="/features" className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}/features`} className="text-lg font-medium hover:text-brand">
               Features
             </Link>
-            <Link href="/pricing" className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}/pricing`} className="text-lg font-medium hover:text-brand">
               Pricing
             </Link>
-            <Link href="/demo" className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}/demo`} className="text-lg font-medium hover:text-brand">
               Demo
             </Link>
-            <Link href="/docs" className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}/docs`} className="text-lg font-medium hover:text-brand">
               Docs
             </Link>
             <Link href="/appearance" className="text-lg font-medium hover:text-brand">
               Appearance
             </Link>
-            <Link href="/brand" className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}/brand`} className="text-lg font-medium hover:text-brand">
               Brand
             </Link>
           </nav>

@@ -6,9 +6,13 @@ import { eq } from "drizzle-orm"
 import { cookies } from "next/headers"
 import { SignJWT } from "jose"
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "your-secret-key-min-32-characters-long"
-)
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error("JWT_SECRET is not set — required to sign impersonation tokens")
+  }
+  return new TextEncoder().encode(secret)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("2h") // Session d'impersonnation limitée à 2h
-      .sign(JWT_SECRET)
+      .sign(getJwtSecret())
 
     // Définir le cookie de session
     const cookieStore = cookies()

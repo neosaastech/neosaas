@@ -6,17 +6,26 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2, Palette, RefreshCw, Sun, Moon, Monitor } from 'lucide-react'
+import { Loader2, Palette, RefreshCw, Sun, Moon, Type } from 'lucide-react'
 import type { ThemeConfig, ColorPalette } from '@/types/theme-config'
 import { defaultTheme } from '@/types/theme-config'
 import { updateThemeConfig, resetThemeConfig, getThemeConfig } from '@/app/actions/theme-config'
+import { Icon, ICON_LIBRARIES, ICON_LIBRARY_LABELS, type IconLibrary } from '@/components/ui/icon'
+import { FONT_PAIRS, getFontPair } from '@/lib/theme/font-pairs'
+import { FontSourcePicker } from '@/components/admin/font-source-picker'
+import { resolveFontFamily } from '@/lib/theme/font-source'
+import { DICEBEAR_STYLES, DEFAULT_DICEBEAR_STYLE, getAvatarUrl } from '@/lib/theme/avatar'
+
+const ICON_PREVIEW_NAMES = ['home', 'user', 'settings', 'check', 'close']
 
 interface ColorInputProps {
   label: string
@@ -110,6 +119,7 @@ export function ThemeSettings() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [theme, setTheme] = useState<ThemeConfig>(defaultTheme)
+  const { setTheme: setResolvedTheme } = useTheme()
 
   // Load the configuration
   useEffect(() => {
@@ -178,6 +188,28 @@ export function ThemeSettings() {
     }))
   }
 
+  const updateIconLibrary = (library: IconLibrary) => {
+    setTheme(prev => ({ ...prev, iconLibrary: library }))
+  }
+
+  const updateFontPair = (fontPairId: string) => {
+    const pair = getFontPair(fontPairId)
+    setTheme(prev => ({
+      ...prev,
+      fontPairId,
+      // Presets use the next/font pipeline (Pilier D v1), not the Google Fonts /
+      // upload / link sources below — clear those so the pickers show "System"
+      // rather than a stale source that no longer matches the applied font.
+      headingFontSource: undefined,
+      bodyFontSource: undefined,
+      typography: {
+        ...prev.typography,
+        fontFamily: pair.fontFamily,
+        fontFamilyHeading: pair.fontFamilyHeading,
+      },
+    }))
+  }
+
   if (loading) {
     return (
       <Card>
@@ -219,6 +251,7 @@ export function ThemeSettings() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
       {/* Theme Mode */}
       <Card>
         <CardHeader>
@@ -226,40 +259,188 @@ export function ThemeSettings() {
             Display Mode
           </CardTitle>
           <CardDescription>
-            Choose the default display mode
+            Default mode, and whether visitors can switch it themselves
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Select
-            value={theme.mode}
-            onValueChange={(value: 'light' | 'dark' | 'auto') =>
-              setTheme(prev => ({ ...prev, mode: value }))
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">
-                <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4" />
-                  Light
-                </div>
-              </SelectItem>
-              <SelectItem value="dark">
-                <div className="flex items-center gap-2">
-                  <Moon className="h-4 w-4" />
-                  Dark
-                </div>
-              </SelectItem>
-              <SelectItem value="auto">
-                <div className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  Auto
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Default mode</Label>
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-2">
+                <Sun className={`h-4 w-4 ${theme.mode === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
+                <span className="text-sm font-medium">Light</span>
+              </div>
+              <Switch
+                checked={theme.mode === 'dark'}
+                onCheckedChange={(checked) => {
+                  const mode = checked ? 'dark' : 'light'
+                  setTheme(prev => ({ ...prev, mode }))
+                  // Preview only, applied on Save: the live public switch is
+                  // the site's own toggle (components/common/theme-toggle.tsx),
+                  // this control isn't a second one.
+                  setResolvedTheme(mode)
+                }}
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Dark</span>
+                <Moon className={`h-4 w-4 ${theme.mode === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div>
+                <Label className="text-sm font-medium">Allow visitors to switch mode</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  When off, the light/dark toggle is hidden site-wide and everyone stays on the default mode above.
+                </p>
+              </div>
+              <Switch
+                checked={theme.allowModeToggle ?? true}
+                onCheckedChange={(checked) => setTheme(prev => ({ ...prev, allowModeToggle: checked }))}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Icons & Avatars (Pilier D) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Type className="h-5 w-5" />
+            Icons & Avatars
+          </CardTitle>
+          <CardDescription>
+            Icon set for UI glyphs, avatar style for generated user/company avatars
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label>Icon Library</Label>
+            <Select
+              value={theme.iconLibrary ?? 'lucide'}
+              onValueChange={(value: IconLibrary) => updateIconLibrary(value)}
+            >
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ICON_LIBRARIES.map((library) => (
+                  <SelectItem key={library} value={library}>
+                    {ICON_LIBRARY_LABELS[library]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+              {ICON_PREVIEW_NAMES.map((name) => (
+                <Icon
+                  key={name}
+                  name={name}
+                  library={theme.iconLibrary ?? 'lucide'}
+                  className="h-6 w-6 text-foreground"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Avatar Style (DiceBear)</Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Generated per-user avatar fallback (identicon-style), not semantic UI icons.
+            </p>
+            <Select
+              value={theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE}
+              onValueChange={(style) => setTheme((prev) => ({ ...prev, avatarStyle: style }))}
+            >
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DICEBEAR_STYLES.map((style) => (
+                  <SelectItem key={style.id} value={style.id}>
+                    {style.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+              {['Alex', 'Sam', 'Jordan', 'Taylor'].map((seed) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={seed}
+                  src={getAvatarUrl(seed, theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE)}
+                  alt={seed}
+                  className="h-10 w-10 rounded-full bg-background"
+                />
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      </div>
+
+      {/* Typography (Pilier D) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Type className="h-5 w-5" />
+            Typography
+          </CardTitle>
+          <CardDescription>
+            Heading and body fonts — Google Fonts, your own font file, or a direct link
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Quick presets</Label>
+            <div className="flex flex-wrap gap-2">
+              {FONT_PAIRS.map((pair) => (
+                <Button
+                  key={pair.id}
+                  type="button"
+                  variant={theme.fontPairId === pair.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => updateFontPair(pair.id)}
+                >
+                  {pair.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t">
+            <FontSourcePicker
+              label="Heading font"
+              role="heading"
+              value={theme.headingFontSource}
+              activeFontFamily={theme.typography.fontFamilyHeading}
+              onChange={(source) =>
+                setTheme((prev) => ({
+                  ...prev,
+                  fontPairId: 'custom',
+                  headingFontSource: source,
+                  typography: { ...prev.typography, fontFamilyHeading: resolveFontFamily(source, 'heading') },
+                }))
+              }
+            />
+            <FontSourcePicker
+              label="Body font"
+              role="body"
+              value={theme.bodyFontSource}
+              activeFontFamily={theme.typography.fontFamily}
+              onChange={(source) =>
+                setTheme((prev) => ({
+                  ...prev,
+                  fontPairId: 'custom',
+                  bodyFontSource: source,
+                  typography: { ...prev.typography, fontFamily: resolveFontFamily(source, 'body') },
+                }))
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 

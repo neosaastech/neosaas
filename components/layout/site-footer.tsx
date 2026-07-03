@@ -2,9 +2,11 @@
 
 import Link from "next/link"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { useLocale } from "@/lib/i18n/use-locale"
 
 export function SiteFooter() {
   const { siteName } = usePlatformConfig()
+  const locale = useLocale()
 
   return (
     <footer className="border-t bg-[#1A1A1A] text-white">
@@ -26,17 +28,17 @@ export function SiteFooter() {
             <h3 className="font-medium mb-4 text-brand">Product</h3>
             <ul className="space-y-2 flex flex-col items-center md:items-start">
               <li>
-                <Link href="/features" className="text-sm text-white/70 hover:text-white">
+                <Link href={`/${locale}/features`} className="text-sm text-white/70 hover:text-white">
                   Features
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" className="text-sm text-white/70 hover:text-white">
+                <Link href={`/${locale}/pricing`} className="text-sm text-white/70 hover:text-white">
                   Pricing
                 </Link>
               </li>
               <li>
-                <Link href="/brand" className="text-sm text-white/70 hover:text-white">
+                <Link href={`/${locale}/brand`} className="text-sm text-white/70 hover:text-white">
                   Brand
                 </Link>
               </li>
@@ -47,17 +49,17 @@ export function SiteFooter() {
             <h3 className="font-medium mb-4 text-brand">Company</h3>
             <ul className="space-y-2 flex flex-col items-center md:items-start">
               <li>
-                <Link href="/legacy/about" className="text-sm text-white/70 hover:text-white">
+                <Link href={`/${locale}/legacy/about`} className="text-sm text-white/70 hover:text-white">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="/legacy/contact" className="text-sm text-white/70 hover:text-white">
+                <Link href={`/${locale}/legacy/contact`} className="text-sm text-white/70 hover:text-white">
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/legacy/affiliate" className="text-sm text-white/70 hover:text-white">
+                <Link href={`/${locale}/legacy/affiliate`} className="text-sm text-white/70 hover:text-white">
                   Affiliates
                 </Link>
               </li>

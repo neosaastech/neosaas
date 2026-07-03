@@ -6,7 +6,7 @@
 
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import type { ThemeConfig } from '@/types/theme-config'
 export { generateThemeCSS } from '@/lib/theme/generate-css'
@@ -14,6 +14,13 @@ export { generateThemeCSS } from '@/lib/theme/generate-css'
 interface DynamicThemeProviderProps {
   theme: ThemeConfig
   children: React.ReactNode
+}
+
+const ThemeConfigContext = createContext<ThemeConfig | null>(null)
+
+/** Read the current ThemeConfig (colors/typography/mode settings) in a client component. */
+export function useThemeConfig(): ThemeConfig | null {
+  return useContext(ThemeConfigContext)
 }
 
 export function DynamicThemeProvider({ theme, children }: DynamicThemeProviderProps) {
@@ -49,7 +56,7 @@ export function DynamicThemeProvider({ theme, children }: DynamicThemeProviderPr
     applyThemeVariables(theme, resolvedTheme)
   }, [theme, resolvedTheme])
 
-  return <>{children}</>
+  return <ThemeConfigContext.Provider value={theme}>{children}</ThemeConfigContext.Provider>
 }
 
 /**

@@ -21,8 +21,12 @@ export async function POST(request: NextRequest) {
     const { syncAll } = body
 
     if (syncAll) {
-      // TODO: Check if user has admin role
-      // For now, allow any authenticated user
+      if (!user.roles?.some((r) => r === 'admin' || r === 'super_admin')) {
+        return NextResponse.json(
+          { error: 'Unauthorized — admin role required to sync all companies' },
+          { status: 403 }
+        )
+      }
 
       console.log('[API Stripe Sync] Syncing all companies')
       const results = await syncAllCompanies()

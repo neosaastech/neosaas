@@ -812,6 +812,57 @@ export const pagePermissions = pgTable("page_permissions", {
 })
 
 // =============================================================================
+// PAGE LAYERS - Composable content blocks (Pilier C — page builder)
+// =============================================================================
+
+/**
+ * Page Layers - ordered content blocks composing a public page.
+ * layerType must match a key in lib/layers/registry.ts. props are validated
+ * against that layer's Zod schema at render time (see app/[locale]/(public)/features/page.tsx).
+ * `locale` scopes rows per-language — the Payload sync adapter does a full
+ * replace of (pagePath, locale) on every publish, so fr and en content never
+ * collide (added 2026-07-03 to close the i18n gap: Payload could already
+ * author localized content, this table just couldn't hold more than one
+ * language's worth of it before).
+ */
+export const pageLayers = pgTable("page_layers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pagePath: text("page_path").notNull(), // e.g. "/features" — not unique, multiple layers per page
+  locale: text("locale").notNull().default("fr"),
+  position: integer("position").notNull(), // display order within pagePath
+  layerType: text("layer_type").notNull(), // key in lib/layers/registry.ts
+  props: jsonb("props").notNull().default({}),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export type PageLayer = typeof pageLayers.$inferSelect
+export type NewPageLayer = typeof pageLayers.$inferInsert
+
+// =============================================================================
+// PILOT ACTIONS LOG - Declarative admin/agent actions (Pilier E — pilotage JSON)
+// =============================================================================
+
+/**
+ * Audit log for POST /api/admin/pilot/apply — every PilotAction batch applied,
+ * by a human admin or an agent (Leon, Charlotte, Claude Code...). See lib/pilot/actions.ts.
+ */
+export const pilotActionsLog = pgTable("pilot_actions_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  actorType: text("actor_type").notNull().default("human"), // 'human' | 'agent'
+  actions: jsonb("actions").notNull(), // full PilotAction[] payload applied
+  result: text("result").notNull(), // 'success' | 'partial' | 'failed'
+  errors: jsonb("errors"),
+  dryRun: boolean("dry_run").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+
+export type PilotActionsLog = typeof pilotActionsLog.$inferSelect
+export type NewPilotActionsLog = typeof pilotActionsLog.$inferInsert
+
+// =============================================================================
 // PLATFORM CONFIGURATION
 // =============================================================================
 
@@ -1622,4 +1673,20 @@ export type NewLlmUsageLog = typeof llmUsageLogs.$inferInsert
 // OAuth Types
 export type OAuthConnection = typeof oauthConnections.$inferSelect
 export type NewOAuthConnection = typeof oauthConnections.$inferInsert
+
+// =============================================================================
+// RATE LIMITING - Auth abuse protection (login/register/password-reset)
+// =============================================================================
+
+/**
+ * One row per (action, identifier) — e.g. "login:ip:1.2.3.4" or "login:email:x@y.com".
+ * Fixed-window counter: count resets whenever windowStart is older than the window
+ * duration, instead of storing one row per attempt (keeps the table small, no cleanup
+ * job needed). See lib/rate-limit.ts.
+ */
+export const rateLimitAttempts = pgTable("rate_limit_attempts", {
+  identifier: text("identifier").primaryKey(),
+  count: integer("count").notNull().default(1),
+  windowStart: timestamp("window_start").defaultNow().notNull(),
+})
 

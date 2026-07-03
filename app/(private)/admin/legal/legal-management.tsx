@@ -436,12 +436,12 @@ export function LegalManagement({
                   </CardHeader>
                   <CardContent className="flex flex-col gap-2">
                       <Button variant="outline" className="justify-start" asChild>
-                          <Link href="/legal/terms" target="_blank">
+                          <Link href="/fr/legal/terms" target="_blank">
                               <ExternalLink className="mr-2 h-4 w-4" /> Terms of Service (ToS)
                           </Link>
                       </Button>
                       <Button variant="outline" className="justify-start" asChild>
-                          <Link href="/legal/privacy" target="_blank">
+                          <Link href="/fr/legal/privacy" target="_blank">
                               <ExternalLink className="mr-2 h-4 w-4" /> Privacy Policy (RGPD)
                           </Link>
                       </Button>
