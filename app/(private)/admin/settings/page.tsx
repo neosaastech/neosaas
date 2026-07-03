@@ -38,6 +38,7 @@ import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
 import { LogsClient } from "@/app/(private)/admin/logs/logs-client"
 import { PagesSettings } from "@/components/admin/pages-settings"
 import { ThemeSettings } from "@/components/admin/theme-settings"
+import { UpdateSettings } from "@/components/admin/update-settings"
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
 
@@ -566,7 +567,7 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="general" className="data-[state=active]:bg-brand data-[state=active]:text-white">
             General
           </TabsTrigger>
@@ -579,6 +580,9 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="pages" className="data-[state=active]:bg-brand data-[state=active]:text-white">
             Pages ACL
           </TabsTrigger>
+          <TabsTrigger value="updates" className="data-[state=active]:bg-brand data-[state=active]:text-white">
+            Mises à jour
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pages">
@@ -587,6 +591,10 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="styles">
           <ThemeSettings />
+        </TabsContent>
+
+        <TabsContent value="updates">
+          <UpdateSettings />
         </TabsContent>
 
         <TabsContent value="logs">
