@@ -8,6 +8,7 @@ import { Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Eyebrow } from "@/components/ui/eyebrow"
 import { cn } from "@/lib/utils"
 
 export interface PricingTablePlan {
@@ -21,13 +22,15 @@ export interface PricingTablePlan {
 }
 
 export interface PricingTableLayerProps {
+  eyebrow?: string
   title?: string
   items: PricingTablePlan[]
 }
 
-export function PricingTableLayer({ title, items }: PricingTableLayerProps) {
+export function PricingTableLayer({ eyebrow, title, items }: PricingTableLayerProps) {
   return (
     <div className="mx-auto mt-16 max-w-5xl">
+      {eyebrow && <Eyebrow className="mb-2 text-center">{eyebrow}</Eyebrow>}
       {title && <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
       <div className={cn("mt-10 grid gap-8", items.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>
         {items.map((plan) => (

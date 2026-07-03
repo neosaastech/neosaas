@@ -3,6 +3,7 @@
  */
 import { Star } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { Eyebrow } from "@/components/ui/eyebrow"
 
 export interface TestimonialItem {
   body: string
@@ -10,16 +11,19 @@ export interface TestimonialItem {
   authorRole?: string
   imageUrl?: string
   rating?: number
+  metric?: string
 }
 
 export interface TestimonialsLayerProps {
+  eyebrow?: string
   title?: string
   items: TestimonialItem[]
 }
 
-export function TestimonialsLayer({ title, items }: TestimonialsLayerProps) {
+export function TestimonialsLayer({ eyebrow, title, items }: TestimonialsLayerProps) {
   return (
     <div className="mx-auto mt-16 max-w-5xl">
+      {eyebrow && <Eyebrow className="mb-2 text-center">{eyebrow}</Eyebrow>}
       {title && <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
       <div className="mt-10 grid gap-6 md:grid-cols-3">
         {items.map((item) => (
@@ -50,6 +54,7 @@ export function TestimonialsLayer({ title, items }: TestimonialsLayerProps) {
                   {item.authorRole && <p className="text-xs text-muted-foreground">{item.authorRole}</p>}
                 </div>
               </div>
+              {item.metric && <p className="text-lg font-bold text-primary">{item.metric}</p>}
             </CardContent>
           </Card>
         ))}

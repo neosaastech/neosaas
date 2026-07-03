@@ -28,6 +28,11 @@ const featureGridItemSchema = z.object({
   bullets: z.array(z.string()),
 })
 
+const trustPillSchema = z.object({
+  icon: z.string(),
+  label: z.string(),
+})
+
 const pricingTablePlanSchema = z.object({
   name: z.string(),
   price: z.string(),
@@ -44,14 +49,17 @@ const testimonialItemSchema = z.object({
   authorRole: z.string().optional(),
   imageUrl: z.string().optional(),
   rating: z.number().min(1).max(5).optional(),
+  metric: z.string().optional(),
 })
 
 export const layerRegistry: Record<string, LayerDefinition> = {
   hero: {
     component: HeroLayer,
     propsSchema: z.object({
+      eyebrow: z.string().optional(),
       title: z.string(),
       subtitle: z.string().optional(),
+      trustPills: z.array(trustPillSchema).optional(),
       ctaLabel: z.string().optional(),
       ctaHref: z.string().optional(),
       secondaryCtaLabel: z.string().optional(),
@@ -62,6 +70,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
   "feature-grid": {
     component: FeatureGridLayer,
     propsSchema: z.object({
+      eyebrow: z.string().optional(),
       title: z.string().optional(),
       items: z.array(featureGridItemSchema),
     }) satisfies z.ZodType<FeatureGridLayerProps>,
@@ -69,6 +78,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
   "pricing-table": {
     component: PricingTableLayer,
     propsSchema: z.object({
+      eyebrow: z.string().optional(),
       title: z.string().optional(),
       items: z.array(pricingTablePlanSchema),
     }) satisfies z.ZodType<PricingTableLayerProps>,
@@ -76,6 +86,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
   testimonials: {
     component: TestimonialsLayer,
     propsSchema: z.object({
+      eyebrow: z.string().optional(),
       title: z.string().optional(),
       items: z.array(testimonialItemSchema),
     }) satisfies z.ZodType<TestimonialsLayerProps>,
@@ -83,6 +94,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
   "cta-banner": {
     component: CtaBannerLayer,
     propsSchema: z.object({
+      eyebrow: z.string().optional(),
       title: z.string(),
       subtitle: z.string().optional(),
       ctaLabel: z.string(),

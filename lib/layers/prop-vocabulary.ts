@@ -25,6 +25,9 @@ export const ALLOWED_PROP_NAMES = [
   "authorName",
   "authorRole",
   "rating",
+  "eyebrow",
+  "trustPills",
+  "metric",
 ] as const
 
 export type AllowedPropName = (typeof ALLOWED_PROP_NAMES)[number]
@@ -57,6 +60,14 @@ export const FORBIDDEN_PROP_SYNONYMS: Record<string, AllowedPropName> = {
   quote: "body",
   role: "authorRole",
   company: "authorRole",
+  kicker: "eyebrow",
+  label: "eyebrow",
+  tag: "eyebrow",
+  overline: "eyebrow",
+  badges: "trustPills",
+  chips: "trustPills",
+  stat: "metric",
+  kpi: "metric",
 }
 
 /**

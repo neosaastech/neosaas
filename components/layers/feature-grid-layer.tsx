@@ -7,6 +7,7 @@
 
 import * as LucideIcons from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Eyebrow } from "@/components/ui/eyebrow"
 
 export interface FeatureGridItem {
   icon: string
@@ -16,13 +17,15 @@ export interface FeatureGridItem {
 }
 
 export interface FeatureGridLayerProps {
+  eyebrow?: string
   title?: string
   items: FeatureGridItem[]
 }
 
-export function FeatureGridLayer({ title, items }: FeatureGridLayerProps) {
+export function FeatureGridLayer({ eyebrow, title, items }: FeatureGridLayerProps) {
   return (
     <div className="mx-auto mt-16">
+      {eyebrow && <Eyebrow className="mb-2 text-center">{eyebrow}</Eyebrow>}
       {title && <h2 className="mb-10 text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => {
