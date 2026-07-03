@@ -112,7 +112,18 @@ async function main() {
     for (let i = 0; i < statements.length; i++) {
       const stmt = statements[i];
       try {
-        await sql.unsafe(stmt);
+        // `sql.unsafe(str)` does NOT execute anything by itself — it only
+        // builds an interpolation helper for embedding inside a tagged
+        // template (e.g. sql`SELECT ${sql.unsafe(colName)}`). Calling it bare
+        // silently no-ops: no error, "success", and nothing ever reaches the
+        // database. This was almost certainly the real cause of this
+        // project's recurring "table missing after migration reported
+        // Applied" issue, previously misdiagnosed as a Neon HTTP-proxy
+        // caching/visibility bug (Gotcha #6/#10/#12 in CLAUDE-neosaas.md) —
+        // found 2026-07-03 while migrating a fresh DB for content-mania v2,
+        // where the symptom was 100% reproducible with zero delay involved.
+        // `sql.query(text, params?)` is the actual raw-execution method.
+        await sql.query(stmt);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         // Tolerate "already exists" errors — idempotent safety
