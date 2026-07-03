@@ -13,8 +13,18 @@ export const ALLOWED_PROP_NAMES = [
   "body",
   "ctaLabel",
   "ctaHref",
+  "secondaryCtaLabel",
+  "secondaryCtaHref",
   "items",
   "imageUrl",
+  "name",
+  "price",
+  "period",
+  "bullets",
+  "highlighted",
+  "authorName",
+  "authorRole",
+  "rating",
 ] as const
 
 export type AllowedPropName = (typeof ALLOWED_PROP_NAMES)[number]
@@ -28,15 +38,32 @@ export const FORBIDDEN_PROP_SYNONYMS: Record<string, AllowedPropName> = {
   buttonLabel: "ctaLabel",
   link: "ctaHref",
   url: "ctaHref",
+  buttonText2: "secondaryCtaLabel",
+  secondaryButtonLabel: "secondaryCtaLabel",
+  link2: "secondaryCtaHref",
   data: "items",
   list: "items",
   entries: "items",
+  plans: "items",
+  testimonials: "items",
   image: "imageUrl",
   img: "imageUrl",
   photo: "imageUrl",
+  avatarUrl: "imageUrl",
+  planName: "name",
+  featured: "highlighted",
+  popular: "highlighted",
+  author: "authorName",
+  quote: "body",
+  role: "authorRole",
+  company: "authorRole",
 }
 
-/** ctaLabel and ctaHref must always be declared together, never alone. */
+/**
+ * Pairs that must always be declared together, never alone — a CTA without
+ * its href (or vice versa) is a broken button, not a valid partial state.
+ */
 export const REQUIRED_PROP_PAIRS: readonly [AllowedPropName, AllowedPropName][] = [
   ["ctaLabel", "ctaHref"],
+  ["secondaryCtaLabel", "secondaryCtaHref"],
 ]

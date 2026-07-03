@@ -16,31 +16,35 @@ export interface FeatureGridItem {
 }
 
 export interface FeatureGridLayerProps {
+  title?: string
   items: FeatureGridItem[]
 }
 
-export function FeatureGridLayer({ items }: FeatureGridLayerProps) {
+export function FeatureGridLayer({ title, items }: FeatureGridLayerProps) {
   return (
-    <div className="mx-auto mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-      {items.map((item) => {
-        const IconComponent = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon]
-        return (
-          <Card key={item.title}>
-            <CardHeader>
-              {IconComponent && <IconComponent className="h-10 w-10 text-primary mb-4" />}
-              <CardTitle>{item.title}</CardTitle>
-              <CardDescription>{item.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-                {item.bullets.map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )
-      })}
+    <div className="mx-auto mt-16">
+      {title && <h2 className="mb-10 text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => {
+          const IconComponent = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon]
+          return (
+            <Card key={item.title}>
+              <CardHeader>
+                {IconComponent && <IconComponent className="h-10 w-10 text-primary mb-4" />}
+                <CardTitle>{item.title}</CardTitle>
+                <CardDescription>{item.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                  {item.bullets.map((bullet) => (
+                    <li key={bullet}>{bullet}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
     </div>
   )
 }
