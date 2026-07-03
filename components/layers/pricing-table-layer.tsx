@@ -6,6 +6,7 @@
  */
 import { Check } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
@@ -30,9 +31,9 @@ export function PricingTableLayer({ title, items }: PricingTableLayerProps) {
       {title && <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
       <div className={cn("mt-10 grid gap-8", items.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>
         {items.map((plan) => (
-          <Card key={plan.name} className={cn("relative", plan.highlighted && "border-brand shadow-lg")}>
+          <Card key={plan.name} className={cn("relative", plan.highlighted && "border-primary shadow-lg")}>
             {plan.highlighted && (
-              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white">Populaire</Badge>
+              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">Populaire</Badge>
             )}
             <CardHeader>
               <CardTitle>{plan.name}</CardTitle>
@@ -50,17 +51,9 @@ export function PricingTableLayer({ title, items }: PricingTableLayerProps) {
                   </li>
                 ))}
               </ul>
-              <a
-                href={plan.ctaHref}
-                className={cn(
-                  "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                  plan.highlighted
-                    ? "bg-brand text-white hover:bg-brand-hover"
-                    : "border border-input hover:bg-accent",
-                )}
-              >
-                {plan.ctaLabel}
-              </a>
+              <Button asChild variant={plan.highlighted ? "default" : "outline"} className="w-full">
+                <a href={plan.ctaHref}>{plan.ctaLabel}</a>
+              </Button>
             </CardContent>
           </Card>
         ))}

@@ -1,6 +1,8 @@
 /**
  * "hero" layer (Pilier C — Calques de page). Registered in lib/layers/registry.ts.
  */
+import { Button } from "@/components/ui/button"
+
 export interface HeroLayerProps {
   title: string
   subtitle?: string
@@ -28,20 +30,14 @@ export function HeroLayer({
         {(ctaLabel && ctaHref) || (secondaryCtaLabel && secondaryCtaHref) ? (
           <div className={imageUrl ? "mt-6 flex flex-wrap gap-3" : "mt-6 flex flex-wrap justify-center gap-3"}>
             {ctaLabel && ctaHref && (
-              <a
-                href={ctaHref}
-                className="inline-flex items-center justify-center rounded-md bg-brand px-6 py-3 text-sm font-medium text-white hover:bg-brand-hover"
-              >
-                {ctaLabel}
-              </a>
+              <Button asChild size="lg">
+                <a href={ctaHref}>{ctaLabel}</a>
+              </Button>
             )}
             {secondaryCtaLabel && secondaryCtaHref && (
-              <a
-                href={secondaryCtaHref}
-                className="inline-flex items-center justify-center rounded-md border border-input px-6 py-3 text-sm font-medium hover:bg-accent"
-              >
-                {secondaryCtaLabel}
-              </a>
+              <Button asChild variant="outline" size="lg">
+                <a href={secondaryCtaHref}>{secondaryCtaLabel}</a>
+              </Button>
             )}
           </div>
         ) : null}
