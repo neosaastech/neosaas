@@ -860,6 +860,38 @@ export const formSubmissions = pgTable("form_submissions", {
 export type FormSubmission = typeof formSubmissions.$inferSelect
 export type NewFormSubmission = typeof formSubmissions.$inferInsert
 
+/**
+ * Mirror of Payload's BlogPosts collection, pushed here by the sync adapter
+ * on publish (same pattern as page_layers) — the "blog-list" page layer
+ * (components/layers/blog-list-layer.tsx) queries this table directly at
+ * render time instead of receiving static props, since it must always show
+ * the *current* latest posts, not a snapshot frozen when the block was
+ * authored. `bodyHtml` is pre-serialized from Payload's Lexical JSON
+ * (@payloadcms/richtext-lexical/html convertLexicalToHTML) at sync time, so
+ * this site never needs a Lexical renderer of its own. `slug` is unique per
+ * site (each site has its own DB) — safe as the sync target for
+ * upsert-by-slug.
+ */
+export const blogPosts = pgTable("blog_posts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  slug: text("slug").notNull().unique(),
+  locale: text("locale").notNull().default("fr"),
+  title: text("title").notNull(),
+  excerpt: text("excerpt"),
+  coverImageUrl: text("cover_image_url"),
+  authorName: text("author_name"),
+  bodyHtml: text("body_html").notNull().default(""),
+  categorySlug: text("category_slug"),
+  categoryPath: text("category_path"),
+  publishedAt: timestamp("published_at"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+})
+
+export type BlogPost = typeof blogPosts.$inferSelect
+export type NewBlogPost = typeof blogPosts.$inferInsert
+
 // =============================================================================
 // PILOT ACTIONS LOG - Declarative admin/agent actions (Pilier E — pilotage JSON)
 // =============================================================================

@@ -32,6 +32,8 @@ export const ALLOWED_PROP_NAMES = [
   "submitLabel",
   "type",
   "required",
+  "limit",
+  "categorySlug",
 ] as const
 
 export type AllowedPropName = (typeof ALLOWED_PROP_NAMES)[number]
@@ -75,6 +77,9 @@ export const FORBIDDEN_PROP_SYNONYMS: Record<string, AllowedPropName> = {
   kpi: "metric",
   submitText: "submitLabel",
   submitButtonLabel: "submitLabel",
+  count: "limit",
+  max: "limit",
+  category: "categorySlug",
 }
 
 /**
