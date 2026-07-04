@@ -11,6 +11,11 @@ import { ensureStripeCustomer, updateStripeCustomerMetadata, deleteStripeCustome
 
 export async function getUsers() {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const allUsers = await db.query.users.findMany({
       with: {
         company: true,
@@ -31,6 +36,11 @@ export async function getUsers() {
 
 export async function createUser(formData: FormData) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const email = formData.get("email") as string
     const username = formData.get("username") as string
     const firstName = formData.get("firstName") as string
@@ -169,8 +179,15 @@ export async function setDpo(userId: string) {
 export async function deleteUser(userId: string) {
   try {
     const currentUser = await getCurrentUser()
-    if (currentUser?.userId === userId) {
-      return { success: false, error: "You cannot delete your own account" }
+    const isSelfDelete = currentUser?.userId === userId
+
+    // Self-service deletion (dashboard/profile "Delete my account") needs no
+    // extra role — deleting someone ELSE requires super_admin. Previously
+    // this only blocked self-delete and had no role check at all for the
+    // "someone else" case, meaning any authenticated user, any role, could
+    // delete any other user's account cross-tenant.
+    if (!isSelfDelete && !currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
     }
 
     const userToDelete = await db.query.users.findFirst({
@@ -287,6 +304,9 @@ export async function deleteUser(userId: string) {
 export async function updateUserRole(userId: string, roleName: string) {
   try {
     const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
     if (currentUser?.userId === userId) {
       return { success: false, error: "You cannot change your own role" }
     }
@@ -359,6 +379,9 @@ export async function bulkUpdateUserStatus(userIds: string[], isActive: boolean)
     }
 
     const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
     if (currentUser && userIds.includes(currentUser.userId)) {
       return { success: false, error: "You cannot change your own status" }
     }
@@ -392,6 +415,9 @@ export async function bulkUpdateUserStatus(userIds: string[], isActive: boolean)
 export async function updateUserStatus(userId: string, isActive: boolean) {
   try {
     const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
     if (currentUser?.userId === userId) {
       return { success: false, error: "You cannot change your own status" }
     }
@@ -434,6 +460,11 @@ export async function updateUser(userId: string, data: {
   companyId?: string | null
 }) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     // Get current user data to check for changes
     const currentUserData = await db.query.users.findFirst({
       where: eq(users.id, userId)
@@ -528,6 +559,11 @@ export async function updateUser(userId: string, data: {
  */
 export async function getCompanies() {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const allCompanies = await db.query.companies.findMany({
       with: {
         users: {
@@ -554,6 +590,11 @@ export async function getCompanies() {
  */
 export async function updateCompanyStatus(companyId: string, isActive: boolean) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const [updatedCompany] = await db
       .update(companies)
       .set({ isActive, updatedAt: new Date() })
@@ -589,6 +630,11 @@ export async function bulkUpdateCompanyStatus(companyIds: string[], isActive: bo
   try {
     if (!companyIds || companyIds.length === 0) {
       return { success: false, error: "No companies selected" }
+    }
+
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
     }
 
     const results = await Promise.all(
@@ -637,6 +683,11 @@ export async function updateCompany(companyId: string, data: {
   vatNumber?: string
 }) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     // Check if email is being changed and if it's already taken
     if (data.email) {
       const existingCompany = await db.query.companies.findFirst({
@@ -693,6 +744,11 @@ export async function createCompany(data: {
   vatNumber?: string
 }) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     // Check if email is already taken
     const existingCompany = await db.query.companies.findFirst({
       where: eq(companies.email, data.email)
@@ -724,6 +780,11 @@ export async function createCompany(data: {
  */
 export async function deleteCompany(companyId: string) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser?.roles?.includes('super_admin')) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     // First check if company has users
     const companyUsers = await db.query.users.findMany({
       where: eq(users.companyId, companyId)

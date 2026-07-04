@@ -24,6 +24,7 @@ import {
   MessageSquare,
   Rocket,
   Headphones,
+  Layers,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -49,6 +50,7 @@ const adminItems = [
   { name: "Appointments", href: "/admin/appointments", icon: CalendarDays, superAdminOnly: false },
   { name: "Products", href: "/admin/products", icon: ShoppingBag, superAdminOnly: false },
   { name: "Organization", href: "/admin/users", icon: Users, superAdminOnly: true },
+  { name: "Pages", href: "/admin/pages", icon: Layers, superAdminOnly: false },
   { name: "Parameters", href: "/admin/settings", icon: Settings, superAdminOnly: false },
   { name: "API Management", href: "/admin/api", icon: Key, superAdminOnly: false },
   { name: "Mail Management", href: "/admin/mail", icon: Mail, superAdminOnly: false },

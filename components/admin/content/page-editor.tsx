@@ -64,7 +64,7 @@ export function PageEditor({ page }: { page: PayloadPageDoc | null }) {
       })
       if (result.success) {
         toast.success(status === "published" ? "Page publiée" : "Brouillon enregistré")
-        router.push("/admin/settings?tab=pages")
+        router.push("/admin/pages")
         router.refresh()
       } else {
         toast.error(result.error)
@@ -95,12 +95,15 @@ export function PageEditor({ page }: { page: PayloadPageDoc | null }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="page-type">Type de page</Label>
-              <Input
-                id="page-type"
-                placeholder="ex. landing, article, legal..."
-                value={pageType}
-                onChange={(e) => setPageType(e.target.value)}
-              />
+              <Select value={pageType || "landing"} onValueChange={setPageType}>
+                <SelectTrigger id="page-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="landing">Landing (marketing)</SelectItem>
+                  <SelectItem value="article">Article (blog)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="meta-title">Meta title (SEO)</Label>
