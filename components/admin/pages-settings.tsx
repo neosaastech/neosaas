@@ -5,10 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Shield, Globe, Users, FileText } from "lucide-react"
+import { Search, Shield, Globe, Users, FileText, ExternalLink, Layers } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getPages, updatePageAccess, syncPages, type AccessLevel } from "@/app/actions/pages"
+import { getPages, updatePageAccess, syncPages, getContentPages, type AccessLevel } from "@/app/actions/pages"
+import type { PayloadPageSummary } from "@/lib/payload-bridge"
 import { toast } from "sonner"
+
+const PAYLOAD_ADMIN_URL = "https://cms.neokube.fr/admin/collections/pages"
 
 interface Page {
   path: string
@@ -41,6 +44,24 @@ export function PagesSettings() {
   const [filteredPages, setFilteredPages] = useState<Page[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [contentPages, setContentPages] = useState<PayloadPageSummary[]>([])
+  const [isLoadingContentPages, setIsLoadingContentPages] = useState(true)
+  const [contentPagesError, setContentPagesError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchContentPages = async () => {
+      setIsLoadingContentPages(true)
+      const result = await getContentPages()
+      if (result.success) {
+        setContentPages(result.data)
+        setContentPagesError(null)
+      } else {
+        setContentPagesError(result.error)
+      }
+      setIsLoadingContentPages(false)
+    }
+    fetchContentPages()
+  }, [])
 
   useEffect(() => {
     const fetchPages = async () => {
@@ -145,14 +166,84 @@ export function PagesSettings() {
   }
 
   return (
+    <div className="flex flex-col gap-6">
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Layers className="h-5 w-5 text-brand" />
+          Content Pages
+        </CardTitle>
+        <CardDescription>
+          Pages authored in the central CMS (Payload). Content is created/edited there for now —
+          a built-in editor is coming next. This list is read live from Payload, scoped to this site.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[150px]">Title</TableHead>
+                <TableHead className="min-w-[150px]">Path</TableHead>
+                <TableHead className="min-w-[100px]">Status</TableHead>
+                <TableHead className="min-w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingContentPages ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">
+                    Loading content pages...
+                  </TableCell>
+                </TableRow>
+              ) : contentPagesError ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-destructive">
+                    {contentPagesError}
+                  </TableCell>
+                </TableRow>
+              ) : contentPages.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">
+                    No content pages yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                contentPages.map((page) => (
+                  <TableRow key={page.id}>
+                    <TableCell className="font-medium">{page.title}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{page.path}</TableCell>
+                    <TableCell>
+                      <Badge variant={page._status === "published" ? "default" : "outline"}>
+                        {page._status === "published" ? "Published" : "Draft"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <a
+                        href={`${PAYLOAD_ADMIN_URL}/${page.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        Edit <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-brand" />
-          Pages Access Control
+          Internal Routes
         </CardTitle>
         <CardDescription>
-          Manage access levels for different pages of your application.
+          Access levels for this app&apos;s own internal routes (dashboard, auth, admin).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -252,5 +343,6 @@ export function PagesSettings() {
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }
