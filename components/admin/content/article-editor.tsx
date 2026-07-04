@@ -13,7 +13,7 @@ import { saveContentArticle, getContentCategories } from "@/app/actions/pages"
 import type { PayloadBlogPostDoc, PayloadCategorySummary } from "@/lib/payload-bridge"
 import { RichTextEditor, RichTextPreview } from "@/components/admin/content/rich-text-editor"
 
-export function ArticleEditor({ article }: { article: PayloadBlogPostDoc | null }) {
+export function ArticleEditor({ article, onSaved }: { article: PayloadBlogPostDoc | null; onSaved?: () => void }) {
   const router = useRouter()
   const [title, setTitle] = useState(article?.title ?? "")
   const [slug, setSlug] = useState(article?.slug ?? "")
@@ -45,8 +45,12 @@ export function ArticleEditor({ article }: { article: PayloadBlogPostDoc | null 
       })
       if (result.success) {
         toast.success(status === "published" ? "Article publié" : "Brouillon enregistré")
-        router.push("/admin/pages")
-        router.refresh()
+        if (onSaved) {
+          onSaved()
+        } else {
+          router.push("/admin/pages")
+          router.refresh()
+        }
       } else {
         toast.error(result.error)
       }

@@ -6,11 +6,27 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree } from "lucide-react"
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { getContentPages, getContentArticles, getContentCategories } from "@/app/actions/pages"
-import type { PayloadPageSummary, PayloadBlogPostSummary, PayloadCategorySummary } from "@/lib/payload-bridge"
+import { toast } from "sonner"
+import {
+  getContentPages,
+  getContentPage,
+  getContentArticles,
+  getContentArticle,
+  getContentCategories,
+} from "@/app/actions/pages"
+import type {
+  PayloadPageSummary,
+  PayloadPageDoc,
+  PayloadBlogPostSummary,
+  PayloadBlogPostDoc,
+  PayloadCategorySummary,
+} from "@/lib/payload-bridge"
+import { CategoriesPanel } from "./content/categories-panel"
+import { ContentSheet } from "./content/content-sheet"
+import { PageEditor } from "./content/page-editor"
+import { ArticleEditor } from "./content/article-editor"
 
 const PAGE_SIZE = 20
 
@@ -21,6 +37,12 @@ const PAGE_SIZE = 20
  * paginated via Payload's native REST pagination (not a client-side slice)
  * since a real site can reach dozens/hundreds of pages, not just the 2
  * that exist today.
+ *
+ * Editing (2026-07-05, Charles: "il vaut mieux privilégier un overlay
+ * bottom qui s'affiche de bas vers le haut... si mobile alors apparition
+ * right") happens in an in-place ContentSheet instead of navigating to a
+ * separate /admin/content/pages/[id] route — one editing pattern for
+ * Pages, Articles, and Categories alike, not one per content type.
  */
 export function ContentHub() {
   return (
@@ -32,12 +54,18 @@ export function ContentHub() {
         <TabsTrigger value="articles">
           <Newspaper className="h-3.5 w-3.5" /> Articles
         </TabsTrigger>
+        <TabsTrigger value="categories">
+          <FolderTree className="h-3.5 w-3.5" /> Catégories
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="pages">
         <PagesPanel />
       </TabsContent>
       <TabsContent value="articles">
         <ArticlesPanel />
+      </TabsContent>
+      <TabsContent value="categories">
+        <CategoriesPanel />
       </TabsContent>
     </Tabs>
   )
@@ -51,19 +79,44 @@ function PagesPanel() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editingDoc, setEditingDoc] = useState<PayloadPageDoc | null>(null)
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false)
+
+  async function load() {
     setIsLoading(true)
-    getContentPages({ page, limit: PAGE_SIZE, pageType: pageType === "all" ? undefined : pageType }).then((result) => {
-      if (result.success) {
-        setPages(result.data.docs)
-        setTotalPages(result.data.totalPages)
-        setError(null)
-      } else {
-        setError(result.error)
-      }
-      setIsLoading(false)
-    })
+    const result = await getContentPages({ page, limit: PAGE_SIZE, pageType: pageType === "all" ? undefined : pageType })
+    if (result.success) {
+      setPages(result.data.docs)
+      setTotalPages(result.data.totalPages)
+      setError(null)
+    } else {
+      setError(result.error)
+    }
+    setIsLoading(false)
+  }
+
+  useEffect(() => {
+    load()
   }, [page, pageType])
+
+  function openCreate() {
+    setEditingDoc(null)
+    setSheetOpen(true)
+  }
+
+  async function openEdit(id: string | number) {
+    setSheetOpen(true)
+    setIsLoadingDoc(true)
+    const result = await getContentPage(id)
+    if (result.success) {
+      setEditingDoc(result.data)
+    } else {
+      toast.error(result.error)
+      setSheetOpen(false)
+    }
+    setIsLoadingDoc(false)
+  }
 
   return (
     <Card>
@@ -75,10 +128,8 @@ function PagesPanel() {
           </CardTitle>
           <CardDescription>Pages authored centrally, editable directly here — live from Payload.</CardDescription>
         </div>
-        <Button asChild size="sm">
-          <Link href="/admin/content/pages/new">
-            <Plus className="h-3.5 w-3.5" /> New page
-          </Link>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" /> New page
         </Button>
       </CardHeader>
       <CardContent>
@@ -101,26 +152,29 @@ function PagesPanel() {
                 <TableHead className="min-w-[150px]">Title</TableHead>
                 <TableHead className="min-w-[150px]">Path</TableHead>
                 <TableHead className="min-w-[100px]">Type</TableHead>
+                <TableHead className="min-w-[120px]">Category</TableHead>
+                <TableHead className="min-w-[140px]">Author</TableHead>
                 <TableHead className="min-w-[100px]">Status</TableHead>
+                <TableHead className="min-w-[140px]">Published</TableHead>
                 <TableHead className="min-w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     Loading pages...
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                  <TableCell colSpan={8} className="h-24 text-center text-destructive">
                     {error}
                   </TableCell>
                 </TableRow>
               ) : pages.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={8} className="h-24 text-center">
                     No pages yet.
                   </TableCell>
                 </TableRow>
@@ -133,17 +187,30 @@ function PagesPanel() {
                       {p.pageType ? <Badge variant="outline">{p.pageType}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
                     </TableCell>
                     <TableCell>
+                      {p.category ? (
+                        <Badge variant="outline">{p.category.name}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {p.author?.email ?? "—"}
+                    </TableCell>
+                    <TableCell>
                       <Badge variant={p._status === "published" ? "default" : "outline"}>
                         {p._status === "published" ? "Published" : "Draft"}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {p.publishedAt ? new Date(p.publishedAt).toLocaleDateString() : "—"}
+                    </TableCell>
                     <TableCell>
-                      <Link
-                        href={`/admin/content/pages/${p.id}`}
+                      <button
+                        onClick={() => openEdit(p.id)}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
                         Edit <Pencil className="h-3 w-3" />
-                      </Link>
+                      </button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -153,6 +220,24 @@ function PagesPanel() {
         </div>
         <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
       </CardContent>
+
+      <ContentSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={editingDoc ? `Modifier "${editingDoc.title}"` : "Nouvelle page"}
+      >
+        {isLoadingDoc ? (
+          <p className="text-sm text-muted-foreground">Chargement…</p>
+        ) : (
+          <PageEditor
+            page={editingDoc}
+            onSaved={() => {
+              setSheetOpen(false)
+              load()
+            }}
+          />
+        )}
+      </ContentSheet>
     </Card>
   )
 }
@@ -166,29 +251,52 @@ function ArticlesPanel() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editingDoc, setEditingDoc] = useState<PayloadBlogPostDoc | null>(null)
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false)
+
   useEffect(() => {
     getContentCategories().then((result) => {
       if (result.success) setCategories(result.data)
     })
   }, [])
 
-  useEffect(() => {
+  async function load() {
     setIsLoading(true)
-    getContentArticles({ page, limit: PAGE_SIZE, category: categoryId === "all" ? undefined : categoryId }).then(
-      (result) => {
-        if (result.success) {
-          setArticles(result.data.docs)
-          setTotalPages(result.data.totalPages)
-          setError(null)
-        } else {
-          setError(result.error)
-        }
-        setIsLoading(false)
-      },
-    )
+    const result = await getContentArticles({ page, limit: PAGE_SIZE, category: categoryId === "all" ? undefined : categoryId })
+    if (result.success) {
+      setArticles(result.data.docs)
+      setTotalPages(result.data.totalPages)
+      setError(null)
+    } else {
+      setError(result.error)
+    }
+    setIsLoading(false)
+  }
+
+  useEffect(() => {
+    load()
   }, [page, categoryId])
 
   const categoryName = (id: string | number | null) => categories.find((c) => String(c.id) === String(id))?.path
+
+  function openCreate() {
+    setEditingDoc(null)
+    setSheetOpen(true)
+  }
+
+  async function openEdit(id: string | number) {
+    setSheetOpen(true)
+    setIsLoadingDoc(true)
+    const result = await getContentArticle(id)
+    if (result.success) {
+      setEditingDoc(result.data)
+    } else {
+      toast.error(result.error)
+      setSheetOpen(false)
+    }
+    setIsLoadingDoc(false)
+  }
 
   return (
     <Card>
@@ -200,10 +308,8 @@ function ArticlesPanel() {
           </CardTitle>
           <CardDescription>Blog posts authored centrally, editable directly here — live from Payload.</CardDescription>
         </div>
-        <Button asChild size="sm">
-          <Link href="/admin/content/articles/new">
-            <Plus className="h-3.5 w-3.5" /> New article
-          </Link>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" /> New article
         </Button>
       </CardHeader>
       <CardContent>
@@ -262,12 +368,12 @@ function ArticlesPanel() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Link
-                        href={`/admin/content/articles/${a.id}`}
+                      <button
+                        onClick={() => openEdit(a.id)}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
                         Edit <Pencil className="h-3 w-3" />
-                      </Link>
+                      </button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -277,6 +383,24 @@ function ArticlesPanel() {
         </div>
         <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
       </CardContent>
+
+      <ContentSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title={editingDoc ? `Modifier "${editingDoc.title}"` : "Nouvel article"}
+      >
+        {isLoadingDoc ? (
+          <p className="text-sm text-muted-foreground">Chargement…</p>
+        ) : (
+          <ArticleEditor
+            article={editingDoc}
+            onSaved={() => {
+              setSheetOpen(false)
+              load()
+            }}
+          />
+        )}
+      </ContentSheet>
     </Card>
   )
 }

@@ -16,6 +16,9 @@ import {
   createBlogPost,
   updateBlogPost,
   listCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
   type PayloadPageSummary,
   type PayloadPageDoc,
   type PageWriteInput,
@@ -23,6 +26,7 @@ import {
   type PayloadBlogPostDoc,
   type BlogPostWriteInput,
   type PayloadCategorySummary,
+  type CategoryWriteInput,
   type PaginatedResult,
   type ListPagesOptions,
   type ListBlogPostsOptions,
@@ -194,5 +198,44 @@ export async function getContentCategories(): Promise<
   } catch (error) {
     console.error("Failed to fetch categories from Payload:", error)
     return { success: false, error: "Failed to fetch categories" }
+  }
+}
+
+// ─── Categories (shared taxonomy for Pages and Articles) ───
+
+export async function saveCategory(
+  id: string | number | null,
+  input: CategoryWriteInput,
+): Promise<{ success: true; data: PayloadCategorySummary } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    const category = id ? await updateCategory(id, input) : await createCategory(input)
+    revalidatePath("/admin/pages")
+    return { success: true, data: category }
+  } catch (error) {
+    console.error("Failed to save category to Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to save category"
+    return { success: false, error: message }
+  }
+}
+
+export async function removeCategory(id: string | number): Promise<{ success: true } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    await deleteCategory(id)
+    revalidatePath("/admin/pages")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete category from Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to delete category"
+    return { success: false, error: message }
   }
 }
