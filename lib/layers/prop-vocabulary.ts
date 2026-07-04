@@ -28,6 +28,10 @@ export const ALLOWED_PROP_NAMES = [
   "eyebrow",
   "trustPills",
   "metric",
+  "successMessage",
+  "submitLabel",
+  "type",
+  "required",
 ] as const
 
 export type AllowedPropName = (typeof ALLOWED_PROP_NAMES)[number]
@@ -49,6 +53,7 @@ export const FORBIDDEN_PROP_SYNONYMS: Record<string, AllowedPropName> = {
   entries: "items",
   plans: "items",
   testimonials: "items",
+  fields: "items",
   image: "imageUrl",
   img: "imageUrl",
   photo: "imageUrl",
@@ -68,6 +73,8 @@ export const FORBIDDEN_PROP_SYNONYMS: Record<string, AllowedPropName> = {
   chips: "trustPills",
   stat: "metric",
   kpi: "metric",
+  submitText: "submitLabel",
+  submitButtonLabel: "submitLabel",
 }
 
 /**

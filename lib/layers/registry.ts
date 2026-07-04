@@ -5,6 +5,7 @@ import { FeatureGridLayer, type FeatureGridLayerProps } from "@/components/layer
 import { PricingTableLayer, type PricingTableLayerProps } from "@/components/layers/pricing-table-layer"
 import { TestimonialsLayer, type TestimonialsLayerProps } from "@/components/layers/testimonials-layer"
 import { CtaBannerLayer, type CtaBannerLayerProps } from "@/components/layers/cta-banner-layer"
+import { FormLayer, type FormLayerProps } from "@/components/layers/form-layer"
 
 /**
  * Single source of truth for page layer types (Pilier G — Normes de nommage & design tokens).
@@ -50,6 +51,13 @@ const testimonialItemSchema = z.object({
   imageUrl: z.string().optional(),
   rating: z.number().min(1).max(5).optional(),
   metric: z.string().optional(),
+})
+
+const formFieldSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  type: z.enum(["text", "email", "textarea", "checkbox"]),
+  required: z.boolean().optional(),
 })
 
 export const layerRegistry: Record<string, LayerDefinition> = {
@@ -100,5 +108,17 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       ctaLabel: z.string(),
       ctaHref: z.string(),
     }) satisfies z.ZodType<CtaBannerLayerProps>,
+  },
+  form: {
+    component: FormLayer,
+    propsSchema: z.object({
+      eyebrow: z.string().optional(),
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      name: z.string(),
+      items: z.array(formFieldSchema),
+      submitLabel: z.string().optional(),
+      successMessage: z.string().optional(),
+    }) satisfies z.ZodType<FormLayerProps>,
   },
 }

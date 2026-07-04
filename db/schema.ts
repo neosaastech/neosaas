@@ -840,6 +840,26 @@ export const pageLayers = pgTable("page_layers", {
 export type PageLayer = typeof pageLayers.$inferSelect
 export type NewPageLayer = typeof pageLayers.$inferInsert
 
+/**
+ * Submissions from the "form" page layer (lib/layers/registry.ts /
+ * components/layers/form-layer.tsx) — one row per submit, `fields` holds
+ * whatever the form's field schema defines (no fixed columns, since a
+ * form's fields are authored in Payload, not hardcoded here). `formName`
+ * distinguishes multiple form instances on the same site (e.g. "contact"
+ * vs "newsletter") since pagePath alone isn't a stable identity — a form
+ * block can be moved between pages without losing its submission history.
+ */
+export const formSubmissions = pgTable("form_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  formName: text("form_name").notNull(),
+  pagePath: text("page_path").notNull(),
+  fields: jsonb("fields").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+})
+
+export type FormSubmission = typeof formSubmissions.$inferSelect
+export type NewFormSubmission = typeof formSubmissions.$inferInsert
+
 // =============================================================================
 // PILOT ACTIONS LOG - Declarative admin/agent actions (Pilier E — pilotage JSON)
 // =============================================================================
