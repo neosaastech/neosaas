@@ -1,7 +1,11 @@
 import { db } from "../db"
 import { pagePermissions } from "../db/schema"
+import type { RequiredRoleLevel } from "../lib/auth/page-access"
 
-type AccessLevel = "public" | "user" | "admin" | "super-admin"
+// Was its own "super-admin" (hyphen) union, independently of app/actions/pages.ts's
+// identical typo — neither ever matched the "super_admin" (underscore) value
+// actually used at runtime. Now both import the same canonical type.
+type AccessLevel = RequiredRoleLevel
 
 interface Page {
   path: string

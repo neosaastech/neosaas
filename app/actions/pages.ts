@@ -4,8 +4,14 @@ import { db } from "@/db"
 import { pagePermissions } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import type { RequiredRoleLevel } from "@/lib/auth/page-access"
 
-export type AccessLevel = "public" | "user" | "admin" | "super-admin"
+// Was its own "public" | "user" | "admin" | "super-admin" (hyphen) union,
+// never matching the "super_admin" (underscore) string actually used by
+// every consumer (components/admin/pages-settings.tsx, db/schema.ts,
+// lib/pilot/actions.ts) — reusing the canonical type kills that drift at
+// the source instead of fixing the typo in two places that can re-diverge.
+export type AccessLevel = RequiredRoleLevel
 
 export async function getPages() {
   try {
