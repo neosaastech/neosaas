@@ -5,7 +5,16 @@ import { pagePermissions } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import type { RequiredRoleLevel } from "@/lib/auth/page-access"
-import { listPages, type PayloadPageSummary } from "@/lib/payload-bridge"
+import { getCurrentUser } from "@/lib/auth"
+import {
+  listPages,
+  getPage,
+  createPage,
+  updatePage,
+  type PayloadPageSummary,
+  type PayloadPageDoc,
+  type PageWriteInput,
+} from "@/lib/payload-bridge"
 
 // Was its own "public" | "user" | "admin" | "super-admin" (hyphen) union,
 // never matching the "super_admin" (underscore) string actually used by
@@ -59,12 +68,12 @@ export async function syncPages(pages: { path: string, name: string, group: stri
 }
 
 /**
- * First slice of the unified Pages screen (Notion "Payload CMS multi-site"
- * — bridge decision 2026-07-04): real content pages authored in the
- * central Payload, fetched read-only via the server-side bridge
- * (lib/payload-bridge.ts). This app never writes this data directly —
- * creation/editing happens in Payload (either its own admin for now, or a
- * future embedded form here), this action only lists what already exists.
+ * Content-management bridge (Notion "Payload CMS multi-site" — 2026-07-04):
+ * real content pages authored in the central Payload, read AND written
+ * through the server-side bridge (lib/payload-bridge.ts) — this app never
+ * writes page_layers directly for this content, Payload's own sync hooks
+ * remain the only path that populates it. All writes gated to admin/
+ * super_admin, matching the pattern already used across app/actions/*.ts.
  */
 export async function getContentPages(): Promise<
   { success: true; data: PayloadPageSummary[] } | { success: false; error: string }
@@ -75,5 +84,36 @@ export async function getContentPages(): Promise<
   } catch (error) {
     console.error("Failed to fetch content pages from Payload:", error)
     return { success: false, error: "Failed to fetch content pages" }
+  }
+}
+
+export async function getContentPage(
+  id: string | number,
+): Promise<{ success: true; data: PayloadPageDoc } | { success: false; error: string }> {
+  try {
+    const page = await getPage(id)
+    return { success: true, data: page }
+  } catch (error) {
+    console.error("Failed to fetch content page from Payload:", error)
+    return { success: false, error: "Failed to fetch content page" }
+  }
+}
+
+export async function saveContentPage(
+  id: string | number | null,
+  input: PageWriteInput,
+): Promise<{ success: true; data: PayloadPageDoc } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    const page = id ? await updatePage(id, input) : await createPage(input)
+    revalidatePath("/admin/settings")
+    return { success: true, data: page }
+  } catch (error) {
+    console.error("Failed to save content page to Payload:", error)
+    return { success: false, error: "Failed to save content page" }
   }
 }

@@ -5,13 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Shield, Globe, Users, FileText, ExternalLink, Layers } from "lucide-react"
+import { Search, Shield, Globe, Users, FileText, Pencil, Plus, Layers } from "lucide-react"
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { getPages, updatePageAccess, syncPages, getContentPages, type AccessLevel } from "@/app/actions/pages"
 import type { PayloadPageSummary } from "@/lib/payload-bridge"
+import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-
-const PAYLOAD_ADMIN_URL = "https://cms.neokube.fr/admin/collections/pages"
 
 interface Page {
   path: string
@@ -168,15 +168,21 @@ export function PagesSettings() {
   return (
     <div className="flex flex-col gap-6">
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Layers className="h-5 w-5 text-brand" />
-          Content Pages
-        </CardTitle>
-        <CardDescription>
-          Pages authored in the central CMS (Payload). Content is created/edited there for now —
-          a built-in editor is coming next. This list is read live from Payload, scoped to this site.
-        </CardDescription>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-brand" />
+            Content Pages
+          </CardTitle>
+          <CardDescription>
+            Pages authored centrally, editable directly here — live from Payload, scoped to this site.
+          </CardDescription>
+        </div>
+        <Button asChild size="sm">
+          <Link href="/admin/content/pages/new">
+            <Plus className="h-3.5 w-3.5" /> New page
+          </Link>
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="rounded-md border overflow-x-auto">
@@ -219,14 +225,12 @@ export function PagesSettings() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <a
-                        href={`${PAYLOAD_ADMIN_URL}/${page.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <Link
+                        href={`/admin/content/pages/${page.id}`}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
-                        Edit <ExternalLink className="h-3 w-3" />
-                      </a>
+                        Edit <Pencil className="h-3 w-3" />
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))

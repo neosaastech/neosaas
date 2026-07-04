@@ -45,8 +45,20 @@ export interface PayloadPageSummary {
   slug: string
   path: string
   parent: string | number | null
+  pageType?: string | null
   _status: "draft" | "published"
   updatedAt: string
+}
+
+export interface PayloadPageBlock {
+  id?: string
+  blockType: string
+  [key: string]: unknown
+}
+
+export interface PayloadPageDoc extends PayloadPageSummary {
+  layout: PayloadPageBlock[]
+  seo?: { metaTitle?: string | null; metaDescription?: string | null }
 }
 
 /** Lists this tenant's own Pages only — never another site's. */
@@ -61,10 +73,50 @@ export async function listPages(): Promise<PayloadPageSummary[]> {
   return data.docs as PayloadPageSummary[]
 }
 
-export async function getPage(id: string | number): Promise<Record<string, unknown>> {
+export async function getPage(id: string | number): Promise<PayloadPageDoc> {
   const res = await payloadFetch(`/pages/${id}?depth=1`)
   if (!res.ok) {
     throw new Error(`Payload bridge: getPage(${id}) failed (${res.status})`)
   }
   return res.json()
+}
+
+export interface PageWriteInput {
+  title: string
+  slug: string
+  parent?: string | number | null
+  pageType?: string
+  layout: PayloadPageBlock[]
+  seo?: { metaTitle?: string; metaDescription?: string }
+  _status: "draft" | "published"
+}
+
+/** Always tagged with this site's own tenant — a bridge caller can't write into another site. */
+export async function createPage(input: PageWriteInput): Promise<PayloadPageDoc> {
+  const res = await payloadFetch(`/pages`, {
+    method: "POST",
+    body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createPage failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return data.doc as PayloadPageDoc
+}
+
+export async function updatePage(
+  id: string | number,
+  input: Partial<PageWriteInput>,
+): Promise<PayloadPageDoc> {
+  const res = await payloadFetch(`/pages/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updatePage(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return data.doc as PayloadPageDoc
 }
