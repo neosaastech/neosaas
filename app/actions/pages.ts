@@ -16,7 +16,6 @@ import {
   createBlogPost,
   updateBlogPost,
   listCategories,
-  lexicalToPlainText,
   type PayloadPageSummary,
   type PayloadPageDoc,
   type PageWriteInput,
@@ -156,12 +155,10 @@ export async function getContentArticles(
 
 export async function getContentArticle(
   id: string | number,
-): Promise<
-  { success: true; data: PayloadBlogPostDoc & { bodyText: string } } | { success: false; error: string }
-> {
+): Promise<{ success: true; data: PayloadBlogPostDoc } | { success: false; error: string }> {
   try {
     const article = await getBlogPost(id)
-    return { success: true, data: { ...article, bodyText: lexicalToPlainText(article.body) } }
+    return { success: true, data: article }
   } catch (error) {
     console.error("Failed to fetch content article from Payload:", error)
     return { success: false, error: "Failed to fetch content article" }

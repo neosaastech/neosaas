@@ -228,55 +228,22 @@ export interface BlogPostWriteInput {
   category?: string | number | null
   excerpt?: string
   /**
-   * Plain text, NOT Payload's Lexical richText JSON — this bridge's editor
-   * is a v1 textarea, not a WYSIWYG (building a Lexical-compatible rich
-   * editor here wasn't asked for). Converted to/from the minimal Lexical
-   * doc shape Payload's richText field expects by
-   * plainTextToLexical/lexicalToPlainText below, one paragraph per line.
+   * Real Payload Lexical richText JSON (the same `editorState.toJSON()`
+   * shape Payload's own admin produces) — components/admin/content/
+   * rich-text-editor.tsx is a genuine Lexical-based WYSIWYG (Charles,
+   * 2026-07-04: "il faut un véritable éditeur"), not a plain-text stand-in,
+   * so this passes straight through with no lossy conversion.
    */
-  body?: string
+  body?: unknown
   publishedAt?: string | null
   seo?: { metaTitle?: string; metaDescription?: string }
   _status: "draft" | "published"
 }
 
-/** One Lexical paragraph node per non-empty line — the minimal valid doc shape Payload's richText field accepts. */
-function plainTextToLexical(text: string): Record<string, unknown> {
-  const lines = text.split("\n").filter((line) => line.length > 0)
-  const children = (lines.length > 0 ? lines : [""]).map((line) => ({
-    type: "paragraph",
-    children: [{ type: "text", text: line, format: 0, detail: 0, mode: "normal", style: "", version: 1 }],
-    direction: "ltr",
-    format: "",
-    indent: 0,
-    version: 1,
-  }))
-  return {
-    root: { type: "root", children, direction: "ltr", format: "", indent: 0, version: 1 },
-  }
-}
-
-/** Inverse of plainTextToLexical — extracts plain text back out for the textarea editor. Best-effort: only reads paragraph/text nodes, drops any richer formatting a Payload-admin edit might have added. */
-export function lexicalToPlainText(doc: unknown): string {
-  if (!doc || typeof doc !== "object") return ""
-  const root = (doc as { root?: { children?: unknown[] } }).root
-  if (!root?.children) return ""
-  return root.children
-    .map((node) => {
-      const children = (node as { children?: { text?: string }[] })?.children ?? []
-      return children.map((c) => c.text ?? "").join("")
-    })
-    .join("\n")
-}
-
 export async function createBlogPost(input: BlogPostWriteInput): Promise<PayloadBlogPostDoc> {
   const res = await payloadFetch(`/blog-posts`, {
     method: "POST",
-    body: JSON.stringify({
-      ...input,
-      body: input.body !== undefined ? plainTextToLexical(input.body) : undefined,
-      tenant: PAYLOAD_TENANT_ID,
-    }),
+    body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
   })
   if (!res.ok) {
     const body = await res.text()
@@ -292,10 +259,7 @@ export async function updateBlogPost(
 ): Promise<PayloadBlogPostDoc> {
   const res = await payloadFetch(`/blog-posts/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({
-      ...input,
-      body: input.body !== undefined ? plainTextToLexical(input.body) : undefined,
-    }),
+    body: JSON.stringify(input),
   })
   if (!res.ok) {
     const body = await res.text()

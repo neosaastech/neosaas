@@ -11,19 +11,15 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { saveContentArticle, getContentCategories } from "@/app/actions/pages"
 import type { PayloadBlogPostDoc, PayloadCategorySummary } from "@/lib/payload-bridge"
+import { RichTextEditor, RichTextPreview } from "@/components/admin/content/rich-text-editor"
 
-type ArticleWithBodyText = PayloadBlogPostDoc & { bodyText: string }
-
-// v1 body editor is a plain textarea, not a WYSIWYG — Payload's own richText
-// (Lexical) is only ever authored/rendered in full there. Ask Charles before
-// building a real rich editor here, it wasn't part of this ask.
-export function ArticleEditor({ article }: { article: ArticleWithBodyText | null }) {
+export function ArticleEditor({ article }: { article: PayloadBlogPostDoc | null }) {
   const router = useRouter()
   const [title, setTitle] = useState(article?.title ?? "")
   const [slug, setSlug] = useState(article?.slug ?? "")
   const [categoryId, setCategoryId] = useState(article?.category ? String(article.category) : "")
   const [excerpt, setExcerpt] = useState(article?.excerpt ?? "")
-  const [body, setBody] = useState(article?.bodyText ?? "")
+  const [body, setBody] = useState<unknown>(article?.body ?? undefined)
   const [metaTitle, setMetaTitle] = useState(article?.seo?.metaTitle ?? "")
   const [metaDescription, setMetaDescription] = useState(article?.seo?.metaDescription ?? "")
   const [categories, setCategories] = useState<PayloadCategorySummary[]>([])
@@ -99,14 +95,8 @@ export function ArticleEditor({ article }: { article: ArticleWithBodyText | null
               <Textarea id="article-excerpt" value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={2} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="article-body">Contenu</Label>
-              <Textarea
-                id="article-body"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={12}
-                placeholder="Un paragraphe par ligne — pas d'éditeur riche pour l'instant."
-              />
+              <Label>Contenu</Label>
+              <RichTextEditor initialValue={article?.body} onChange={setBody} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="article-meta-title">Meta title (SEO)</Label>
@@ -138,13 +128,8 @@ export function ArticleEditor({ article }: { article: ArticleWithBodyText | null
         <div className="rounded-lg border bg-background p-6">
           <h1 className="text-2xl font-bold">{title || "Titre de l'article"}</h1>
           {excerpt && <p className="mt-2 text-muted-foreground">{excerpt}</p>}
-          <div className="mt-4 flex flex-col gap-3">
-            {body
-              .split("\n")
-              .filter(Boolean)
-              .map((line, i) => (
-                <p key={i}>{line}</p>
-              ))}
+          <div className="mt-4">
+            <RichTextPreview value={body} />
           </div>
         </div>
       </div>
