@@ -94,7 +94,11 @@ export function DynamicTable({
               <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
             </Button>
           ),
-          cell: ({ getValue }) => String(getValue() ?? ""),
+          cell: ({ getValue }) => {
+            const value = getValue()
+            if (value && typeof value === "object") return JSON.stringify(value)
+            return String(value ?? "")
+          },
         })),
     [config.fields],
   )

@@ -7,7 +7,7 @@
  * page/hooks/table by hand. See lib/dashboard/feature-registry.ts.
  */
 
-export type FeatureFieldType = "text" | "number" | "select" | "textarea"
+export type FeatureFieldType = "text" | "number" | "select" | "textarea" | "json"
 
 export interface FeatureFieldOption {
   label: string
@@ -22,6 +22,10 @@ export interface FeatureFieldConfig {
   type: FeatureFieldType
   /** Required for type "select" — ignored otherwise. */
   options?: FeatureFieldOption[]
+  /** For type "json" only: shown as placeholder text in the textarea to
+   * hint at the expected shape (e.g. line items), since there's no
+   * per-field schema for arbitrary JSON. */
+  jsonHint?: string
   required?: boolean
   /** Whether this field gets its own column in DynamicTable. Fields not
    * shown in the table are still editable in DynamicForm. */
