@@ -46,6 +46,15 @@ export interface PayloadPageSummary {
   path: string
   parent: string | number | null
   pageType?: string | null
+  // Populated objects (not bare IDs) — listPages fetches at depth=1
+  // specifically so the Content Hub table can show real names instead of
+  // opaque relationship IDs (Charles, 2026-07-05: "on doit avoir... le nom
+  // du créateur, la catégorie de page").
+  category?: { id: string | number; name: string; slug: string } | null
+  // Payload's Users collection only has `email` (no name fields) — that's
+  // the real display identity for "creator", not a placeholder.
+  author?: { id: string | number; email: string } | null
+  publishedAt?: string | null
   _status: "draft" | "published"
   updatedAt: string
 }
@@ -87,7 +96,11 @@ export async function listPages(options: ListPagesOptions = {}): Promise<Paginat
   const { page = 1, limit = 20, pageType } = options
   const params = new URLSearchParams({
     "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
-    depth: "0",
+    // depth=1 (not 0) so category/author come back as populated
+    // {id, name/email} objects the table can display directly, not bare
+    // relationship IDs — this is the one list call the Content Hub table
+    // renders from, so it's worth the extra join cost here specifically.
+    depth: "1",
     limit: String(limit),
     page: String(page),
     sort: "path",
@@ -114,6 +127,7 @@ export interface PageWriteInput {
   slug: string
   parent?: string | number | null
   pageType?: string
+  category?: string | number | null
   layout: PayloadPageBlock[]
   seo?: { metaTitle?: string; metaDescription?: string }
   _status: "draft" | "published"
@@ -169,6 +183,47 @@ export async function listCategories(): Promise<PayloadCategorySummary[]> {
   }
   const data = await res.json()
   return data.docs as PayloadCategorySummary[]
+}
+
+export interface CategoryWriteInput {
+  name: string
+  slug: string
+  parent?: string | number | null
+}
+
+/** Always tagged with this site's own tenant, same rule as createPage/createBlogPost. */
+export async function createCategory(input: CategoryWriteInput): Promise<PayloadCategorySummary> {
+  const res = await payloadFetch(`/categories`, {
+    method: "POST",
+    body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createCategory failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return data.doc as PayloadCategorySummary
+}
+
+export async function updateCategory(id: string | number, input: CategoryWriteInput): Promise<PayloadCategorySummary> {
+  const res = await payloadFetch(`/categories/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updateCategory(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return data.doc as PayloadCategorySummary
+}
+
+export async function deleteCategory(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/categories/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deleteCategory(${id}) failed (${res.status}): ${body}`)
+  }
 }
 
 export interface PayloadBlogPostSummary {

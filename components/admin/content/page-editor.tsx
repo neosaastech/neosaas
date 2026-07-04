@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -9,20 +9,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { saveContentPage } from "@/app/actions/pages"
-import type { PayloadPageDoc, PayloadPageBlock } from "@/lib/payload-bridge"
+import { saveContentPage, getContentCategories } from "@/app/actions/pages"
+import type { PayloadPageDoc, PayloadPageBlock, PayloadCategorySummary } from "@/lib/payload-bridge"
 import { AVAILABLE_BLOCK_TYPES, BlockEditor } from "./block-editor"
 import { BlockPreview } from "./block-preview"
 
-export function PageEditor({ page }: { page: PayloadPageDoc | null }) {
+export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onSaved?: () => void }) {
   const router = useRouter()
   const [title, setTitle] = useState(page?.title ?? "")
   const [slug, setSlug] = useState(page?.slug ?? "")
   const [pageType, setPageType] = useState(page?.pageType ?? "")
+  const [categoryId, setCategoryId] = useState<string>(page?.category ? String(page.category.id) : "")
+  const [categories, setCategories] = useState<PayloadCategorySummary[]>([])
   const [metaTitle, setMetaTitle] = useState(page?.seo?.metaTitle ?? "")
   const [metaDescription, setMetaDescription] = useState(page?.seo?.metaDescription ?? "")
   const [layout, setLayout] = useState<PayloadPageBlock[]>(page?.layout ?? [])
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    getContentCategories().then((result) => {
+      if (result.success) setCategories(result.data)
+    })
+  }, [])
 
   function addBlock(blockType: string) {
     setLayout([...layout, { blockType }])
@@ -58,14 +66,19 @@ export function PageEditor({ page }: { page: PayloadPageDoc | null }) {
         title,
         slug,
         pageType: pageType || undefined,
+        category: categoryId || null,
         layout: sanitizedLayout,
         seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
         _status: status,
       })
       if (result.success) {
         toast.success(status === "published" ? "Page publiée" : "Brouillon enregistré")
-        router.push("/admin/pages")
-        router.refresh()
+        if (onSaved) {
+          onSaved()
+        } else {
+          router.push("/admin/pages")
+          router.refresh()
+        }
       } else {
         toast.error(result.error)
       }
@@ -102,6 +115,22 @@ export function PageEditor({ page }: { page: PayloadPageDoc | null }) {
                 <SelectContent>
                   <SelectItem value="landing">Landing (marketing)</SelectItem>
                   <SelectItem value="article">Article (blog)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="page-category">Catégorie</Label>
+              <Select value={categoryId || "none"} onValueChange={(v) => setCategoryId(v === "none" ? "" : v)}>
+                <SelectTrigger id="page-category">
+                  <SelectValue placeholder="Aucune catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune catégorie</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.path || c.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
