@@ -1,41 +1,81 @@
+import { and, eq, isNotNull } from "drizzle-orm"
+import { db } from "@/db"
+import { pageLayers, blogPosts } from "@/db/schema"
 import { loadNeosaasConfig } from "@/server/loadConfig"
+import { LOCALES } from "@/app/[locale]/layout"
 
+interface SitemapUrl {
+  loc: string
+  changefreq: string
+  priority: number
+  images?: { loc: string; title: string }[]
+}
+
+/**
+ * Real sitemap, not a hardcoded list (found 2026-07-04: the previous version
+ * only ever listed 4 fixed URLs — including a "/contact" page that doesn't
+ * exist — and never picked up pages created through the Content Hub /
+ * Payload). Pulls every active page_layers path and blog_posts slug, one
+ * <url> per locale, alongside a small set of always-present static routes.
+ */
 export async function generateSitemapXml() {
   const config = await loadNeosaasConfig()
   const siteUrl = config.siteUrl || `https://${config.domain}`
 
-  const pages = [
+  const staticPaths = ["/features", "/pricing"]
+
+  const pages: SitemapUrl[] = [
     {
       loc: `${siteUrl}/`,
       changefreq: "weekly",
       priority: 1.0,
       images: [
-        {
-          loc: `${siteUrl}/public/clean-data-overview.png`,
-          title: "Overview Clean Data",
-        },
-        {
-          loc: `${siteUrl}/public/dashboard.jpg`,
-          title: "Dashboard Screenshot",
-        },
+        { loc: `${siteUrl}/public/clean-data-overview.png`, title: "Overview Clean Data" },
+        { loc: `${siteUrl}/public/dashboard.jpg`, title: "Dashboard Screenshot" },
       ],
     },
-    {
-      loc: `${siteUrl}/features`,
-      changefreq: "monthly",
-      priority: 0.8,
-    },
-    {
-      loc: `${siteUrl}/pricing`,
-      changefreq: "monthly",
-      priority: 0.8,
-    },
-    {
-      loc: `${siteUrl}/contact`,
-      changefreq: "yearly",
-      priority: 0.5,
-    },
   ]
+
+  for (const locale of LOCALES) {
+    for (const staticPath of staticPaths) {
+      pages.push({
+        loc: `${siteUrl}/${locale}${staticPath}`,
+        changefreq: "monthly",
+        priority: 0.8,
+      })
+    }
+  }
+
+  // CMS-authored pages (Payload -> page_layers), one entry per locale that
+  // actually has active layers — a page only published in "en" shouldn't
+  // produce a dead "fr" sitemap entry.
+  const cmsPages = await db
+    .selectDistinct({ pagePath: pageLayers.pagePath, locale: pageLayers.locale })
+    .from(pageLayers)
+    .where(eq(pageLayers.isActive, true))
+
+  for (const page of cmsPages) {
+    if (staticPaths.includes(page.pagePath)) continue // already added above with both locales
+    pages.push({
+      loc: `${siteUrl}/${page.locale}${page.pagePath}`,
+      changefreq: "monthly",
+      priority: 0.6,
+    })
+  }
+
+  // Blog posts, same rule — only locales that are actually published.
+  const posts = await db
+    .select({ slug: blogPosts.slug, locale: blogPosts.locale })
+    .from(blogPosts)
+    .where(and(eq(blogPosts.isActive, true), isNotNull(blogPosts.publishedAt)))
+
+  for (const post of posts) {
+    pages.push({
+      loc: `${siteUrl}/${post.locale}/blog/${post.slug}`,
+      changefreq: "monthly",
+      priority: 0.5,
+    })
+  }
 
   const urls = pages
     .map((page) => {

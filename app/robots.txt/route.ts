@@ -1,10 +1,11 @@
-export async function GET() {
-  const robotsTxt = `
-User-agent: *
-Allow: /
+import { generateRobotsTxt } from "@/config/seo/generateRobots"
 
-Sitemap: https://www.neosaas.tech/sitemap.xml
-`.trim()
+// Was hardcoding "https://www.neosaas.tech/sitemap.xml" — a stale placeholder
+// domain, unrelated to whatever domain a given deployment actually serves.
+// generateRobotsTxt() already existed and builds the right URL from the
+// real site config, it just wasn't wired up here.
+export async function GET() {
+  const robotsTxt = await generateRobotsTxt()
 
   return new Response(robotsTxt, {
     headers: {
