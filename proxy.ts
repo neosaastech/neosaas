@@ -57,32 +57,34 @@ async function enforcePageAccess(request: NextRequest): Promise<NextResponse | n
 
 const DEFAULT_LOCALE = "fr"
 
-// Only the routes that actually moved under app/[locale]/(public) — auth,
-// admin, dashboard, api, and the (errors) pages stay unlocalized and must
-// never be redirected here, so this is a positive allowlist rather than a
-// negative exclusion (safer: a route this list forgets just 404s instead of
-// silently being redirected somewhere wrong).
-const PUBLIC_LOCALIZED_PREFIXES = [
-  "/book",
-  "/brand",
-  "/configuration",
-  "/dashboard-exemple",
-  "/demo",
-  "/docs",
-  "/features",
-  "/legacy",
-  "/legal",
-  "/pricing",
-  "/store",
+// Was a positive allowlist of specific known static routes — broke the
+// moment a page got created dynamically through the Content Hub (found
+// 2026-07-04: a freshly-published page 404'd at its bare path instead of
+// redirecting to /fr/<path>, because it obviously couldn't be in a
+// hardcoded list written before it existed). Inverted to a denylist:
+// admin/dashboard/auth/api/system routes are excluded by name, everything
+// else is a candidate for locale redirect — matches how app/[locale]/(public)
+// actually now includes a generic [...slug] catch-all for CMS pages, not
+// just a fixed set of static ones.
+const NEVER_LOCALIZED_PREFIXES = [
+  "/admin",
+  "/dashboard",
+  "/auth",
+  "/api",
+  "/onboarding",
+  "/maintenance",
+  "/success",
+  "/_next",
 ]
 
 function needsLocaleRedirect(path: string): boolean {
   const alreadyLocalized = LOCALES.some((locale) => path === `/${locale}` || path.startsWith(`/${locale}/`))
   if (alreadyLocalized) return false
 
-  const isPublicRoot = path === "/"
-  const isPublicPrefixed = PUBLIC_LOCALIZED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
-  return isPublicRoot || isPublicPrefixed
+  if (path.includes(".")) return false // static files (favicon.ico, images...)
+
+  const isNeverLocalized = NEVER_LOCALIZED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+  return !isNeverLocalized
 }
 
 // Cache for configuration (refreshed every 5 minutes)
