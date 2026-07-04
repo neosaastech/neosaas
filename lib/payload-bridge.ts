@@ -120,3 +120,58 @@ export async function updatePage(
   const data = await res.json()
   return data.doc as PayloadPageDoc
 }
+
+// ─── Generic collection CRUD (Metadata-Driven UI — types/form-builder.ts) ───
+// Unlike the Pages helpers above, these aren't tenant-scoped: an arbitrary
+// dashboard-feature collection (e.g. "quotes") isn't necessarily registered
+// under @payloadcms/plugin-multi-tenant at all. Callers (the
+// /api/dashboard/[feature] proxy routes) are responsible for any further
+// scoping a given collection needs (e.g. filtering by company) — this layer
+// only forwards to Payload's REST API with the service credential.
+
+export interface PayloadListResult<T = Record<string, unknown>> {
+  docs: T[]
+  totalDocs: number
+  totalPages: number
+  page: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
+
+export async function listCollection(
+  slug: string,
+  searchParams: URLSearchParams,
+): Promise<PayloadListResult> {
+  const res = await payloadFetch(`/${slug}?${searchParams.toString()}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listCollection(${slug}) failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function createCollectionDoc(
+  slug: string,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const res = await payloadFetch(`/${slug}`, { method: "POST", body: JSON.stringify(data) })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createCollectionDoc(${slug}) failed (${res.status}): ${body}`)
+  }
+  const result = await res.json()
+  return result.doc
+}
+
+export async function updateCollectionDoc(
+  slug: string,
+  id: string | number,
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const res = await payloadFetch(`/${slug}/${id}`, { method: "PATCH", body: JSON.stringify(data) })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updateCollectionDoc(${slug}, ${id}) failed (${res.status}): ${body}`)
+  }
+  const result = await res.json()
+  return result.doc
+}
