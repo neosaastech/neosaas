@@ -12,6 +12,20 @@ import type { PayloadPageBlock } from "@/lib/payload-bridge"
  * render time) and can't be meaningfully live-previewed from in-progress
  * form state — shown as a placeholder instead of trying to fake it.
  */
+// Payload stores an untouched optional field as `null`, not "absent" —
+// every propsSchema here declares those fields `z.string().optional()`
+// (undefined-or-string), which Zod fails on `null` since it's neither.
+// Found 2026-07-05: a page's hero block (title + subtitle filled in,
+// eyebrow left blank) showed "Champs incomplets" despite having every
+// field the form actually asked for — the blank `eyebrow` (stored as
+// `null`) was failing validation silently, a false negative, not a real
+// incompleteness. Stripping nulls before validating (schemas themselves
+// are untouched, so a truly missing required field like `title` still
+// correctly fails) fixes that without loosening what counts as complete.
+function stripNulls<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v === null ? undefined : v])) as T
+}
+
 export function BlockPreview({ block }: { block: PayloadPageBlock }) {
   const def = layerRegistry[block.blockType]
   if (!def) return null
@@ -24,7 +38,7 @@ export function BlockPreview({ block }: { block: PayloadPageBlock }) {
     )
   }
 
-  const parsed = def.propsSchema.safeParse(block)
+  const parsed = def.propsSchema.safeParse(stripNulls(block))
   if (!parsed.success) {
     return (
       <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
