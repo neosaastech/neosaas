@@ -11,9 +11,22 @@ import {
   getPage,
   createPage,
   updatePage,
+  listBlogPosts,
+  getBlogPost,
+  createBlogPost,
+  updateBlogPost,
+  listCategories,
+  lexicalToPlainText,
   type PayloadPageSummary,
   type PayloadPageDoc,
   type PageWriteInput,
+  type PayloadBlogPostSummary,
+  type PayloadBlogPostDoc,
+  type BlogPostWriteInput,
+  type PayloadCategorySummary,
+  type PaginatedResult,
+  type ListPagesOptions,
+  type ListBlogPostsOptions,
 } from "@/lib/payload-bridge"
 
 // Was its own "public" | "user" | "admin" | "super-admin" (hyphen) union,
@@ -75,11 +88,13 @@ export async function syncPages(pages: { path: string, name: string, group: stri
  * remain the only path that populates it. All writes gated to admin/
  * super_admin, matching the pattern already used across app/actions/*.ts.
  */
-export async function getContentPages(): Promise<
-  { success: true; data: PayloadPageSummary[] } | { success: false; error: string }
+export async function getContentPages(
+  options: ListPagesOptions = {},
+): Promise<
+  { success: true; data: PaginatedResult<PayloadPageSummary> } | { success: false; error: string }
 > {
   try {
-    const pages = await listPages()
+    const pages = await listPages(options)
     return { success: true, data: pages }
   } catch (error) {
     console.error("Failed to fetch content pages from Payload:", error)
@@ -110,7 +125,7 @@ export async function saveContentPage(
 
   try {
     const page = id ? await updatePage(id, input) : await createPage(input)
-    revalidatePath("/admin/settings")
+    revalidatePath("/admin/pages")
     return { success: true, data: page }
   } catch (error) {
     console.error("Failed to save content page to Payload:", error)
@@ -120,5 +135,67 @@ export async function saveContentPage(
     // to tell apart from a working save whose result just wasn't visible.
     const message = error instanceof Error ? error.message : "Failed to save content page"
     return { success: false, error: message }
+  }
+}
+
+// ─── Articles (BlogPosts) — same content-hub gating pattern as Pages above ───
+
+export async function getContentArticles(
+  options: ListBlogPostsOptions = {},
+): Promise<
+  { success: true; data: PaginatedResult<PayloadBlogPostSummary> } | { success: false; error: string }
+> {
+  try {
+    const articles = await listBlogPosts(options)
+    return { success: true, data: articles }
+  } catch (error) {
+    console.error("Failed to fetch content articles from Payload:", error)
+    return { success: false, error: "Failed to fetch content articles" }
+  }
+}
+
+export async function getContentArticle(
+  id: string | number,
+): Promise<
+  { success: true; data: PayloadBlogPostDoc & { bodyText: string } } | { success: false; error: string }
+> {
+  try {
+    const article = await getBlogPost(id)
+    return { success: true, data: { ...article, bodyText: lexicalToPlainText(article.body) } }
+  } catch (error) {
+    console.error("Failed to fetch content article from Payload:", error)
+    return { success: false, error: "Failed to fetch content article" }
+  }
+}
+
+export async function saveContentArticle(
+  id: string | number | null,
+  input: BlogPostWriteInput,
+): Promise<{ success: true; data: PayloadBlogPostDoc } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    const article = id ? await updateBlogPost(id, input) : await createBlogPost(input)
+    revalidatePath("/admin/pages")
+    return { success: true, data: article }
+  } catch (error) {
+    console.error("Failed to save content article to Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to save content article"
+    return { success: false, error: message }
+  }
+}
+
+export async function getContentCategories(): Promise<
+  { success: true; data: PayloadCategorySummary[] } | { success: false; error: string }
+> {
+  try {
+    const categories = await listCategories()
+    return { success: true, data: categories }
+  } catch (error) {
+    console.error("Failed to fetch categories from Payload:", error)
+    return { success: false, error: "Failed to fetch categories" }
   }
 }

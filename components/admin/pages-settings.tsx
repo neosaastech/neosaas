@@ -3,188 +3,77 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Shield, Globe, Users, FileText, Pencil, Plus, Layers } from "lucide-react"
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { getPages, updatePageAccess, syncPages, getContentPages, type AccessLevel } from "@/app/actions/pages"
-import type { PayloadPageSummary } from "@/lib/payload-bridge"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { getContentPages, getContentArticles, getContentCategories } from "@/app/actions/pages"
+import type { PayloadPageSummary, PayloadBlogPostSummary, PayloadCategorySummary } from "@/lib/payload-bridge"
 
-interface Page {
-  path: string
-  name: string
-  access: AccessLevel
-  group: string
+const PAGE_SIZE = 20
+
+/**
+ * The content environment (2026-07-04, Charles): creating Pages or
+ * Articles, nothing else — Internal Routes ACL moved to its own super_admin
+ * screen (components/admin/internal-routes-settings.tsx). Both lists are
+ * paginated via Payload's native REST pagination (not a client-side slice)
+ * since a real site can reach dozens/hundreds of pages, not just the 2
+ * that exist today.
+ */
+export function ContentHub() {
+  return (
+    <Tabs defaultValue="pages" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="pages">
+          <Layers className="h-3.5 w-3.5" /> Pages
+        </TabsTrigger>
+        <TabsTrigger value="articles">
+          <Newspaper className="h-3.5 w-3.5" /> Articles
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="pages">
+        <PagesPanel />
+      </TabsContent>
+      <TabsContent value="articles">
+        <ArticlesPanel />
+      </TabsContent>
+    </Tabs>
+  )
 }
 
-const defaultPages: Page[] = [
-  { path: "/", name: "Home Page", access: "public", group: "Public" },
-  { path: "/features", name: "Features", access: "public", group: "Public" },
-  { path: "/pricing", name: "Pricing", access: "public", group: "Public" },
-  { path: "/docs", name: "Documentation", access: "public", group: "Public" },
-  { path: "/auth/login", name: "Login", access: "public", group: "Authentication" },
-  { path: "/auth/register", name: "Register", access: "public", group: "Authentication" },
-  { path: "/dashboard", name: "Dashboard Overview", access: "user", group: "Dashboard" },
-  { path: "/dashboard/profile", name: "User Profile", access: "user", group: "Dashboard" },
-  { path: "/dashboard/payments", name: "Payments", access: "user", group: "Dashboard" },
-  { path: "/dashboard/company-management", name: "Company Management", access: "user", group: "Dashboard" },
-  { path: "/dashboard/checkout", name: "Checkout", access: "user", group: "Dashboard" },
-  { path: "/admin", name: "Admin Dashboard", access: "admin", group: "Admin" },
-  { path: "/admin/api", name: "API Management", access: "admin", group: "Admin" },
-  { path: "/admin/pages", name: "Pages", access: "admin", group: "Admin" },
-  { path: "/admin/mail", name: "Mail Management", access: "admin", group: "Admin" },
-  // Cross-tenant user/company management — matches sidebar's
-  // superAdminOnly:true for "Organization". Actually enforced by
-  // middleware.ts (was cosmetic before 2026-07-04).
-  { path: "/admin/users", name: "Organization", access: "super_admin", group: "Admin" },
-]
-
-export function PagesSettings() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [pages, setPages] = useState<Page[]>([])
-  const [filteredPages, setFilteredPages] = useState<Page[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+function PagesPanel() {
+  const [pages, setPages] = useState<PayloadPageSummary[]>([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [pageType, setPageType] = useState<string>("all")
   const [isLoading, setIsLoading] = useState(true)
-  const [contentPages, setContentPages] = useState<PayloadPageSummary[]>([])
-  const [isLoadingContentPages, setIsLoadingContentPages] = useState(true)
-  const [contentPagesError, setContentPagesError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchContentPages = async () => {
-      setIsLoadingContentPages(true)
-      const result = await getContentPages()
+    setIsLoading(true)
+    getContentPages({ page, limit: PAGE_SIZE, pageType: pageType === "all" ? undefined : pageType }).then((result) => {
       if (result.success) {
-        setContentPages(result.data)
-        setContentPagesError(null)
+        setPages(result.data.docs)
+        setTotalPages(result.data.totalPages)
+        setError(null)
       } else {
-        setContentPagesError(result.error)
-      }
-      setIsLoadingContentPages(false)
-    }
-    fetchContentPages()
-  }, [])
-
-  useEffect(() => {
-    const fetchPages = async () => {
-      setIsLoading(true)
-      const result = await getPages()
-      if (result.success && result.data && result.data.length > 0) {
-        // Always sync (onConflictDoNothing — idempotent) so new entries
-        // added to defaultPages (e.g. /admin/users) reach an
-        // already-populated prod table, not just a fresh/empty one.
-        await syncPages(defaultPages)
-        const refreshed = await getPages()
-        const dbPages = (refreshed.success && refreshed.data ? refreshed.data : result.data).map(p => ({
-          path: p.path,
-          name: p.name,
-          access: p.access as AccessLevel,
-          group: p.group
-        }))
-        setPages(dbPages)
-        setFilteredPages(dbPages)
-      } else {
-        // If no pages in DB, sync default pages
-        await syncPages(defaultPages)
-        setPages(defaultPages)
-        setFilteredPages(defaultPages)
+        setError(result.error)
       }
       setIsLoading(false)
-    }
-    fetchPages()
-  }, [])
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (searchTerm) {
-        setIsSearching(true)
-        const filtered = pages.filter(
-          (page) =>
-            page.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            page.group.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
-        setFilteredPages(filtered)
-        setIsSearching(false)
-      } else {
-        setFilteredPages(pages)
-      }
-    }, 300)
-
-    return () => clearTimeout(delayDebounceFn)
-  }, [searchTerm, pages])
-
-  const getAccessBadge = (access: AccessLevel) => {
-    switch (access) {
-      case "public":
-        return (
-          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-            <Globe className="w-3 h-3 mr-1" /> Public
-          </Badge>
-        )
-      case "user":
-        return (
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-            <Users className="w-3 h-3 mr-1" /> User
-          </Badge>
-        )
-      case "admin":
-        return (
-          <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-            <Shield className="w-3 h-3 mr-1" /> Admin
-          </Badge>
-        )
-      case "super_admin":
-        return (
-          <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-            <Shield className="w-3 h-3 mr-1" /> Super Admin
-          </Badge>
-        )
-      default:
-        return <Badge variant="outline">{access}</Badge>
-    }
-  }
-
-  const handleAccessChange = async (path: string, newAccess: AccessLevel) => {
-    // Optimistic update
-    const updatedPages = pages.map(p => 
-      p.path === path ? { ...p, access: newAccess } : p
-    )
-    setPages(updatedPages)
-    
-    // Also update filtered pages if needed
-    if (searchTerm) {
-      setFilteredPages(filteredPages.map(p => 
-        p.path === path ? { ...p, access: newAccess } : p
-      ))
-    } else {
-      setFilteredPages(updatedPages)
-    }
-
-    const result = await updatePageAccess(path, newAccess)
-    if (result.success) {
-      toast.success(`Access updated for ${path}`)
-    } else {
-      toast.error("Failed to update access")
-      // Revert on error
-      // (Implementation omitted for brevity, but ideally should revert state)
-    }
-  }
+    })
+  }, [page, pageType])
 
   return (
-    <div className="flex flex-col gap-6">
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5 text-brand" />
-            Content Pages
+            Pages
           </CardTitle>
-          <CardDescription>
-            Pages authored centrally, editable directly here — live from Payload, scoped to this site.
-          </CardDescription>
+          <CardDescription>Pages authored centrally, editable directly here — live from Payload.</CardDescription>
         </div>
         <Button asChild size="sm">
           <Link href="/admin/content/pages/new">
@@ -193,48 +82,64 @@ export function PagesSettings() {
         </Button>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex items-center justify-between">
+          <Select value={pageType} onValueChange={(v) => { setPageType(v); setPage(1) }}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les types</SelectItem>
+              <SelectItem value="landing">Landing</SelectItem>
+              <SelectItem value="article">Article</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[150px]">Title</TableHead>
                 <TableHead className="min-w-[150px]">Path</TableHead>
+                <TableHead className="min-w-[100px]">Type</TableHead>
                 <TableHead className="min-w-[100px]">Status</TableHead>
                 <TableHead className="min-w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingContentPages ? (
+              {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
-                    Loading content pages...
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    Loading pages...
                   </TableCell>
                 </TableRow>
-              ) : contentPagesError ? (
+              ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center text-destructive">
-                    {contentPagesError}
+                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
+                    {error}
                   </TableCell>
                 </TableRow>
-              ) : contentPages.length === 0 ? (
+              ) : pages.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
-                    No content pages yet.
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    No pages yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                contentPages.map((page) => (
-                  <TableRow key={page.id}>
-                    <TableCell className="font-medium">{page.title}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{page.path}</TableCell>
+                pages.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.title}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{p.path}</TableCell>
                     <TableCell>
-                      <Badge variant={page._status === "published" ? "default" : "outline"}>
-                        {page._status === "published" ? "Published" : "Draft"}
+                      {p.pageType ? <Badge variant="outline">{p.pageType}</Badge> : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={p._status === "published" ? "default" : "outline"}>
+                        {p._status === "published" ? "Published" : "Draft"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/admin/content/pages/${page.id}`}
+                        href={`/admin/content/pages/${p.id}`}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
                         Edit <Pencil className="h-3 w-3" />
@@ -246,106 +151,123 @@ export function PagesSettings() {
             </TableBody>
           </Table>
         </div>
+        <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
       </CardContent>
     </Card>
+  )
+}
+
+function ArticlesPanel() {
+  const [articles, setArticles] = useState<PayloadBlogPostSummary[]>([])
+  const [categories, setCategories] = useState<PayloadCategorySummary[]>([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [categoryId, setCategoryId] = useState<string>("all")
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getContentCategories().then((result) => {
+      if (result.success) setCategories(result.data)
+    })
+  }, [])
+
+  useEffect(() => {
+    setIsLoading(true)
+    getContentArticles({ page, limit: PAGE_SIZE, category: categoryId === "all" ? undefined : categoryId }).then(
+      (result) => {
+        if (result.success) {
+          setArticles(result.data.docs)
+          setTotalPages(result.data.totalPages)
+          setError(null)
+        } else {
+          setError(result.error)
+        }
+        setIsLoading(false)
+      },
+    )
+  }, [page, categoryId])
+
+  const categoryName = (id: string | number | null) => categories.find((c) => String(c.id) === String(id))?.path
+
+  return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-brand" />
-          Internal Routes
-        </CardTitle>
-        <CardDescription>
-          Access levels for this app&apos;s own internal routes (dashboard, auth, admin).
-        </CardDescription>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Newspaper className="h-5 w-5 text-brand" />
+            Articles
+          </CardTitle>
+          <CardDescription>Blog posts authored centrally, editable directly here — live from Payload.</CardDescription>
+        </div>
+        <Button asChild size="sm">
+          <Link href="/admin/content/articles/new">
+            <Plus className="h-3.5 w-3.5" /> New article
+          </Link>
+        </Button>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center mb-4">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search pages..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <div className="mb-4 flex items-center justify-between">
+          <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setPage(1) }}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les catégories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.path || c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[150px]">Page Name</TableHead>
-                <TableHead className="min-w-[180px] hidden sm:table-cell">Path</TableHead>
-                <TableHead className="min-w-[100px] hidden md:table-cell">Group</TableHead>
-                <TableHead className="min-w-[160px]">Access Level</TableHead>
+                <TableHead className="min-w-[150px]">Title</TableHead>
+                <TableHead className="min-w-[120px]">Category</TableHead>
+                <TableHead className="min-w-[100px]">Status</TableHead>
+                <TableHead className="min-w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
-                    Loading pages...
+                    Loading articles...
                   </TableCell>
                 </TableRow>
-              ) : filteredPages.length === 0 ? (
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-destructive">
+                    {error}
+                  </TableCell>
+                </TableRow>
+              ) : articles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
-                    No pages found.
+                    No articles yet.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPages.map((page) => (
-                  <TableRow key={page.path}>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col gap-1">
-                        <span>{page.name}</span>
-                        <span className="sm:hidden font-mono text-xs text-muted-foreground">{page.path}</span>
-                        <span className="md:hidden">
-                          <Badge variant="outline" className="text-xs">{page.group}</Badge>
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground hidden sm:table-cell">
-                      {page.path}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline">{page.group}</Badge>
+                articles.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-medium">{a.title}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{categoryName(a.category) ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={a._status === "published" ? "default" : "outline"}>
+                        {a._status === "published" ? "Published" : "Draft"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          defaultValue={page.access}
-                          onValueChange={(value) => handleAccessChange(page.path, value as AccessLevel)}
-                        >
-                          <SelectTrigger className="w-[140px] h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="public">
-                              <div className="flex items-center">
-                                <Globe className="w-3 h-3 mr-2 text-green-500" /> Public
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="user">
-                              <div className="flex items-center">
-                                <Users className="w-3 h-3 mr-2 text-blue-500" /> User
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="admin">
-                              <div className="flex items-center">
-                                <Shield className="w-3 h-3 mr-2 text-purple-500" /> Admin
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="super_admin">
-                              <div className="flex items-center">
-                                <Shield className="w-3 h-3 mr-2 text-red-500" /> Super Admin
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <Link
+                        href={`/admin/content/articles/${a.id}`}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        Edit <Pencil className="h-3 w-3" />
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))
@@ -353,8 +275,35 @@ export function PagesSettings() {
             </TableBody>
           </Table>
         </div>
+        <PaginationControls page={page} totalPages={totalPages} onChange={setPage} />
       </CardContent>
     </Card>
+  )
+}
+
+function PaginationControls({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number
+  totalPages: number
+  onChange: (page: number) => void
+}) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="mt-4 flex items-center justify-between">
+      <span className="text-sm text-muted-foreground">
+        Page {page} / {totalPages}
+      </span>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+          <ChevronLeft className="h-3.5 w-3.5" /> Previous
+        </Button>
+        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+          Next <ChevronRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   )
 }

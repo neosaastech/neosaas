@@ -61,16 +61,44 @@ export interface PayloadPageDoc extends PayloadPageSummary {
   seo?: { metaTitle?: string | null; metaDescription?: string | null }
 }
 
-/** Lists this tenant's own Pages only — never another site's. */
-export async function listPages(): Promise<PayloadPageSummary[]> {
-  const res = await payloadFetch(
-    `/pages?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=0&limit=100&sort=path`,
-  )
+export interface PaginatedResult<T> {
+  docs: T[]
+  totalDocs: number
+  totalPages: number
+  page: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
+
+export interface ListPagesOptions {
+  page?: number
+  limit?: number
+  /** Filter by pageType (landing/article) — the content-hub category filter. */
+  pageType?: string
+}
+
+/**
+ * Lists this tenant's own Pages only — never another site's. Paginated
+ * (Payload's native REST pagination, not a client-side slice) since a real
+ * site can end up with dozens/hundreds of pages once Pilier A / more
+ * marketing pages land — loading everything at once doesn't scale.
+ */
+export async function listPages(options: ListPagesOptions = {}): Promise<PaginatedResult<PayloadPageSummary>> {
+  const { page = 1, limit = 20, pageType } = options
+  const params = new URLSearchParams({
+    "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
+    depth: "0",
+    limit: String(limit),
+    page: String(page),
+    sort: "path",
+  })
+  if (pageType) params.set("where[pageType][equals]", pageType)
+
+  const res = await payloadFetch(`/pages?${params.toString()}`)
   if (!res.ok) {
     throw new Error(`Payload bridge: listPages failed (${res.status})`)
   }
-  const data = await res.json()
-  return data.docs as PayloadPageSummary[]
+  return res.json()
 }
 
 export async function getPage(id: string | number): Promise<PayloadPageDoc> {
@@ -119,6 +147,162 @@ export async function updatePage(
   }
   const data = await res.json()
   return data.doc as PayloadPageDoc
+}
+
+// ─── BlogPosts (Articles) — the other content-hub category alongside Pages ───
+
+export interface PayloadCategorySummary {
+  id: string | number
+  name: string
+  slug: string
+  path: string
+  parent: string | number | null
+}
+
+/** Categories are typically few (tens, not hundreds) — no pagination needed for a filter dropdown. */
+export async function listCategories(): Promise<PayloadCategorySummary[]> {
+  const res = await payloadFetch(
+    `/categories?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=0&limit=200&sort=path`,
+  )
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listCategories failed (${res.status})`)
+  }
+  const data = await res.json()
+  return data.docs as PayloadCategorySummary[]
+}
+
+export interface PayloadBlogPostSummary {
+  id: string | number
+  title: string
+  slug: string
+  category: string | number | null
+  excerpt?: string | null
+  publishedAt?: string | null
+  _status: "draft" | "published"
+  updatedAt: string
+}
+
+export interface PayloadBlogPostDoc extends PayloadBlogPostSummary {
+  body?: unknown
+  coverImage?: string | number | null
+  seo?: { metaTitle?: string | null; metaDescription?: string | null }
+}
+
+export interface ListBlogPostsOptions {
+  page?: number
+  limit?: number
+  category?: string | number
+}
+
+export async function listBlogPosts(
+  options: ListBlogPostsOptions = {},
+): Promise<PaginatedResult<PayloadBlogPostSummary>> {
+  const { page = 1, limit = 20, category } = options
+  const params = new URLSearchParams({
+    "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
+    depth: "0",
+    limit: String(limit),
+    page: String(page),
+    sort: "-publishedAt",
+  })
+  if (category) params.set("where[category][equals]", String(category))
+
+  const res = await payloadFetch(`/blog-posts?${params.toString()}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listBlogPosts failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function getBlogPost(id: string | number): Promise<PayloadBlogPostDoc> {
+  const res = await payloadFetch(`/blog-posts/${id}?depth=1`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: getBlogPost(${id}) failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export interface BlogPostWriteInput {
+  title: string
+  slug: string
+  category?: string | number | null
+  excerpt?: string
+  /**
+   * Plain text, NOT Payload's Lexical richText JSON — this bridge's editor
+   * is a v1 textarea, not a WYSIWYG (building a Lexical-compatible rich
+   * editor here wasn't asked for). Converted to/from the minimal Lexical
+   * doc shape Payload's richText field expects by
+   * plainTextToLexical/lexicalToPlainText below, one paragraph per line.
+   */
+  body?: string
+  publishedAt?: string | null
+  seo?: { metaTitle?: string; metaDescription?: string }
+  _status: "draft" | "published"
+}
+
+/** One Lexical paragraph node per non-empty line — the minimal valid doc shape Payload's richText field accepts. */
+function plainTextToLexical(text: string): Record<string, unknown> {
+  const lines = text.split("\n").filter((line) => line.length > 0)
+  const children = (lines.length > 0 ? lines : [""]).map((line) => ({
+    type: "paragraph",
+    children: [{ type: "text", text: line, format: 0, detail: 0, mode: "normal", style: "", version: 1 }],
+    direction: "ltr",
+    format: "",
+    indent: 0,
+    version: 1,
+  }))
+  return {
+    root: { type: "root", children, direction: "ltr", format: "", indent: 0, version: 1 },
+  }
+}
+
+/** Inverse of plainTextToLexical — extracts plain text back out for the textarea editor. Best-effort: only reads paragraph/text nodes, drops any richer formatting a Payload-admin edit might have added. */
+export function lexicalToPlainText(doc: unknown): string {
+  if (!doc || typeof doc !== "object") return ""
+  const root = (doc as { root?: { children?: unknown[] } }).root
+  if (!root?.children) return ""
+  return root.children
+    .map((node) => {
+      const children = (node as { children?: { text?: string }[] })?.children ?? []
+      return children.map((c) => c.text ?? "").join("")
+    })
+    .join("\n")
+}
+
+export async function createBlogPost(input: BlogPostWriteInput): Promise<PayloadBlogPostDoc> {
+  const res = await payloadFetch(`/blog-posts`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      body: input.body !== undefined ? plainTextToLexical(input.body) : undefined,
+      tenant: PAYLOAD_TENANT_ID,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createBlogPost failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return data.doc as PayloadBlogPostDoc
+}
+
+export async function updateBlogPost(
+  id: string | number,
+  input: Partial<BlogPostWriteInput>,
+): Promise<PayloadBlogPostDoc> {
+  const res = await payloadFetch(`/blog-posts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...input,
+      body: input.body !== undefined ? plainTextToLexical(input.body) : undefined,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updateBlogPost(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return data.doc as PayloadBlogPostDoc
 }
 
 // ─── Generic collection CRUD (Metadata-Driven UI — types/form-builder.ts) ───

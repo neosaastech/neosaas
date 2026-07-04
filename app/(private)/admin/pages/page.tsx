@@ -2,7 +2,7 @@
 
 import { Shield } from "lucide-react"
 import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
-import { PagesSettings } from "@/components/admin/pages-settings"
+import { ContentHub } from "@/components/admin/pages-settings"
 
 // Split out of /admin/settings (was the "Pages ACL" tab) — content
 // management outgrew a settings tab and deserved its own place in the nav.
@@ -27,10 +27,10 @@ export default function AdminPagesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-[#1A1A1A]">Pages</h1>
-        <p className="text-muted-foreground mt-1">Manage content pages and internal route access.</p>
+        <h1 className="text-3xl font-bold text-[#1A1A1A]">Content</h1>
+        <p className="text-muted-foreground mt-1">Create and manage Pages and Articles.</p>
       </div>
-      <PagesSettings />
+      <ContentHub />
     </div>
   )
 }
