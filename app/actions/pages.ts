@@ -114,6 +114,11 @@ export async function saveContentPage(
     return { success: true, data: page }
   } catch (error) {
     console.error("Failed to save content page to Payload:", error)
-    return { success: false, error: "Failed to save content page" }
+    // Was collapsing every failure into "Failed to save content page" —
+    // swallowed the real Payload validation error (e.g. a duplicate slug,
+    // a missing required field), making a genuine save failure impossible
+    // to tell apart from a working save whose result just wasn't visible.
+    const message = error instanceof Error ? error.message : "Failed to save content page"
+    return { success: false, error: message }
   }
 }

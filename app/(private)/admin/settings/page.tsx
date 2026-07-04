@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,6 +45,13 @@ type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
 
 export default function AdminSettingsPage() {
   const { isChecking, isAdmin } = useRequireAdmin()
+  const searchParams = useSearchParams()
+  // Tabs was previously uncontrolled (defaultValue="general"), so a
+  // `?tab=pages` redirect (e.g. after creating a content page) landed
+  // silently on General instead — the page had actually saved, it just
+  // wasn't visible where the user was sent. Controlled + seeded from the
+  // URL fixes that, and makes the tab bookmarkable/shareable too.
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") ?? "general")
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -566,7 +574,7 @@ export default function AdminSettingsPage() {
         <SaveStatusIndicator />
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="general" className="data-[state=active]:bg-brand data-[state=active]:text-white">
             General
