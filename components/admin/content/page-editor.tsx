@@ -46,21 +46,34 @@ export function PageEditor({ page }: { page: PayloadPageDoc | null }) {
 
   async function handleSave(status: "draft" | "published") {
     setIsSaving(true)
-    const result = await saveContentPage(page?.id ?? null, {
-      title,
-      slug,
-      pageType: pageType || undefined,
-      layout,
-      seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
-      _status: status,
-    })
-    setIsSaving(false)
-    if (result.success) {
-      toast.success(status === "published" ? "Page publiée" : "Brouillon enregistré")
-      router.push("/admin/settings?tab=pages")
-      router.refresh()
-    } else {
-      toast.error(result.error)
+    try {
+      // JSON round-trip strips `undefined` values from nested block objects
+      // (e.g. a freshly-added repeatable item's not-yet-filled fields) —
+      // cheap insurance against a Server Action serialization edge case,
+      // since a client-side throw here previously had no catch at all: the
+      // promise would reject, isSaving would stay stuck true forever, and
+      // nothing — no toast, no server log — would ever show why.
+      const sanitizedLayout = JSON.parse(JSON.stringify(layout))
+      const result = await saveContentPage(page?.id ?? null, {
+        title,
+        slug,
+        pageType: pageType || undefined,
+        layout: sanitizedLayout,
+        seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
+        _status: status,
+      })
+      if (result.success) {
+        toast.success(status === "published" ? "Page publiée" : "Brouillon enregistré")
+        router.push("/admin/settings?tab=pages")
+        router.refresh()
+      } else {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      console.error("handleSave threw before reaching the server:", error)
+      toast.error(error instanceof Error ? error.message : "Une erreur inattendue est survenue")
+    } finally {
+      setIsSaving(false)
     }
   }
 
