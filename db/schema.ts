@@ -524,6 +524,14 @@ export const serviceApiConfigs = pgTable("service_api_configs", {
   config: jsonb("config").notNull(), // Encrypted service-specific configuration
   metadata: jsonb("metadata"), // Additional service metadata (region, account info, etc.)
   lastTestedAt: timestamp("last_tested_at"), // Last successful connection test
+  // Vault Pilier B (2026-07-04): 'database' = today's behaviour, encrypted
+  // only in this deployment's own Postgres. 'vault' marks a config whose
+  // authoritative copy also lives in NeoKube's central Vault at vaultPath,
+  // so a client's keys survive moving this deployment off Vercel/Neon
+  // entirely — the sync side (Vault <-> this table) is infra work, not
+  // app code, since Vercel serverless can't reach Vault directly.
+  secretBackend: text("secret_backend").notNull().default("database"), // 'database' | 'vault'
+  vaultPath: text("vault_path"), // e.g. secret/neosaas/<deployment_id>/<service_name>/<environment>
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })

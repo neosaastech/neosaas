@@ -64,6 +64,13 @@
       "when": 1783141226998,
       "tag": "0008_simple_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783189713457,
+      "tag": "0009_soft_cammi",
+      "breakpoints": true
     }
   ]
 }
