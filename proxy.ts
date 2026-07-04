@@ -4,6 +4,12 @@ import { db } from '@/db'
 import { platformConfig } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { LOCALES } from '@/app/[locale]/layout'
+import {
+  canAccessPage,
+  findRequiredRoleForPath,
+  getCachedPagePermissions,
+  getUserIdFromToken,
+} from '@/lib/auth/page-access'
 
 /**
  * Next.js 16 Proxy Configuration
@@ -14,7 +20,40 @@ import { LOCALES } from '@/app/[locale]/layout'
  * - Header modifications
  *
  * Complex logic (auth, validation) should be in server components/functions.
+ *
+ * Exception (2026-07-04): page_permissions.access enforcement. This is the
+ * only point in the app that runs before every /admin and /dashboard
+ * request regardless of which page component handles it, which is exactly
+ * what closing the "page_permissions is cosmetic" gap requires — a
+ * per-page server component check can't catch a request before it starts
+ * rendering. All the actual logic lives in lib/auth/page-access.ts
+ * (cached lookup, longest-prefix match, role check); this file only calls
+ * it, kept intentionally thin.
  */
+const ACCESS_CONTROLLED_PREFIXES = ["/admin", "/dashboard"]
+
+async function enforcePageAccess(request: NextRequest): Promise<NextResponse | null> {
+  const path = request.nextUrl.pathname
+  if (!ACCESS_CONTROLLED_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
+    return null
+  }
+
+  const permissions = await getCachedPagePermissions()
+  const requiredRole = findRequiredRoleForPath(path, permissions)
+  if (requiredRole === "public") return null
+
+  const userId = await getUserIdFromToken(request.cookies.get("auth-token")?.value)
+  if (!userId) {
+    return NextResponse.redirect(new URL("/auth/login", request.url))
+  }
+  if (requiredRole === "user") return null
+
+  const allowed = await canAccessPage(userId, requiredRole)
+  if (!allowed) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
+  return null
+}
 
 const DEFAULT_LOCALE = "fr"
 
@@ -108,6 +147,9 @@ export async function proxy(request: NextRequest) {
     url.pathname = `/${DEFAULT_LOCALE}${path === "/" ? "" : path}`
     return NextResponse.redirect(url)
   }
+
+  const accessDenied = await enforcePageAccess(request)
+  if (accessDenied) return accessDenied
 
   return NextResponse.next()
 }

@@ -34,8 +34,12 @@ const defaultPages: Page[] = [
   { path: "/dashboard/checkout", name: "Checkout", access: "user", group: "Dashboard" },
   { path: "/admin", name: "Admin Dashboard", access: "admin", group: "Admin" },
   { path: "/admin/api", name: "API Management", access: "admin", group: "Admin" },
-  { path: "/admin/pages", name: "Pages ACL", access: "admin", group: "Admin" },
+  { path: "/admin/pages", name: "Pages", access: "admin", group: "Admin" },
   { path: "/admin/mail", name: "Mail Management", access: "admin", group: "Admin" },
+  // Cross-tenant user/company management — matches sidebar's
+  // superAdminOnly:true for "Organization". Actually enforced by
+  // middleware.ts (was cosmetic before 2026-07-04).
+  { path: "/admin/users", name: "Organization", access: "super_admin", group: "Admin" },
 ]
 
 export function PagesSettings() {
@@ -68,8 +72,12 @@ export function PagesSettings() {
       setIsLoading(true)
       const result = await getPages()
       if (result.success && result.data && result.data.length > 0) {
-        // Map DB result to Page interface
-        const dbPages = result.data.map(p => ({
+        // Always sync (onConflictDoNothing — idempotent) so new entries
+        // added to defaultPages (e.g. /admin/users) reach an
+        // already-populated prod table, not just a fresh/empty one.
+        await syncPages(defaultPages)
+        const refreshed = await getPages()
+        const dbPages = (refreshed.success && refreshed.data ? refreshed.data : result.data).map(p => ({
           path: p.path,
           name: p.name,
           access: p.access as AccessLevel,
