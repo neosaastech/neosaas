@@ -9,6 +9,7 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
 import { useTheme } from 'next-themes'
 import type { ThemeConfig } from '@/types/theme-config'
+import { applyThemePreview } from '@/lib/theme/apply-theme-variables'
 export { generateThemeCSS } from '@/lib/theme/generate-css'
 
 interface DynamicThemeProviderProps {
@@ -53,60 +54,8 @@ export function DynamicThemeProvider({ theme, children }: DynamicThemeProviderPr
 
   // Appliquer les variables CSS quand le thème résolu change
   useEffect(() => {
-    applyThemeVariables(theme, resolvedTheme)
+    applyThemePreview(theme, resolvedTheme)
   }, [theme, resolvedTheme])
 
   return <ThemeConfigContext.Provider value={theme}>{children}</ThemeConfigContext.Provider>
-}
-
-/**
- * Applique les variables CSS du thème
- */
-function applyThemeVariables(theme: ThemeConfig, resolvedTheme: string | undefined) {
-  const root = document.documentElement
-
-  // Déterminer quelle palette utiliser basé sur le thème résolu de next-themes
-  const isDark = resolvedTheme === 'dark'
-  const colorPalette = isDark ? theme.dark : theme.light
-
-  // Appliquer les couleurs
-  Object.entries(colorPalette).forEach(([key, value]) => {
-    const cssVar = `--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`
-    root.style.setProperty(cssVar, value)
-  })
-
-  // Appliquer la typographie
-  if (theme.typography) {
-    root.style.setProperty('--font-family', theme.typography.fontFamily)
-    root.style.setProperty('--font-family-heading', theme.typography.fontFamilyHeading)
-    root.style.setProperty('--font-family-mono', theme.typography.fontFamilyMono)
-
-    // Tailles de police
-    Object.entries(theme.typography.fontSize).forEach(([key, value]) => {
-      root.style.setProperty(`--font-size-${key}`, value)
-    })
-
-    // Poids de police
-    Object.entries(theme.typography.fontWeight).forEach(([key, value]) => {
-      root.style.setProperty(`--font-weight-${key}`, value)
-    })
-
-    // Hauteur de ligne
-    Object.entries(theme.typography.lineHeight).forEach(([key, value]) => {
-      root.style.setProperty(`--line-height-${key}`, value)
-    })
-  }
-
-  // Appliquer l'espacement
-  if (theme.spacing) {
-    // Border radius
-    Object.entries(theme.spacing.borderRadius).forEach(([key, value]) => {
-      root.style.setProperty(`--radius-${key}`, value)
-    })
-
-    // Spacing
-    Object.entries(theme.spacing.spacing).forEach(([key, value]) => {
-      root.style.setProperty(`--spacing-${key}`, value)
-    })
-  }
 }

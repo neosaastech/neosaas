@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Check, ChevronsUpDown, Upload, Link2, Type } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,8 +31,13 @@ export function FontSourcePicker({ label, role, value, onChange, activeFontFamil
   const [comboboxOpen, setComboboxOpen] = useState(false)
   const [customFamily, setCustomFamily] = useState("")
   const [linkUrl, setLinkUrl] = useState(value?.type === "link" ? value.value : "")
+  const [selectedTab, setSelectedTab] = useState<FontSource["type"]>(value?.type ?? "system")
 
-  const activeTab = value?.type ?? "system"
+  useEffect(() => {
+    if (value?.type) {
+      setSelectedTab(value.type)
+    }
+  }, [value?.type])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -52,9 +57,13 @@ export function FontSourcePicker({ label, role, value, onChange, activeFontFamil
     <div className="space-y-2">
       <Label>{label}</Label>
       <Tabs
-        value={activeTab}
+        value={selectedTab}
         onValueChange={(tab) => {
-          if (tab === "system") onChange({ type: "system", value: "" })
+          const type = tab as FontSource["type"]
+          setSelectedTab(type)
+          if (type === "system") {
+            onChange({ type: "system", value: "" })
+          }
         }}
       >
         <TabsList className="grid w-full grid-cols-4">

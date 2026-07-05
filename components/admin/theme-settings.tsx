@@ -5,7 +5,8 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2, Palette, RefreshCw, Sun, Moon, Type } from 'lucide-react'
+import { Loader2, Palette, RefreshCw, Sun, Moon, Type, Cloud } from 'lucide-react'
 import type { ThemeConfig, ColorPalette } from '@/types/theme-config'
 import { defaultTheme } from '@/types/theme-config'
 import { updateThemeConfig, resetThemeConfig, getThemeConfig } from '@/app/actions/theme-config'
@@ -23,10 +24,12 @@ import { Icon, ICON_LIBRARIES, ICON_LIBRARY_LABELS, type IconLibrary } from '@/c
 import { FONT_PAIRS, getFontPair } from '@/lib/theme/font-pairs'
 import { FontSourcePicker } from '@/components/admin/font-source-picker'
 import { resolveFontFamily } from '@/lib/theme/font-source'
+import { applyThemePreview } from '@/lib/theme/apply-theme-variables'
 import { DICEBEAR_STYLES, DEFAULT_DICEBEAR_STYLE, getAvatarUrl } from '@/lib/theme/avatar'
 
 const ICON_PREVIEW_NAMES = ['home', 'user', 'settings', 'check', 'close']
 
+type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
 interface ColorInputProps {
   label: string
   value: string
@@ -116,17 +119,15 @@ function ColorInput({ label, value, onChange, description }: ColorInputProps) {
 }
 
 export function ThemeSettings() {
+  const router = useRouter()
+  const { resolvedTheme } = useTheme()
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [theme, setTheme] = useState<ThemeConfig>(defaultTheme)
-  const { setTheme: setResolvedTheme } = useTheme()
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const hasHydrated = useRef(false)
 
-  // Load the configuration
-  useEffect(() => {
-    loadTheme()
-  }, [])
-
-  const loadTheme = async () => {
+  const loadTheme = useCallback(async () => {
     setLoading(true)
     try {
       const config = await getThemeConfig()
@@ -136,45 +137,79 @@ export function ThemeSettings() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const handleSave = async () => {
-    setSaving(true)
+  // Load the configuration
+  useEffect(() => {
+    loadTheme()
+  }, [loadTheme])
+
+  const saveTheme = useCallback(async () => {
+    setSaveStatus('saving')
     try {
       const result = await updateThemeConfig(theme)
       if (result.success) {
-        toast.success('Theme saved successfully')
-        // Reload page to apply changes
-        window.location.reload()
+        setSaveStatus('saved')
+        router.refresh()
       } else {
+        setSaveStatus('error')
         toast.error(result.error || 'Error saving theme')
       }
     } catch (error) {
+      setSaveStatus('error')
       toast.error('Error saving theme')
-    } finally {
-      setSaving(false)
     }
-  }
+  }, [theme, router])
+
+  const triggerAutoSave = useCallback(() => {
+    if (!hasHydrated.current) return
+
+    setSaveStatus('unsaved')
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(() => {
+      saveTheme()
+    }, 1500)
+  }, [saveTheme])
+
+  // Live preview + auto-save when theme changes
+  useEffect(() => {
+    if (loading) return
+
+    applyThemePreview(theme, resolvedTheme)
+
+    if (!hasHydrated.current) {
+      hasHydrated.current = true
+      return
+    }
+
+    triggerAutoSave()
+  }, [theme, resolvedTheme, loading, triggerAutoSave])
 
   const handleReset = async () => {
     if (!confirm('Are you sure you want to reset to the default theme?')) {
       return
     }
 
-    setSaving(true)
+    setSaveStatus('saving')
     try {
       const result = await resetThemeConfig()
       if (result.success) {
         toast.success('Theme reset successfully')
+        setSaveStatus('saved')
+        hasHydrated.current = false
         await loadTheme()
-        window.location.reload()
+        router.refresh()
       } else {
+        setSaveStatus('error')
         toast.error(result.error || 'Error resetting theme')
       }
     } catch (error) {
+      setSaveStatus('error')
       toast.error('Error resetting theme')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -210,6 +245,35 @@ export function ThemeSettings() {
     }))
   }
 
+  const SaveStatusIndicator = () => (
+    <div className="flex items-center gap-2 text-sm">
+      {saveStatus === 'saving' && (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <span className="text-muted-foreground">Saving...</span>
+        </>
+      )}
+      {saveStatus === 'saved' && (
+        <>
+          <Cloud className="h-4 w-4 text-green-500" />
+          <span className="text-green-600">Saved</span>
+        </>
+      )}
+      {saveStatus === 'unsaved' && (
+        <>
+          <Cloud className="h-4 w-4 text-orange-500" />
+          <span className="text-orange-600">Unsaved changes</span>
+        </>
+      )}
+      {saveStatus === 'error' && (
+        <>
+          <Cloud className="h-4 w-4 text-red-500" />
+          <span className="text-red-600">Save failed</span>
+        </>
+      )}
+    </div>
+  )
+
   if (loading) {
     return (
       <Card>
@@ -230,23 +294,14 @@ export function ThemeSettings() {
             Theme Configuration
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Customize your site's colors and styles
+            Customize your site's colors and styles (auto-saved)
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleReset} disabled={saving}>
+        <div className="flex items-center gap-4">
+          <SaveStatusIndicator />
+          <Button variant="outline" onClick={handleReset} disabled={saveStatus === 'saving'}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Reset
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save'
-            )}
           </Button>
         </div>
       </div>
@@ -259,41 +314,16 @@ export function ThemeSettings() {
             Display Mode
           </CardTitle>
           <CardDescription>
-            Default mode, and whether visitors can switch it themselves
+            Whether visitors can switch light/dark mode themselves
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Default mode</Label>
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <Sun className={`h-4 w-4 ${theme.mode === 'light' ? 'text-foreground' : 'text-muted-foreground'}`} />
-                <span className="text-sm font-medium">Light</span>
-              </div>
-              <Switch
-                checked={theme.mode === 'dark'}
-                onCheckedChange={(checked) => {
-                  const mode = checked ? 'dark' : 'light'
-                  setTheme(prev => ({ ...prev, mode }))
-                  // Preview only, applied on Save: the live public switch is
-                  // the site's own toggle (components/common/theme-toggle.tsx),
-                  // this control isn't a second one.
-                  setResolvedTheme(mode)
-                }}
-              />
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Dark</span>
-                <Moon className={`h-4 w-4 ${theme.mode === 'dark' ? 'text-foreground' : 'text-muted-foreground'}`} />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
               <div>
                 <Label className="text-sm font-medium">Allow visitors to switch mode</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  When off, the light/dark toggle is hidden site-wide and everyone stays on the default mode above.
+                  When off, the light/dark toggle is hidden site-wide and everyone stays on the configured default mode.
                 </p>
               </div>
               <Switch
@@ -440,6 +470,14 @@ export function ThemeSettings() {
                 }))
               }
             />
+          </div>
+
+          <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Live preview</p>
+            <h3 className="text-2xl font-heading font-bold">Heading — The quick brown fox</h3>
+            <p className="font-sans text-base">
+              Body text — Lorem ipsum dolor sit amet, consectetur adipiscing elit. Changes apply instantly across the site.
+            </p>
           </div>
         </CardContent>
       </Card>
