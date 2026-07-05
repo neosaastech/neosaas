@@ -120,6 +120,55 @@ every live image. The actual tenant boundary that matters is in the
 browse or attach another tenant's media in the relationship picker — same
 rule already applied to `Pages.parent`/`Pages.category`/`Categories.parent`.
 
+## Live Preview
+
+Payload's editor gets a real "see it before you publish" panel (Charles,
+2026-07-05: the stock block form has zero visual feedback) — the site's
+own rendering, live, in an iframe, updating as the editor types.
+
+```
+Payload admin edits a Page      →   admin.livePreview.url (payload.config.ts)
+                                     opens an iframe at:
+                                     https://<site>/api/preview?secret=...&path=...
+                                            │
+                                            ▼
+                                     app/api/preview/route.ts validates
+                                     PREVIEW_SECRET, enables Next.js Draft
+                                     Mode, redirects to the real page route
+                                            │
+                                            ▼
+                                     [...slug]/page.tsx sees draftMode()
+                                     enabled → fetches the draft straight
+                                     from Payload (getPageForPreview(),
+                                     draft=true) instead of querying this
+                                     site's own page_layers table (which
+                                     only ever has *published* content)
+                                            │
+                                            ▼
+                                     lib/layers/from-payload.ts maps
+                                     Payload's raw block shape into the same
+                                     rows <BlockRenderer/> already consumes
+                                            │
+                                            ▼
+                                     <RefreshPreview/> (wraps Payload's
+                                     official RefreshRouteOnSave) calls
+                                     router.refresh() on every keystroke —
+                                     re-fetches the draft, re-renders
+```
+
+**Why a separate fetch path just for this**: every other read in this repo
+deliberately never talks to Payload at runtime (see "How a page gets built"
+above) — a draft is the one exception, since it doesn't exist in
+`page_layers` at all until published. `lib/layers/from-payload.ts` mirrors
+payload-cms's `mapBlockToProps()` field-for-field; touch both when adding a
+block type, same mirror discipline as the rest of this doc.
+
+**Env vars**: `PREVIEW_SECRET` (shared between payload-cms and this site —
+gates `/api/preview`), `NEXT_PUBLIC_PAYLOAD_URL` (Payload's own origin, so
+`RefreshRouteOnSave` only trusts postMessages from it). payload-cms side
+needs `PREVIEW_SECRET` + `NEOSAAS_APP_PREVIEW_URL` (fallback base URL,
+overridden by a Tenant's own `domain` field when set).
+
 ## Naming convention ("Pilier G")
 
 `lib/layers/prop-vocabulary.ts` is the canonical prop-name dictionary.

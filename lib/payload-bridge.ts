@@ -122,6 +122,30 @@ export async function getPage(id: string | number): Promise<PayloadPageDoc> {
   return res.json()
 }
 
+/**
+ * Live Preview only — fetches a page straight from Payload including
+ * unpublished drafts (`draft=true`), unlike every other read in this file
+ * which only ever sees what the sync hooks already pushed into this site's
+ * own page_layers table. depth=2 so an `image` upload resolves to `{ url }`
+ * (lib/layers/from-payload.ts needs the populated object, not a bare ID).
+ */
+export async function getPageForPreview(path: string, locale: string): Promise<PayloadPageDoc | null> {
+  const params = new URLSearchParams({
+    "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
+    "where[path][equals]": path,
+    depth: "2",
+    draft: "true",
+    locale,
+    limit: "1",
+  })
+  const res = await payloadFetch(`/pages?${params.toString()}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: getPageForPreview(${path}) failed (${res.status})`)
+  }
+  const result = (await res.json()) as PaginatedResult<PayloadPageDoc>
+  return result.docs[0] ?? null
+}
+
 export interface PageWriteInput {
   title: string
   slug: string

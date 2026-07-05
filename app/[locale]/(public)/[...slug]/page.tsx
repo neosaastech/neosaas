@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation"
+import { draftMode } from "next/headers"
 import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { pageLayers } from "@/db/schema"
-import { BlockRenderer } from "@/components/layers/block-renderer"
+import { BlockRenderer, type PageLayerRow } from "@/components/layers/block-renderer"
+import { getPageForPreview } from "@/lib/payload-bridge"
+import { mapPayloadLayoutToLayerRows } from "@/lib/layers/from-payload"
+import { RefreshPreview } from "@/components/common/refresh-preview"
 
 /**
  * Generic renderer for any page created via the Content Hub (Payload →
@@ -24,15 +28,29 @@ export default async function DynamicPage({
 }) {
   const { locale, slug } = await params
   const pagePath = `/${slug.join("/")}`
+  const { isEnabled: isPreview } = await draftMode()
 
-  let layers: { id: string; layerType: string; props: unknown }[] = []
-  try {
-    layers = await db.query.pageLayers.findMany({
-      where: and(eq(pageLayers.pagePath, pagePath), eq(pageLayers.locale, locale), eq(pageLayers.isActive, true)),
-      orderBy: asc(pageLayers.position),
-    })
-  } catch (error) {
-    console.error(`Failed to load page layers for ${pagePath}:`, error)
+  let layers: PageLayerRow[] = []
+
+  if (isPreview) {
+    // Live Preview: read the draft straight from Payload — page_layers only
+    // ever has *published* content, so a draft would 404 through the normal
+    // path below even though it genuinely exists.
+    try {
+      const doc = await getPageForPreview(pagePath, locale)
+      layers = doc ? mapPayloadLayoutToLayerRows(doc.layout ?? []) : []
+    } catch (error) {
+      console.error(`Failed to load preview for ${pagePath}:`, error)
+    }
+  } else {
+    try {
+      layers = await db.query.pageLayers.findMany({
+        where: and(eq(pageLayers.pagePath, pagePath), eq(pageLayers.locale, locale), eq(pageLayers.isActive, true)),
+        orderBy: asc(pageLayers.position),
+      })
+    } catch (error) {
+      console.error(`Failed to load page layers for ${pagePath}:`, error)
+    }
   }
 
   if (layers.length === 0) {
@@ -41,6 +59,7 @@ export default async function DynamicPage({
 
   return (
     <div className="container py-12 md:py-24">
+      {isPreview && <RefreshPreview />}
       <BlockRenderer layers={layers} pagePath={pagePath} />
     </div>
   )

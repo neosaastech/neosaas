@@ -91,6 +91,8 @@
     "@lexical/utils": "^0.46.0",
     "@neondatabase/serverless": "latest",
     "@opentelemetry/api": "latest",
+    "@payloadcms/live-preview-react": "^3.85.2",
+    "@payloadcms/richtext-lexical": "^3.85.2",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
     "@radix-ui/react-aspect-ratio": "latest",
