@@ -62,7 +62,7 @@ interface), and `mapBlockToProps()`'s case for that block type. Skipping
 one means content saves fine in Payload but silently fails Zod validation
 (or loses a field) on the site.
 
-## Current block inventory (7)
+## Current block inventory (8)
 
 | `layerType` | Purpose | Notable props | Dynamic? |
 |---|---|---|---|
@@ -73,9 +73,52 @@ one means content saves fine in Payload but silently fails Zod validation
 | `cta-banner` | Full-width closing CTA | `eyebrow`, `title`, `subtitle`, `ctaLabel`+`ctaHref` | No |
 | `form` | Generic lead-capture form | `eyebrow`, `title`, `subtitle`, `name` (form identity), `items[]` (`name`, `label`, `type`, `required`), `submitLabel`, `successMessage` | No (submits to `/api/forms/submit` → `form_submissions` table) |
 | `blog-list` | Latest blog posts | `eyebrow`, `title`, `subtitle`, `limit`, `categorySlug` | **Yes** — queries `blog_posts` at render time |
+| `content` | Freeform rich text | `bodyHtml` | No — synced from Payload's Lexical editor via `convertLexicalToHTML`, same as a blog post body |
 
 Full shapes are the source of truth in `lib/layers/registry.ts` — this
 table is a map, not a spec.
+
+## Block styling: `blockSettings` / `<BlockWrapper />` / `<BlockRenderer />`
+
+Every block (not just content) also carries a `blockSettings` group,
+independent of its own content fields — `backgroundColor` (white/gray/
+dark/brand), `padding` (none/normal/large), `textAlign` (left/center/
+right), `hasBorder` (checkbox). An editor sets these from Payload's admin
+(or the Content Hub's block editor) without touching code.
+
+This is deliberately **not** part of any layer's own `propsSchema` — a
+layer component (`HeroLayer`, `ContentLayer`, ...) only ever describes its
+actual content, never styling mechanics. The split:
+
+- `lib/layers/block-settings.ts` — the Zod schema (mirrors payload-cms's
+  `src/blocks/shared/blockSettings.ts` group field) and
+  `resolveBlockSettingsClassName()`, which turns the four settings into
+  Tailwind utility classes (e.g. `dark` → `bg-slate-900 text-white`).
+- `components/layers/block-wrapper.tsx` — `<BlockWrapper settings={...}>`
+  applies those classes around a layer's rendered JSX.
+- `components/layers/block-renderer.tsx` — `<BlockRenderer layers={...} />`,
+  the one shared rendering loop (layerRegistry lookup → strip
+  `blockSettings` out of the raw props → `propsSchema.parse()` the rest →
+  wrap in `<BlockWrapper>`). Both page routes (`features/page.tsx`,
+  `[...slug]/page.tsx`) use this instead of duplicating the loop.
+
+No entry needed in `mapBlockToProps()`'s per-block cases for this — the
+Payload sync (`syncPageToNeosaasApp`) merges `blockSettings` into every
+block's synced props once, generically, so a new block type gets it for
+free.
+
+## Media & multi-tenancy
+
+Payload's `media` collection stays publicly readable (`access.read: () =>
+true`) on purpose — a published page's `imageUrl` is a real URL the
+browser fetches with no Payload session, so locking that down would break
+every live image. The actual tenant boundary that matters is in the
+**admin authoring UI**: every `upload`-type field inside a block (Hero's
+`image`, Testimonials' `items.image`, plus BlogPosts' `coverImage`) has
+`filterOptions: tenantFilterOptions` (payload-cms's
+`src/hooks/tenantFilterOptions.ts`), so an editor of one tenant can never
+browse or attach another tenant's media in the relationship picker — same
+rule already applied to `Pages.parent`/`Pages.category`/`Categories.parent`.
 
 ## Naming convention ("Pilier G")
 
@@ -125,6 +168,12 @@ established pattern going forward for any new variant-based UI primitive.
 6. **payload-cms**: add a `case '<layer-type>':` to `mapBlockToProps()` in
    `src/sync/targets/neosaas-app.ts`.
 7. Run `pnpm lint:layers` and `tsc --noEmit` in both repos before shipping.
+
+Styling (`blockSettings`) needs no extra step — every block gets it
+automatically by including `blockSettingsField` in its Payload `fields`
+array (step 4) and rendering through `<BlockRenderer />` (already true for
+every page route). Only add `filterOptions: tenantFilterOptions` yourself
+if the new block has its own `upload`-type field.
 
 If the block needs its own database table (like `form_submissions` or
 `blog_posts`) rather than reusing `page_layers`, also: add the table to

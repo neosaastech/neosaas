@@ -4,6 +4,7 @@ import Script from "next/script"
 import { ThemeProvider } from "@/components/common/theme-provider"
 import { DynamicThemeProvider } from "@/components/common/dynamic-theme-provider"
 import { BackToTop } from "@/components/common/back-to-top"
+import { PrelineScript } from "@/components/common/preline-script"
 import { Toaster } from "@/components/ui/sonner"
 import "@/styles/globals.css"
 
@@ -86,6 +87,7 @@ export default async function RootLayout({
         
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <DynamicThemeProvider theme={themeConfig}>
+            <PrelineScript />
             {children}
             <BackToTop />
             <Toaster />

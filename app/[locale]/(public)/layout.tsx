@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/layout/site-header"
 import { SiteFooter } from "@/components/layout/site-footer"
 import { getCurrentUser } from "@/lib/auth"
 import { getPlatformConfig } from "@/lib/config"
+import { getHeaderConfig, getFooterConfig } from "@/app/actions/site-nav"
 import { PlatformConfigProvider } from "@/contexts/platform-config-context"
 import { isAdmin } from "@/lib/auth/server"
 import { CookieConsent } from "@/components/legal/cookie-consent"
@@ -19,6 +20,7 @@ export default async function PublicLayout({
 }) {
   const user = await getCurrentUser()
   const platformConfig = await getPlatformConfig()
+  const [headerConfig, footerConfig] = await Promise.all([getHeaderConfig(), getFooterConfig()])
 
   // Check maintenance mode - redirect non-admin users to maintenance page
   if (platformConfig.maintenanceMode) {
@@ -31,9 +33,9 @@ export default async function PublicLayout({
   return (
     <PlatformConfigProvider config={platformConfig}>
       <div className="flex min-h-screen flex-col">
-        <SiteHeader user={user} />
+        <SiteHeader user={user} headerConfig={headerConfig} />
         <main className="flex-1">{children}</main>
-        <SiteFooter />
+        <SiteFooter footerConfig={footerConfig} />
         <CookieConsent
           logo={platformConfig.showCookieLogo ? platformConfig.logo : null}
           enabled={platformConfig.cookieConsentEnabled}

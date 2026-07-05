@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { pageLayers } from "@/db/schema"
-import { layerRegistry } from "@/lib/layers/registry"
+import { BlockRenderer } from "@/components/layers/block-renderer"
 import { HeroLayer } from "@/components/layers/hero-layer"
 import { FeatureGridLayer } from "@/components/layers/feature-grid-layer"
 
@@ -55,20 +55,7 @@ export default async function FeaturesPage({ params }: { params: Promise<{ local
 
   return (
     <div className="container py-12 md:py-24">
-      {layers.length === 0 ? (
-        <StaticFallback />
-      ) : (
-        layers.map((layer) => {
-          const def = layerRegistry[layer.layerType]
-          if (!def) {
-            console.error(`Unknown layerType "${layer.layerType}" for /features`)
-            return null
-          }
-          const props = def.propsSchema.parse(layer.props)
-          const Component = def.component
-          return <Component key={layer.id} {...props} />
-        })
-      )}
+      {layers.length === 0 ? <StaticFallback /> : <BlockRenderer layers={layers} pagePath="/features" />}
     </div>
   )
 }

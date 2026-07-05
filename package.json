@@ -146,6 +146,7 @@
     "next": "latest",
     "next-themes": "latest",
     "pg": "^8.16.3",
+    "preline": "^4.2.0",
     "react": "^19",
     "react-big-calendar": "^1.19.4",
     "react-day-picker": "latest",

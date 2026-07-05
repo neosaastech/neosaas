@@ -2,6 +2,7 @@
 
 import { layerRegistry } from "@/lib/layers/registry"
 import type { PayloadPageBlock } from "@/lib/payload-bridge"
+import { BlockWrapper } from "@/components/layers/block-wrapper"
 
 /**
  * Renders a block with its *current, unsaved* form values using the exact
@@ -48,5 +49,9 @@ export function BlockPreview({ block }: { block: PayloadPageBlock }) {
   }
 
   const Component = def.component
-  return <Component {...parsed.data} />
+  return (
+    <BlockWrapper settings={block.blockSettings}>
+      <Component {...parsed.data} />
+    </BlockWrapper>
+  )
 }

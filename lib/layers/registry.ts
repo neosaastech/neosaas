@@ -7,6 +7,7 @@ import { TestimonialsLayer, type TestimonialsLayerProps } from "@/components/lay
 import { CtaBannerLayer, type CtaBannerLayerProps } from "@/components/layers/cta-banner-layer"
 import { FormLayer, type FormLayerProps } from "@/components/layers/form-layer"
 import { BlogListLayer, type BlogListLayerProps } from "@/components/layers/blog-list-layer"
+import { ContentLayer, type ContentLayerProps } from "@/components/layers/content-layer"
 
 /**
  * Single source of truth for page layer types (Pilier G — Normes de nommage & design tokens).
@@ -131,5 +132,11 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       limit: z.number().optional(),
       categorySlug: z.string().optional(),
     }) satisfies z.ZodType<BlogListLayerProps>,
+  },
+  content: {
+    component: ContentLayer,
+    propsSchema: z.object({
+      bodyHtml: z.string(),
+    }) satisfies z.ZodType<ContentLayerProps>,
   },
 }

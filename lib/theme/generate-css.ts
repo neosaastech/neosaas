@@ -66,6 +66,7 @@ export function generateThemeCSS(theme: ThemeConfig): string {
     ${lightColors}
     ${typography}
     ${spacing}
+    ${theme.radiusBase ? `--radius: ${theme.radiusBase};` : ''}
   }
 
   .dark {

@@ -145,6 +145,15 @@ export interface ThemeConfig {
   headingFontSource?: FontSource
   bodyFontSource?: FontSource
 
+  // Rayon de bordure global (ex. '0px'/'8px'/'16px'), pilote directement la
+  // variable --radius que tout borderRadius Tailwind consomme déjà
+  // (tailwind.config.ts: lg/md/sm sont tous dérivés de var(--radius)).
+  // Distinct de `spacing.borderRadius` ci-dessus, qui génère des variables
+  // --radius-none/sm/md/lg/xl/full qu'aucune classe Tailwind ne lit
+  // aujourd'hui — un futur nettoyage pourrait unifier les deux, mais ce
+  // champ est la seule des deux qui a un effet visible.
+  radiusBase?: string
+
   // Métadonnées
   createdAt?: Date
   updatedAt?: Date

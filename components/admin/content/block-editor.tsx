@@ -7,6 +7,7 @@ import { ChevronUp, ChevronDown, Trash2 } from "lucide-react"
 import { layerRegistry } from "@/lib/layers/registry"
 import { DynamicObjectForm } from "./dynamic-field"
 import type { PayloadPageBlock } from "@/lib/payload-bridge"
+import { blockSettingsSchema } from "@/lib/layers/block-settings"
 import { z } from "zod"
 
 export function BlockEditor({
@@ -54,12 +55,20 @@ export function BlockEditor({
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
         <DynamicObjectForm
           schema={def.propsSchema as z.ZodObject<z.ZodRawShape>}
           value={block}
           onChange={(next) => onChange({ ...next, blockType: block.blockType, id: block.id })}
         />
+        <div className="border-t pt-4">
+          <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">Style</p>
+          <DynamicObjectForm
+            schema={blockSettingsSchema}
+            value={(block.blockSettings as Record<string, unknown>) ?? {}}
+            onChange={(next) => onChange({ ...block, blockSettings: next })}
+          />
+        </div>
       </CardContent>
     </Card>
   )

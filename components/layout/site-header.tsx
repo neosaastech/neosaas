@@ -10,12 +10,14 @@ import Image from "next/image"
 import { Github, Linkedin, Lock } from 'lucide-react'
 import { type JWTPayload } from "@/lib/auth"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import type { HeaderConfig } from "@/types/site-nav"
 
 interface SiteHeaderProps {
   user?: JWTPayload | null
+  headerConfig?: HeaderConfig | null
 }
 
-export function SiteHeader({ user }: SiteHeaderProps) {
+export function SiteHeader({ user, headerConfig }: SiteHeaderProps) {
   const pathname = usePathname()
   const isDemo = pathname === "/demo"
   const { siteName, logo, logoDisplayMode } = usePlatformConfig()
@@ -39,10 +41,17 @@ export function SiteHeader({ user }: SiteHeaderProps) {
             )}
           </Link>
         </div>
-        <MainNav />
+        <MainNav items={headerConfig?.navItems} />
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
             {!isDemo && <MobileMenu user={user} />}
+            {headerConfig?.ctaLabel && headerConfig?.ctaHref && (
+              <Link href={headerConfig.ctaHref} className="hidden md:block">
+                <Button size="sm" variant="outline">
+                  {headerConfig.ctaLabel}
+                </Button>
+              </Link>
+            )}
             <div className="hidden md:flex items-center space-x-2 mr-2">
               <Link
                 href="https://www.linkedin.com/company/109552979/admin/dashboard/"

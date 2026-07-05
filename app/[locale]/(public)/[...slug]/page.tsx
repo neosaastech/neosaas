@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { pageLayers } from "@/db/schema"
-import { layerRegistry } from "@/lib/layers/registry"
+import { BlockRenderer } from "@/components/layers/block-renderer"
 
 /**
  * Generic renderer for any page created via the Content Hub (Payload →
@@ -41,16 +41,7 @@ export default async function DynamicPage({
 
   return (
     <div className="container py-12 md:py-24">
-      {layers.map((layer) => {
-        const def = layerRegistry[layer.layerType]
-        if (!def) {
-          console.error(`Unknown layerType "${layer.layerType}" for ${pagePath}`)
-          return null
-        }
-        const props = def.propsSchema.parse(layer.props)
-        const Component = def.component
-        return <Component key={layer.id} {...props} />
-      })}
+      <BlockRenderer layers={layers} pagePath={pagePath} />
     </div>
   )
 }
