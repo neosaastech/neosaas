@@ -4,6 +4,7 @@ import type React from "react"
 import { PrivateSidebar } from "@/components/layout/private-dashboard/sidebar"
 import { PrivateHeader } from "@/components/layout/private-dashboard/header"
 import { UserProvider } from "@/lib/contexts/user-context"
+import { sessionUserFromAuth } from "@/lib/auth/session-user"
 import { PlatformConfigProvider, type PlatformConfig } from "@/contexts/platform-config-context"
 import { CartProvider } from "@/contexts/cart-context"
 import { useState } from "react"
@@ -28,7 +29,7 @@ export function PrivateLayoutClient({ children, user, platformConfig, alerts }: 
 
   return (
     <PlatformConfigProvider config={platformConfig}>
-      <UserProvider>
+      <UserProvider initialUser={sessionUserFromAuth(user)}>
         <CartProvider>
           <div className="flex h-screen">
             <PrivateSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />

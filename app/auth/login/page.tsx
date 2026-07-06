@@ -130,6 +130,7 @@ export default function LoginPage() {
 
       const userName = data.user.firstName || 'User';
       const userRoles = data.user.roles || [];
+      const isAdminUser = userRoles.includes("admin") || userRoles.includes("super_admin");
 
       // Save user data to localStorage for client-side usage
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -138,11 +139,11 @@ export default function LoginPage() {
         description: userRoles.length > 0 ? `Role: ${userRoles.join(', ')}` : 'Loading your dashboard...'
       });
 
-      // Check if user needs onboarding (no company assigned)
-      if (!data.user.companyId) {
+      if (isAdminUser) {
+        router.push('/admin');
+      } else if (!data.user.companyId) {
         router.push('/dashboard/company-management');
       } else {
-        // Redirect to dashboard
         router.push('/dashboard');
       }
     } catch (error) {

@@ -1,9 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Shield } from "lucide-react"
+import { useUser } from "@/lib/contexts/user-context"
 
 /**
  * Client-side Admin Guard Component
@@ -11,53 +12,15 @@ import { Shield } from "lucide-react"
  */
 export function AdminClientGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const pathname = usePathname()
-  const [isChecking, setIsChecking] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const { isAdmin, isLoading } = useUser()
 
   useEffect(() => {
-    async function checkAdminAccess() {
-      try {
-        console.log("[CLIENT GUARD] Checking admin access for path:", pathname)
-
-        const response = await fetch("/api/auth/me")
-
-        if (!response.ok) {
-          console.log("[CLIENT GUARD] Not authenticated, redirecting to login")
-          router.push("/auth/login")
-          return
-        }
-
-        const data = await response.json()
-        const userRoles = data.user?.roles?.map((r: any) => r.roleName) || []
-
-        console.log("[CLIENT GUARD] User roles:", userRoles)
-
-        const hasAdminRole = userRoles.includes("admin") || userRoles.includes("super_admin")
-
-        console.log("[CLIENT GUARD] Has admin role:", hasAdminRole)
-
-        if (!hasAdminRole) {
-          console.log("[CLIENT GUARD] No admin role, redirecting to dashboard")
-          router.push("/dashboard")
-          return
-        }
-
-        console.log("[CLIENT GUARD] Admin access granted")
-        setIsAdmin(true)
-      } catch (error) {
-        console.error("[CLIENT GUARD] Error checking access:", error)
-        router.push("/dashboard")
-      } finally {
-        setIsChecking(false)
-      }
+    if (!isLoading && !isAdmin) {
+      router.push("/dashboard")
     }
+  }, [isAdmin, isLoading, router])
 
-    checkAdminAccess()
-  }, [pathname, router])
-
-  // Show loading state while checking admin access
-  if (isChecking) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
@@ -69,7 +32,6 @@ export function AdminClientGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Don't render anything if not admin (will be redirected)
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">

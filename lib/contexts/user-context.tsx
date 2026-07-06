@@ -13,7 +13,7 @@ interface UserPermission {
   permissionDescription: string
 }
 
-interface User {
+export interface SessionUser {
   id: string
   email: string
   firstName: string | null
@@ -25,7 +25,7 @@ interface User {
 }
 
 interface UserContextType {
-  user: User | null
+  user: SessionUser | null
   isLoading: boolean
   hasRole: (roleName: string | string[]) => boolean
   hasPermission: (permissionName: string | string[]) => boolean
@@ -36,9 +36,14 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
-export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+interface UserProviderProps {
+  children: React.ReactNode
+  initialUser?: SessionUser | null
+}
+
+export function UserProvider({ children, initialUser = null }: UserProviderProps) {
+  const [user, setUser] = useState<SessionUser | null>(initialUser)
+  const [isLoading, setIsLoading] = useState(!initialUser)
 
   const fetchUser = async () => {
     try {
@@ -46,12 +51,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setUser(data.user)
-      } else {
+      } else if (!initialUser) {
         setUser(null)
       }
     } catch (error) {
       console.error("Failed to fetch user:", error)
-      setUser(null)
+      if (!initialUser) {
+        setUser(null)
+      }
     } finally {
       setIsLoading(false)
     }
