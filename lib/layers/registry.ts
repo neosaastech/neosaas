@@ -8,6 +8,10 @@ import { CtaBannerLayer, type CtaBannerLayerProps } from "@/components/layers/ct
 import { FormLayer, type FormLayerProps } from "@/components/layers/form-layer"
 import { BlogListLayer, type BlogListLayerProps } from "@/components/layers/blog-list-layer"
 import { ContentLayer, type ContentLayerProps } from "@/components/layers/content-layer"
+import { ColumnsLayer, type ColumnsLayerProps } from "@/components/layers/columns-layer"
+import { ArticleHeaderLayer, type ArticleHeaderLayerProps } from "@/components/layers/article-header-layer"
+import { ReferenceCardLayer, type ReferenceCardLayerProps } from "@/components/layers/reference-card-layer"
+import { GrapesJsDesignLayer, type GrapesJsDesignLayerProps } from "@/components/layers/grapesjs-design-layer"
 
 /**
  * Single source of truth for page layer types (Pilier G — Normes de nommage & design tokens).
@@ -138,5 +142,50 @@ export const layerRegistry: Record<string, LayerDefinition> = {
     propsSchema: z.object({
       bodyHtml: z.string(),
     }) satisfies z.ZodType<ContentLayerProps>,
+  },
+  "article-header": {
+    component: ArticleHeaderLayer,
+    propsSchema: z.object({
+      title: z.string().optional(),
+      imageUrl: z.string().optional(),
+      authorName: z.string().optional(),
+      publishedAt: z.string().optional(),
+    }) satisfies z.ZodType<ArticleHeaderLayerProps>,
+  },
+  "grapesjs-design": {
+    component: GrapesJsDesignLayer,
+    propsSchema: z.object({
+      html: z.string().optional(),
+      css: z.string().optional(),
+    }) satisfies z.ZodType<GrapesJsDesignLayerProps>,
+  },
+  reference: {
+    component: ReferenceCardLayer,
+    propsSchema: z.object({
+      title: z.string().optional(),
+      excerpt: z.string().optional(),
+      imageUrl: z.string().optional(),
+      href: z.string().optional(),
+    }) satisfies z.ZodType<ReferenceCardLayerProps>,
+  },
+  columns: {
+    component: ColumnsLayer,
+    // Nested blocks' own props are validated by BlockRenderer re-parsing
+    // through their own layerType's propsSchema when rendered inside
+    // ColumnsLayer — this envelope only needs to check the shape, not the
+    // inner content.
+    propsSchema: z.object({
+      columnCount: z.number().min(2).max(3).optional(),
+      columns: z.array(
+        z.object({
+          blocks: z.array(
+            z.object({
+              layerType: z.string(),
+              props: z.record(z.string(), z.unknown()),
+            }),
+          ),
+        }),
+      ),
+    }) satisfies z.ZodType<ColumnsLayerProps>,
   },
 }
