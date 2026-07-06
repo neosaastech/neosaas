@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImageCropper } from "@/components/ui/image-cropper"
 import { toast } from "sonner"
 import {
@@ -26,6 +25,11 @@ import {
   Cloud,
 } from "lucide-react"
 import { PaymentSettings } from "@/components/admin/payment-settings"
+import { HeaderBrandingVisibilitySelectors } from "@/components/admin/header-branding-visibility-selectors"
+import {
+  logoDisplayModeToVisibility,
+  visibilityToLogoDisplayMode,
+} from "@/lib/logo-display"
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
 
@@ -35,7 +39,8 @@ export function DashboardParameters() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const [siteName, setSiteName] = useState("NeoSaaS")
-  const [logoDisplayMode, setLogoDisplayMode] = useState<"logo" | "text" | "both">("both")
+  const [showLogoInHeader, setShowLogoInHeader] = useState(true)
+  const [showSiteNameInHeader, setShowSiteNameInHeader] = useState(true)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string>("/placeholder.svg?height=100&width=100")
   const [cropperOpen, setCropperOpen] = useState(false)
@@ -71,7 +76,7 @@ export function DashboardParameters() {
     try {
       const formData = new FormData()
       formData.append('siteName', siteName)
-      formData.append('logoDisplayMode', logoDisplayMode)
+      formData.append('logoDisplayMode', visibilityToLogoDisplayMode(showLogoInHeader, showSiteNameInHeader))
       formData.append('maintenanceMode', maintenanceMode.toString())
       formData.append('gtmCode', gtmCode)
       formData.append('customHeaderCode', customHeaderCode)
@@ -107,7 +112,7 @@ export function DashboardParameters() {
       setSaveStatus('error')
       toast.error(error instanceof Error ? error.message : 'Failed to save')
     }
-  }, [siteName, logoDisplayMode, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, seoSettings, socialLinks, logoFile])
+  }, [siteName, showLogoInHeader, showSiteNameInHeader, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, seoSettings, socialLinks, logoFile])
 
   // Debounced auto-save
   const triggerAutoSave = useCallback(() => {
@@ -132,7 +137,11 @@ export function DashboardParameters() {
         if (res.ok) {
           const data = await res.json()
           if (data.site_name) setSiteName(data.site_name)
-          if (data.logo_display_mode) setLogoDisplayMode(data.logo_display_mode)
+          if (data.logo_display_mode) {
+            const visibility = logoDisplayModeToVisibility(data.logo_display_mode)
+            setShowLogoInHeader(visibility.showLogoInHeader)
+            setShowSiteNameInHeader(visibility.showSiteNameInHeader)
+          }
           if (data.logo) setLogoPreview(data.logo)
           if (data.maintenance_mode !== undefined) {
             setMaintenanceMode(data.maintenance_mode === 'true' || data.maintenance_mode === true)
@@ -162,7 +171,7 @@ export function DashboardParameters() {
   // Trigger auto-save on changes
   useEffect(() => {
     triggerAutoSave()
-  }, [siteName, logoDisplayMode, gtmCode, customHeaderCode, customFooterCode, adminFooterCopyright, seoSettings, socialLinks])
+  }, [siteName, showLogoInHeader, showSiteNameInHeader, gtmCode, customHeaderCode, customFooterCode, adminFooterCopyright, seoSettings, socialLinks])
 
   // Handle logo change - open cropper
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -332,22 +341,12 @@ export function DashboardParameters() {
                         </p>
                       </div>
                       
-                      <div className="space-y-2">
-                        <Label htmlFor="logoDisplayMode">Display Mode</Label>
-                        <Select 
-                          value={logoDisplayMode} 
-                          onValueChange={(value: "logo" | "text" | "both") => setLogoDisplayMode(value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select display mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="logo">Logo Only</SelectItem>
-                            <SelectItem value="text">Text Only</SelectItem>
-                            <SelectItem value="both">Both (Logo + Text)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <HeaderBrandingVisibilitySelectors
+                        showLogoInHeader={showLogoInHeader}
+                        showSiteNameInHeader={showSiteNameInHeader}
+                        onShowLogoInHeaderChange={setShowLogoInHeader}
+                        onShowSiteNameInHeaderChange={setShowSiteNameInHeader}
+                      />
                     </div>
                   </div>
                   <ImageCropper

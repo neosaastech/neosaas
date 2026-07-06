@@ -176,6 +176,10 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
   const [isClientSupportOpen, setIsClientSupportOpen] = useState(isAnyPathActive(pathname, clientSupportPaths))
   const [isCollapsed, setIsCollapsed] = useState(false)
 
+  const showLogoInHeader =
+    isCollapsed || logoDisplayMode === "logo" || logoDisplayMode === "both"
+  const showSiteNameInHeader =
+    !isCollapsed && (logoDisplayMode === "text" || logoDisplayMode === "both")
   const logoInitials = siteName.substring(0, 2).toUpperCase()
   const visibleAdminItems = adminItems.filter((item) => !item.superAdminOnly || isSuperAdmin)
 
@@ -210,7 +214,7 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
       >
         <div className={cn("flex h-16 items-center border-b", isCollapsed ? "px-3 justify-center" : "px-6")}>
           <Link href="/dashboard" className="flex items-center gap-2" onClick={handleLinkClick}>
-            {(isCollapsed || logoDisplayMode === "logo" || logoDisplayMode === "both") &&
+            {showLogoInHeader &&
               (logo ? (
                 <img src={logo} alt={siteName} className="h-8 w-8 object-contain" />
               ) : (
@@ -218,7 +222,7 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
                   {logoInitials}
                 </div>
               ))}
-            {!isCollapsed && (logoDisplayMode === "text" || logoDisplayMode === "both") && (
+            {showSiteNameInHeader && (
               <span className="font-bold text-xl">
                 <span className="text-foreground">{siteName.substring(0, 3)}</span>
                 <span className="text-brand">{siteName.substring(3)}</span>

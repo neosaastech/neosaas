@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { ImageCropper } from "@/components/ui/image-cropper"
 import { toast } from "sonner"
@@ -39,6 +38,11 @@ import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
 import { LogsClient } from "@/app/(private)/admin/logs/logs-client"
 import { ThemeSettings } from "@/components/admin/theme-settings"
 import { UpdateSettings } from "@/components/admin/update-settings"
+import { HeaderBrandingVisibilitySelectors } from "@/components/admin/header-branding-visibility-selectors"
+import {
+  logoDisplayModeToVisibility,
+  visibilityToLogoDisplayMode,
+} from "@/lib/logo-display"
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
 
@@ -57,7 +61,8 @@ export default function AdminSettingsPage() {
   const [siteUrl, setSiteUrl] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [gdprContactName, setGdprContactName] = useState("")
-  const [logoDisplayMode, setLogoDisplayMode] = useState<"logo" | "text" | "both">("both")
+  const [showLogoInHeader, setShowLogoInHeader] = useState(true)
+  const [showSiteNameInHeader, setShowSiteNameInHeader] = useState(true)
   const [logoPreview, setLogoPreview] = useState<string>("/placeholder.svg?height=100&width=100")
   const [cropperOpen, setCropperOpen] = useState(false)
   const [tempLogoSrc, setTempLogoSrc] = useState<string | null>(null)
@@ -109,7 +114,7 @@ export default function AdminSettingsPage() {
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
-      formData.append('logoDisplayMode', logoDisplayMode)
+      formData.append('logoDisplayMode', visibilityToLogoDisplayMode(showLogoInHeader, showSiteNameInHeader))
       formData.append('maintenanceMode', maintenanceMode.toString())
       formData.append('gtmCode', gtmCode)
       formData.append('customHeaderCode', customHeaderCode)
@@ -147,7 +152,7 @@ export default function AdminSettingsPage() {
       setSaveStatus('error')
       toast.error(error instanceof Error ? error.message : 'Failed to save')
     }
-  }, [siteName, siteUrl, contactEmail, gdprContactName, logoDisplayMode, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
+  }, [siteName, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
 
   // Debounced auto-save
   const triggerAutoSave = useCallback(() => {
@@ -177,7 +182,11 @@ export default function AdminSettingsPage() {
           if (data.site_url) setSiteUrl(data.site_url)
           if (data.default_sender_email) setContactEmail(data.default_sender_email)
           if (data.gdpr_contact_name) setGdprContactName(data.gdpr_contact_name)
-          if (data.logo_display_mode) setLogoDisplayMode(data.logo_display_mode)
+          if (data.logo_display_mode) {
+            const visibility = logoDisplayModeToVisibility(data.logo_display_mode)
+            setShowLogoInHeader(visibility.showLogoInHeader)
+            setShowSiteNameInHeader(visibility.showSiteNameInHeader)
+          }
           if (data.logo) setLogoPreview(data.logo)
           if (data.maintenance_mode !== undefined) {
             setMaintenanceMode(data.maintenance_mode === 'true' || data.maintenance_mode === true)
@@ -238,7 +247,7 @@ export default function AdminSettingsPage() {
   // Trigger auto-save on changes
   useEffect(() => {
     triggerAutoSave()
-  }, [siteName, siteUrl, contactEmail, gdprContactName, logoDisplayMode, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
+  }, [siteName, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
 
   // Handle logo change - open cropper
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,7 +283,7 @@ export default function AdminSettingsPage() {
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
-      formData.append('logoDisplayMode', logoDisplayMode)
+      formData.append('logoDisplayMode', visibilityToLogoDisplayMode(showLogoInHeader, showSiteNameInHeader))
       formData.append('maintenanceMode', maintenanceMode.toString())
       formData.append('gtmCode', gtmCode)
       formData.append('customHeaderCode', customHeaderCode)
@@ -319,7 +328,7 @@ export default function AdminSettingsPage() {
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
-      formData.append('logoDisplayMode', logoDisplayMode)
+      formData.append('logoDisplayMode', visibilityToLogoDisplayMode(showLogoInHeader, showSiteNameInHeader))
       formData.append('maintenanceMode', maintenanceMode.toString())
       formData.append('gtmCode', gtmCode)
       formData.append('customHeaderCode', customHeaderCode)
@@ -371,7 +380,7 @@ export default function AdminSettingsPage() {
         formData.append('siteUrl', siteUrl)
         formData.append('defaultSenderEmail', contactEmail)
         formData.append('gdprContactName', gdprContactName)
-        formData.append('logoDisplayMode', logoDisplayMode)
+        formData.append('logoDisplayMode', visibilityToLogoDisplayMode(showLogoInHeader, showSiteNameInHeader))
         formData.append('maintenanceMode', maintenanceMode.toString())
         formData.append('gtmCode', gtmCode)
         formData.append('customHeaderCode', customHeaderCode)
@@ -421,7 +430,7 @@ export default function AdminSettingsPage() {
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
-      formData.append('logoDisplayMode', logoDisplayMode)
+      formData.append('logoDisplayMode', visibilityToLogoDisplayMode(showLogoInHeader, showSiteNameInHeader))
       formData.append('maintenanceMode', maintenanceMode.toString())
       formData.append('gtmCode', gtmCode)
       formData.append('customHeaderCode', customHeaderCode)
@@ -705,22 +714,12 @@ export default function AdminSettingsPage() {
                         SVG, PNG recommended. Saved automatically.
                       </p>
                       
-                      <div className="space-y-2">
-                        <Label htmlFor="logoDisplayMode">Display Mode</Label>
-                        <Select 
-                          value={logoDisplayMode} 
-                          onValueChange={(value: "logo" | "text" | "both") => setLogoDisplayMode(value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select display mode" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="logo">Logo Only</SelectItem>
-                            <SelectItem value="text">Text Only</SelectItem>
-                            <SelectItem value="both">Both (Logo + Text)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <HeaderBrandingVisibilitySelectors
+                        showLogoInHeader={showLogoInHeader}
+                        showSiteNameInHeader={showSiteNameInHeader}
+                        onShowLogoInHeaderChange={setShowLogoInHeader}
+                        onShowSiteNameInHeaderChange={setShowSiteNameInHeader}
+                      />
                     </div>
                   </div>
                   <ImageCropper
