@@ -468,67 +468,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </div>
       </section>
 
-      {/* Project Structure Section */}
-      <section className="container py-12 md:py-24 lg:py-32">
-        <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
-          <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Built for scale</h2>
-          <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
-            NeoSaaS is designed with a modular architecture that allows you to scale each component independently. Our
-            back office system provides a unified management interface while maintaining separation of concerns.
-          </p>
-        </div>
-
-        <div className="mx-auto grid justify-center gap-4 md:max-w-[64rem] mt-8">
-          {/* Project Structure Visualization */}
-          <div className="relative overflow-hidden rounded-lg border bg-background p-2 max-w-2xl mx-auto">
-            <div className="flex h-full flex-col justify-between rounded-md p-6">
-              <div className="space-y-2">
-                <h3 className="font-bold">Project Structure</h3>
-                <p className="text-sm text-muted-foreground">
-                  Clean and organized folder structure following Next.js best practices with Auth0 integration.
-                </p>
-              </div>
-              <div className="mt-4 rounded-md bg-muted p-4 overflow-x-auto">
-                <pre className="text-xs text-left">
-                  {`src
-├── app
-│   ├── (auth)
-│   │   ├── layout.tsx
-│   │   ├── sign-in
-│   │   │   └── page.tsx
-│   │   └── sign-up
-│   │       └── page.tsx
-│   ├── (protected)
-│   │   ├── dashboard
-│   │   │   └── page.tsx
-│   │   └── layout.tsx
-│   ├── api
-│   │   └── auth
-│   │       └── [...all]
-│   │           └── route.ts
-│   ├── favicon.ico
-│   ├── globals.css
-│   ├── layout.tsx
-│   └── page.tsx
-├── components
-│   ├── forms
-│   │   ├── sign-in-form.tsx
-│   │   └── sign-up-form.tsx
-│   └── ui
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── input.tsx
-├── config
-└── lib
-    ├── auth-client.ts
-    ├── auth.ts
-    └── prisma.ts`}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }
