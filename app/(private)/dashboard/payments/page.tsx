@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { usePageTitle } from "@/hooks/use-page-title"
 import {
   getStripePaymentMethods,
   getInvoices,
@@ -108,6 +109,7 @@ function getSubscriptionLabel(sub: StripeSubscription) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PaymentsPage() {
+  usePageTitle("Payments")
   const [cards, setCards] = useState<PaymentCard[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
   const [subscriptionsList, setSubscriptionsList] = useState<StripeSubscription[]>([])

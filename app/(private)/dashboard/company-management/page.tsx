@@ -8,17 +8,20 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { CompanyLogoUpload } from "@/components/dashboard/company-logo-upload"
 import { Building2, Users, Mail, Phone, MapPin, FileText, UserPlus, Pencil, Check, X, Search, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { useUser } from "@/lib/contexts/user-context"
 import { cancelInvitation, removeUserFromCompany } from "@/app/actions/company-users"
+import { usePageTitle } from "@/hooks/use-page-title"
 
 interface Company {
   id: string
   name: string
   email: string
+  logo?: string | null
   city?: string
   address?: string
   zipCode?: string
@@ -43,6 +46,7 @@ interface TeamMember {
 export default function CompanyManagementPage() {
   const { hasRole, isLoading } = useUser()
   const canEdit = hasRole(["writer", "admin", "super_admin"])
+  usePageTitle("Company Management")
 
   const [company, setCompany] = useState<Company | null>(null)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -244,7 +248,15 @@ export default function CompanyManagementPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Building2 className="h-8 w-8 text-brand" />
+              {company?.logo ? (
+                <img
+                  src={company.logo}
+                  alt={company.name}
+                  className="h-10 w-10 rounded-lg border object-cover"
+                />
+              ) : (
+                <Building2 className="h-8 w-8 text-brand" />
+              )}
               <div>
                 <CardTitle>Company Information</CardTitle>
                 <CardDescription>Manage your organization settings</CardDescription>
@@ -259,6 +271,17 @@ export default function CompanyManagementPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {company && canEdit && (
+            <CompanyLogoUpload
+              companyName={company.name}
+              companyEmail={company.email}
+              initialLogo={company.logo}
+              uploadUrl="/api/company/logo"
+              deleteUrl="/api/company/logo"
+              onLogoChange={(logo) => setCompany((prev) => (prev ? { ...prev, logo } : prev))}
+            />
+          )}
+
           {isEditingCompany ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

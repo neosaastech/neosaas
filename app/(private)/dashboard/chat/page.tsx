@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/contexts/user-context"
+import { usePageTitle } from "@/hooks/use-page-title"
 
 interface ChatMessage {
   id: string
@@ -77,6 +78,7 @@ const statusConfig = {
 
 export default function UserChatPage() {
   const { user } = useUser()
+  usePageTitle("Chat")
   const [conversations, setConversations] = useState<ChatConversation[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedConversation, setSelectedConversation] = useState<ChatConversation | null>(null)
@@ -209,9 +211,9 @@ export default function UserChatPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
               <MessageSquare className="h-6 w-6" />
-              My Conversations
+              Chat
             </h1>
             <p className="text-muted-foreground">
               Chat with our support team

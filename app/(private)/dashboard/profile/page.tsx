@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { deleteUser } from "@/app/actions/users"
+import { usePageTitle } from "@/hooks/use-page-title"
 
 // Mock data for initial display (simulating DB data)
 const INITIAL_USER = {
@@ -48,6 +49,7 @@ const INITIAL_USER = {
 
 export default function ProfilePage() {
   const router = useRouter()
+  usePageTitle("Profile")
   const [user, setUser] = useState(INITIAL_USER)
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -116,12 +118,12 @@ export default function ProfilePage() {
           // Update with the actual URL from server
           setUser((prev) => ({ ...prev, profileImage: data.imagePath }))
           
-          // Update localStorage for header sync
+          // Update localStorage for header sync (omit large base64 image)
           const storedUser = localStorage.getItem("user")
           if (storedUser) {
             const parsedUser = JSON.parse(storedUser)
-            localStorage.setItem("user", JSON.stringify({ ...parsedUser, profileImage: data.imagePath }))
-            // Dispatch storage event for immediate update in other components
+            const { profileImage: _img, ...slim } = parsedUser
+            localStorage.setItem("user", JSON.stringify(slim))
             window.dispatchEvent(new Event("storage"))
           }
           
@@ -160,12 +162,13 @@ export default function ProfilePage() {
         const data = await response.json()
         setUser((prev) => ({ ...prev, ...data.user }))
         
-        // Update localStorage
+        // Update localStorage (omit large base64 fields)
         const storedUser = localStorage.getItem("user")
         if (storedUser) {
-            const parsedUser = JSON.parse(storedUser)
-            localStorage.setItem("user", JSON.stringify({ ...parsedUser, ...data.user }))
-            window.dispatchEvent(new Event("storage"))
+          const parsedUser = JSON.parse(storedUser)
+          const { profileImage: _img, companyLogo: _logo, ...slim } = { ...parsedUser, ...data.user }
+          localStorage.setItem("user", JSON.stringify(slim))
+          window.dispatchEvent(new Event("storage"))
         }
 
         // Trigger admin alerts refresh
@@ -253,6 +256,11 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Profile</h1>
+        <p className="text-muted-foreground mt-2">Manage your personal information and account settings</p>
+      </div>
+
       {/* Top Profile Card */}
       <Card>
         <CardContent className="p-6">

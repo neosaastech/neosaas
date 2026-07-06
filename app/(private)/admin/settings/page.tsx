@@ -565,7 +565,7 @@ export default function AdminSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[#1A1A1A]">Parameters</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#1A1A1A] to-white bg-clip-text text-transparent">Parameters</h1>
           <p className="text-muted-foreground mt-1">Manage your site configuration, SEO, and integrations</p>
         </div>
         <SaveStatusIndicator />

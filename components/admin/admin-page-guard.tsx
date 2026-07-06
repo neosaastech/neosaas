@@ -18,7 +18,7 @@ export function AdminPageGuard({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Shield className="h-12 w-12 animate-pulse text-brand mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground">Vérification des droits d'accès...</p>
+          <p className="text-lg text-muted-foreground">Verifying access...</p>
         </div>
       </div>
     )

@@ -32,7 +32,7 @@ export async function verifyAdminAuth(request: NextRequest): Promise<AdminAuthRe
       return {
         isAuthenticated: false,
         isAdmin: false,
-        error: "Non authentifié - token manquant ou invalide",
+        error: "Not authenticated — missing or invalid token",
       };
     }
 
@@ -52,7 +52,7 @@ export async function verifyAdminAuth(request: NextRequest): Promise<AdminAuthRe
         isAdmin: false,
         userId: user.userId,
         roles: roleNames,
-        error: "Accès refusé - permissions admin requises",
+        error: "Access denied — admin permissions required",
       };
     }
 
@@ -67,7 +67,7 @@ export async function verifyAdminAuth(request: NextRequest): Promise<AdminAuthRe
     return {
       isAuthenticated: false,
       isAdmin: false,
-      error: `Erreur interne: ${error.message}`,
+      error: `Internal error: ${error.message}`,
     };
   }
 }
@@ -96,7 +96,7 @@ export async function requireAdminAuth(
     return NextResponse.json(
       {
         success: false,
-        error: authResult.error || "Authentification requise",
+        error: authResult.error || "Authentication required",
       },
       { status: 401 }
     );
@@ -136,7 +136,7 @@ export function withAdminAuth(
       return NextResponse.json(
         {
           success: false,
-          error: authResult.error || "Accès refusé",
+          error: authResult.error || "Access denied",
         },
         { status: authResult.isAuthenticated ? 403 : 401 }
       );

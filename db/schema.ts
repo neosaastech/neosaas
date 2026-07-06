@@ -34,6 +34,7 @@ export const companies = pgTable("companies", {
   siret: text("siret"),
   vatNumber: text("vat_number"),
   phone: text("phone"),
+  logo: text("logo"),
   stripeCustomerId: text("stripe_customer_id").unique(), // Stripe Customer ID
   stripeSetupIntentClientSecret: text("stripe_setup_intent_client_secret"), // Temporary secret for adding cards
   stripeDefaultPaymentMethod: text("stripe_default_payment_method"), // Default card payment method ID

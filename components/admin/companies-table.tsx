@@ -79,6 +79,7 @@ interface Company {
   id: string
   name: string
   email: string
+  logo?: string | null
   phone?: string | null
   address?: string | null
   city?: string | null
@@ -184,10 +185,24 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
     }
   }
 
+  const uploadCompanyLogo = async (companyId: string, file: File) => {
+    const formData = new FormData()
+    formData.append("logo", file)
+    const response = await fetch(`/api/admin/companies/${companyId}/logo`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || "Failed to upload company logo")
+    }
+  }
+
   const handleCreateCompany = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     const formData = new FormData(e.currentTarget)
+    const logoFile = formData.get("logo") as File | null
 
     const data = {
       name: formData.get("name") as string,
@@ -202,10 +217,18 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
 
     const result = await createCompany(data)
 
-    if (result.success) {
-      toast.success("Company created successfully")
-      setIsCreateOpen(false)
-      window.location.reload()
+    if (result.success && result.data) {
+      try {
+        if (logoFile && logoFile.size > 0) {
+          await uploadCompanyLogo(result.data.id, logoFile)
+        }
+        toast.success("Company created successfully")
+        setIsCreateOpen(false)
+        window.location.reload()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Company created but logo upload failed")
+        window.location.reload()
+      }
     } else {
       toast.error(result.error || "Failed to create company")
     }
@@ -608,13 +631,25 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
                     {company.id.substring(0, 8)}...
                   </TableCell>
                   <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      {company.name}
+                    <div className="flex items-center gap-3">
+                      {company.logo ? (
+                        <img
+                          src={company.logo}
+                          alt={company.name}
+                          className="h-9 w-9 rounded-lg border object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 rounded-lg border bg-muted flex items-center justify-center shrink-0">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div>
+                        <div>{company.name}</div>
+                        {company.siret && (
+                          <div className="text-xs text-muted-foreground">SIRET: {company.siret}</div>
+                        )}
+                      </div>
                     </div>
-                    {company.siret && (
-                      <div className="text-xs text-muted-foreground">SIRET: {company.siret}</div>
-                    )}
                   </TableCell>
                   <TableCell>{company.email}</TableCell>
                   <TableCell>
@@ -708,8 +743,12 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
                     checked={selectedCompanies.includes(company.id)}
                     onCheckedChange={(checked) => handleSelectCompany(company.id, checked as boolean)}
                   />
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-muted">
-                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-muted overflow-hidden shrink-0">
+                    {company.logo ? (
+                      <img src={company.logo} alt={company.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                    )}
                   </div>
                   <div>
                     <p className="font-medium text-sm">{company.name}</p>

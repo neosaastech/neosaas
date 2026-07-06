@@ -23,7 +23,7 @@ NeoSaaS is a full-stack multi-tenant SaaS boilerplate built with Next.js 15 App 
 | Category | Technology |
 |---|---|
 | Framework | Next.js 15 (App Router) + React 19 |
-| Language | TypeScript 5.7 |
+| Language | TypeScript 5.7 · **UI copy: English** |
 | Database | PostgreSQL (Drizzle ORM) |
 | UI | Tailwind CSS 3.4 + shadcn/ui (Radix UI) |
 | Auth | JWT + OAuth (Google, GitHub, Microsoft, Facebook) |
@@ -299,6 +299,16 @@ pnpm db:migrate    # Apply pending migrations
 pnpm db:push       # Direct schema sync (development only)
 pnpm db:studio     # Open Drizzle Studio (visual DB browser)
 ```
+
+---
+
+## Language
+
+NeoSaaS is **English-first**. All navigation, page titles, forms, toasts, and user-facing API messages must be written in English.
+
+- Policy: **[docs/LANGUAGE.md](./LANGUAGE.md)**
+- Cursor rule: `.cursor/rules/english-ui.mdc`
+- Client pages: use `usePageTitle()` from `@/hooks/use-page-title.ts` so the browser tab matches the `<h1>`
 
 ---
 

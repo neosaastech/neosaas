@@ -83,6 +83,7 @@ Full developer reference: **[docs/PROJECT.md](./docs/PROJECT.md)**
 | Topic | File |
 |---|---|
 | Quick start & setup | [docs/setup/QUICK_START.md](./docs/setup/QUICK_START.md) |
+| **Language policy (English UI)** | [docs/LANGUAGE.md](./docs/LANGUAGE.md) |
 | Architecture | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Vercel deployment | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
 | Project status | [STATUS.md](./STATUS.md) |

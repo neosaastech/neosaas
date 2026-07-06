@@ -20,7 +20,7 @@ export const featureRegistry: Record<string, FeatureConfig> = {
    * without extending the form engine.
    */
   devis: {
-    title: "Gestion des Devis",
+    title: "Quote Management",
     endpoint: "quotes",
     fields: [
       { name: "reference", label: "Référence", type: "text", required: true, tableShow: true },

@@ -66,9 +66,10 @@ export function CompanyCreateSheet({ open, onOpenChange, onSave, isLoading }: Co
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
                 className="hidden"
                 name="logo"
+                form="create-company-form"
                 onChange={handleLogoUpload}
               />
               <div className="flex gap-2">
@@ -99,7 +100,7 @@ export function CompanyCreateSheet({ open, onOpenChange, onSave, isLoading }: Co
           </div>
         </div>
 
-        <form onSubmit={onSave} className="space-y-6">
+        <form id="create-company-form" onSubmit={onSave} className="space-y-6">
           {/* Basic Company Info */}
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

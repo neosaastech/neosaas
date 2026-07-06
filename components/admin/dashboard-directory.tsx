@@ -43,6 +43,7 @@ export function DashboardDirectory({ currentUserId }: DashboardDirectoryProps) {
             zipCode: c.zipCode,
             siret: c.siret,
             vatNumber: c.vatNumber,
+            logo: c.logo,
             isActive: c.isActive,
           })))
         }

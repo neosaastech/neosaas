@@ -43,6 +43,7 @@ import {
   AlertTitle,
 } from "@/components/ui/alert"
 import { toast } from "sonner"
+import { usePageTitle } from "@/hooks/use-page-title"
 
 const faqItems = [
   {
@@ -81,11 +82,12 @@ const faqItems = [
 
 export default function SupportPage() {
   const router = useRouter()
+  usePageTitle("Support")
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Help Center</h1>
+        <h1 className="text-3xl font-bold">Support</h1>
         <p className="text-muted-foreground">
           Find answers to your questions or chat with our support team
         </p>

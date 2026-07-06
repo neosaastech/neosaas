@@ -61,11 +61,19 @@ export async function GET() {
       return acc;
     }, [] as typeof userPermissionsData);
 
-    // Return user data (without password)
-    const { password: _, ...userWithoutPassword } = user;
+    // Strip large base64 logo from /me — fetch via GET /api/company/logo instead
+    const { password: _, company, ...userWithoutPassword } = user;
+    const companySummary = company
+      ? (() => {
+          const { logo, ...rest } = company;
+          return { ...rest, hasLogo: !!logo };
+        })()
+      : null;
+
     return NextResponse.json({
       user: {
         ...userWithoutPassword,
+        company: companySummary,
         roles: userRolesData,
         permissions: uniquePermissions,
       }

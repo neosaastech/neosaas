@@ -62,8 +62,8 @@ export function AdminClientGuard({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <Shield className="h-12 w-12 animate-pulse text-brand mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground">Vérification des droits d'accès administrateur...</p>
-          <p className="text-sm text-muted-foreground/60 mt-2">Un moment...</p>
+          <p className="text-lg text-muted-foreground">Verifying administrator access...</p>
+          <p className="text-sm text-muted-foreground/60 mt-2">One moment...</p>
         </div>
       </div>
     )
@@ -75,8 +75,8 @@ export function AdminClientGuard({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground">Accès refusé</p>
-          <p className="text-sm text-muted-foreground/60 mt-2">Redirection en cours...</p>
+          <p className="text-lg text-muted-foreground">Access denied</p>
+          <p className="text-sm text-muted-foreground/60 mt-2">Redirecting...</p>
         </div>
       </div>
     )

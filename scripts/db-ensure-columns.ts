@@ -113,6 +113,11 @@ const REQUIRED_COLUMNS = [
   // never added. The app crashes with "column does not exist" at runtime.
   {
     table: 'companies',
+    column: 'logo',
+    sql: `ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "logo" text`,
+  },
+  {
+    table: 'companies',
     column: 'stripe_customer_id',
     sql: `ALTER TABLE "companies" ADD COLUMN IF NOT EXISTS "stripe_customer_id" text`,
   },

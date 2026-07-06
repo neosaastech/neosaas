@@ -123,9 +123,11 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
   const protocol = request.headers.get('x-forwarded-proto') || 'http'
 
-  // HTTPS Force Redirect
+  // HTTPS Force Redirect (skip on localhost — dev server has no TLS)
+  const host = request.nextUrl.hostname
+  const isLocalDev = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')
   const forceHttps = await shouldForceHttps()
-  if (forceHttps && protocol === 'http') {
+  if (forceHttps && protocol === 'http' && !isLocalDev) {
     const httpsUrl = new URL(request.url)
     httpsUrl.protocol = 'https:'
     return NextResponse.redirect(httpsUrl, { status: 301 })

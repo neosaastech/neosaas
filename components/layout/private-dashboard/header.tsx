@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserCompanyAvatar } from "@/components/common/user-company-avatar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { NotificationBell } from "@/components/admin/notification-bell"
 import Link from "next/link"
@@ -31,6 +31,8 @@ interface UserData {
   role: string
   position?: string
   profileImage: string | null
+  companyLogo?: string | null
+  companyName?: string | null
   isAdmin?: boolean
 }
 
@@ -65,54 +67,82 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
   }, [])
 
   useEffect(() => {
-    // Fetch user data from API
+    const persistUserToStorage = (userData: UserData) => {
+      try {
+        // Never store base64 images in localStorage — they exceed the ~5MB quota
+        const { companyLogo: _logo, profileImage: _img, ...slim } = userData
+        localStorage.setItem("user", JSON.stringify(slim))
+      } catch (error) {
+        console.warn("[HEADER] Could not persist user to localStorage:", error)
+      }
+    }
+
     const fetchUserData = async () => {
       try {
-        const response = await fetch("/api/auth/me")
-        if (response.ok) {
-          const data = await response.json()
-          const userRoles = data.user.roles?.map((r: any) => r.roleName) || []
-          const userData = {
+        const [meResponse, logoResponse] = await Promise.all([
+          fetch("/api/auth/me"),
+          fetch("/api/company/logo"),
+        ])
+
+        if (meResponse.ok) {
+          const data = await meResponse.json()
+          const userRoles = data.user.roles?.map((r: { roleName: string }) => r.roleName) || []
+          let companyLogo: string | null = null
+          if (logoResponse.ok) {
+            const logoData = await logoResponse.json()
+            companyLogo = logoData.logo ?? null
+          }
+
+          const userData: UserData = {
             firstName: data.user.firstName || "",
             lastName: data.user.lastName || "",
             email: data.user.email || "",
             role: data.user.roles?.[0]?.roleName || "User",
             position: data.user.position || data.user.roles?.[0]?.roleName || "User",
             profileImage: data.user.profileImage || null,
-            isAdmin: userRoles.includes('admin') || userRoles.includes('super_admin'),
+            companyLogo,
+            companyName: data.user.company?.name || null,
+            isAdmin: userRoles.includes("admin") || userRoles.includes("super_admin"),
           }
           setUser(userData)
-          // Update localStorage for other components
-          localStorage.setItem("user", JSON.stringify(userData))
+          persistUserToStorage(userData)
         }
       } catch (error) {
         console.error("Error fetching user data:", error)
       }
     }
 
-    // Initial load from localStorage
     const storedUser = localStorage.getItem("user")
     if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    } else {
-      // Default mock data
-      setUser({
-        firstName: "Musharof",
-        lastName: "Chowdhury",
-        email: "randomuser@pimjo.com",
-        role: "Team Manager",
-        position: "Team Manager",
-        profileImage: null,
-      })
+      try {
+        // Drop legacy entries that stored multi-MB base64 images and broke navigation
+        if (storedUser.length > 50_000) {
+          localStorage.removeItem("user")
+        } else {
+          setUser(JSON.parse(storedUser))
+        }
+      } catch {
+        localStorage.removeItem("user")
+      }
     }
 
-    // Fetch fresh data from API
     fetchUserData()
+
+    const handleCompanyLogoUpdated = (event: Event) => {
+      const logo = (event as CustomEvent<{ logo: string | null }>).detail?.logo ?? null
+      setUser((prev) => (prev ? { ...prev, companyLogo: logo } : prev))
+    }
+
+    window.addEventListener("companyLogoUpdated", handleCompanyLogoUpdated)
 
     const handleStorageChange = () => {
       const updatedUser = localStorage.getItem("user")
       if (updatedUser) {
-        setUser(JSON.parse(updatedUser))
+        try {
+          setUser(JSON.parse(updatedUser))
+        } catch {
+          localStorage.removeItem("user")
+        }
       }
     }
 
@@ -120,6 +150,7 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
     const interval = setInterval(handleStorageChange, 1000)
 
     return () => {
+      window.removeEventListener("companyLogoUpdated", handleCompanyLogoUpdated)
       window.removeEventListener("storage", handleStorageChange)
       clearInterval(interval)
     }
@@ -141,10 +172,6 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
       setIsSearching(false)
     }
   }, [searchQuery, catalogItems])
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName[0]}${lastName[0]}`.toUpperCase()
-  }
 
   const handleLogout = async () => {
     try {
@@ -223,7 +250,7 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
               ) : (
                 <div className="p-8 text-center">
                   <Search className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-muted-foreground">Aucun résultat trouvé</p>
+                  <p className="text-sm font-medium text-muted-foreground">No results found</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Essayez "users", "products", "admin", "settings"...
                   </p>
@@ -252,22 +279,37 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-              <Avatar className="h-10 w-10 border-2 border-brand/20">
-                <AvatarImage
-                  src={user?.profileImage || "/placeholder.svg?height=40&width=40"}
-                  alt={user ? `${user.firstName} ${user.lastName}` : "User"}
-                />
-                <AvatarFallback className="bg-brand text-white font-semibold">
-                  {user ? getInitials(user.firstName, user.lastName) : "U"}
-                </AvatarFallback>
-              </Avatar>
+            <Button variant="ghost" className="relative h-11 w-11 rounded-full p-0">
+              <UserCompanyAvatar
+                firstName={user?.firstName}
+                lastName={user?.lastName}
+                profileImage={user?.profileImage}
+                companyLogo={user?.companyLogo}
+                companyName={user?.companyName}
+              />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-64" align="end">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-2">
-                <p className="text-sm font-semibold">{user ? `${user.firstName} ${user.lastName}` : "User"}</p>
+                <div className="flex items-center gap-3">
+                  <UserCompanyAvatar
+                    firstName={user?.firstName}
+                    lastName={user?.lastName}
+                    profileImage={user?.profileImage}
+                    companyLogo={user?.companyLogo}
+                    companyName={user?.companyName}
+                    size="sm"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold truncate">
+                      {user ? `${user.firstName} ${user.lastName}` : "User"}
+                    </p>
+                    {user?.companyName && (
+                      <p className="text-xs text-muted-foreground truncate">{user.companyName}</p>
+                    )}
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">{user?.email || "user@neosaas.com"}</p>
                 <p className="text-xs text-brand font-medium">{user?.position || user?.role || "Member"}</p>
                 {user?.role && (

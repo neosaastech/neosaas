@@ -33,7 +33,7 @@ export function FeaturePage({ config }: { config: FeatureConfig }) {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">{config.title}</h1>
         <Button onClick={() => setIsCreating(true)}>
-          <Plus className="h-4 w-4" /> Nouveau
+          <Plus className="h-4 w-4" /> New
         </Button>
       </div>
 
@@ -42,7 +42,7 @@ export function FeaturePage({ config }: { config: FeatureConfig }) {
       <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingDoc ? "Modifier" : "Nouveau"}</DialogTitle>
+            <DialogTitle>{editingDoc ? "Edit" : "New"}</DialogTitle>
           </DialogHeader>
           <DynamicForm
             config={config}
