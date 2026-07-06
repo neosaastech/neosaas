@@ -12,10 +12,10 @@ set -e
 #   1. HTTP connectivity test
 #   2. Full DB rebuild — drop all tables, re-apply migrations, seed core data
 #   3. Seed reference data (VAT, platform config, email templates, page permissions)
+#   4. ALWAYS ensure bootstrap super_admin (even when migrations are external)
 #
-# At this stage every Vercel/CI build runs `pnpm db:hard-reset` (destructive).
-# Full schema sync with drizzle-kit push (TCP) is handled by GitHub Actions
-# CI workflow (db-migrate.yml) which CAN reach Neon on any port.
+# At this stage every Vercel/CI build runs `pnpm db:hard-reset` (destructive)
+# unless DB_MIGRATIONS_STRATEGY=github-actions or SKIP_DB_MIGRATIONS is set.
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Global: prefer IPv4 DNS resolution to avoid ENETUNREACH on IPv6
@@ -49,37 +49,68 @@ retry_with_backoff() {
   return 1
 }
 
+# ─── Helper: ensure bootstrap super_admin (always runs when DATABASE_URL set) ───
+ensure_bootstrap_super_admin() {
+  echo "🔐 Vérification du compte bootstrap super_admin..."
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+  if ! DATABASE_URL="$MIGRATION_DATABASE_URL" npx tsx scripts/db-connectivity-test.ts; then
+    echo "❌ Base de données inaccessible — impossible de vérifier le compte bootstrap."
+    if [ "$VERCEL_ENV" = "production" ]; then
+      exit 1
+    fi
+    echo "⚠️  Build preview/dev continue sans vérification bootstrap."
+    return 1
+  fi
+
+  export DATABASE_URL="$MIGRATION_DATABASE_URL"
+
+  echo "🌱 Vérification des rôles de base (idempotent)..."
+  if ! retry_with_backoff 2 3 "pnpm db:seed-base"; then
+    echo "❌ Impossible d'initialiser les rôles — build annulé."
+    exit 1
+  fi
+
+  if ! npx tsx scripts/ensure-bootstrap-super-admin.ts; then
+    echo "❌ Le compte bootstrap n'a pas le rôle super_admin — build annulé."
+    exit 1
+  fi
+
+  echo "✅ Compte bootstrap super_admin vérifié (admin@exemple.com / admin)"
+  echo ""
+}
+
 # Vérifier si on est sur Vercel ou en CI
 if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
   echo "✅ Build CI/CD détecté (Env: ${VERCEL_ENV:-${CI_ENVIRONMENT:-unknown}})"
 
+  SKIP_MIGRATIONS=false
   if [ "${SKIP_DB_MIGRATIONS:-}" = "true" ] || [ "${SKIP_DB_MIGRATIONS:-}" = "1" ] || [ "${DB_MIGRATIONS_STRATEGY:-}" = "github-actions" ]; then
-    echo "⏭️  Migrations DB ignorées (gérées par un runner externe)"
+    SKIP_MIGRATIONS=true
+    echo "⏭️  Migrations DB gérées par un runner externe (hard-reset ignoré)"
     echo ""
-  else
+  fi
 
-  # Vérifier si DATABASE_URL est défini
   if [ -n "$DATABASE_URL" ]; then
-    # ── Vérifier le rôle dans l'URL ──────────────────────────────────────────
-    if echo "$DATABASE_URL" | grep -q "@authenticator\|//authenticator"; then
-      echo "❌ DATABASE_URL utilise le rôle 'authenticator' qui n'a pas les droits CREATE/ALTER."
-      echo "   Corrigez la variable dans Vercel pour utiliser 'neondb_owner'."
-      echo "   URL attendue: postgresql://neondb_owner:PASSWORD@<your-neon-host>-pooler..."
-      exit 1
-    fi
+  # ── Vérifier le rôle dans l'URL ──────────────────────────────────────────
+  if echo "$DATABASE_URL" | grep -q "@authenticator\|//authenticator"; then
+    echo "❌ DATABASE_URL utilise le rôle 'authenticator' qui n'a pas les droits CREATE/ALTER."
+    echo "   Corrigez la variable dans Vercel pour utiliser 'neondb_owner'."
+    exit 1
+  fi
 
-    echo "✅ DATABASE_URL configuré (rôle OK)"
+  echo "✅ DATABASE_URL configuré (rôle OK)"
 
-    # Prefer unpooled Neon URL for migrations if available
-    MIGRATION_DATABASE_URL="${DATABASE_URL_UNPOOLED:-$DATABASE_URL}"
+  MIGRATION_DATABASE_URL="${DATABASE_URL_UNPOOLED:-$DATABASE_URL}"
 
-    if [ -n "$DATABASE_URL_UNPOOLED" ]; then
-      echo "✅ DATABASE_URL_UNPOOLED disponible (connexion directe pour migrations)"
-    else
-      echo "ℹ️  Utilisation de DATABASE_URL poolée pour les migrations"
-    fi
-    echo ""
+  if [ -n "$DATABASE_URL_UNPOOLED" ]; then
+    echo "✅ DATABASE_URL_UNPOOLED disponible (connexion directe pour migrations)"
+  else
+    echo "ℹ️  Utilisation de DATABASE_URL poolée pour les migrations"
+  fi
+  echo ""
 
+  if [ "$SKIP_MIGRATIONS" = "false" ]; then
     # ─── ÉTAPE 1: Test de connectivité via HTTP (port 443) ───
     echo "🔌 Étape 1/4 : Test de connectivité (HTTP, port 443)..."
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -104,17 +135,11 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       else
         echo ""
         echo "❌ Reconstruction de la base échouée — build annulé."
-        echo "   💡 Vérifiez drizzle/meta/_journal.json et les fichiers .sql dans ./drizzle/"
-        echo "   💡 Assurez-vous que DATABASE_URL utilise le rôle 'neondb_owner'"
         exit 1
       fi
       echo ""
 
-      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      echo "✅ Schéma de base de données reconstruit"
-      echo ""
-
-      # ─── ÉTAPE 3/4: SEEDING — Données de référence (TVA, config plateforme) ───
+      # ─── ÉTAPE 3/4: SEEDING — Données de référence ───
       echo "🌱 Étape 3/4 : Initialisation des données de référence (rôles, TVA, config)..."
       if retry_with_backoff 2 3 "pnpm db:seed-base"; then
         echo "✅ Données de base initialisées"
@@ -132,11 +157,9 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       fi
       echo ""
 
-      # Add delay to allow database connections to close properly
       echo "⏳ Attente de la fermeture des connexions..."
       sleep 3
 
-      # ─── SEEDING: Permissions de pages ───
       echo "🔐 Initialisation des permissions de pages..."
       if retry_with_backoff 2 3 "pnpm seed:pages"; then
         echo "✅ Permissions de pages initialisées"
@@ -144,43 +167,26 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
         echo "⚠️  Synchronisation des pages échouée (non bloquant)"
       fi
       echo ""
-
-      # ─── SEEDING: Calques de page /features (Pilier C) — désactivé au build ───
-      # Retiré du pipeline automatique après 3 échecs en prod malgré unpooled +
-      # sleep 5 + backoff jusqu'à ~35s (commits 2aba37f, c779f14) : "relation
-      # page_layers does not exist" persiste même 20+ secondes après que
-      # migrate.ts a confirmé "Applied" sur cette même table, via la même
-      # connexion unpooled. Ce n'est donc pas un simple délai de propagation —
-      # cause exacte non identifiée (comportement du proxy HTTP Neon, pas un
-      # bug applicatif). Pas bloquant : /features a un fallback statique
-      # identique tant que la table est vide. Seeding à faire manuellement
-      # après déploiement : `pnpm seed:page-layers` (avec DATABASE_URL réelle),
-      # ou via /admin/pilotage (Pilier E) une fois cette PR mergée.
-
-      # ─── VÉRIFICATION: Bootstrap super_admin (bloquant, tous environnements) ───
-      echo "🔐 Vérification du compte bootstrap super_admin..."
-      if npx tsx scripts/ensure-bootstrap-super-admin.ts; then
-        echo "✅ Compte bootstrap super_admin vérifié (admin@exemple.com / admin)"
-      else
-        echo "❌ Le compte bootstrap n'a pas le rôle super_admin — build annulé."
+    else
+      echo "❌ Base de données non accessible — build annulé en production."
+      if [ "$VERCEL_ENV" = "production" ]; then
         exit 1
       fi
-      echo ""
-
-      # Correction des configurations email pour les environnements de prévisualisation/dev
-      if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
-          echo "🔧 Correction des configurations email (Preview/Dev)..."
-          npx tsx scripts/fix-email-provider-defaults.ts
-          echo "✅ Configurations email corrigées"
-          echo ""
-      fi
-
-    else
-      echo "⚠️  Base de données non accessible - synchronisation ignorée"
-      echo "   Le build continuera sans mise à jour du schéma"
-      echo "   💡 Vérifiez DATABASE_URL dans Vercel"
+      echo "⚠️  Build preview/dev continue sans hard-reset."
       echo ""
     fi
+  fi
+
+  # ALWAYS ensure bootstrap admin — even when migrations are external/skipped
+  ensure_bootstrap_super_admin
+
+  if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
+    echo "🔧 Correction des configurations email (Preview/Dev)..."
+    npx tsx scripts/fix-email-provider-defaults.ts
+    echo "✅ Configurations email corrigées"
+    echo ""
+  fi
+
   else
     if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
       echo "ℹ️  DATABASE_URL non définie — migrations ignorées (env: ${VERCEL_ENV})"
@@ -189,7 +195,6 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       echo "   Vercel Dashboard → Settings → Environment Variables → DATABASE_URL"
       exit 1
     fi
-  fi
   fi
 else
   echo "ℹ️  Build local détecté - synchronisation ignorée"

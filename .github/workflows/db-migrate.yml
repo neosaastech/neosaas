@@ -86,3 +86,7 @@ jobs:
       - name: Seed page permissions
         if: success()
         run: pnpm seed:pages
+
+      - name: Ensure bootstrap super_admin
+        if: success()
+        run: pnpm ensure:bootstrap-admin
