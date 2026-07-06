@@ -4,7 +4,7 @@ import { platformConfig } from "@/db/schema"
 export interface PlatformConfigData {
   siteName: string
   logo: string | null
-  logoDisplayMode?: "logo" | "text" | "both"
+  logoDisplayMode?: "logo" | "text" | "both" | "none"
   authEnabled: boolean
   maintenanceMode: boolean
   defaultSenderEmail: string
