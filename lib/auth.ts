@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 function getJwtSecret(): string {
   const secret = process.env.NEXTAUTH_SECRET;
@@ -69,27 +69,35 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
 }
 
 /**
- * Derive the cookie domain from NEXTAUTH_URL / NEXT_PUBLIC_APP_URL.
- * Returns e.g. ".neosaas.tech" for production so the cookie is shared
- * between neosaas.tech and www.neosaas.tech.
- * Returns undefined for localhost / *.vercel.app (browser default scoping).
+ * Derive cookie domain from the incoming request host.
+ * Only sets a shared domain (e.g. ".neosaas.tech") when the request is on that
+ * domain. Never sets domain on *.vercel.app — otherwise browsers reject the
+ * cookie when NEXTAUTH_URL points to a custom domain.
  */
-function getCookieDomain(): string | undefined {
+async function getCookieDomain(): Promise<string | undefined> {
+  const headersList = await headers();
+  const requestHost = headersList.get('host')?.split(':')[0];
+
+  if (!requestHost || requestHost === 'localhost' || requestHost.endsWith('.vercel.app')) {
+    return undefined;
+  }
+
   const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || '';
   try {
-    const { hostname } = new URL(appUrl);
+    const { hostname: configuredHost } = new URL(appUrl);
+    const rootDomain = configuredHost.split('.').slice(-2).join('.');
+
     if (
-      hostname !== 'localhost' &&
-      !hostname.endsWith('.vercel.app') &&
-      hostname.includes('.')
+      requestHost === configuredHost ||
+      requestHost === rootDomain ||
+      requestHost.endsWith(`.${rootDomain}`)
     ) {
-      // ".neosaas.tech" covers both neosaas.tech and www.neosaas.tech
-      const parts = hostname.split('.');
-      return '.' + parts.slice(-2).join('.');
+      return `.${rootDomain}`;
     }
   } catch {
     // malformed URL — fall through
   }
+
   return undefined;
 }
 
@@ -98,7 +106,7 @@ function getCookieDomain(): string | undefined {
  */
 export async function setAuthCookie(token: string) {
   const cookieStore = await cookies();
-  const domain = getCookieDomain();
+  const domain = await getCookieDomain();
   cookieStore.set(TOKEN_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -114,7 +122,7 @@ export async function setAuthCookie(token: string) {
  */
 export async function removeAuthCookie() {
   const cookieStore = await cookies();
-  const domain = getCookieDomain();
+  const domain = await getCookieDomain();
   if (domain) {
     cookieStore.set(TOKEN_NAME, '', {
       httpOnly: true,
