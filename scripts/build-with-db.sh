@@ -157,20 +157,21 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
       # après déploiement : `pnpm seed:page-layers` (avec DATABASE_URL réelle),
       # ou via /admin/pilotage (Pilier E) une fois cette PR mergée.
 
+      # ─── VÉRIFICATION: Bootstrap super_admin (bloquant, tous environnements) ───
+      echo "🔐 Vérification du compte bootstrap super_admin..."
+      if npx tsx scripts/ensure-bootstrap-super-admin.ts; then
+        echo "✅ Compte bootstrap super_admin vérifié (admin@exemple.com / admin)"
+      else
+        echo "❌ Le compte bootstrap n'a pas le rôle super_admin — build annulé."
+        exit 1
+      fi
+      echo ""
+
       # Correction des configurations email pour les environnements de prévisualisation/dev
       if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
           echo "🔧 Correction des configurations email (Preview/Dev)..."
           npx tsx scripts/fix-email-provider-defaults.ts
           echo "✅ Configurations email corrigées"
-          echo ""
-
-          # ─── SEEDING: Compte admin de test (Preview/Dev uniquement — jamais en prod) ───
-          echo "🔐 Initialisation du compte admin de test (Preview/Dev)..."
-          if retry_with_backoff 2 3 "pnpm seed:dev-admin"; then
-            echo "✅ Compte admin de test prêt (admin@exemple.com / admin)"
-          else
-            echo "⚠️  Seeding admin de test échoué (non bloquant)"
-          fi
           echo ""
       fi
 

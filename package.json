@@ -23,6 +23,7 @@
     "seed:pages": "tsx scripts/sync-pages.ts",
     "seed:page-layers": "tsx scripts/seed-page-layers.ts",
     "seed:dev-admin": "tsx scripts/seed-dev-admin.ts",
+    "ensure:bootstrap-admin": "tsx scripts/ensure-bootstrap-super-admin.ts",
     "check:email-config": "tsx scripts/check-email-config.ts",
     "version:patch": "pnpm version patch --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",

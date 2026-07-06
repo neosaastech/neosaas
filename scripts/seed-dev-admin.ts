@@ -38,9 +38,21 @@ async function seedDevAdmin() {
   await db.insert(userRoles).values({
     userId: newUser.id,
     roleId: superAdminRole[0].id,
+  }).onConflictDoNothing();
+
+  const hasSuperAdmin = await db.query.userRoles.findFirst({
+    where: (userRoles, { and, eq }) => and(
+      eq(userRoles.userId, newUser.id),
+      eq(userRoles.roleId, superAdminRole[0].id),
+    ),
   });
 
-  console.log('  ✓ Dev admin created — admin@exemple.com / admin');
+  if (!hasSuperAdmin) {
+    console.error('  ❌ Failed to assign super_admin role to bootstrap user');
+    process.exit(1);
+  }
+
+  console.log('  ✓ Dev admin created — admin@exemple.com / admin (super_admin)');
   process.exit(0);
 }
 

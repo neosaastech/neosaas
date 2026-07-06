@@ -101,7 +101,9 @@ async function seed() {
     const adminEmail = 'admin@exemple.com';
     const existingAdmin = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
 
-    if (existingAdmin.length === 0) {
+    let adminUser = existingAdmin[0];
+
+    if (!adminUser) {
       const hashedPassword = await bcrypt.hash('admin', 10);
       
       const [newUser] = await db.insert(users).values({
@@ -115,20 +117,38 @@ async function seed() {
         isSiteManager: true
       }).returning();
 
-      const superAdminRole = await getRole('super_admin');
-      if (superAdminRole) {
-        await db.insert(userRoles).values({
-          userId: newUser.id,
-          roleId: superAdminRole.id
-        });
-      }
-      
+      adminUser = newUser;
       console.log('  ✓ Provisory super admin created');
-      console.log('  📧 Email: admin@exemple.com');
-      console.log('  🔑 Password: admin');
     } else {
-      console.log('  ℹ️  Super admin already exists');
+      console.log('  ℹ️  Bootstrap user already exists');
     }
+
+    const superAdminRole = await getRole('super_admin');
+    if (!superAdminRole) {
+      console.error('  ❌ super_admin role not found');
+      process.exit(1);
+    }
+
+    await db.insert(userRoles).values({
+      userId: adminUser.id,
+      roleId: superAdminRole.id
+    }).onConflictDoNothing();
+
+    const hasSuperAdmin = await db.query.userRoles.findFirst({
+      where: (userRoles, { and, eq }) => and(
+        eq(userRoles.userId, adminUser.id),
+        eq(userRoles.roleId, superAdminRole.id),
+      ),
+    });
+
+    if (!hasSuperAdmin) {
+      console.error('  ❌ Failed to assign super_admin role to bootstrap user');
+      process.exit(1);
+    }
+
+    console.log('  ✓ super_admin role assigned');
+    console.log('  📧 Email: admin@exemple.com');
+    console.log('  🔑 Password: admin');
 
     console.log('\n✅ Seeding complete!');
     process.exit(0);
