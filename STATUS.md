@@ -9,6 +9,26 @@
 
 ## 🚨 Corrections Récentes
 
+### Release App v1.0.5 - Docker CI stabilise (7 juillet 2026)
+
+**Contexte** : finalisation de la release applicative apres correction des echecs Docker GitHub Actions.
+
+**Changements** :
+
+- ✅ **Versionning** : bump `1.0.4` -> `1.0.5`.
+- ✅ **Docker build deterministic** : pin explicite de `pnpm@10.34.4` dans les stages Docker pour eviter les variations Corepack vers pnpm 11.
+- ✅ **Validation locale** : build image Docker termine jusqu'a l'export de l'image.
+
+**Fichiers modifies** :
+
+- `package.json`
+- `package-lock.json`
+- `Dockerfile`
+- `STATUS.md`
+- `docs/PROJECT.md`
+
+**Impact** : release candidate app versee avec tag dedie et pipeline Docker plus previsible.
+
 ### Fix GitHub Actions Docker - build CI et tagging GHCR (7 juillet 2026)
 
 **Contexte** : le workflow Docker GitHub Actions pouvait echouer pendant le build image.

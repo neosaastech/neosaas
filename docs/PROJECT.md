@@ -401,6 +401,12 @@ Local version scripts remain available for development convenience, but the cano
 ## Changelog
 
 ### [2026-07-07]
+- **Release app v1.0.5** : bump de version pour livrer les correctifs Docker CI.
+- **Pin pnpm Docker** : verrouillage sur `pnpm@10.34.4` dans le `Dockerfile` pour eviter les echecs `minimumReleaseAge` avec pnpm 11.
+- **Fichiers modifies** : `package.json`, `package-lock.json`, `Dockerfile`, `docs/PROJECT.md`, `STATUS.md`.
+- **Impact** : release plus stable et reproductible en build image.
+
+### [2026-07-07]
 - **Fix CI Docker build** : le `Dockerfile` bascule de `pnpm build` vers `pnpm build:local` pour eviter la dependance `DATABASE_URL` pendant le build image GitHub Actions.
 - **Fix GHCR tagging** : normalisation en minuscules du nom d'image (`IMAGE_NAME_LOWER`) pour garantir la compatibilite registry.
 - **Fix version pnpm Docker** : pin de pnpm a `10.34.4` via Corepack pour eviter l'erreur `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` dans le build CI.
