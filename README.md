@@ -4,7 +4,7 @@
   <img src="https://avatars.githubusercontent.com/u/215877912?s=180&v=4" alt="NeoSaaS" width="140" />
 </p>
 
-<h1 align="center">NeoSaaS Boilerplate</h1>
+<h1 align="center">NeoSaaS tech Boilerplate</h1>
 
 <p align="center">
   Build and launch a production-grade SaaS faster with a complete multi-tenant foundation.
