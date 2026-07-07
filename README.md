@@ -79,9 +79,7 @@ flowchart LR
     J --> B
 ```
 
-<p align="center">
-  <img src="./public/schema-neosaas-architecture.png" alt="NeoSaaS Architecture Overview" width="900" />
-</p>
+
 
 ## Install in Minutes
 
