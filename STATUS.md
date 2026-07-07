@@ -9,6 +9,23 @@
 
 ## 🚨 Corrections Récentes
 
+### Stabilisation navigation Admin - anti fausse deconnexion (7 juillet 2026)
+
+**Contexte** : certaines pages admin (`Organization`, `Parameters`, `Content`, etc.) pouvaient provoquer des sauts de navigation ou une redirection vers login en cas d'erreur transitoire sur `/api/auth/me`.
+
+**Changements** :
+
+- ✅ **Guard client durci** : `useRequireAdmin` redirige maintenant uniquement sur `401` (login) et `403` (dashboard).
+- ✅ **Tolérance aux erreurs transitoires** : en cas de `5xx`/erreur reseau, le guard ne force plus une deconnexion client et s'appuie sur la protection serveur existante (`requireAdmin` dans le layout admin).
+- ✅ **Session plus stable** : ajout de `credentials: "include"` + `cache: "no-store"` pour fiabiliser la verification de session.
+- ✅ **Compatibilite composants** : le hook expose aussi `user` (deja attendu par certaines pages admin).
+
+**Fichier modifie** :
+
+- `lib/hooks/use-require-admin.ts`
+
+**Impact** : reduction des redirections intempestives et meilleure stabilite de navigation dans l'admin, sans affaiblir la securite serveur.
+
 ### Release Docker Prod — préparation v1.0.3 (7 juillet 2026)
 
 **Contexte** : préparation d'un paquet de déploiement production conteneurisé avant push vers le dépôt cible `neosaastech/neosaas`.

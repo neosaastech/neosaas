@@ -401,6 +401,13 @@ Local version scripts remain available for development convenience, but the cano
 ## Changelog
 
 ### [2026-07-07]
+- **Stabilisation guard admin** : `useRequireAdmin` ne redirige plus vers login pour toute reponse non-OK; redirections strictes uniquement sur `401` (login) et `403` (dashboard).
+- **Robustesse session client** : verification `/api/auth/me` avec `credentials: "include"` et `cache: "no-store"`.
+- **Anti deconnexion intempestive** : en cas d'erreur transitoire (`5xx` / reseau), le guard conserve la navigation et s'appuie sur la protection serveur `requireAdmin` du layout.
+- **Compatibilite pages admin** : le hook retourne aussi `user` pour les ecrans qui l'utilisent.
+- **Fichiers modifies** : `lib/hooks/use-require-admin.ts`, `docs/PROJECT.md`, `STATUS.md`.
+
+### [2026-07-07]
 - **Preparation Docker production (v1.0.3)** : ajout d'un `Dockerfile` multi-stage, d'un `.dockerignore` et d'un `docker-compose.prod.yml` pour deploiement conteneurise.
 - **Versionning release** : bump de `1.0.2` a `1.0.3` avant creation du tag.
 - **Fichiers modifies** : `Dockerfile`, `.dockerignore`, `docker-compose.prod.yml`, `package.json`, `docs/PROJECT.md`, `STATUS.md`.
