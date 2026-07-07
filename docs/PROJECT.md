@@ -401,6 +401,12 @@ Local version scripts remain available for development convenience, but the cano
 ## Changelog
 
 ### [2026-07-07]
+- **Preparation Docker production (v1.0.3)** : ajout d'un `Dockerfile` multi-stage, d'un `.dockerignore` et d'un `docker-compose.prod.yml` pour deploiement conteneurise.
+- **Versionning release** : bump de `1.0.2` a `1.0.3` avant creation du tag.
+- **Fichiers modifies** : `Dockerfile`, `.dockerignore`, `docker-compose.prod.yml`, `package.json`, `docs/PROJECT.md`, `STATUS.md`.
+- **Impact** : paquet deploiement Docker pret pour push vers le depot cible.
+
+### [2026-07-07]
 - **Fix build/deploiement Next.js** : suppression d'un import client vers un module serveur (`lib/pages/template-variables.ts`) qui entrainait des erreurs `next/headers` et `pg` (`dns/fs/net`) pendant le build.
 - **Stabilisation Turbopack** : ajout de `turbopack.root` dans `next.config.mjs` pour forcer la racine projet.
 - **Registry client-safe** : ajout de `lib/layers/registry-client.ts` et bascule de `BlockEditor`/`BlockPreview` sur ce registry pour ne plus importer le bloc `blog-list` (DB) dans le bundle client.

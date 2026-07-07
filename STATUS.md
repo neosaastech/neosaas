@@ -9,6 +9,28 @@
 
 ## 🚨 Corrections Récentes
 
+### Release Docker Prod — préparation v1.0.3 (7 juillet 2026)
+
+**Contexte** : préparation d'un paquet de déploiement production conteneurisé avant push vers le dépôt cible `neosaastech/neosaas`.
+
+**Changements** :
+
+- ✅ **Docker multi-stage prod** : ajout de `Dockerfile` (deps/builder/runner) pour build Next.js puis exécution en mode production.
+- ✅ **Contexte Docker propre** : ajout de `.dockerignore` pour exclure artefacts locaux (`.git`, `node_modules`, `.next`, etc.).
+- ✅ **Orchestration prod** : ajout de `docker-compose.prod.yml` avec variables d'environnement runtime (DB, auth, Stripe).
+- ✅ **Versioning release** : bump applicatif `1.0.2` → `1.0.3`.
+
+**Fichiers modifiés** :
+
+- `Dockerfile`
+- `.dockerignore`
+- `docker-compose.prod.yml`
+- `package.json`
+- `STATUS.md`
+- `docs/PROJECT.md`
+
+**Impact** : base prête pour build/push image Docker et déploiement production versionné.
+
 ### Fix Build/Déploiement — séparation client/serveur des variables template (7 juillet 2026)
 
 **Contexte** : le build Next.js échouait avec des erreurs `next/headers` et `pg` (`dns/fs/net`) chargés côté client via la chaîne d'import des variables template.
