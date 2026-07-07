@@ -1,0 +1,45 @@
+"use client"
+
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Moon, Sun } from "lucide-react"
+import { useThemeConfig } from "@/components/common/dynamic-theme-provider"
+
+export function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const themeConfig = useThemeConfig()
+
+  // Avoid hydration mismatch by only rendering after mount
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const toggleTheme = () => {
+    setTheme(resolvedTheme === "dark" ? "light" : "dark")
+  }
+
+  // Admin can disable end-user mode switching entirely (ThemeConfig.allowModeToggle)
+  if (themeConfig?.allowModeToggle === false) {
+    return null
+  }
+
+  // Show a placeholder during SSR to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <Button variant="ghost" size="icon" className="relative rounded-full">
+        <Sun className="h-5 w-5" />
+        <span className="sr-only">Toggle theme</span>
+      </Button>
+    )
+  }
+
+  return (
+    <Button variant="ghost" size="icon" className="relative rounded-full" onClick={toggleTheme}>
+      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  )
+}

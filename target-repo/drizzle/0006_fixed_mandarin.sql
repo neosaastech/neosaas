@@ -1,0 +1,1 @@
+ALTER TABLE "page_layers" ADD COLUMN "locale" text DEFAULT 'fr' NOT NULL;

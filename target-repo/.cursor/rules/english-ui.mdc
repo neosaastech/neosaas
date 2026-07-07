@@ -1,0 +1,47 @@
+---
+description: NeoSaaS is English-only for all user-facing UI, menus, page titles, and API client messages.
+alwaysApply: true
+---
+
+# English UI — NeoSaaS
+
+NeoSaaS product copy is **English only**. Do not introduce French (or other) user-visible strings in the application.
+
+## Always English
+
+- Sidebar / header navigation labels and group titles
+- Page headings (`<h1>`) and browser tab titles (`usePageTitle` from `@/hooks/use-page-title`)
+- Buttons, toasts, dialogs, placeholders, empty states, loading text
+- Admin guards and access-denied messages
+- `lib/search-catalog.ts` entries for new routes
+- API `error` / `message` fields consumed by the UI
+
+## Client dashboard titles (align menu ↔ page)
+
+| Route | Title |
+|-------|-------|
+| `/dashboard` | Catalog |
+| `/dashboard/company-management` | Company Management |
+| `/dashboard/payments` | Payments |
+| `/dashboard/profile` | Profile |
+| `/dashboard/chat` | Chat |
+| `/dashboard/support` | Support |
+
+Account footer menu: collapsible **Account** → **Profile** (Company Management, Payments) + **Support** (Chat, Support).
+
+## Implementation
+
+```tsx
+usePageTitle("Payments") // browser tab
+<h1 className="text-3xl font-bold">Payments</h1> // must match menu
+```
+
+Use `en-US` for dates/numbers shown to users.
+
+## Do not
+
+- Add French menu items (e.g. "Catalogue", "Gestion de compte") without an i18n system
+- Ship French toasts, guards, or placeholders
+- Mix languages on the same screen
+
+Full policy: `docs/LANGUAGE.md`

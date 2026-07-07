@@ -1,0 +1,27 @@
+diff --git a/scripts/build-with-db.sh b/scripts/build-with-db.sh
+--- scripts/build-with-db.sh
++++ scripts/build-with-db.sh
+@@ -11,16 +11,18 @@
+   if [ -n "$DATABASE_URL" ]; then
+     echo "✅ DATABASE_URL configuré"
+     echo ""
+     
+-    # RÉINITIALISATION AUTOMATIQUE À CHAQUE DÉPLOIEMENT
+-    echo "🔄 Mode Reset Automatique : La base de données sera réinitialisée à chaque déploiement"
+-    echo "⚠️ Réinitialisation complète de la base de données..."
++    # MIGRATION AUTOMATIQUE À CHAQUE DÉPLOIEMENT
++    echo "🔄 Mode Migration : Mise à jour du schéma de base de données"
++    echo "💾 Les données existantes seront préservées"
+     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+-    pnpm db:hard-reset
++    echo "📋 Application des migrations de schéma..."
++    # Auto-confirmer les prompts avec echo "y"
++    echo "y" | pnpm drizzle-kit push
+ 
+     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+-    echo "✅ Base de données réinitialisée et synchronisée avec succès"
++    echo "✅ Schéma de base de données mis à jour avec succès"
+     echo ""
+ 
+     echo "🌱 Initialisation des templates d'email..."
+     pnpm seed:email-templates
