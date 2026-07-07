@@ -3,13 +3,21 @@
  */
 const { neon } = require('@neondatabase/serverless');
 
-const DATABASE_URL = 'postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require&channel_binding=require';
+const DATABASE_URL = process.env.DATABASE_URL;
+const TARGET_EMAIL = process.env.TARGET_EMAIL;
 
 async function checkUser() {
   try {
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL is required (load it from your vault/secret manager)');
+    }
+    if (!TARGET_EMAIL) {
+      throw new Error('TARGET_EMAIL is required (do not hardcode personal emails in repository scripts)');
+    }
+
     const sql = neon(DATABASE_URL);
 
-    console.log('🔍 Checking user: __REDACTED_EMAIL__\n');
+    console.log(`🔍 Checking user: ${TARGET_EMAIL}\n`);
 
     const result = await sql`
       SELECT
@@ -24,7 +32,7 @@ async function checkUser() {
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
-      WHERE u.email = '__REDACTED_EMAIL__'
+      WHERE u.email = ${TARGET_EMAIL}
     `;
 
     if (result.length === 0) {

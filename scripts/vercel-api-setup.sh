@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration automatique des variables Vercel via API REST
-# Team: __VERCEL_TEAM_ID_FROM_VAULT__
+# TEAM_ID must be provided from your vault/secret manager
 
 set -e
 
@@ -33,8 +33,21 @@ if [ -z "$VERCEL_TOKEN" ]; then
     exit 1
 fi
 
-TEAM_ID="__VERCEL_TEAM_ID_FROM_VAULT__"
+TEAM_ID="${TEAM_ID:-}"
 PROJECT_NAME="neosaas-website"
+DATABASE_URL="${DATABASE_URL:-}"
+
+if [ -z "$TEAM_ID" ]; then
+  echo "❌ TEAM_ID manquant."
+  echo "   Chargez-le depuis votre vault/secret manager avant execution."
+  exit 1
+fi
+
+if [ -z "$DATABASE_URL" ]; then
+  echo "❌ DATABASE_URL manquante."
+  echo "   Chargez-la depuis votre vault/secret manager avant execution."
+  exit 1
+fi
 
 echo "🔍 Recherche du projet..."
 
@@ -118,9 +131,7 @@ echo ""
 
 # DATABASE_URL
 echo "1️⃣  DATABASE_URL"
-add_env_var "DATABASE_URL" \
-  "postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require" \
-  "preview"
+add_env_var "DATABASE_URL" "$DATABASE_URL" "preview"
 
 # NEXTAUTH_SECRET
 echo ""

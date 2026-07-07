@@ -10,14 +10,30 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 set -e
 
-VERCEL_TOKEN="${1:-${VERCEL_TOKEN:-__VERCEL_TOKEN_REDACTED__}}"
-TEAM_ID="__VERCEL_TEAM_ID_FROM_VAULT__"
+VERCEL_TOKEN="${1:-${VERCEL_TOKEN:-}}"
+TEAM_ID="${TEAM_ID:-}"
 PROJECT_NAME="neosaas-website"
 
-# ─── Variables Neon ───────────────────────────────────────────────────────────
-DB_POOLED="postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require"
-DB_DIRECT="postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require"
-# ─────────────────────────────────────────────────────────────────────────────
+DB_POOLED="${DATABASE_URL:-}"
+DB_DIRECT="${DATABASE_URL_UNPOOLED:-}"
+
+if [ -z "$VERCEL_TOKEN" ]; then
+  echo "❌ VERCEL_TOKEN manquant."
+  echo "   Chargez-le depuis votre vault/secret manager puis relancez."
+  exit 1
+fi
+
+if [ -z "$TEAM_ID" ]; then
+  echo "❌ TEAM_ID manquant."
+  echo "   Chargez-le depuis votre vault/secret manager puis relancez."
+  exit 1
+fi
+
+if [ -z "$DB_POOLED" ] || [ -z "$DB_DIRECT" ]; then
+  echo "❌ DATABASE_URL / DATABASE_URL_UNPOOLED manquantes."
+  echo "   Exportez les secrets depuis votre vault/secret manager avant execution."
+  exit 1
+fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔑 Injection DATABASE_URL → Vercel (preview + development)"

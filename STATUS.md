@@ -545,9 +545,28 @@ curl -X POST https://[votre-domaine]/api/admin/stripe/sync-products \
 🔴 **Le fichier `.env` contient des credentials sensibles!**
 
 ```env
-DATABASE_URL='postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>-pooler...'
-NEXTAUTH_SECRET='supersecretkeythatisatleast32characterslong'
+DATABASE_URL='${DATABASE_URL_FROM_VAULT}'
+NEXTAUTH_SECRET='${NEXTAUTH_SECRET_FROM_VAULT}'
 ```
+
+## 📅 Changelog
+
+### [07 juillet 2026]
+- **Sanitisation version publique** : retrait des identifiants organisation/personnels restants dans les scripts et messages d'erreur.
+- **Hardening scripts Vercel** : `TEAM_ID` n'est plus hardcode et devient obligatoire via variables d'environnement (vault).
+- **Hardening scripts users** : suppression des emails personnels hardcodes, `TARGET_EMAIL` devient obligatoire.
+- **Impact** : reduction du risque d'exposition d'informations internes lors de la publication vers le depot public.
+
+### [07 juillet 2026]
+- **Nettoyage backend OAuth GitHub** : suppression des doublons et fichiers obsoletes dans `app/api/admin/configure-github-oauth/`.
+- **Fichiers supprimés** : `route-new.ts`, `route-fixed.ts`, `route.ts.backup`, `README_ACTIONS.md`, `DELETE_THESE_FILES.md`.
+- **Diagnostic prod/Vercel** : erreur backend reproduite localement sur `/api/health` quand `DATABASE_URL` est absente (`500 database:not_configured`).
+- **Impact** : surface backend simplifiee et cause racine de l'erreur de deploiement identifiee (variables Vercel manquantes).
+
+### [17 février 2026]
+- **Hardening sécurité scripts** : suppression des secrets hardcodés (token Vercel + URLs DB) et passage en mode env/vault-only.
+- **Fichiers modifiés** : `scripts/deployment/configure-vercel-preview.sh`, `scripts/deployment/inject-now.sh`, `scripts/quick-check-user.js`, `scripts/setup-vercel-env.sh`, `scripts/vercel-api-setup.sh`, `STATUS.md`
+- **Impact** : aucune credential sensible en clair dans les scripts ciblés; exécution conditionnée à l'injection de secrets depuis le vault/pipeline.
 
 **ACTIONS REQUISES IMMÉDIATEMENT:**
 

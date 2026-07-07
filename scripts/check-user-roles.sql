@@ -1,4 +1,4 @@
--- Check user roles for __REDACTED_EMAIL__
+-- Check user roles for a specific account
 SELECT
   u.id as user_id,
   u.email,
@@ -12,7 +12,7 @@ FROM users u
 LEFT JOIN user_roles ur ON u.id = ur.user_id
 LEFT JOIN roles r ON ur.role_id = r.id
 LEFT JOIN companies c ON u.company_id = c.id
-WHERE u.email = '__REDACTED_EMAIL__';
+WHERE u.email = '<target-email@example.com>';
 
 -- Check all admin/super_admin users
 SELECT

@@ -5,9 +5,30 @@ set -e
 # Configuration Vercel Preview - À exécuter localement
 # ============================================
 
-VERCEL_TOKEN="${VERCEL_TOKEN:-__VERCEL_TOKEN_REDACTED__}"
-TEAM_ID="__VERCEL_TEAM_ID_FROM_VAULT__"
+VERCEL_TOKEN="${VERCEL_TOKEN:-}"
+TEAM_ID="${TEAM_ID:-}"
 PROJECT_NAME="neosaas-website"
+
+DATABASE_URL="${DATABASE_URL:-}"
+DATABASE_URL_UNPOOLED="${DATABASE_URL_UNPOOLED:-}"
+
+if [ -z "$VERCEL_TOKEN" ]; then
+  echo "❌ VERCEL_TOKEN manquant."
+  echo "   Chargez-le depuis votre vault/secret manager puis relancez le script."
+  exit 1
+fi
+
+if [ -z "$TEAM_ID" ]; then
+  echo "❌ TEAM_ID manquant."
+  echo "   Chargez-le depuis votre vault/secret manager avant execution."
+  exit 1
+fi
+
+if [ -z "$DATABASE_URL" ] || [ -z "$DATABASE_URL_UNPOOLED" ]; then
+  echo "❌ DATABASE_URL / DATABASE_URL_UNPOOLED manquantes."
+  echo "   Chargez ces secrets depuis votre vault/secret manager avant execution."
+  exit 1
+fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🚀 Configuration Vercel Preview Environment"
@@ -124,14 +145,12 @@ add_env_var() {
 
 # 1. DATABASE_URL  (pooler — pour l'app Next.js en serverless)
 echo "1️⃣  DATABASE_URL (pooler)"
-add_env_var "DATABASE_URL" \
-  "postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require"
+add_env_var "DATABASE_URL" "$DATABASE_URL"
 echo ""
 
 # 2. DATABASE_URL_UNPOOLED  (connexion directe — pour drizzle-kit et les migrations)
 echo "2️⃣  DATABASE_URL_UNPOOLED (direct, pour migrations)"
-add_env_var "DATABASE_URL_UNPOOLED" \
-  "postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require"
+add_env_var "DATABASE_URL_UNPOOLED" "$DATABASE_URL_UNPOOLED"
 echo ""
 
 # 4. NEXTAUTH_SECRET

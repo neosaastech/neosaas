@@ -6,8 +6,13 @@
 import { neon } from '@neondatabase/serverless';
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const TARGET_EMAIL = process.env.TARGET_EMAIL;
 if (!DATABASE_URL) {
   console.error("❌ DATABASE_URL is required. Run: DATABASE_URL='...' npx tsx scripts/check-user-direct.ts");
+  process.exit(1);
+}
+if (!TARGET_EMAIL) {
+  console.error("❌ TARGET_EMAIL is required. Run: TARGET_EMAIL='user@example.com' npx tsx scripts/check-user-direct.ts");
   process.exit(1);
 }
 
@@ -15,7 +20,7 @@ async function checkUser() {
   try {
     const sql = neon(DATABASE_URL);
 
-    console.log('🔍 Checking user: __REDACTED_EMAIL__\n');
+    console.log(`🔍 Checking user: ${TARGET_EMAIL}\n`);
 
     const result = await sql`
       SELECT
@@ -30,7 +35,7 @@ async function checkUser() {
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
-      WHERE u.email = '__REDACTED_EMAIL__'
+      WHERE u.email = ${TARGET_EMAIL}
     `;
 
     if (result.length === 0) {

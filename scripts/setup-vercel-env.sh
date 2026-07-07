@@ -27,9 +27,17 @@ echo ""
 echo "📋 Configuration des variables d'environnement..."
 echo ""
 
+DATABASE_URL="${DATABASE_URL:-}"
+
+if [ -z "$DATABASE_URL" ]; then
+  echo "❌ DATABASE_URL manquante."
+  echo "   Chargez-la depuis votre vault/secret manager avant execution."
+  exit 1
+fi
+
 # DATABASE_URL
 echo "1️⃣  Configuration de DATABASE_URL..."
-echo "postgresql://neondb_owner:__NEON_PASSWORD_REDACTED__@<your-neon-host>/neondb?sslmode=require" | \
+echo "$DATABASE_URL" | \
   vercel env add DATABASE_URL production preview development
 
 # NEXTAUTH_SECRET
