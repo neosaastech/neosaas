@@ -71,6 +71,13 @@
       "when": 1783189713457,
       "tag": "0009_soft_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783440011321,
+      "tag": "0010_shallow_leader",
+      "breakpoints": true
     }
   ]
 }

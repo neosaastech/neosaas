@@ -13,6 +13,7 @@ import {
 import { UserCompanyAvatar } from "@/components/common/user-company-avatar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { NotificationBell } from "@/components/admin/notification-bell"
+import { UserNotificationBell } from "@/components/common/user-notification-bell"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -255,8 +256,8 @@ export function PrivateHeader() {
 
         <ThemeToggle />
 
-        {/* Admin Notification Bell */}
-        {user?.isAdmin && <NotificationBell />}
+        {/* Notification Bell — admin sees platform-wide events, everyone else sees their own */}
+        {user?.isAdmin ? <NotificationBell /> : user && <UserNotificationBell />}
 
         {/* Cart Icon with Badge */}
         {itemCount > 0 && (
