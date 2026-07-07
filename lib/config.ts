@@ -1,5 +1,7 @@
 import { db } from "@/db"
 import { platformConfig } from "@/db/schema"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OFFLINE_PLATFORM_CONFIG } from "@/lib/dev/mock-data"
 
 export interface PlatformConfigData {
   siteName: string
@@ -28,6 +30,10 @@ export interface PlatformConfigData {
 export type { PlatformConfigData as PlatformConfig }
 
 export async function getPlatformConfig(): Promise<PlatformConfigData> {
+  if (isOfflineDev()) {
+    return OFFLINE_PLATFORM_CONFIG
+  }
+
   try {
     const configs = await db.select().from(platformConfig)
 

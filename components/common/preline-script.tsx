@@ -15,6 +15,10 @@ export function PrelineScript() {
   const pathname = usePathname()
 
   useEffect(() => {
+    // Preline targets marketing UI only — autoInit on admin routes can leave
+    // invisible `fixed inset-0` backdrops that block all clicks after navigation.
+    if (pathname.startsWith("/admin") || pathname.startsWith("/dashboard")) return
+
     import("preline").then(() => {
       (window as unknown as { HSStaticMethods: { autoInit: () => void } }).HSStaticMethods.autoInit()
     })

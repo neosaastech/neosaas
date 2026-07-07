@@ -102,13 +102,13 @@ export default function SupportPage() {
                 <Book className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold">Documentation</h3>
+                <h3 className="font-semibold">Pricing</h3>
                 <p className="text-sm text-muted-foreground">
-                  Complete guides and tutorials
+                  View plans and subscription options
                 </p>
                 <Button variant="link" className="p-0 h-auto mt-2" asChild>
-                  <Link href="/fr/docs">
-                    View documentation <ExternalLink className="ml-1 h-3 w-3" />
+                  <Link href="/fr/pricing">
+                    View pricing <ExternalLink className="ml-1 h-3 w-3" />
                   </Link>
                 </Button>
               </div>

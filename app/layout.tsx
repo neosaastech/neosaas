@@ -4,7 +4,7 @@ import Script from "next/script"
 import { ThemeProvider } from "@/components/common/theme-provider"
 import { DynamicThemeProvider } from "@/components/common/dynamic-theme-provider"
 import { BackToTop } from "@/components/common/back-to-top"
-import { PrelineScript } from "@/components/common/preline-script"
+import { RouteOverlayCleanup } from "@/components/common/route-overlay-cleanup"
 import { Toaster } from "@/components/ui/sonner"
 import "@/styles/globals.css"
 
@@ -67,13 +67,13 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${themeFontVariables}`}>
       <head>
-        {config.customHeaderCode && (
-          <div dangerouslySetInnerHTML={{ __html: config.customHeaderCode }} />
-        )}
         {googleFontsHref && <link rel="stylesheet" href={googleFontsHref} />}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />
       </head>
       <body className="font-sans">
+        {config.customHeaderCode && (
+          <div dangerouslySetInnerHTML={{ __html: config.customHeaderCode }} />
+        )}
         {config.gtmCode && (
           <noscript>
             <iframe
@@ -87,7 +87,7 @@ export default async function RootLayout({
         
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <DynamicThemeProvider theme={themeConfig}>
-            <PrelineScript />
+            <RouteOverlayCleanup />
             {children}
             <BackToTop />
             <Toaster />

@@ -6,8 +6,14 @@ import { eq, desc, and } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getCurrentUser } from "@/lib/auth"
 import { headers } from "next/headers"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OFFLINE_MOCK_TOS, OFFLINE_LEGAL_COMPANY } from "@/lib/dev/mock-data"
 
 export async function getLatestTos() {
+  if (isOfflineDev()) {
+    return { success: true, data: OFFLINE_MOCK_TOS }
+  }
+
   try {
     const tos = await db.query.termsOfService.findFirst({
       where: eq(termsOfService.isActive, true),
@@ -156,6 +162,10 @@ export async function checkTosAcceptance() {
 }
 
 export async function getLegalCompanyDetails() {
+  if (isOfflineDev()) {
+    return OFFLINE_LEGAL_COMPANY
+  }
+
   try {
     // First try to find the designated site manager
     const siteManager = await db.query.users.findFirst({

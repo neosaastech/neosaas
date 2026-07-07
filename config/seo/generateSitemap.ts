@@ -1,6 +1,6 @@
-import { and, eq, isNotNull } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { db } from "@/db"
-import { pageLayers, blogPosts } from "@/db/schema"
+import { pageLayers } from "@/db/schema"
 import { loadNeosaasConfig } from "@/server/loadConfig"
 import { LOCALES } from "@/app/[locale]/layout"
 
@@ -22,7 +22,7 @@ export async function generateSitemapXml() {
   const config = await loadNeosaasConfig()
   const siteUrl = config.siteUrl || `https://${config.domain}`
 
-  const staticPaths = ["/features", "/pricing"]
+  const staticPaths = ["/pricing"]
 
   const pages: SitemapUrl[] = [
     {
@@ -55,25 +55,11 @@ export async function generateSitemapXml() {
     .where(eq(pageLayers.isActive, true))
 
   for (const page of cmsPages) {
-    if (staticPaths.includes(page.pagePath)) continue // already added above with both locales
+    if (staticPaths.includes(page.pagePath)) continue
     pages.push({
       loc: `${siteUrl}/${page.locale}${page.pagePath}`,
       changefreq: "monthly",
       priority: 0.6,
-    })
-  }
-
-  // Blog posts, same rule — only locales that are actually published.
-  const posts = await db
-    .select({ slug: blogPosts.slug, locale: blogPosts.locale })
-    .from(blogPosts)
-    .where(and(eq(blogPosts.isActive, true), isNotNull(blogPosts.publishedAt)))
-
-  for (const post of posts) {
-    pages.push({
-      loc: `${siteUrl}/${post.locale}/blog/${post.slug}`,
-      changefreq: "monthly",
-      priority: 0.5,
     })
   }
 

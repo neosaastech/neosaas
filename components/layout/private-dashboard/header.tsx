@@ -1,6 +1,6 @@
 "use client"
 
-import { Menu, LogOut, User, CreditCard, Search, ShoppingCart } from "lucide-react"
+import { LogOut, User, CreditCard, Search, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -36,11 +36,7 @@ interface UserData {
   isAdmin?: boolean
 }
 
-interface PrivateHeaderProps {
-  onMenuClick?: () => void
-}
-
-export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
+export function PrivateHeader() {
   const router = useRouter()
   const { logo, siteName } = usePlatformConfig()
   const { itemCount } = useCart()
@@ -187,10 +183,7 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
   }
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b bg-background px-6 relative">
-      <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
-        <Menu className="h-5 w-5" />
-      </Button>
+    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background/90 px-4 backdrop-blur-md sm:px-6">
 
       {/* Mobile Logo */}
       <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -215,7 +208,7 @@ export function PrivateHeader({ onMenuClick }: PrivateHeaderProps) {
               placeholder="Search admin pages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 h-9 pl-9 pr-4 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
+              className="h-9 w-64 rounded-lg border border-border bg-background ps-9 pe-4 text-sm text-foreground shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
           </div>
 

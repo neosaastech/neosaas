@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Loader2, Terminal, History, Shield } from "lucide-react"
+import Link from "next/link"
+import { Loader2, Terminal, History, Shield, LayoutGrid } from "lucide-react"
 import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
 
 const EXAMPLE_PAYLOAD = JSON.stringify(
@@ -115,16 +116,24 @@ export default function PilotagePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Terminal className="h-7 w-7" />
-          Pilotage JSON
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Pilote une instance NeoSaaS de façon déclarative — création de pages, composition de calques,
-          config plateforme — sans passer par l&apos;UI admin. Actions supportées : <code>create_page</code>,{" "}
-          <code>set_layers</code>, <code>set_platform_config</code>.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Terminal className="h-7 w-7" />
+            Pilotage JSON
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Pilote une instance NeoSaaS de façon déclarative — création de pages, composition de calques,
+            config plateforme — sans passer par l&apos;UI admin. Actions supportées : <code>create_page</code>,{" "}
+            <code>set_layers</code>, <code>set_platform_config</code>.
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/admin/pilotage/builder">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Éditeur visuel (Puck)
+          </Link>
+        </Button>
       </div>
 
       <Card>

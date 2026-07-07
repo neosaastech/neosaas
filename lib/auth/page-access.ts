@@ -1,5 +1,7 @@
 import { jwtVerify } from "jose"
 import { hasRole } from "./server"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OFFLINE_DEV_USER, OFFLINE_PAGE_PERMISSIONS } from "@/lib/dev/mock-data"
 
 /**
  * Access-level threshold for the unified Pages model (Payload-authored
@@ -42,6 +44,7 @@ export async function canAccessPage(
   requiredRole: RequiredRoleLevel,
 ): Promise<boolean> {
   if (requiredRole === "public") return true
+  if (isOfflineDev() && userId === OFFLINE_DEV_USER.userId) return true
   if (!userId) return false
   if (requiredRole === "user") return true
   return hasRole(userId, allowedRoleNamesFor(requiredRole))
@@ -80,6 +83,10 @@ let permissionsCacheTimestamp = 0
 const PERMISSIONS_CACHE_TTL = 5 * 60 * 1000
 
 export async function getCachedPagePermissions(): Promise<{ path: string; access: string }[]> {
+  if (isOfflineDev()) {
+    return OFFLINE_PAGE_PERMISSIONS
+  }
+
   const now = Date.now()
   if (cachedPermissions && now - permissionsCacheTimestamp < PERMISSIONS_CACHE_TTL) {
     return cachedPermissions
@@ -107,6 +114,10 @@ export async function getCachedPagePermissions(): Promise<{ path: string; access
  * outlive a role change made mid-session).
  */
 export async function getUserIdFromToken(token: string | undefined): Promise<string | null> {
+  if (isOfflineDev()) {
+    return OFFLINE_DEV_USER.userId
+  }
+
   if (!token) return null
   try {
     const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET)

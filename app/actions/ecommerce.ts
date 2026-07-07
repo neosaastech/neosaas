@@ -5,6 +5,9 @@ import { products, carts, cartItems, orders, orderItems, appointments, outlookIn
 import { eq, and, desc, asc, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getCurrentUser } from "@/lib/auth"
+import { getPlatformConfig } from "@/lib/config"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OFFLINE_MOCK_PRODUCTS } from "@/lib/dev/mock-data"
 import { z } from "zod"
 import { emailRouter } from "@/lib/email"
 import { cookies } from "next/headers"
@@ -115,6 +118,13 @@ export async function migrateGuestCart(): Promise<{ success: boolean; migrated: 
 // --- Products ---
 
 export async function getProducts(filter: { isPublished?: boolean } = {}) {
+  if (isOfflineDev()) {
+    const data = filter.isPublished
+      ? OFFLINE_MOCK_PRODUCTS.filter((p) => p.isPublished)
+      : OFFLINE_MOCK_PRODUCTS
+    return { success: true, data }
+  }
+
   try {
     const conditions = []
     if (filter.isPublished !== undefined) {
@@ -248,7 +258,7 @@ export async function upsertProduct(data: any) {
         .set(updateData)
         .where(eq(products.id, data.id))
 
-      revalidatePath("/store")
+      revalidatePath("/pricing")
       revalidatePath("/admin/products")
       revalidatePath("/dashboard")
 
@@ -305,7 +315,7 @@ export async function upsertProduct(data: any) {
 
       const productId = result[0].id
 
-      revalidatePath("/store")
+      revalidatePath("/pricing")
       revalidatePath("/admin/products")
       revalidatePath("/dashboard")
 
@@ -340,7 +350,7 @@ export async function deleteProduct(id: string) {
 
     await db.delete(products).where(eq(products.id, id))
     
-    revalidatePath("/store")
+    revalidatePath("/pricing")
     return { success: true }
   } catch (error) {
     console.error("Failed to delete product:", error)

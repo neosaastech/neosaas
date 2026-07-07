@@ -1,10 +1,12 @@
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
+import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 import * as schema from './schema';
 
-// Lazy initialization for database connection to avoid build-time errors
 let _sql: NeonQueryFunction<false, false> | null = null;
-let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let _pool: Pool | null = null;
+let _db: ReturnType<typeof drizzleNeon<typeof schema>> | ReturnType<typeof drizzlePg<typeof schema>> | null = null;
 
 function getConnectionString(): string {
   const url = process.env.DATABASE_URL ?? process.env.DATABASE_URL_UNPOOLED;
@@ -15,33 +17,43 @@ function getConnectionString(): string {
       'Expected format: postgresql://neondb_owner:PASSWORD@<your-neon-host>/neondb?sslmode=require'
     );
   }
-  // Detect wrong role — 'authenticator' has no CREATE/ALTER rights
   if (url.includes('://authenticator') || url.includes('//authenticator@')) {
     throw new Error(
       "DATABASE_URL uses role 'authenticator' which lacks DDL permissions. " +
       "Update the variable in Vercel to use 'neondb_owner' instead."
     );
   }
-  // Remove unsupported query parameters for Neon HTTP driver
   return url
     .replace('&channel_binding=require', '')
     .replace('channel_binding=require&', '')
     .replace('?channel_binding=require', '');
 }
 
+function isLocalPostgres(url: string): boolean {
+  return /localhost|127\.0\.0\.1/.test(url);
+}
+
+function initDb() {
+  if (_db) return _db;
+  const connectionString = getConnectionString();
+  if (isLocalPostgres(connectionString)) {
+    _pool = new Pool({ connectionString });
+    _db = drizzlePg(_pool, { schema });
+  } else {
+    _sql = neon(connectionString);
+    _db = drizzleNeon(_sql, { schema });
+  }
+  return _db;
+}
+
 // Lazy getter for db - only connects when first accessed
-export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+export const db = new Proxy({} as ReturnType<typeof drizzleNeon<typeof schema>>, {
   get(_, prop) {
-    if (!_db) {
-      const connectionString = getConnectionString();
-      _sql = neon(connectionString);
-      _db = drizzle(_sql, { schema });
-    }
-    return (_db as Record<string | symbol, unknown>)[prop];
+    const instance = initDb();
+    return (instance as Record<string | symbol, unknown>)[prop];
   }
 });
 
-// Export validation function to be called before database operations
 export function validateDatabaseUrl() {
   if (!process.env.DATABASE_URL && !process.env.DATABASE_URL_UNPOOLED) {
     throw new Error(

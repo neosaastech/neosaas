@@ -4,6 +4,8 @@ import { requireAuth, isAdmin } from "@/lib/auth/server"
 import { PrivateLayoutClient } from "./layout-client"
 import { getPlatformConfig } from "@/lib/config"
 import { AdminAlerts } from "@/components/admin/admin-alerts"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OfflineBanner } from "@/components/dev/offline-banner"
 
 // Force dynamic rendering for maintenance mode check
 export const dynamic = 'force-dynamic'
@@ -30,5 +32,10 @@ export default async function PrivateLayout({ children }: { children: React.Reac
 
   const alerts = userIsAdmin ? <AdminAlerts /> : null
 
-  return <PrivateLayoutClient user={user} platformConfig={platformConfig} alerts={alerts}>{children}</PrivateLayoutClient>
+  return (
+    <>
+      {isOfflineDev() && <OfflineBanner />}
+      <PrivateLayoutClient user={user} platformConfig={platformConfig} alerts={alerts}>{children}</PrivateLayoutClient>
+    </>
+  )
 }

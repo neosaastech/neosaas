@@ -10,6 +10,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getProducts } from "@/app/actions/ecommerce"
 import { ImpersonationBanner } from "@/components/admin/impersonation-banner"
+import { PrelineWelcomeBanner } from "@/components/preline/application/welcome-banner"
 
 import { useCart } from "@/contexts/cart-context"
 import { usePageTitle } from "@/hooks/use-page-title"
@@ -72,16 +73,10 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      {/* Hero Section - NeoSaaS Bronze theme */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#1A1A1A] to-brand p-8 text-white">
-        <div className="relative z-10">
-          <h1 className="text-3xl font-bold mb-2">Catalog</h1>
-          <p className="text-white/90 max-w-2xl">
-            Products and offers available for your client workspace.
-          </p>
-        </div>
-        <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/10 to-transparent" />
-      </div>
+      <PrelineWelcomeBanner
+        title="Welcome to your Dashboard"
+        subtitle="Manage your services, track your usage, and explore our marketplace."
+      />
 
       {/* Dynamic Products Section */}
       <div>

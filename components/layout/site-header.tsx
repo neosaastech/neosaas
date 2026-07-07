@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from 'next/navigation'
 import { MainNav } from "@/components/layout/main-nav"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -19,8 +18,6 @@ interface SiteHeaderProps {
 }
 
 export function SiteHeader({ user, headerConfig }: SiteHeaderProps) {
-  const pathname = usePathname()
-  const isDemo = pathname === "/demo"
   const { siteName, logo, logoDisplayMode } = usePlatformConfig()
 
   // Default fallback logo
@@ -45,7 +42,7 @@ export function SiteHeader({ user, headerConfig }: SiteHeaderProps) {
         <MainNav items={headerConfig?.navItems} />
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
-            {!isDemo && <MobileMenu user={user} />}
+            <MobileMenu user={user} />
             {headerConfig?.ctaLabel && headerConfig?.ctaHref && (
               <Link href={headerConfig.ctaHref} className="hidden md:block">
                 <Button size="sm" variant="outline">

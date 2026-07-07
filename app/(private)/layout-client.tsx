@@ -7,7 +7,6 @@ import { UserProvider } from "@/lib/contexts/user-context"
 import { sessionUserFromAuth } from "@/lib/auth/session-user"
 import { PlatformConfigProvider, type PlatformConfig } from "@/contexts/platform-config-context"
 import { CartProvider } from "@/contexts/cart-context"
-import { useState } from "react"
 import { TosModal } from "@/components/legal/tos-modal"
 
 interface User {
@@ -25,17 +24,15 @@ interface PrivateLayoutClientProps {
 }
 
 export function PrivateLayoutClient({ children, user, platformConfig, alerts }: PrivateLayoutClientProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-
   return (
     <PlatformConfigProvider config={platformConfig}>
       <UserProvider initialUser={sessionUserFromAuth(user)}>
         <CartProvider>
-          <div className="flex h-screen">
-            <PrivateSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-            <div className="flex flex-1 flex-col">
-              <PrivateHeader onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
-              <main className="flex-1 overflow-y-auto bg-muted/30 p-6 flex flex-col">
+          <div className="flex h-screen overflow-hidden bg-muted/30">
+            <PrivateSidebar />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <PrivateHeader />
+              <main className="flex flex-1 flex-col overflow-y-auto p-4 sm:p-6 lg:p-8">
                 {alerts}
                 <div className="flex-1">{children}</div>
                 {platformConfig.adminFooterCopyright && (

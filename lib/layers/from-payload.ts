@@ -34,6 +34,7 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
         secondaryCtaLabel: block.secondaryCtaLabel ?? undefined,
         secondaryCtaHref: block.secondaryCtaHref ?? undefined,
         imageUrl: extractMediaUrl(block.image),
+        videoUrl: extractMediaUrl(block.video),
       }
     case "feature-grid": {
       const items = (block.items as Array<Record<string, unknown>>) ?? []
@@ -87,6 +88,26 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
         ctaLabel: block.ctaLabel,
         ctaHref: block.ctaHref,
       }
+    case "welcome-banner":
+      return {
+        title: block.title,
+        subtitle: block.subtitle ?? undefined,
+        ctaLabel: block.ctaLabel ?? undefined,
+        ctaHref: block.ctaHref ?? undefined,
+      }
+    case "icon-showcase": {
+      const items = (block.items as Array<Record<string, unknown>>) ?? []
+      return {
+        items: items.map((item) => ({
+          icon: String(item.icon),
+          label: String(item.label),
+          highlighted: item.highlighted === true,
+        })),
+        imageUrl: extractMediaUrl(block.image),
+        videoUrl: extractMediaUrl(block.video),
+        overlayIcons: block.overlayIcons === false ? false : undefined,
+      }
+    }
     case "form": {
       const items = (block.items as Array<Record<string, unknown>>) ?? []
       return {

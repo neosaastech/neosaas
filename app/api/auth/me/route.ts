@@ -1,48 +1,42 @@
-import { NextResponse } from 'next/server';
-import { db, validateDatabaseUrl } from '@/db';
-import { users, userRoles, roles, rolePermissions, permissions, companies } from '@/db/schema';
-import { getCurrentUser } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
+import { NextResponse } from "next/server"
+import { db, validateDatabaseUrl } from "@/db"
+import { users, userRoles, roles, rolePermissions, permissions } from "@/db/schema"
+import { getCurrentUser } from "@/lib/auth"
+import { eq } from "drizzle-orm"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OFFLINE_AUTH_ME_USER } from "@/lib/dev/mock-data"
 
 export async function GET() {
   try {
-    validateDatabaseUrl();
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
 
     if (!currentUser) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
-    const [userRecord] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, currentUser.userId))
-      .limit(1);
-
-    if (!userRecord) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    if (isOfflineDev()) {
+      return NextResponse.json({ user: OFFLINE_AUTH_ME_USER })
     }
 
-    let companySummary = null;
-    if (userRecord.companyId) {
-      const [company] = await db
-        .select()
-        .from(companies)
-        .where(eq(companies.id, userRecord.companyId))
-        .limit(1);
+    validateDatabaseUrl()
 
-      if (company) {
-        const { logo, ...rest } = company;
-        companySummary = { ...rest, hasLogo: !!logo };
-      }
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, currentUser.userId),
+      with: {
+        company: true,
+      },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+    const companySummary = user.company
+      ? {
+          ...user.company,
+          hasLogo: !!user.company.logo,
+        }
+      : null
     const userRolesData = await db
       .select({
         roleName: roles.name,
@@ -50,7 +44,7 @@ export async function GET() {
       })
       .from(userRoles)
       .innerJoin(roles, eq(userRoles.roleId, roles.id))
-      .where(eq(userRoles.userId, userRecord.id));
+      .where(eq(userRoles.userId, user.id))
 
     const userPermissionsData = await db
       .select({
@@ -60,17 +54,19 @@ export async function GET() {
       .from(userRoles)
       .innerJoin(rolePermissions, eq(userRoles.roleId, rolePermissions.roleId))
       .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-      .where(eq(userRoles.userId, userRecord.id));
+      .where(eq(userRoles.userId, user.id))
 
-    const uniquePermissions = userPermissionsData.reduce((acc, curr) => {
-      if (!acc.find((p) => p.permissionName === curr.permissionName)) {
-        acc.push(curr);
-      }
-      return acc;
-    }, [] as typeof userPermissionsData);
+    const uniquePermissions = userPermissionsData.reduce(
+      (acc, curr) => {
+        if (!acc.find((p) => p.permissionName === curr.permissionName)) {
+          acc.push(curr)
+        }
+        return acc
+      },
+      [] as typeof userPermissionsData,
+    )
 
-    const { password: _, ...userWithoutPassword } = userRecord;
-
+    const { password: _, ...userWithoutPassword } = user
     return NextResponse.json({
       user: {
         ...userWithoutPassword,
@@ -78,12 +74,9 @@ export async function GET() {
         roles: userRolesData,
         permissions: uniquePermissions,
       },
-    });
+    })
   } catch (error) {
-    console.error('Get current user error:', error);
-    return NextResponse.json(
-      { error: 'An error occurred while fetching user data' },
-      { status: 500 }
-    );
+    console.error("Get current user error:", error)
+    return NextResponse.json({ error: "An error occurred while fetching user data" }, { status: 500 })
   }
 }
