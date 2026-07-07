@@ -93,6 +93,10 @@ let cacheTimestamp = 0
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 async function shouldForceHttps(): Promise<boolean> {
+  if (process.env.NODE_ENV === "development") {
+    return false
+  }
+
   const now = Date.now()
   
   // Return cached value if still valid

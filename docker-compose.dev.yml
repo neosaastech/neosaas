@@ -1,0 +1,23 @@
+# Postgres locale pour tester Puck + page_layers (branche feat/puck-builder-local).
+# Port 5433 pour éviter les conflits avec d'autres instances Postgres sur 5432.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: neosaas-dev-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: neosaas
+      POSTGRES_PASSWORD: neosaas
+      POSTGRES_DB: neosaas_dev
+    volumes:
+      - neosaas_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neosaas -d neosaas_dev"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  neosaas_dev_pgdata:

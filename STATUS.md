@@ -9,6 +9,26 @@
 
 ## 🚨 Corrections Récentes
 
+### Dépendances — Mise à jour mineure de compatibilité outils (7 juillet 2026)
+
+**Contexte** : besoin d'appliquer uniquement les mises à jour mineures/patch pour améliorer la compatibilité sans introduire de ruptures majeures.
+
+**Changements** :
+
+- ✅ **Upgrade mineur/patch appliqué** sur les dépendances front et runtime (Radix UI, React 19.2.x, Stripe SDK mineur, PG, Tailwind merge, etc.).
+- ✅ **Upgrade mineur/patch appliqué** sur les dépendances dev (`@types/node`, `@types/pg`, `@types/react`, `drizzle-kit`, `postcss`, `tailwindcss`, `tsx`).
+- ⚠️ **Majors volontairement exclues** (ex: Tailwind 4, TypeScript 6, Zod 4, Stripe 22) pour éviter les régressions.
+
+**Fichiers modifiés** :
+
+- `package.json`
+- `docs/PROJECT.md`
+- `STATUS.md`
+
+**Impact** : meilleure stabilité des dépendances dans la même major, avec un risque de régression réduit pour les outils du projet.
+
+---
+
 ### README — Versioning auto + logo + vidéo FR (23 mars 2026)
 
 **Contexte** : Les changements de release n'étaient pas suffisamment visibles. Besoin d'une distinction claire dans `README.md` avec branding et ressource vidéo.

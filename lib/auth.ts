@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
+import { isOfflineDev } from '@/lib/dev/offline-mode';
+import { OFFLINE_DEV_USER } from '@/lib/dev/mock-data';
 
 function getJwtSecret(): string {
   const secret = process.env.NEXTAUTH_SECRET;
@@ -58,6 +60,10 @@ export function verifyToken(token: string): JWTPayload | null {
  * Get the current user from the auth token cookie
  */
 export async function getCurrentUser(): Promise<JWTPayload | null> {
+  if (isOfflineDev()) {
+    return OFFLINE_DEV_USER;
+  }
+
   const cookieStore = await cookies();
   const token = cookieStore.get(TOKEN_NAME)?.value;
 

@@ -1,4 +1,5 @@
 "use client"
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -14,9 +15,10 @@ interface MobileMenuProps {
 export function MobileMenu({ user }: MobileMenuProps) {
   const { siteName } = usePlatformConfig()
   const locale = useLocale()
+  const [open, setOpen] = useState(false)
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-6 w-6" />
@@ -32,32 +34,23 @@ export function MobileMenu({ user }: MobileMenuProps) {
         </div>
         <div className="flex flex-col gap-6 px-2 py-6">
           <nav className="flex flex-col space-y-4">
-            <Link href={`/${locale}`} className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
               Home
             </Link>
-            <Link href={`/${locale}/features`} className="text-lg font-medium hover:text-brand">
-              Features
-            </Link>
-            <Link href={`/${locale}/pricing`} className="text-lg font-medium hover:text-brand">
+            <Link href={`/${locale}/pricing`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
               Pricing
             </Link>
-            <Link href={`/${locale}/demo`} className="text-lg font-medium hover:text-brand">
-              Demo
+            <Link href={`/${locale}/legal/privacy`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
+              Privacy
             </Link>
-            <Link href={`/${locale}/docs`} className="text-lg font-medium hover:text-brand">
-              Docs
-            </Link>
-            <Link href="/appearance" className="text-lg font-medium hover:text-brand">
-              Appearance
-            </Link>
-            <Link href={`/${locale}/brand`} className="text-lg font-medium hover:text-brand">
-              Brand
+            <Link href={`/${locale}/legal/terms`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
+              Terms
             </Link>
           </nav>
 
           <div className="flex flex-col gap-2 mt-4">
             {user ? (
-              <Link href="/dashboard">
+              <Link href="/dashboard" onClick={() => setOpen(false)}>
                 <Button className="w-full gap-2">
                   <Lock className="h-4 w-4" />
                   Dashboard
@@ -65,12 +58,12 @@ export function MobileMenu({ user }: MobileMenuProps) {
               </Link>
             ) : (
               <>
-                <Link href="/auth/login">
+                <Link href="/auth/login" onClick={() => setOpen(false)}>
                   <Button variant="outline" className="w-full">
                     Login
                   </Button>
                 </Link>
-                <Link href="/auth/register">
+                <Link href="/auth/register" onClick={() => setOpen(false)}>
                   <Button className="w-full bg-brand hover:bg-[#B26B27] text-white border-none">Sign Up</Button>
                 </Link>
               </>

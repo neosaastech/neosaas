@@ -9,17 +9,15 @@ const DEFAULT_COLUMNS = [
   {
     title: "Product",
     links: [
-      { label: "Features", href: "/features" },
+      { label: "Home", href: "/" },
       { label: "Pricing", href: "/pricing" },
-      { label: "Brand", href: "/brand" },
     ],
   },
   {
-    title: "Company",
+    title: "Legal",
     links: [
-      { label: "About", href: "/legacy/about" },
-      { label: "Contact", href: "/legacy/contact" },
-      { label: "Affiliates", href: "/legacy/affiliate" },
+      { label: "Privacy Policy", href: "/legal/privacy" },
+      { label: "Terms of Service", href: "/legal/terms" },
     ],
   },
 ]

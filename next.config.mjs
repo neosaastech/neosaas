@@ -1,3 +1,19 @@
+/** CSP shared by public marketing routes embeddable in Payload Live Preview. */
+const PUBLIC_PREVIEW_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://api.stripe.com https://*.neon.tech https://cms.neokube.fr wss:",
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  "frame-ancestors 'self' https://cms.neokube.fr",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "upgrade-insecure-requests",
+].join("; ")
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['lago-javascript-client'],
@@ -23,10 +39,6 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
@@ -57,6 +69,7 @@ const nextConfig = {
               "font-src 'self' data:",
               "connect-src 'self' https://api.stripe.com https://*.neon.tech wss:",
               "frame-src https://js.stripe.com https://hooks.stripe.com",
+              "frame-ancestors 'none'",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -84,36 +97,14 @@ const nextConfig = {
         ],
       },
       {
-        // Payload's Live Preview (app.payload.config.ts admin.livePreview)
-        // opens these exact routes in an iframe from cms.neokube.fr — the
-        // blanket X-Frame-Options: DENY above blocks that outright (browsers
-        // refuse to render the frame at all, no server error, just a blank/
-        // broken iframe — found 2026-07-05 debugging why Live Preview looked
-        // "broken"). Scoped to only the public marketing routes
-        // (app/[locale]/(public)/...) — dashboard/admin keep the strict
-        // blanket deny untouched. Last-matching headers() entry wins per
-        // Next.js docs, so this overrides frame-ancestors/CSP for just these
-        // paths without weakening it anywhere else.
+        // Payload Live Preview iframe — homepage locale root (/fr, /en)
+        source: '/:locale(fr|en)',
+        headers: [{ key: 'Content-Security-Policy', value: PUBLIC_PREVIEW_CSP }],
+      },
+      {
+        // Payload Live Preview iframe — all public marketing sub-routes
         source: '/:locale(fr|en)/:path*',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https:",
-              "font-src 'self' data:",
-              "connect-src 'self' https://api.stripe.com https://*.neon.tech wss:",
-              "frame-src https://js.stripe.com https://hooks.stripe.com",
-              "frame-ancestors 'self' https://cms.neokube.fr",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "upgrade-insecure-requests",
-            ].join('; '),
-          },
-        ],
+        headers: [{ key: 'Content-Security-Policy', value: PUBLIC_PREVIEW_CSP }],
       },
     ]
   },

@@ -1,6 +1,8 @@
 import { cookies } from "next/headers"
 import { jwtVerify } from "jose"
 import { redirect } from "next/navigation"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OFFLINE_DEV_USER } from "@/lib/dev/mock-data"
 
 function getJwtSecret(): string {
   const secret = process.env.NEXTAUTH_SECRET
@@ -23,6 +25,10 @@ export interface AuthUser {
  * This replaces the middleware auth logic for Next.js 16
  */
 export async function verifyAuth(): Promise<AuthUser | null> {
+  if (isOfflineDev()) {
+    return OFFLINE_DEV_USER
+  }
+
   const cookieStore = await cookies()
   const token = cookieStore.get("auth-token")?.value
 
@@ -59,6 +65,10 @@ export async function requireAuth(): Promise<AuthUser> {
  * Returns the list of role names for the authenticated user
  */
 export async function getUserRoles(userId: string): Promise<string[]> {
+  if (isOfflineDev() && userId === OFFLINE_DEV_USER.userId) {
+    return ["super_admin"]
+  }
+
   try {
     const { db } = await import("@/db")
     const { userRoles, roles } = await import("@/db/schema")

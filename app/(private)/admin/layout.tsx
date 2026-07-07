@@ -1,6 +1,5 @@
 import type React from "react"
 import { requireAdmin } from "@/lib/auth/server"
-import { AdminClientGuard } from "./admin-client-guard"
 import { AdminLiveChat } from "@/components/admin/admin-live-chat"
 
 /**
@@ -26,12 +25,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   console.log("[ADMIN LAYOUT] ✅ Admin access GRANTED for:", user.email)
 
-  // CLIENT-SIDE: Additional protection layer
+  // Server-side requireAdmin() is sufficient — AdminClientGuard caused a
+  // fullscreen loading layer on every admin navigation and blocked interaction.
   return (
-    <AdminClientGuard>
+    <>
       {children}
       <AdminLiveChat />
-    </AdminClientGuard>
+    </>
   )
 }
 

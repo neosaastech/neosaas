@@ -5,6 +5,8 @@ import { FeatureGridLayer, type FeatureGridLayerProps } from "@/components/layer
 import { PricingTableLayer, type PricingTableLayerProps } from "@/components/layers/pricing-table-layer"
 import { TestimonialsLayer, type TestimonialsLayerProps } from "@/components/layers/testimonials-layer"
 import { CtaBannerLayer, type CtaBannerLayerProps } from "@/components/layers/cta-banner-layer"
+import { WelcomeBannerLayer, type WelcomeBannerLayerProps } from "@/components/layers/welcome-banner-layer"
+import { IconShowcaseLayer, type IconShowcaseLayerProps } from "@/components/layers/icon-showcase-layer"
 import { FormLayer, type FormLayerProps } from "@/components/layers/form-layer"
 import { BlogListLayer, type BlogListLayerProps } from "@/components/layers/blog-list-layer"
 import { ContentLayer, type ContentLayerProps } from "@/components/layers/content-layer"
@@ -55,6 +57,12 @@ const testimonialItemSchema = z.object({
   metric: z.string().optional(),
 })
 
+const iconShowcaseItemSchema = z.object({
+  icon: z.string(),
+  label: z.string(),
+  highlighted: z.boolean().optional(),
+})
+
 const formFieldSchema = z.object({
   name: z.string(),
   label: z.string(),
@@ -75,6 +83,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       secondaryCtaLabel: z.string().optional(),
       secondaryCtaHref: z.string().optional(),
       imageUrl: z.string().optional(),
+      videoUrl: z.string().optional(),
     }) satisfies z.ZodType<HeroLayerProps>,
   },
   "feature-grid": {
@@ -110,6 +119,24 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       ctaLabel: z.string(),
       ctaHref: z.string(),
     }) satisfies z.ZodType<CtaBannerLayerProps>,
+  },
+  "welcome-banner": {
+    component: WelcomeBannerLayer,
+    propsSchema: z.object({
+      title: z.string(),
+      subtitle: z.string().optional(),
+      ctaLabel: z.string().optional(),
+      ctaHref: z.string().optional(),
+    }) satisfies z.ZodType<WelcomeBannerLayerProps>,
+  },
+  "icon-showcase": {
+    component: IconShowcaseLayer,
+    propsSchema: z.object({
+      items: z.array(iconShowcaseItemSchema).optional(),
+      imageUrl: z.string().optional(),
+      videoUrl: z.string().optional(),
+      overlayIcons: z.boolean().optional(),
+    }) satisfies z.ZodType<IconShowcaseLayerProps>,
   },
   form: {
     component: FormLayer,

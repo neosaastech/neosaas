@@ -1,8 +1,10 @@
 'use server'
 
 import { db } from "@/db"
-import { pagePermissions } from "@/db/schema"
-import { eq } from "drizzle-orm"
+import { pageLayers, pagePermissions } from "@/db/schema"
+import { and, asc, eq } from "drizzle-orm"
+import { buildHomeLayers } from "@/lib/pages/home-content"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
 import { revalidatePath } from "next/cache"
 import type { RequiredRoleLevel } from "@/lib/auth/page-access"
 import { getCurrentUser } from "@/lib/auth"
@@ -220,6 +222,52 @@ export async function saveCategory(
     console.error("Failed to save category to Payload:", error)
     const message = error instanceof Error ? error.message : "Failed to save category"
     return { success: false, error: message }
+  }
+}
+
+/** Page layers for Puck builder — falls back to buildHomeLayers() when DB is empty on /. */
+export async function getPageLayers(pagePath: string, locale: string = "fr") {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false as const, error: "Unauthorized" }
+  }
+
+  if (isOfflineDev()) {
+    if (pagePath === "/") {
+      const rows = buildHomeLayers(locale).map((layer) => ({
+        layerType: layer.layerType,
+        position: layer.position,
+        props: layer.props as Record<string, unknown>,
+      }))
+      return { success: true as const, data: rows }
+    }
+    return { success: true as const, data: [] }
+  }
+
+  try {
+    const layers = await db.query.pageLayers.findMany({
+      where: and(eq(pageLayers.pagePath, pagePath), eq(pageLayers.locale, locale)),
+      orderBy: asc(pageLayers.position),
+    })
+    if (layers.length === 0 && pagePath === "/") {
+      const rows = buildHomeLayers(locale).map((layer) => ({
+        layerType: layer.layerType,
+        position: layer.position,
+        props: layer.props as Record<string, unknown>,
+      }))
+      return { success: true as const, data: rows }
+    }
+    return {
+      success: true as const,
+      data: layers.map((l) => ({
+        layerType: l.layerType,
+        position: l.position,
+        props: l.props as Record<string, unknown>,
+      })),
+    }
+  } catch (error) {
+    console.error(`Failed to fetch page_layers for ${pagePath}:`, error)
+    return { success: false as const, error: "Failed to fetch page layers" }
   }
 }
 

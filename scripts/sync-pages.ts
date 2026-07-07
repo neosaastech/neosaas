@@ -16,9 +16,9 @@ interface Page {
 
 const defaultPages: Page[] = [
   { path: "/", name: "Home Page", access: "public", group: "Public" },
-  { path: "/features", name: "Features", access: "public", group: "Public" },
   { path: "/pricing", name: "Pricing", access: "public", group: "Public" },
-  { path: "/docs", name: "Documentation", access: "public", group: "Public" },
+  { path: "/legal/privacy", name: "Privacy Policy", access: "public", group: "Legal" },
+  { path: "/legal/terms", name: "Terms of Service", access: "public", group: "Legal" },
   { path: "/auth/login", name: "Login", access: "public", group: "Authentication" },
   { path: "/auth/register", name: "Register", access: "public", group: "Authentication" },
   { path: "/dashboard", name: "Dashboard Overview", access: "user", group: "Dashboard" },
@@ -29,6 +29,8 @@ const defaultPages: Page[] = [
   { path: "/admin", name: "Admin Dashboard", access: "admin", group: "Admin" },
   { path: "/admin/api", name: "API Management", access: "admin", group: "Admin" },
   { path: "/admin/pages", name: "Pages ACL", access: "admin", group: "Admin" },
+  { path: "/admin/pilotage/builder", name: "Page Builder", access: "admin", group: "Admin" },
+  { path: "/admin/pilotage", name: "Pilotage JSON", access: "admin", group: "Admin" },
   { path: "/admin/mail", name: "Mail Management", access: "admin", group: "Admin" },
 ]
 

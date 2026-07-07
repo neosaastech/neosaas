@@ -3,6 +3,8 @@ import { verifyAuth } from "./server";
 import { db } from "@/db";
 import { userRoles, roles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isOfflineDev } from "@/lib/dev/offline-mode";
+import { OFFLINE_DEV_USER } from "@/lib/dev/mock-data";
 
 /**
  * Middleware utilitaire pour vérifier l'authentification admin
@@ -33,6 +35,15 @@ export async function verifyAdminAuth(request: NextRequest): Promise<AdminAuthRe
         isAuthenticated: false,
         isAdmin: false,
         error: "Non authentifié - token manquant ou invalide",
+      };
+    }
+
+    if (isOfflineDev() && user.userId === OFFLINE_DEV_USER.userId) {
+      return {
+        isAuthenticated: true,
+        isAdmin: true,
+        userId: user.userId,
+        roles: ["super_admin"],
       };
     }
 

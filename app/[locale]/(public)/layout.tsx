@@ -9,6 +9,8 @@ import { PlatformConfigProvider } from "@/contexts/platform-config-context"
 import { isAdmin } from "@/lib/auth/server"
 import { CookieConsent } from "@/components/legal/cookie-consent"
 import { ChatWidgetWrapper } from "@/components/chat/chat-widget-wrapper"
+import { isOfflineDev } from "@/lib/dev/offline-mode"
+import { OfflineBanner } from "@/components/dev/offline-banner"
 
 // Force dynamic rendering to ensure maintenance mode check runs on every request
 export const dynamic = 'force-dynamic'
@@ -33,6 +35,7 @@ export default async function PublicLayout({
   return (
     <PlatformConfigProvider config={platformConfig}>
       <div className="flex min-h-screen flex-col">
+        {isOfflineDev() && <OfflineBanner />}
         <SiteHeader user={user} headerConfig={headerConfig} />
         <main className="flex-1">{children}</main>
         <SiteFooter footerConfig={footerConfig} />

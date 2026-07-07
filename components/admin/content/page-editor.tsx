@@ -13,6 +13,7 @@ import { saveContentPage, getContentCategories } from "@/app/actions/pages"
 import type { PayloadPageDoc, PayloadPageBlock, PayloadCategorySummary } from "@/lib/payload-bridge"
 import { AVAILABLE_BLOCK_TYPES, BlockEditor } from "./block-editor"
 import { BlockPreview } from "./block-preview"
+import { TemplateVariablesHint } from "./template-variables-hint"
 
 export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onSaved?: () => void }) {
   const router = useRouter()
@@ -192,6 +193,7 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
       </div>
 
       <div className="flex flex-col gap-4">
+        <TemplateVariablesHint />
         <h3 className="text-sm font-medium">Aperçu en direct</h3>
         <div className="rounded-lg border bg-background p-6">
           {layout.length === 0 ? (

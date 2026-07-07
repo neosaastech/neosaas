@@ -75,16 +75,18 @@ export function CookieConsent({
   // If hidden via user action (accept/decline), don't render
   if (hide) return null
 
-  const displayMessage = message 
+  const displayMessage = message
     ? message.replace(/{site_name}/g, siteName)
     : `We use cookies to ensure you get the best experience on our website.`
+
+  if (!isOpen) return null
 
   return (
     <div
       className={cn(
         "fixed z-50 w-full max-w-sm transition-all duration-700 ease-out",
         position === "bottom-right" ? "bottom-6 right-6" : "bottom-6 left-6",
-        isOpen ? "translate-y-0 opacity-100" : "translate-y-32 opacity-0"
+        "translate-y-0 opacity-100",
       )}
     >
       <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-background/80 p-6 shadow-2xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 dark:border-white/10 dark:bg-black/40">

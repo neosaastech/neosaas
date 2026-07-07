@@ -27,44 +27,12 @@ export const frontendPages: SearchElement[] = [
     description: "Website homepage"
   },
   {
-    name: "Store",
-    path: "/store",
-    category: "Commerce",
-    section: "front",
-    keywords: ["store", "shop", "buy", "products"],
-    description: "Products and services catalog"
-  },
-  {
     name: "Pricing & Plans",
     path: "/pricing",
     category: "Commercial",
     section: "front",
     keywords: ["pricing", "plans", "subscription", "price"],
     description: "Pricing grid and subscription plans"
-  },
-  {
-    name: "Contact",
-    path: "/contact",
-    category: "Support",
-    section: "front",
-    keywords: ["contact", "support", "help"],
-    description: "Contact form"
-  },
-  {
-    name: "About",
-    path: "/about",
-    category: "Information",
-    section: "front",
-    keywords: ["about", "company"],
-    description: "Company presentation"
-  },
-  {
-    name: "Legal Notice",
-    path: "/legal/mentions",
-    category: "Legal",
-    section: "front",
-    keywords: ["legal", "notice"],
-    description: "Legal notice"
   },
   {
     name: "Privacy Policy",
@@ -415,50 +383,9 @@ export const configPages: SearchElement[] = [
 ]
 
 /**
- * Documentation (accessible according to configuration)
+ * Documentation pages removed — public site is now homepage + pricing + legal + CMS pages.
  */
-export const documentationPages: SearchElement[] = [
-  {
-    name: "Documentation",
-    path: "/docs",
-    category: "Documentation",
-    section: "docs",
-    keywords: ["docs", "documentation", "help", "guide"],
-    description: "Documentation du projet"
-  },
-  {
-    name: "Quick Start Guide",
-    path: "/docs/quick-start",
-    category: "Documentation",
-    section: "docs",
-    keywords: ["quick start", "getting started", "installation", "setup"],
-    description: "Quick start guide"
-  },
-  {
-    name: "Troubleshooting",
-    path: "/docs/troubleshooting",
-    category: "Documentation",
-    section: "docs",
-    keywords: ["troubleshooting", "errors", "help"],
-    description: "Troubleshooting guide"
-  },
-  {
-    name: "Search System",
-    path: "/docs/admin-search",
-    category: "Documentation",
-    section: "docs",
-    keywords: ["search", "navigation", "find"],
-    description: "Search system documentation"
-  },
-  {
-    name: "Project Architecture",
-    path: "/docs/architecture",
-    category: "Documentation",
-    section: "docs",
-    keywords: ["architecture", "structure", "tech stack"],
-    description: "Technical architecture"
-  },
-]
+export const documentationPages: SearchElement[] = []
 
 /**
  * Complete catalog - Combines all elements
