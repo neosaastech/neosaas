@@ -401,6 +401,12 @@ Local version scripts remain available for development convenience, but the cano
 ## Changelog
 
 ### [2026-07-07]
+- **Fix CI Docker build** : le `Dockerfile` bascule de `pnpm build` vers `pnpm build:local` pour eviter la dependance `DATABASE_URL` pendant le build image GitHub Actions.
+- **Fix GHCR tagging** : normalisation en minuscules du nom d'image (`IMAGE_NAME_LOWER`) pour garantir la compatibilite registry.
+- **Fichiers modifies** : `Dockerfile`, `.github/workflows/docker-image.yml`, `docs/PROJECT.md`, `STATUS.md`.
+- **Impact** : pipeline Docker GitHub plus stable (build + push).
+
+### [2026-07-07]
 - **Stabilisation guard admin** : `useRequireAdmin` ne redirige plus vers login pour toute reponse non-OK; redirections strictes uniquement sur `401` (login) et `403` (dashboard).
 - **Robustesse session client** : verification `/api/auth/me` avec `credentials: "include"` et `cache: "no-store"`.
 - **Anti deconnexion intempestive** : en cas d'erreur transitoire (`5xx` / reseau), le guard conserve la navigation et s'appuie sur la protection serveur `requireAdmin` du layout.

@@ -9,6 +9,22 @@
 
 ## 🚨 Corrections Récentes
 
+### Fix GitHub Actions Docker - build CI et tagging GHCR (7 juillet 2026)
+
+**Contexte** : le workflow Docker GitHub Actions pouvait echouer pendant le build image.
+
+**Changements** :
+
+- ✅ **Build Docker decouple de la DB CI** : le `Dockerfile` utilise `pnpm build:local` au lieu de `pnpm build`, ce qui evite l'appel au script `build-with-db.sh` (dependant de `DATABASE_URL` en environnement CI).
+- ✅ **Tag image GHCR fiabilise** : normalisation en minuscules du nom d'image via `IMAGE_NAME_LOWER=${GITHUB_REPOSITORY,,}` avant `docker/metadata-action`.
+
+**Fichiers modifies** :
+
+- `Dockerfile`
+- `.github/workflows/docker-image.yml`
+
+**Impact** : reduction des echecs de build Docker sur GitHub Actions et generation de tags GHCR compatibles.
+
 ### Stabilisation navigation Admin - anti fausse deconnexion (7 juillet 2026)
 
 **Contexte** : certaines pages admin (`Organization`, `Parameters`, `Content`, etc.) pouvaient provoquer des sauts de navigation ou une redirection vers login en cas d'erreur transitoire sur `/api/auth/me`.
