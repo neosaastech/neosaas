@@ -17,10 +17,6 @@
   <img src="https://img.shields.io/badge/versioning-semver-brightgreen" alt="SemVer" />
 </p>
 
-<p align="center">
-  <img src="./public/dashboard.jpg" alt="NeoSaaS Product Preview" width="900" />
-</p>
-
 ## Why This Boilerplate
 
 NeoSaaS helps you solve the biggest SaaS starter problems quickly:
