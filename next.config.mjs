@@ -1,3 +1,6 @@
+import { dirname } from "node:path"
+import { fileURLToPath } from "node:url"
+
 /** CSP shared by public marketing routes embeddable in Payload Live Preview. */
 const PUBLIC_PREVIEW_CSP = [
   "default-src 'self'",
@@ -14,6 +17,8 @@ const PUBLIC_PREVIEW_CSP = [
   "upgrade-insecure-requests",
 ].join("; ")
 
+const projectRoot = dirname(fileURLToPath(import.meta.url))
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['lago-javascript-client'],
@@ -23,7 +28,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  turbopack: {},
+  turbopack: {
+    root: projectRoot,
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {

@@ -1,6 +1,6 @@
 "use client"
 
-import { layerRegistry } from "@/lib/layers/registry"
+import { clientLayerRegistry } from "@/lib/layers/registry-client"
 import type { PayloadPageBlock } from "@/lib/payload-bridge"
 import { BlockWrapper } from "@/components/layers/block-wrapper"
 
@@ -28,7 +28,7 @@ function stripNulls<T extends Record<string, unknown>>(obj: T): T {
 }
 
 export function BlockPreview({ block }: { block: PayloadPageBlock }) {
-  const def = layerRegistry[block.blockType]
+  const def = clientLayerRegistry[block.blockType]
   if (!def) return null
 
   if (block.blockType === "blog-list") {

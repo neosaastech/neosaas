@@ -9,6 +9,30 @@
 
 ## 🚨 Corrections Récentes
 
+### Fix Build/Déploiement — séparation client/serveur des variables template (7 juillet 2026)
+
+**Contexte** : le build Next.js échouait avec des erreurs `next/headers` et `pg` (`dns/fs/net`) chargés côté client via la chaîne d'import des variables template.
+
+**Changements** :
+
+- ✅ **Import client sécurisé** : `components/admin/content/template-variables-hint.tsx` importe désormais le catalogue depuis `lib/pages/template-variables-core.ts` (module sans dépendances serveur).
+- ✅ **Stabilisation Turbopack** : `next.config.mjs` définit explicitement `turbopack.root` pour éviter l'inférence de racine sur un lockfile parent.
+- ✅ **Registry client-safe pour l'éditeur de blocs** : les composants admin client (`BlockEditor`/`BlockPreview`) utilisent `lib/layers/registry-client.ts`, ce qui évite de charger le bloc `blog-list` (dépendant DB) dans le bundle navigateur.
+- ✅ **Paiements dashboard client-safe** : `components/dashboard/stripe-card-form.tsx` n'importe plus `lib/stripe` côté client; il utilise `createStripeSetupIntent` (server action) qui renvoie déjà `clientSecret` + `publishableKey`.
+
+**Fichiers modifiés** :
+
+- `components/admin/content/template-variables-hint.tsx`
+- `components/admin/content/block-editor.tsx`
+- `components/admin/content/block-preview.tsx`
+- `lib/layers/registry-client.ts`
+- `components/dashboard/stripe-card-form.tsx`
+- `next.config.mjs`
+- `STATUS.md`
+- `docs/PROJECT.md`
+
+**Impact** : suppression du couplage client → auth/db sur ce flux, ce qui débloque le build sur cette erreur de déploiement.
+
 ### Dépendances — Mise à jour mineure de compatibilité outils (7 juillet 2026)
 
 **Contexte** : besoin d'appliquer uniquement les mises à jour mineures/patch pour améliorer la compatibilité sans introduire de ruptures majeures.

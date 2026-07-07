@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ChevronDown, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { PAGE_TEMPLATE_VARIABLE_CATALOG } from "@/lib/pages/template-variables"
+import { PAGE_TEMPLATE_VARIABLE_CATALOG } from "@/lib/pages/template-variables-core"
 
 const GROUP_LABELS: Record<string, string> = {
   site: "Site",

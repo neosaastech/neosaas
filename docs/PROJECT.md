@@ -391,6 +391,14 @@ Local version scripts remain available for development convenience, but the cano
 ## Changelog
 
 ### [2026-07-07]
+- **Fix build/deploiement Next.js** : suppression d'un import client vers un module serveur (`lib/pages/template-variables.ts`) qui entrainait des erreurs `next/headers` et `pg` (`dns/fs/net`) pendant le build.
+- **Stabilisation Turbopack** : ajout de `turbopack.root` dans `next.config.mjs` pour forcer la racine projet.
+- **Registry client-safe** : ajout de `lib/layers/registry-client.ts` et bascule de `BlockEditor`/`BlockPreview` sur ce registry pour ne plus importer le bloc `blog-list` (DB) dans le bundle client.
+- **Fix Stripe dashboard** : suppression d'un import client de `lib/stripe` dans `stripe-card-form.tsx`; initialisation Stripe via `createStripeSetupIntent` (server action) pour eviter le chainage DB/pg dans le bundle navigateur.
+- **Fichiers modifies** : `components/admin/content/template-variables-hint.tsx`, `components/admin/content/block-editor.tsx`, `components/admin/content/block-preview.tsx`, `components/dashboard/stripe-card-form.tsx`, `lib/layers/registry-client.ts`, `next.config.mjs`, `docs/PROJECT.md`, `STATUS.md`.
+- **Impact** : flux de variables template compatible client, build plus stable en environnement de deploiement.
+
+### [2026-07-07]
 - **Mise a jour mineure des dependances** : upgrade patch/minor uniquement pour renforcer la compatibilite des outils sans passer de major.
 - **Fichiers modifies** : `package.json`, `docs/PROJECT.md`, `STATUS.md`.
 - **Impact** : base de dependances plus stable, avec reduction du risque de regression immediate.

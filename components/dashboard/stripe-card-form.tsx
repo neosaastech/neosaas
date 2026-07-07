@@ -227,24 +227,15 @@ export function StripeCardFormAuto({ onSuccess, onCancel }: StripeCardFormAutoPr
   useEffect(() => {
     const init = async () => {
       try {
-        // Import actions dynamically to avoid circular dependencies
-        const { createCardSetupIntent } = await import('@/app/actions/stripe-payments')
-        const { getStripeCredentials } = await import('@/lib/stripe')
-
-        // Get Stripe credentials (publishable key for Elements)
-        const credentials = await getStripeCredentials(false)
-        if (!credentials) {
-          throw new Error('Stripe not configured')
+        // Use server action to create a SetupIntent and return publishable key.
+        const { createStripeSetupIntent } = await import('@/app/actions/payments')
+        const result = await createStripeSetupIntent()
+        if (!result.success || !result.clientSecret || !result.publishableKey) {
+          throw new Error(result.error || 'Failed to initialize Stripe setup')
         }
 
-        // Create a SetupIntent tied to the company's Stripe customer
-        const result = await createCardSetupIntent()
-        if (!result.success || !result.data) {
-          throw new Error(result.error || 'Failed to create setup intent')
-        }
-
-        setPublishableKey(credentials.publishableKey)
-        setClientSecret(result.data.clientSecret)
+        setPublishableKey(result.publishableKey)
+        setClientSecret(result.clientSecret)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to initialize')
       } finally {

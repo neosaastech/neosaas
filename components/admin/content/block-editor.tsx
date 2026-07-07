@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronUp, ChevronDown, Trash2 } from "lucide-react"
-import { layerRegistry } from "@/lib/layers/registry"
+import { clientLayerRegistry } from "@/lib/layers/registry-client"
 import { DynamicObjectForm } from "./dynamic-field"
 import type { PayloadPageBlock } from "@/lib/payload-bridge"
 import { blockSettingsSchema } from "@/lib/layers/block-settings"
@@ -27,7 +27,7 @@ export function BlockEditor({
   canMoveUp: boolean
   canMoveDown: boolean
 }) {
-  const def = layerRegistry[block.blockType]
+  const def = clientLayerRegistry[block.blockType]
 
   if (!def) {
     return (
@@ -74,4 +74,4 @@ export function BlockEditor({
   )
 }
 
-export const AVAILABLE_BLOCK_TYPES = Object.keys(layerRegistry)
+export const AVAILABLE_BLOCK_TYPES = Object.keys(clientLayerRegistry)
