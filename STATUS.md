@@ -17,6 +17,7 @@
 
 - ✅ **Build Docker decouple de la DB CI** : le `Dockerfile` utilise `pnpm build:local` au lieu de `pnpm build`, ce qui evite l'appel au script `build-with-db.sh` (dependant de `DATABASE_URL` en environnement CI).
 - ✅ **Tag image GHCR fiabilise** : normalisation en minuscules du nom d'image via `IMAGE_NAME_LOWER=${GITHUB_REPOSITORY,,}` avant `docker/metadata-action`.
+- ✅ **Blocage pnpm 11 corrige** : pin de pnpm a `10.34.4` dans le `Dockerfile` (`corepack prepare ... --activate`) pour eviter l'echec `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` pendant `pnpm install --frozen-lockfile`.
 
 **Fichiers modifies** :
 

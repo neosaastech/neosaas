@@ -403,6 +403,7 @@ Local version scripts remain available for development convenience, but the cano
 ### [2026-07-07]
 - **Fix CI Docker build** : le `Dockerfile` bascule de `pnpm build` vers `pnpm build:local` pour eviter la dependance `DATABASE_URL` pendant le build image GitHub Actions.
 - **Fix GHCR tagging** : normalisation en minuscules du nom d'image (`IMAGE_NAME_LOWER`) pour garantir la compatibilite registry.
+- **Fix version pnpm Docker** : pin de pnpm a `10.34.4` via Corepack pour eviter l'erreur `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` dans le build CI.
 - **Fichiers modifies** : `Dockerfile`, `.github/workflows/docker-image.yml`, `docs/PROJECT.md`, `STATUS.md`.
 - **Impact** : pipeline Docker GitHub plus stable (build + push).
 
