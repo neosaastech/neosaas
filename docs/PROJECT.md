@@ -401,6 +401,13 @@ Local version scripts remain available for development convenience, but the cano
 ## Changelog
 
 ### [2026-07-07]
+- **Docker Actions plus rapide** : suppression de QEMU pour un build `linux/amd64` uniquement.
+- **Cache CI optimise** : `cache-to` BuildKit passe en `mode=min` pour accelerer l'export cache.
+- **Runtime container optimise** : utilisation de Next `output: 'standalone'` et copie selective des artefacts runtime.
+- **Fichiers modifies** : `.github/workflows/docker-image.yml`, `Dockerfile`, `next.config.mjs`, `docs/PROJECT.md`, `STATUS.md`.
+- **Impact** : build/push Docker plus rapide et image plus compacte.
+
+### [2026-07-07]
 - **Release app v1.0.5** : bump de version pour livrer les correctifs Docker CI.
 - **Pin pnpm Docker** : verrouillage sur `pnpm@10.34.4` dans le `Dockerfile` pour eviter les echecs `minimumReleaseAge` avec pnpm 11.
 - **Fichiers modifies** : `package.json`, `package-lock.json`, `Dockerfile`, `docs/PROJECT.md`, `STATUS.md`.

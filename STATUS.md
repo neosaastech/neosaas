@@ -9,6 +9,25 @@
 
 ## 🚨 Corrections Récentes
 
+### Optimisation performance GitHub Actions Docker (7 juillet 2026)
+
+**Contexte** : le workflow Docker de l'app etait percu comme trop lent sur GitHub Actions.
+
+**Changements** :
+
+- ✅ **QEMU retire** : suppression de l'etape `setup-qemu` (inutile en build mono-plateforme `linux/amd64`).
+- ✅ **Cache BuildKit plus rapide** : passage de `cache-to: type=gha,mode=max` a `mode=min` pour reduire le temps d'export cache.
+- ✅ **Image runtime plus legere** : passage en mode Next `standalone` et copie selective (`.next/standalone`, `.next/static`, `public`) au lieu de copier tout `/app`.
+- ✅ **Entrypoint simplifie** : execution runtime via `node server.js` (standalone) au lieu de `pnpm start`.
+
+**Fichiers modifies** :
+
+- `.github/workflows/docker-image.yml`
+- `Dockerfile`
+- `next.config.mjs`
+
+**Impact** : reduction du temps total build/push et taille d'image plus faible.
+
 ### Release App v1.0.5 - Docker CI stabilise (7 juillet 2026)
 
 **Contexte** : finalisation de la release applicative apres correction des echecs Docker GitHub Actions.
