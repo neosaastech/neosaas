@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/neosaastech/Neosaas-app/compare/v1.3.0...v1.4.0) (2026-07-08)
+
+### Features
+
+* **content-hub:** add delete for Pages and Articles ([15d6cb2](https://github.com/neosaastech/Neosaas-app/commit/15d6cb29d6734fbcb2280029968dad9877796f7f))
+
 ## [1.3.0](https://github.com/neosaastech/Neosaas-app/compare/v1.2.0...v1.3.0) (2026-07-08)
 
 ### Features

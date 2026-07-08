@@ -198,6 +198,21 @@ export async function updatePage(
   return data.doc as PayloadPageDoc
 }
 
+/**
+ * Real Payload delete, not a soft-delete — the sync side (payload-cms's
+ * syncPageAfterDelete) already takes the target site's copy dark first, so
+ * this only removes the Payload doc itself, which was already unreachable
+ * to a visitor before this call. Content Hub had no delete at all until
+ * 2026-07-08 (Charles), only Payload's own separate admin did.
+ */
+export async function deletePage(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/pages/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deletePage(${id}) failed (${res.status}): ${body}`)
+  }
+}
+
 // ─── BlogPosts (Articles) — the other content-hub category alongside Pages ───
 
 export interface PayloadCategorySummary {
@@ -358,6 +373,15 @@ export async function updateBlogPost(
   }
   const data = await res.json()
   return data.doc as PayloadBlogPostDoc
+}
+
+/** Same rationale as deletePage — target site is already deactivated by the sync hook first. */
+export async function deleteBlogPost(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/blog-posts/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deleteBlogPost(${id}) failed (${res.status}): ${body}`)
+  }
 }
 
 // ─── Generic collection CRUD (Metadata-Driven UI — types/form-builder.ts) ───

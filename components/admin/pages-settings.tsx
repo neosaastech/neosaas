@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree, AlertTriangle } from "lucide-react"
+import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree, AlertTriangle, Trash2 } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -17,8 +17,10 @@ import { toast } from "sonner"
 import {
   getContentPages,
   getContentPage,
+  removeContentPage,
   getContentArticles,
   getContentArticle,
+  removeContentArticle,
   getContentCategories,
 } from "@/app/actions/pages"
 import type {
@@ -123,6 +125,16 @@ function PagesPanel() {
     setIsLoadingDoc(false)
   }
 
+  async function handleDelete(p: PayloadPageSummary) {
+    const result = await removeContentPage(p.id)
+    if (result.success) {
+      toast.success("Page supprimée")
+      load()
+    } else {
+      toast.error(result.error)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -222,12 +234,20 @@ function PagesPanel() {
                       {p.publishedAt ? new Date(p.publishedAt).toLocaleDateString() : "—"}
                     </TableCell>
                     <TableCell>
-                      <button
-                        onClick={() => openEdit(p.id)}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        Edit <Pencil className="h-3 w-3" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEdit(p.id)}
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          Edit <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(p)}
+                          className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+                        >
+                          Delete <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -315,6 +335,16 @@ function ArticlesPanel() {
     setIsLoadingDoc(false)
   }
 
+  async function handleDelete(a: PayloadBlogPostSummary) {
+    const result = await removeContentArticle(a.id)
+    if (result.success) {
+      toast.success("Article supprimé")
+      load()
+    } else {
+      toast.error(result.error)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -397,12 +427,20 @@ function ArticlesPanel() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <button
-                        onClick={() => openEdit(a.id)}
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        Edit <Pencil className="h-3 w-3" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEdit(a.id)}
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          Edit <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(a)}
+                          className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+                        >
+                          Delete <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

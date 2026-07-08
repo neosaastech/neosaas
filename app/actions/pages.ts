@@ -13,10 +13,12 @@ import {
   getPage,
   createPage,
   updatePage,
+  deletePage,
   listBlogPosts,
   getBlogPost,
   createBlogPost,
   updateBlogPost,
+  deleteBlogPost,
   listCategories,
   createCategory,
   updateCategory,
@@ -143,6 +145,30 @@ export async function saveContentPage(
   }
 }
 
+/**
+ * Content Hub had no way to delete a Page at all until now (2026-07-08,
+ * Charles) — only Payload's own separate admin did, which editors don't
+ * know to use. Deleting a published page fires payload-cms's
+ * syncPageAfterDelete first (deactivates the target site's copy), so by the
+ * time this resolves the content is already gone from the live site too.
+ */
+export async function removeContentPage(id: string | number): Promise<{ success: true } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    await deletePage(id)
+    revalidatePath("/admin/pages")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete content page from Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to delete content page"
+    return { success: false, error: message }
+  }
+}
+
 // ─── Articles (BlogPosts) — same content-hub gating pattern as Pages above ───
 
 export async function getContentArticles(
@@ -187,6 +213,24 @@ export async function saveContentArticle(
   } catch (error) {
     console.error("Failed to save content article to Payload:", error)
     const message = error instanceof Error ? error.message : "Failed to save content article"
+    return { success: false, error: message }
+  }
+}
+
+/** Same rationale as removeContentPage — Content Hub had no delete for Articles either. */
+export async function removeContentArticle(id: string | number): Promise<{ success: true } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+
+  try {
+    await deleteBlogPost(id)
+    revalidatePath("/admin/pages")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete content article from Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to delete content article"
     return { success: false, error: message }
   }
 }
