@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useId } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Upload, X, User } from "lucide-react"
+import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
 
 interface Company {
   id: string
@@ -25,24 +26,24 @@ interface UserCreateSheetProps {
 
 export function UserCreateSheet({ open, onOpenChange, onSave, companies, isLoading }: UserCreateSheetProps) {
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<CroppedFileInputHandle>(null)
+  // This sheet can be mounted twice at once (separate desktop/mobile render
+  // paths sharing the same `open` state), so a hardcoded form id would
+  // collide and silently break the `form=` association on the file input —
+  // useId() guarantees a unique id per mounted instance.
+  const formId = useId()
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+  const handleImageReady = (file: File) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setProfileImagePreview(reader.result as string)
     }
+    reader.readAsDataURL(file)
   }
 
   const handleRemoveImage = () => {
     setProfileImagePreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
+    fileInputRef.current?.clear()
   }
 
   return (
@@ -68,20 +69,19 @@ export function UserCreateSheet({ open, onOpenChange, onSave, companies, isLoadi
           
           <div className="pt-16 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
             <div className="flex flex-col items-center gap-2 pt-2">
-              <input
+              <CroppedFileInput
                 ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
+                onFileReady={handleImageReady}
+                fileName="avatar.png"
                 name="profileImage"
-                onChange={handleImageUpload}
+                form={formId}
               />
               <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => fileInputRef.current?.open()}
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Upload Photo
@@ -104,7 +104,7 @@ export function UserCreateSheet({ open, onOpenChange, onSave, companies, isLoadi
           </div>
         </div>
 
-        <form onSubmit={onSave} className="space-y-6">
+        <form id={formId} onSubmit={onSave} className="space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div className="space-y-2">

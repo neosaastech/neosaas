@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
 import { Camera, Save, Pencil, Trash2, Loader2, Lock } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -58,7 +59,7 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<CroppedFileInputHandle>(null)
 
   // Load user data from API on mount
   useEffect(() => {
@@ -97,50 +98,47 @@ export default function ProfilePage() {
     fetchUserData()
   }, [])
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Optimistic update for immediate feedback
-      const imageUrl = URL.createObjectURL(file)
-      setUser((prev) => ({ ...prev, profileImage: imageUrl }))
+  const handleImageUpload = async (file: File) => {
+    // Optimistic update for immediate feedback
+    const imageUrl = URL.createObjectURL(file)
+    setUser((prev) => ({ ...prev, profileImage: imageUrl }))
 
-      const formData = new FormData()
-      formData.append("image", file)
+    const formData = new FormData()
+    formData.append("image", file)
 
-      try {
-        const response = await fetch("/api/profile/image", {
-          method: "POST",
-          body: formData,
-        })
+    try {
+      const response = await fetch("/api/profile/image", {
+        method: "POST",
+        body: formData,
+      })
 
-        if (response.ok) {
-          const data = await response.json()
-          // Update with the actual URL from server
-          setUser((prev) => ({ ...prev, profileImage: data.imagePath }))
-          
-          // Update localStorage for header sync (omit large base64 image)
-          const storedUser = localStorage.getItem("user")
-          if (storedUser) {
-            const parsedUser = JSON.parse(storedUser)
-            const { profileImage: _img, ...slim } = parsedUser
-            localStorage.setItem("user", JSON.stringify(slim))
-            window.dispatchEvent(new Event("storage"))
-          }
+      if (response.ok) {
+        const data = await response.json()
+        // Update with the actual URL from server
+        setUser((prev) => ({ ...prev, profileImage: data.imagePath }))
 
-          // The localStorage copy above never carries the (base64) image, so
-          // notify the header directly with the actual value — mirrors the
-          // companyLogoUpdated event used for the company logo.
-          window.dispatchEvent(new CustomEvent("profileImageUpdated", { detail: { profileImage: data.imagePath } }))
-
-          toast.success("Image updated")
-        } else {
-          const errorData = await response.json()
-          toast.error(errorData.error || "Failed to upload image")
+        // Update localStorage for header sync (omit large base64 image)
+        const storedUser = localStorage.getItem("user")
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser)
+          const { profileImage: _img, ...slim } = parsedUser
+          localStorage.setItem("user", JSON.stringify(slim))
+          window.dispatchEvent(new Event("storage"))
         }
-      } catch (error) {
-        console.error("Error uploading image:", error)
-        toast.error("An error occurred while uploading image")
+
+        // The localStorage copy above never carries the (base64) image, so
+        // notify the header directly with the actual value — mirrors the
+        // companyLogoUpdated event used for the company logo.
+        window.dispatchEvent(new CustomEvent("profileImageUpdated", { detail: { profileImage: data.imagePath } }))
+
+        toast.success("Image updated")
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.error || "Failed to upload image")
       }
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      toast.error("An error occurred while uploading image")
     }
   }
 
@@ -276,12 +274,12 @@ export default function ProfilePage() {
                 <AvatarFallback className="text-xl bg-[#5B8FF9] text-white">{user.firstName[0]}</AvatarFallback>
               </Avatar>
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => fileInputRef.current?.open()}
                 className="absolute bottom-0 right-0 p-1.5 bg-brand text-white rounded-full hover:bg-brand-hover transition-colors shadow-sm"
               >
                 <Camera className="h-4 w-4" />
               </button>
-              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+              <CroppedFileInput ref={fileInputRef} onFileReady={handleImageUpload} fileName="avatar.png" />
             </div>
 
             <div className="flex-1 text-center md:text-left space-y-2">

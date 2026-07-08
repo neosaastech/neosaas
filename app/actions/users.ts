@@ -96,7 +96,7 @@ export async function createUser(formData: FormData) {
     }
 
     revalidatePath("/admin/users")
-    return { success: true, message: "User created successfully" }
+    return { success: true, message: "User created successfully", data: { id: newUser.id } }
   } catch (error) {
     console.error("Failed to create user:", error)
     return { success: false, error: "Failed to create user" }

@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Building2, Upload, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
 
 interface CompanyLogoUploadProps {
   companyName?: string
@@ -25,7 +26,7 @@ export function CompanyLogoUpload({
   onLogoChange,
   disabled = false,
 }: CompanyLogoUploadProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<CroppedFileInputHandle>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(initialLogo)
   const [isUploading, setIsUploading] = useState(false)
 
@@ -54,13 +55,6 @@ export function CompanyLogoUpload({
     }
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    await uploadLogo(file)
-    if (fileInputRef.current) fileInputRef.current.value = ""
-  }
-
   const handleRemoveLogo = async () => {
     if (!deleteUrl && !logoPreview) return
 
@@ -77,7 +71,7 @@ export function CompanyLogoUpload({
       setLogoPreview(null)
       onLogoChange?.(null)
       window.dispatchEvent(new CustomEvent("companyLogoUpdated", { detail: { logo: null } }))
-      if (fileInputRef.current) fileInputRef.current.value = ""
+      fileInputRef.current?.clear()
       toast.success("Logo removed")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to remove logo")
@@ -109,14 +103,7 @@ export function CompanyLogoUpload({
             </div>
           )}
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
-            className="hidden"
-            onChange={handleLogoUpload}
-            disabled={disabled || isUploading}
-          />
+          <CroppedFileInput ref={fileInputRef} onFileReady={uploadLogo} fileName="logo.png" />
 
           <div className="flex gap-2 mt-1">
             <Button
@@ -124,7 +111,7 @@ export function CompanyLogoUpload({
               variant="outline"
               size="sm"
               disabled={disabled || isUploading}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => fileInputRef.current?.open()}
             >
               {isUploading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

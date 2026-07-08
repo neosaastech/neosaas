@@ -22,6 +22,8 @@ import {
 import { Check, ChevronsUpDown, Upload, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
+import { toast } from "sonner"
 
 interface Company {
   id: string
@@ -78,7 +80,8 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
   const [searchValue, setSearchValue] = useState("")
   const [selectedCompany, setSelectedCompany] = useState(user?.companyId || "none")
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(user?.profileImage || null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const fileInputRef = useRef<CroppedFileInputHandle>(null)
 
   // Synchroniser l'état local quand user change
   useEffect(() => {
@@ -90,21 +93,43 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
 
   if (!user) return null
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileImagePreview(reader.result as string)
+  const handleImageReady = async (file: File) => {
+    setIsUploadingImage(true)
+    try {
+      const formData = new FormData()
+      formData.append("profileImage", file)
+      const response = await fetch(`/api/admin/users/${user.id}/profile-image`, {
+        method: "POST",
+        body: formData,
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upload profile image")
       }
-      reader.readAsDataURL(file)
+      setProfileImagePreview(data.profileImage)
+      toast.success("Profile image updated")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to upload profile image")
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
-  const handleRemoveImage = () => {
-    setProfileImagePreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+  const handleRemoveImage = async () => {
+    setIsUploadingImage(true)
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/profile-image`, { method: "DELETE" })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to remove profile image")
+      }
+      setProfileImagePreview(null)
+      fileInputRef.current?.clear()
+      toast.success("Profile image removed")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove profile image")
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
@@ -136,20 +161,14 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
           
           <div className="pt-16 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
             <div className="flex flex-col items-center gap-2 pt-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                name="profileImage"
-                onChange={handleImageUpload}
-              />
+              <CroppedFileInput ref={fileInputRef} onFileReady={handleImageReady} fileName="avatar.png" name="profileImage" />
               <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  onClick={() => fileInputRef.current?.open()}
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Upload Photo
@@ -159,6 +178,7 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
                     type="button"
                     variant="outline"
                     size="sm"
+                    disabled={isUploadingImage}
                     onClick={handleRemoveImage}
                     className="text-red-600 hover:text-red-700"
                   >

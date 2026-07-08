@@ -274,17 +274,39 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
     }
   }
 
+  const uploadUserProfileImage = async (userId: string, file: File) => {
+    const formData = new FormData()
+    formData.append("profileImage", file)
+    const response = await fetch(`/api/admin/users/${userId}/profile-image`, {
+      method: "POST",
+      body: formData,
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || "Failed to upload profile image")
+    }
+  }
+
   const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     const formData = new FormData(e.currentTarget)
+    const profileImageFile = formData.get("profileImage") as File | null
 
     const result = await createUser(formData)
 
-    if (result.success) {
-      toast.success("User created successfully")
-      setIsCreateOpen(false)
-      window.location.reload()
+    if (result.success && result.data) {
+      try {
+        if (profileImageFile && profileImageFile.size > 0) {
+          await uploadUserProfileImage(result.data.id, profileImageFile)
+        }
+        toast.success("User created successfully")
+        setIsCreateOpen(false)
+        window.location.reload()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "User created but profile image upload failed")
+        window.location.reload()
+      }
     } else {
       toast.error(result.error || "Failed to create user")
     }

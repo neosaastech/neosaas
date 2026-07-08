@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useId } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Upload, X, Building2 } from "lucide-react"
+import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
 
 interface CompanyCreateSheetProps {
   open: boolean
@@ -17,24 +18,24 @@ interface CompanyCreateSheetProps {
 
 export function CompanyCreateSheet({ open, onOpenChange, onSave, isLoading }: CompanyCreateSheetProps) {
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<CroppedFileInputHandle>(null)
+  // useId() rather than a hardcoded string: a hardcoded form id would collide
+  // (and silently break the file input's `form=` association) if this sheet
+  // is ever mounted more than once at a time, as its user-management sibling
+  // (UserCreateSheet) already is for separate desktop/mobile render paths.
+  const formId = useId()
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+  const handleLogoReady = (file: File) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string)
     }
+    reader.readAsDataURL(file)
   }
 
   const handleRemoveLogo = () => {
     setLogoPreview(null)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
+    fileInputRef.current?.clear()
   }
 
   return (
@@ -63,21 +64,19 @@ export function CompanyCreateSheet({ open, onOpenChange, onSave, isLoading }: Co
           
           <div className="pt-16 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
             <div className="flex flex-col items-center gap-2 pt-2">
-              <input
+              <CroppedFileInput
                 ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp"
-                className="hidden"
+                onFileReady={handleLogoReady}
+                fileName="logo.png"
                 name="logo"
-                form="create-company-form"
-                onChange={handleLogoUpload}
+                form={formId}
               />
               <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => fileInputRef.current?.open()}
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   Upload Logo
@@ -100,7 +99,7 @@ export function CompanyCreateSheet({ open, onOpenChange, onSave, isLoading }: Co
           </div>
         </div>
 
-        <form id="create-company-form" onSubmit={onSave} className="space-y-6">
+        <form id={formId} onSubmit={onSave} className="space-y-6">
           {/* Basic Company Info */}
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

@@ -35,6 +35,7 @@ export default function OrganizationPage() {
             id: c.id,
             name: c.name,
             email: c.email,
+            logo: c.logo,
             phone: c.phone,
             address: c.address,
             city: c.city,
@@ -44,6 +45,7 @@ export default function OrganizationPage() {
             isActive: c.isActive,
             users: c.users,
             createdAt: c.createdAt,
+            updatedAt: c.updatedAt,
           })))
         }
 
