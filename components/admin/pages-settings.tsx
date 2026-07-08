@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree, AlertTriangle, Trash2 } from "lucide-react"
+import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree, AlertTriangle, Trash2, FileText, Image as ImageIcon } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/tooltip"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { getPublicationStatusConfig } from "@/lib/status-configs"
 import {
   getContentPages,
   getContentPage,
@@ -185,6 +187,7 @@ function PagesPanel() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[56px]"></TableHead>
                 <TableHead className="min-w-[150px]">Title</TableHead>
                 <TableHead className="min-w-[150px]">Path</TableHead>
                 <TableHead className="min-w-[100px]">Type</TableHead>
@@ -198,25 +201,34 @@ function PagesPanel() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
+                  <TableCell colSpan={9} className="h-24 text-center">
                     Loading pages...
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-destructive">
+                  <TableCell colSpan={9} className="h-24 text-center text-destructive">
                     {error}
                   </TableCell>
                 </TableRow>
               ) : pages.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
+                  <TableCell colSpan={9} className="h-24 text-center">
                     No pages yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 pages.map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="group">
+                    <TableCell>
+                      <div className="flex h-9 w-9 items-center justify-center rounded-md border bg-muted">
+                        {p.pageType === "article" ? (
+                          <Newspaper className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">{p.title}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{p.path}</TableCell>
                     <TableCell>
@@ -234,9 +246,7 @@ function PagesPanel() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
-                        <Badge variant={p._status === "published" ? "default" : "outline"}>
-                          {p._status === "published" ? "Published" : "Draft"}
-                        </Badge>
+                        <StatusBadge config={getPublicationStatusConfig(p._status === "published")} size="sm" />
                         {p.syncStatus?.ok === false && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -249,8 +259,10 @@ function PagesPanel() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {p.publishedAt ? new Date(p.publishedAt).toLocaleDateString() : "—"}
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {p.publishedAt
+                        ? new Date(p.publishedAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
+                        : "—"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -410,6 +422,7 @@ function ArticlesPanel() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[56px]"></TableHead>
                 <TableHead className="min-w-[150px]">Title</TableHead>
                 <TableHead className="min-w-[120px]">Category</TableHead>
                 <TableHead className="min-w-[100px]">Status</TableHead>
@@ -419,32 +432,40 @@ function ArticlesPanel() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     Loading articles...
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center text-destructive">
+                  <TableCell colSpan={5} className="h-24 text-center text-destructive">
                     {error}
                   </TableCell>
                 </TableRow>
               ) : articles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center">
+                  <TableCell colSpan={5} className="h-24 text-center">
                     No articles yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 articles.map((a) => (
-                  <TableRow key={a.id}>
+                  <TableRow key={a.id} className="group">
+                    <TableCell>
+                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                        {a.coverImage?.url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.coverImage.url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">{a.title}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{categoryName(a.category) ?? "—"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
-                        <Badge variant={a._status === "published" ? "default" : "outline"}>
-                          {a._status === "published" ? "Published" : "Draft"}
-                        </Badge>
+                        <StatusBadge config={getPublicationStatusConfig(a._status === "published")} size="sm" />
                         {a.syncStatus?.ok === false && (
                           <Tooltip>
                             <TooltipTrigger asChild>

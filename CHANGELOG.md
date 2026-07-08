@@ -1,3 +1,9 @@
+## [1.6.0](https://github.com/neosaastech/Neosaas-app/compare/v1.5.1...v1.6.0) (2026-07-08)
+
+### Features
+
+* **content-hub:** visual polish to match the Products page ([a7996c7](https://github.com/neosaastech/Neosaas-app/commit/a7996c75ef4c5da42ef670fe4a07e615641d5a27))
+
 ## [1.5.1](https://github.com/neosaastech/Neosaas-app/compare/v1.5.0...v1.5.1) (2026-07-08)
 
 ### Bug Fixes

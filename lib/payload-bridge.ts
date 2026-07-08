@@ -296,11 +296,13 @@ export interface PayloadBlogPostSummary {
   _status: "draft" | "published"
   updatedAt: string
   syncStatus?: PayloadSyncStatus | null
+  // Populated {id, url} at depth=1 (see listBlogPosts) — a bare ID at
+  // depth=0 isn't a usable thumbnail src.
+  coverImage?: { id: string | number; url: string } | null
 }
 
 export interface PayloadBlogPostDoc extends PayloadBlogPostSummary {
   body?: unknown
-  coverImage?: string | number | null
   seo?: { metaTitle?: string | null; metaDescription?: string | null }
 }
 
@@ -318,7 +320,9 @@ export async function listBlogPosts(
   const { page = 1, limit = 20, category, locale = "fr" } = options
   const params = new URLSearchParams({
     "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
-    depth: "0",
+    // depth=1 (was 0) so coverImage comes back as {id,url} for the
+    // Content Hub table's thumbnail column instead of a bare ID.
+    depth: "1",
     limit: String(limit),
     page: String(page),
     sort: "-publishedAt",
