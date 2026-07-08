@@ -54,6 +54,15 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
   }
 
   async function handleSave(status: "draft" | "published") {
+    // A page with zero blocks publishes "successfully" (no error, no
+    // syncStatus failure) but has nothing to render — 404s on the live
+    // site with no indication why (Charles, 2026-07-08, mistook this for
+    // a 500). Catching it here, before the request, beats a confusing
+    // silent no-op after.
+    if (status === "published" && layout.length === 0) {
+      toast.error("Ajoutez au moins un bloc avant de publier — une page publiée sans bloc n'affiche rien sur le site.")
+      return
+    }
     setIsSaving(true)
     try {
       // JSON round-trip strips `undefined` values from nested block objects

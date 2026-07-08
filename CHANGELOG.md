@@ -1,3 +1,9 @@
+## [1.5.1](https://github.com/neosaastech/Neosaas-app/compare/v1.5.0...v1.5.1) (2026-07-08)
+
+### Bug Fixes
+
+* **pages:** block publishing a page with zero blocks ([bb08510](https://github.com/neosaastech/Neosaas-app/commit/bb08510e0ac1b374dd589e72177bea046b9508d0))
+
 ## [1.5.0](https://github.com/neosaastech/Neosaas-app/compare/v1.4.0...v1.5.0) (2026-07-08)
 
 ### Features
