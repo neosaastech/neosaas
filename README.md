@@ -34,28 +34,9 @@ pnpm dev
 
 Open http://localhost:3000
 
-## Versioning automatique
+## Automated Versioning
 
-Le flux officiel de release est géré par GitHub Actions avec le workflow `.github/workflows/release.yml`.
-
-1. Ouvrir l'onglet Actions sur GitHub
-2. Lancer le workflow release
-3. Choisir le type de bump: patch, minor ou major
-
-Le workflow effectue automatiquement:
-- mise à jour de la version dans package.json
-- commit sur main
-- création du tag vX.Y.Z
-- création d'une GitHub Release avec notes automatiques
-
-### Commandes locales utiles
-
-```bash
-pnpm release:auto
-pnpm version:patch
-pnpm version:minor
-pnpm version:major
-```
+Releases on `release-live` are fully automated by [semantic-release](https://github.com/semantic-release/semantic-release) (`.github/workflows/release-live.yml`, config in `.releaserc.json`) — no manual version bump, no release PR to merge. Every push with a releasable [Conventional Commit](https://www.conventionalcommits.org/) publishes immediately, since `release-live` is the trigger point that propagates updates to every client site (`scripts/release-sync-boilerplate.sh`). See `CHANGELOG.md`'s Versioning Policy for the patch/minor/major rule.
 
 ## Vidéo et chaîne (FR)
 
@@ -122,3 +103,9 @@ Security headers enforced on all responses (via `next.config.ts`):
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-DNS-Prefetch-Control: on`
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
+
+Author: Charles Van den Driessche ([neosaas.tech](https://neosaas.tech)) — contact@neomnia.net / contact@neosaas.tech

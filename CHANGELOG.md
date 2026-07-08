@@ -1,31 +1,49 @@
+## [1.0.10](https://github.com/neosaastech/Neosaas-app/compare/v1.0.9...v1.0.10) (2026-07-08)
+
+### Bug Fixes
+
+* **ci:** release-live.yml still had the release-please content ([1c8b8b7](https://github.com/neosaastech/Neosaas-app/commit/1c8b8b778278816b84b159068a800795f7a19dbd))
+
 # Changelog
 
-Toutes les modifications notables du boilerplate NeoSaaS seront documentées ici.
+All notable changes to the NeoSaaS boilerplate are documented here.
+
+## Versioning Policy
+
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`), enforced automatically by [semantic-release](https://github.com/semantic-release/semantic-release) from [Conventional Commits](https://www.conventionalcommits.org/) messages. Every push to `release-live` that contains a releasable commit publishes immediately — no manual version bump, no release PR to merge — since `release-live` is the trigger point that propagates updates to every client site (see `scripts/release-sync-boilerplate.sh`):
+
+- **PATCH** (`x.y.Z`) — bug fixes only (`fix:` commits). No new features, no architecture changes.
+- **MINOR** (`x.Y.z`) — new features or notable non-breaking changes (`feat:` commits).
+- **MAJOR** (`X.y.z`) — different architecture or advanced/breaking new capabilities (`feat!:`, `fix!:`, or a `BREAKING CHANGE:` footer).
 
 ## [Unreleased]
 
-## [1.0.8] - 2026-07-08
+## [1.0.9] - 2026-07-08
+
+_Note: originally tagged v1.0.8, renumbered to v1.0.9 to avoid colliding
+with a pre-existing, unrelated `v1.0.8` tag left over from an earlier
+release cycle (PR #49, 2026-07-07)._
 
 ### Fixed
-- Avatar utilisateur et logo entreprise effacés du header en moins d'une seconde (cache `localStorage` qui écrasait l'état chargé depuis l'API)
-- Logo entreprise absent de la liste des entreprises et de la fiche d'édition admin (champ `logo` oublié dans le mapping de `getCompanies()`)
-- Recadrage d'image incohérent selon les écrans — composant partagé (`CroppedFileInput`) branché sur les 5 sélecteurs d'image (avatar profil, logo entreprise self-service + admin, avatar utilisateur création/édition admin)
-- Upload d'avatar admin (création/édition d'utilisateur) purement cosmétique — jamais réellement persisté côté serveur ; nouvel endpoint `/api/admin/users/[userId]/profile-image`
-- "Send Test" (Mail Management) envoyait le HTML/sujet brut sans substituer les variables — `{{firstName}}` etc. arrivaient littéralement dans l'email de test
-- Emails réellement envoyés (inscription, reset mot de passe) utilisaient des types de templates absents de l'UI admin — `password_reset` en particulier échouait silencieusement, aucun email n'était envoyé
-- 4 templates email commerce (commande physique/digitale/abonnement, paiement) totalement absents en base
-- Sujet des emails commande/paiement toujours écrasé par une chaîne codée en dur, empêchant toute modification via l'UI admin
-- Variables proposées dans le picker de l'UI mail ne correspondant pas à celles réellement substituées par le code d'envoi (par type de template désormais)
-- Notification de changement d'email jamais envoyée (appel `sendEmail()` malformé)
-- Variables dynamiques (`{{siteName}}` etc.) non résolues dans le corps des articles de blog, contrairement aux pages
+- User avatar and company logo disappearing from the header within a second of loading (a `localStorage` cache was clobbering the state fetched from the API)
+- Company logo missing from the companies list and the admin edit form (the `logo` field was dropped in `getCompanies()`'s mapping)
+- Inconsistent image cropping across screens — shared component (`CroppedFileInput`) wired into all 5 image pickers (profile avatar, self-service + admin company logo, admin user create/edit avatar)
+- Admin avatar upload (user create/edit) was purely cosmetic — never actually persisted server-side; added `/api/admin/users/[userId]/profile-image`
+- "Send Test" (Mail Management) sent raw HTML/subject without substituting variables — `{{firstName}}` etc. arrived literally in the test email
+- Emails actually sent (signup, password reset) used template types missing from the admin UI — `password_reset` in particular failed silently, no email was ever sent
+- 4 commerce email templates (physical/digital/subscription order, payment) were entirely missing from the database
+- Order/payment email subjects were always overridden by a hardcoded string, making the admin-editable subject a no-op
+- Variables offered in the mail UI's picker didn't match what the send code actually substituted (now derived per template type)
+- Email-change notification was never sent (malformed `sendEmail()` call)
+- Dynamic variables (`{{siteName}}` etc.) weren't resolved in blog article bodies, unlike pages
 
 ## [1.0.7] - 2026-07-07
 
 ### Fixed
-- Build ne wipe plus la base de données par défaut (`db:migrate` additif, `db:hard-reset` opt-in explicite)
-- Logout ne laissait jamais expirer le cookie de session (domaine + double `Set-Cookie` qui s'écrasait)
-- Mécanisme "Appliquer le correctif" (mise à jour des sites filles) : sélection de version fiable (`releases/latest` au lieu de `tags`), déploiement Vercel confirmé via Deploy Hook + polling au lieu du seul webhook Git
-- Credentials du mécanisme de mise à jour configurables par site depuis `admin/api` (pas de variables d'environnement à poser à la main)
+- Build no longer wipes the database by default (`db:migrate` is additive, `db:hard-reset` is explicit opt-in)
+- Logout never actually expired the session cookie (domain + duplicate `Set-Cookie` overwriting each other)
+- "Apply update" mechanism (updating client sites): reliable version selection (`releases/latest` instead of `tags`), Vercel deployment confirmed via Deploy Hook + polling instead of relying on the Git webhook alone
+- Update mechanism credentials now configurable per site from `admin/api` (no more manual environment variables)
 
 ### Added
-- Cloche de notifications visible pour tous les utilisateurs de l'espace privé (auparavant réservée aux admins)
+- Notification bell visible to all users in the private area (previously admin-only)
