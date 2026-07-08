@@ -39,6 +39,16 @@ async function payloadFetch(path: string, init?: RequestInit): Promise<Response>
   return res
 }
 
+// Written by payload-cms's syncPageAfterChange/syncBlogPostAfterChange right
+// after a sync attempt — surfaces what used to be a server-only log line, so
+// "Published" in this table can't silently mean "actually 404s on the real
+// site" anymore (Charles, 2026-07-08).
+export interface PayloadSyncStatus {
+  ok: boolean | null
+  message: string | null
+  syncedAt: string | null
+}
+
 export interface PayloadPageSummary {
   id: string | number
   title: string
@@ -57,6 +67,7 @@ export interface PayloadPageSummary {
   publishedAt?: string | null
   _status: "draft" | "published"
   updatedAt: string
+  syncStatus?: PayloadSyncStatus | null
 }
 
 export interface PayloadPageBlock {
@@ -259,6 +270,7 @@ export interface PayloadBlogPostSummary {
   publishedAt?: string | null
   _status: "draft" | "published"
   updatedAt: string
+  syncStatus?: PayloadSyncStatus | null
 }
 
 export interface PayloadBlogPostDoc extends PayloadBlogPostSummary {

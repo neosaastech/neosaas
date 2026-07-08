@@ -6,7 +6,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree } from "lucide-react"
+import { Layers, Newspaper, Pencil, Plus, ChevronLeft, ChevronRight, FolderTree, AlertTriangle } from "lucide-react"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
@@ -197,9 +202,21 @@ function PagesPanel() {
                       {p.author?.email ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={p._status === "published" ? "default" : "outline"}>
-                        {p._status === "published" ? "Published" : "Draft"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={p._status === "published" ? "default" : "outline"}>
+                          {p._status === "published" ? "Published" : "Draft"}
+                        </Badge>
+                        {p.syncStatus?.ok === false && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{p.syncStatus.message ?? "Échec de synchronisation vers le site."}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {p.publishedAt ? new Date(p.publishedAt).toLocaleDateString() : "—"}
@@ -363,9 +380,21 @@ function ArticlesPanel() {
                     <TableCell className="font-medium">{a.title}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{categoryName(a.category) ?? "—"}</TableCell>
                     <TableCell>
-                      <Badge variant={a._status === "published" ? "default" : "outline"}>
-                        {a._status === "published" ? "Published" : "Draft"}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant={a._status === "published" ? "default" : "outline"}>
+                          {a._status === "published" ? "Published" : "Draft"}
+                        </Badge>
+                        {a.syncStatus?.ok === false && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{a.syncStatus.message ?? "Échec de synchronisation vers le site."}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <button
