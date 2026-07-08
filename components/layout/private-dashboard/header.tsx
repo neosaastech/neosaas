@@ -130,13 +130,23 @@ export function PrivateHeader() {
       setUser((prev) => (prev ? { ...prev, companyLogo: logo } : prev))
     }
 
+    const handleProfileImageUpdated = (event: Event) => {
+      const profileImage = (event as CustomEvent<{ profileImage: string | null }>).detail?.profileImage ?? null
+      setUser((prev) => (prev ? { ...prev, profileImage } : prev))
+    }
+
     window.addEventListener("companyLogoUpdated", handleCompanyLogoUpdated)
+    window.addEventListener("profileImageUpdated", handleProfileImageUpdated)
 
     const handleStorageChange = () => {
       const updatedUser = localStorage.getItem("user")
       if (updatedUser) {
         try {
-          setUser(JSON.parse(updatedUser))
+          // The stored copy never carries profileImage/companyLogo (stripped to
+          // stay under the localStorage quota), so merge onto prev instead of
+          // replacing it — otherwise this clobbers the avatars fetched from the
+          // API on every "storage" event and on the 1s poll below.
+          setUser((prev) => (prev ? { ...prev, ...JSON.parse(updatedUser) } : JSON.parse(updatedUser)))
         } catch {
           localStorage.removeItem("user")
         }
@@ -148,6 +158,7 @@ export function PrivateHeader() {
 
     return () => {
       window.removeEventListener("companyLogoUpdated", handleCompanyLogoUpdated)
+      window.removeEventListener("profileImageUpdated", handleProfileImageUpdated)
       window.removeEventListener("storage", handleStorageChange)
       clearInterval(interval)
     }

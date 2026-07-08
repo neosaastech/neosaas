@@ -126,7 +126,12 @@ export default function ProfilePage() {
             localStorage.setItem("user", JSON.stringify(slim))
             window.dispatchEvent(new Event("storage"))
           }
-          
+
+          // The localStorage copy above never carries the (base64) image, so
+          // notify the header directly with the actual value — mirrors the
+          // companyLogoUpdated event used for the company logo.
+          window.dispatchEvent(new CustomEvent("profileImageUpdated", { detail: { profileImage: data.imagePath } }))
+
           toast.success("Image updated")
         } else {
           const errorData = await response.json()
