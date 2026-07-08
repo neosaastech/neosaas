@@ -159,7 +159,18 @@ export async function proxy(request: NextRequest) {
   const accessDenied = await enforcePageAccess(request)
   if (accessDenied) return accessDenied
 
-  return NextResponse.next()
+  // <html lang> lives in the true root layout (app/layout.tsx), above the
+  // [locale] segment, so it can't read params.locale directly — this header
+  // is how it finds out. Was hardcoded to "en" unconditionally before this
+  // (Charles, 2026-07-08: real SEO/accessibility bug on every /fr/ page).
+  // Non-locale routes (admin/dashboard/auth) fall back to DEFAULT_LOCALE,
+  // which is also more correct than the old hardcoded "en" for this
+  // French-first app.
+  const localeSegment = path.split("/")[1]
+  const locale = LOCALES.includes(localeSegment as (typeof LOCALES)[number]) ? localeSegment : DEFAULT_LOCALE
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-locale", locale)
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {

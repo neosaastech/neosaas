@@ -83,6 +83,10 @@ function PagesPanel() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [pageType, setPageType] = useState<string>("all")
+  // Payload silently defaulted to 'fr' (defaultLocale, fallback:true) with
+  // no indication that's what was shown — this makes the choice explicit
+  // (Charles, 2026-07-08: "on ne sait pas quelle langue est engagée").
+  const [locale, setLocale] = useState<string>("fr")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -92,7 +96,7 @@ function PagesPanel() {
 
   async function load() {
     setIsLoading(true)
-    const result = await getContentPages({ page, limit: PAGE_SIZE, pageType: pageType === "all" ? undefined : pageType })
+    const result = await getContentPages({ page, limit: PAGE_SIZE, pageType: pageType === "all" ? undefined : pageType, locale })
     if (result.success) {
       setPages(result.data.docs)
       setTotalPages(result.data.totalPages)
@@ -105,7 +109,7 @@ function PagesPanel() {
 
   useEffect(() => {
     load()
-  }, [page, pageType])
+  }, [page, pageType, locale])
 
   function openCreate() {
     setEditingDoc(null)
@@ -143,7 +147,11 @@ function PagesPanel() {
             <Layers className="h-5 w-5 text-brand" />
             Pages
           </CardTitle>
-          <CardDescription>Pages authored centrally, editable directly here — live from Payload.</CardDescription>
+          <CardDescription>
+            Pages authored centrally, editable directly here — live from Payload. Note : /pricing et /legal
+            restent codées en dur (logique métier/paiement) et ne peuvent jamais être pilotées d&apos;ici, quel
+            que soit ce que vous publiez sur ces chemins.
+          </CardDescription>
         </div>
         <Button size="sm" onClick={openCreate}>
           <Plus className="h-3.5 w-3.5" /> New page
@@ -151,16 +159,27 @@ function PagesPanel() {
       </CardHeader>
       <CardContent>
         <div className="mb-4 flex items-center justify-between">
-          <Select value={pageType} onValueChange={(v) => { setPageType(v); setPage(1) }}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les types</SelectItem>
-              <SelectItem value="landing">Landing</SelectItem>
-              <SelectItem value="article">Article</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={pageType} onValueChange={(v) => { setPageType(v); setPage(1) }}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="landing">Landing</SelectItem>
+                <SelectItem value="article">Article</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={locale} onValueChange={(v) => { setLocale(v); setPage(1) }}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>
@@ -285,6 +304,7 @@ function ArticlesPanel() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [categoryId, setCategoryId] = useState<string>("all")
+  const [locale, setLocale] = useState<string>("fr")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -300,7 +320,7 @@ function ArticlesPanel() {
 
   async function load() {
     setIsLoading(true)
-    const result = await getContentArticles({ page, limit: PAGE_SIZE, category: categoryId === "all" ? undefined : categoryId })
+    const result = await getContentArticles({ page, limit: PAGE_SIZE, category: categoryId === "all" ? undefined : categoryId, locale })
     if (result.success) {
       setArticles(result.data.docs)
       setTotalPages(result.data.totalPages)
@@ -313,7 +333,7 @@ function ArticlesPanel() {
 
   useEffect(() => {
     load()
-  }, [page, categoryId])
+  }, [page, categoryId, locale])
 
   const categoryName = (id: string | number | null) => categories.find((c) => String(c.id) === String(id))?.path
 
@@ -361,19 +381,30 @@ function ArticlesPanel() {
       </CardHeader>
       <CardContent>
         <div className="mb-4 flex items-center justify-between">
-          <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setPage(1) }}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes les catégories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.path || c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={categoryId} onValueChange={(v) => { setCategoryId(v); setPage(1) }}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les catégories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.path || c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={locale} onValueChange={(v) => { setLocale(v); setPage(1) }}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>

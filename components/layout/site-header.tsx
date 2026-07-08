@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { MainNav } from "@/components/layout/main-nav"
 import { ThemeToggle } from "@/components/common/theme-toggle"
+import { LocaleSwitcher } from "@/components/common/locale-switcher"
 import { Button } from "@/components/ui/button"
 import { MobileMenu } from "@/components/layout/mobile-menu"
 import Image from "next/image"
@@ -68,6 +69,7 @@ export function SiteHeader({ user, headerConfig }: SiteHeaderProps) {
                 <Github className="h-5 w-5" />
               </Link>
             </div>
+            <LocaleSwitcher />
             <ThemeToggle />
             <div className="hidden md:flex space-x-1">
               {user ? (

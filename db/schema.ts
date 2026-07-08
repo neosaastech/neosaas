@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, boolean, primaryKey, integer, jsonb, varchar, json, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, text, timestamp, uuid, boolean, primaryKey, integer, jsonb, varchar, json, pgEnum, uniqueIndex } from "drizzle-orm/pg-core"
 import { relations } from "drizzle-orm"
 
 // =============================================================================
@@ -850,6 +850,32 @@ export type PageLayer = typeof pageLayers.$inferSelect
 export type NewPageLayer = typeof pageLayers.$inferInsert
 
 /**
+ * Per-page SEO, synced from Payload's plugin-seo `meta.title`/`meta.description`
+ * (payload-cms's pages_locales.meta_title/meta_description) — separate from
+ * page_layers because SEO is one row per (path, locale), not one per block.
+ * generateMetadata() reads this first and falls back to the site-wide
+ * seoSettings (platform_config, app/layout.tsx) when a page hasn't set its
+ * own — never a competing OG system, an override of the existing one
+ * (Charles, 2026-07-08: "on a les balises og qui proviennent de notre
+ * système seo social media").
+ */
+export const pageSeo = pgTable("page_seo", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  pagePath: text("page_path").notNull(),
+  locale: text("locale").notNull().default("fr"),
+  metaTitle: text("meta_title"),
+  metaDescription: text("meta_description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  pathLocaleUnique: uniqueIndex("page_seo_path_locale_unique").on(table.pagePath, table.locale),
+}))
+
+export type PageSeo = typeof pageSeo.$inferSelect
+export type NewPageSeo = typeof pageSeo.$inferInsert
+
+/**
  * Submissions from the "form" page layer (lib/layers/registry.ts /
  * components/layers/form-layer.tsx) — one row per submit, `fields` holds
  * whatever the form's field schema defines (no fixed columns, since a
@@ -893,6 +919,11 @@ export const blogPosts = pgTable("blog_posts", {
   categorySlug: text("category_slug"),
   categoryPath: text("category_path"),
   publishedAt: timestamp("published_at"),
+  // Synced from Payload's plugin-seo meta.title/meta.description — same
+  // "override, not a competing system" rationale as pageSeo above. One row
+  // per post already, so plain columns instead of a separate table.
+  metaTitle: text("meta_title"),
+  metaDescription: text("meta_description"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

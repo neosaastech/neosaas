@@ -1,9 +1,52 @@
 import { and, asc, eq } from "drizzle-orm"
 import { notFound } from "next/navigation"
+import type { Metadata } from "next"
 import { db } from "@/db"
 import { blogPosts, pageLayers } from "@/db/schema"
 import { BlockRenderer } from "@/components/layers/block-renderer"
 import { buildPageTemplateContext, interpolateTemplateString } from "@/lib/pages/template-variables"
+import { getPlatformConfig } from "@/lib/config"
+import { LOCALES } from "@/app/[locale]/layout"
+
+// Never had any metadata at all before this — every article showed the
+// site-wide title/description. Uses blog_posts' own meta_title/
+// meta_description (synced from Payload's plugin-seo) with the post's own
+// title/excerpt/cover as fallback, same "override the site-wide OG config,
+// never replace it" rule as buildPageMetadata (lib/seo/page-metadata.ts) —
+// separate here since blog_posts already has its own columns for this,
+// not page_seo.
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const post = await db.query.blogPosts.findFirst({ where: eq(blogPosts.slug, slug) })
+  if (!post || !post.isActive) return {}
+
+  const config = await getPlatformConfig()
+  const seo = config.seoSettings || {}
+  const title = post.metaTitle || post.title
+  const description = post.metaDescription || post.excerpt || seo.description
+  const image = post.coverImageUrl || seo.ogImage
+
+  const languages: Record<string, string> = {}
+  for (const l of LOCALES) languages[l] = `/${l}/blog/${slug}`
+
+  return {
+    title,
+    description,
+    alternates: { languages },
+    openGraph: {
+      title,
+      description,
+      images: image ? [{ url: image }] : undefined,
+      siteName: config.siteName,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  }
+}
 
 /**
  * Cover/title/author/body stay this fixed template (proven, low-risk) —

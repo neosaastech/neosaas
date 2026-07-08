@@ -185,6 +185,22 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
           ))}
         </div>
 
+        {page && (
+          <p className="text-xs text-muted-foreground">
+            Chemin final : <span className="font-mono">{page.path || (slug ? `/${slug}` : "/")}</span>
+            {page._status === "published" ? (
+              <>
+                {" — "}
+                <a href={page.path} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Voir en ligne
+                </a>
+              </>
+            ) : (
+              " — Brouillon : n'apparaît pas encore sur le site tant que non publié."
+            )}
+          </p>
+        )}
+
         <div className="flex gap-3">
           <Button type="button" variant="outline" disabled={isSaving} onClick={() => handleSave("draft")}>
             Enregistrer le brouillon

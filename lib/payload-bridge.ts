@@ -95,6 +95,15 @@ export interface ListPagesOptions {
   limit?: number
   /** Filter by pageType (landing/article) — the content-hub category filter. */
   pageType?: string
+  /**
+   * Which locale's title/layout to fetch — omitted defaults to Payload's
+   * own defaultLocale ('fr', fallback:true), which silently showed French
+   * content with no indication that's what was happening (Charles,
+   * 2026-07-08: "on ne sait pas quelle langue est engagée"). Content Hub
+   * now always passes this explicitly so the locale on screen is a visible
+   * choice, not a hidden default.
+   */
+  locale?: string
 }
 
 /**
@@ -104,7 +113,7 @@ export interface ListPagesOptions {
  * marketing pages land — loading everything at once doesn't scale.
  */
 export async function listPages(options: ListPagesOptions = {}): Promise<PaginatedResult<PayloadPageSummary>> {
-  const { page = 1, limit = 20, pageType } = options
+  const { page = 1, limit = 20, pageType, locale = "fr" } = options
   const params = new URLSearchParams({
     "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
     // depth=1 (not 0) so category/author come back as populated
@@ -115,6 +124,7 @@ export async function listPages(options: ListPagesOptions = {}): Promise<Paginat
     limit: String(limit),
     page: String(page),
     sort: "path",
+    locale,
   })
   if (pageType) params.set("where[pageType][equals]", pageType)
 
@@ -298,18 +308,21 @@ export interface ListBlogPostsOptions {
   page?: number
   limit?: number
   category?: string | number
+  /** Same rationale as ListPagesOptions.locale. */
+  locale?: string
 }
 
 export async function listBlogPosts(
   options: ListBlogPostsOptions = {},
 ): Promise<PaginatedResult<PayloadBlogPostSummary>> {
-  const { page = 1, limit = 20, category } = options
+  const { page = 1, limit = 20, category, locale = "fr" } = options
   const params = new URLSearchParams({
     "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
     depth: "0",
     limit: String(limit),
     page: String(page),
     sort: "-publishedAt",
+    locale,
   })
   if (category) params.set("where[category][equals]", String(category))
 

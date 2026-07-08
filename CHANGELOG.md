@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/neosaastech/Neosaas-app/compare/v1.4.0...v1.5.0) (2026-07-08)
+
+### Features
+
+* **i18n+seo:** fix hardcoded <html lang>, add locale switcher, per-page SEO ([96b8cbe](https://github.com/neosaastech/Neosaas-app/commit/96b8cbeb58894918c22a686e24ba2c29bb6b9a7c))
+
 ## [1.4.0](https://github.com/neosaastech/Neosaas-app/compare/v1.3.0...v1.4.0) (2026-07-08)
 
 ### Features

@@ -1,5 +1,6 @@
 import type React from "react"
 import Script from "next/script"
+import { headers } from "next/headers"
 
 import { ThemeProvider } from "@/components/common/theme-provider"
 import { DynamicThemeProvider } from "@/components/common/dynamic-theme-provider"
@@ -28,6 +29,9 @@ export async function generateMetadata() {
       description: seo.description || `${config.siteName} provides all the tools you need to build, launch, and scale your SaaS business.`,
       generator: 'v0.app',
       icons: config.logo ? [{ rel: "icon", url: config.logo }] : [{ rel: "icon", url: "/favicon.ico" }],
+      // Without this, relative OG image URLs resolve against localhost in
+      // some contexts instead of the real domain — never set before now.
+      metadataBase: seo.baseUrl ? new URL(seo.baseUrl) : undefined,
       openGraph: {
         title: seo.ogTitle || config.siteName,
         description: seo.ogDescription || seo.description,
@@ -63,9 +67,12 @@ export default async function RootLayout({
   const config = await getPlatformConfig()
   const themeConfig = await getThemeConfig()
   const googleFontsHref = getGoogleFontsLinkHref(themeConfig.headingFontSource, themeConfig.bodyFontSource)
+  // Set by proxy.ts from the actual /fr or /en URL segment — this layout
+  // sits above the [locale] route so it can't read params.locale directly.
+  const locale = (await headers()).get("x-locale") || "fr"
 
   return (
-    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${themeFontVariables}`}>
+    <html lang={locale} suppressHydrationWarning className={`${GeistSans.variable} ${themeFontVariables}`}>
       <head>
         {googleFontsHref && <link rel="stylesheet" href={googleFontsHref} />}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />

@@ -1,11 +1,23 @@
 import { notFound } from "next/navigation"
 import { draftMode } from "next/headers"
 import { and, asc, eq } from "drizzle-orm"
+import type { Metadata } from "next"
 import { db } from "@/db"
 import { pageLayers } from "@/db/schema"
 import { BlockRenderer, type PageLayerRow } from "@/components/layers/block-renderer"
 import { PreviewChrome } from "@/components/common/preview-chrome"
 import { loadPreviewLayers } from "@/lib/pages/preview-layers"
+import { buildPageMetadata } from "@/lib/seo/page-metadata"
+import type { Locale } from "@/app/[locale]/layout"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string[] }>
+}): Promise<Metadata> {
+  const { locale, slug } = await params
+  return buildPageMetadata({ pagePath: `/${slug.join("/")}`, locale: locale as Locale })
+}
 
 /**
  * Generic renderer for any page created via the Content Hub (Payload →
