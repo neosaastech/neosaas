@@ -154,6 +154,38 @@ export async function initLago(environment: ServiceEnvironment = 'production') {
 }
 
 /**
+ * Initialize GitHub client — reuses the same "github_api" config already
+ * saved from admin/api's "API Configuration (Server Integration)" panel
+ * (app/api/admin/configure-github-api/route.ts), extended with `repo` /
+ * `workflowFile` so the update mechanism
+ * (app/api/admin/system/update/route.ts) can dispatch apply-update.yml on
+ * this site's own repo without a second, separate credential entry.
+ */
+export async function initGithub(environment: ServiceEnvironment = 'production') {
+  const config = await serviceApiRepository.getConfig('github_api', environment) as
+    | { isActive: boolean; config: { personalAccessToken: string; repo?: string; workflowFile?: string } }
+    | null;
+
+  if (!config) {
+    throw new Error(`GitHub configuration not found for environment: ${environment}`);
+  }
+
+  if (!config.isActive) {
+    throw new Error(`GitHub configuration is not active for environment: ${environment}`);
+  }
+
+  if (!config.config.repo) {
+    throw new Error(`Dépôt cible manquant — renseigne "repo" dans la configuration GitHub API (ex: neosaastech/neosaas-website)`);
+  }
+
+  return {
+    token: config.config.personalAccessToken,
+    repo: config.config.repo,
+    workflowFile: config.config.workflowFile || 'apply-update.yml',
+  };
+}
+
+/**
  * Test a service configuration
  */
 export async function testServiceConnection(serviceName: string, environment: ServiceEnvironment = 'production'): Promise<{ success: boolean; message: string }> {
@@ -182,6 +214,26 @@ export async function testServiceConnection(serviceName: string, environment: Se
       case 'lago':
         await initLago(environment);
         return { success: true, message: 'Lago configuration is valid' };
+
+      case 'github_api': {
+        const gh = await initGithub(environment);
+        // Real validation, not just presence: confirm the token can actually
+        // see the target repo (catches expired/wrong-scope tokens and typos
+        // in the repo name before an admin relies on it in production).
+        const res = await fetch(`https://api.github.com/repos/${gh.repo}`, {
+          headers: {
+            Authorization: `Bearer ${gh.token}`,
+            Accept: 'application/vnd.github+json',
+          },
+        });
+        if (!res.ok) {
+          return {
+            success: false,
+            message: `GitHub API a répondu ${res.status} pour ${gh.repo} — vérifie le token et le nom du dépôt`,
+          };
+        }
+        return { success: true, message: `Accès confirmé à ${gh.repo}` };
+      }
 
       default:
         return { success: false, message: `Unknown service: ${serviceName}` };

@@ -9,6 +9,7 @@ import { db } from '@/db'
 import { platformConfig } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { logSystemEvent } from '@/app/actions/logs'
+import { initGithub } from '@/lib/services/initializers'
 
 const CONFIG_KEY = 'system_update_status'
 
@@ -162,9 +163,33 @@ async function checkForUpdate(userId?: string): Promise<UpdateStatus> {
 async function deployViaGithubActions(
   userId?: string,
 ): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> {
-  const githubToken = process.env.UPDATE_GITHUB_TOKEN
-  const repo = process.env.UPDATE_GITHUB_REPO // e.g. "neosaastech/neosaas-website"
-  const workflowFile = process.env.UPDATE_WORKFLOW_FILE || 'apply-update.yml'
+  // Credentials come from this site's own encrypted "github_api" config
+  // (admin/api → "🔑 API Configuration (Server Integration)"), not from Vercel
+  // env vars — pasted once by an admin for this site specifically, no manual
+  // CLI/Vault setup needed per site. The repo field is the same panel,
+  // extended for this purpose (see lib/services/initializers.ts:initGithub).
+  let githubToken: string
+  let repo: string
+  let workflowFile: string
+  try {
+    const gh = await initGithub()
+    githubToken = gh.token
+    repo = gh.repo
+    workflowFile = gh.workflowFile
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    await logSystemEvent({
+      category: 'system_update',
+      level: 'error',
+      message: `GitHub configuration missing or invalid: ${message}`,
+      userId,
+    })
+    return {
+      ok: false,
+      status: 501,
+      body: { success: false, error: `Configuration GitHub manquante ou invalide : ${message}` },
+    }
+  }
 
   const res = await fetch(
     `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/dispatches`,
@@ -245,12 +270,15 @@ async function deployViaKubeWebhook(
 
 /**
  * Picks whichever deploy path this deployment has been configured for.
- * Vercel-hosted sites set UPDATE_GITHUB_TOKEN/UPDATE_GITHUB_REPO;
- * self-hosted customers set UPDATE_ORCHESTRATOR_WEBHOOK_URL/UPDATE_SYSTEM_TOKEN.
- * Neither configured → 501, no silent no-op.
+ * Vercel-hosted sites paste a GitHub token + repo in admin/api's "API
+ * Configuration (Server Integration)" panel (serviceName='github_api');
+ * self-hosted customers set
+ * UPDATE_ORCHESTRATOR_WEBHOOK_URL/UPDATE_SYSTEM_TOKEN. Neither configured →
+ * 501, no silent no-op.
  */
 async function deployUpdate(userId?: string): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> {
-  if (process.env.UPDATE_GITHUB_TOKEN && process.env.UPDATE_GITHUB_REPO) {
+  const hasGithubConfig = await initGithub().then(() => true).catch(() => false)
+  if (hasGithubConfig) {
     return deployViaGithubActions(userId)
   }
 
@@ -264,7 +292,7 @@ async function deployUpdate(userId?: string): Promise<{ ok: boolean; status: num
     body: {
       success: false,
       error:
-        'No update mechanism configured — set UPDATE_GITHUB_TOKEN/UPDATE_GITHUB_REPO (Vercel-hosted sites) or UPDATE_ORCHESTRATOR_WEBHOOK_URL/UPDATE_SYSTEM_TOKEN (self-hosted).',
+        'Aucun mécanisme de mise à jour configuré — ajoute un compte GitHub dans admin/api (Vercel-hosted), ou configure UPDATE_ORCHESTRATOR_WEBHOOK_URL/UPDATE_SYSTEM_TOKEN (self-hosted).',
     },
   }
 }

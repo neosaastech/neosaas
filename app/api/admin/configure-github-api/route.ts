@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { personalAccessToken } = body;
+    const { personalAccessToken, repo, workflowFile } = body;
 
     if (!personalAccessToken || typeof personalAccessToken !== "string") {
       return NextResponse.json(
@@ -51,6 +51,14 @@ export async function POST(request: NextRequest) {
 
     console.log("💾 [GitHub API Config] Saving token to database...");
 
+    // upsertConfig replaces the whole `config` blob rather than merging it —
+    // fetch what's already there first so re-saving just the token doesn't
+    // silently wipe out `repo`/`workflowFile` set in a previous save (used
+    // by the "Appliquer le correctif" update mechanism).
+    const existing = (await serviceApiRepository.getConfig("github_api", "production")) as
+      | { config: { repo?: string; workflowFile?: string } }
+      | null;
+
     // Save to database using serviceApiRepository (encrypted automatically)
     const result = await serviceApiRepository.upsertConfig({
       serviceName: "github_api",
@@ -60,6 +68,8 @@ export async function POST(request: NextRequest) {
       isDefault: true,
       config: {
         personalAccessToken,
+        repo: repo ?? existing?.config?.repo,
+        workflowFile: workflowFile ?? existing?.config?.workflowFile,
       },
       metadata: {
         configuredAt: new Date().toISOString(),
@@ -129,6 +139,8 @@ export async function GET(request: NextRequest) {
           lastTested: config.metadata?.lastTested,
           configuredAt: config.metadata?.configuredAt,
           hasToken: !!config.config.personalAccessToken,
+          repo: config.config.repo ?? null,
+          workflowFile: config.config.workflowFile ?? null,
         },
       },
       { status: 200 }

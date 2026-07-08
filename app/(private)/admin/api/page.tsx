@@ -230,6 +230,7 @@ export default function AdminApiPage() {
   })
   const [githubApiConfig, setGithubApiConfig] = useState({
     personalAccessToken: "",
+    repo: "",
   })
 
   const [googleConfig, setGoogleConfig] = useState({
@@ -1299,6 +1300,20 @@ export default function AdminApiPage() {
                       </p>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="github-api-repo">Dépôt cible pour les mises à jour (optionnel)</Label>
+                      <Input
+                        id="github-api-repo"
+                        placeholder="neosaastech/neosaas-website"
+                        value={githubApiConfig.repo}
+                        onChange={(e) => setGithubApiConfig({ ...githubApiConfig, repo: e.target.value })}
+                        className="font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Renseigné, ce token sert aussi au bouton "Appliquer le correctif" (onglet Mises à jour) pour déclencher le déploiement de ce dépôt.
+                      </p>
+                    </div>
+
                     <div className="flex gap-2">
                       <Button
                         onClick={async () => {
@@ -1314,6 +1329,7 @@ export default function AdminApiPage() {
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
                                 personalAccessToken: githubApiConfig.personalAccessToken,
+                                repo: githubApiConfig.repo || undefined,
                               }),
                             });
 
