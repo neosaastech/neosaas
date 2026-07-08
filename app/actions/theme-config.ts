@@ -27,7 +27,34 @@ export async function getThemeConfig(): Promise<ThemeConfig> {
       return defaultTheme
     }
 
-    return JSON.parse(result[0].value) as ThemeConfig
+    // Was a bare cast (`as ThemeConfig`) — a stored row missing any nested
+    // key (light/dark/typography.fontSize.../spacing...) crashed every page
+    // on the site the moment generateThemeCSS() did Object.entries() on the
+    // missing key (2026-07-08 incident: a Payload tenant save overwrote
+    // theme_config with an incomplete object — see the sync-side fix in
+    // payload-cms — and this cast had zero defense against it). Deep-merges
+    // onto defaultTheme so a partial/corrupted row degrades gracefully
+    // instead of taking the whole site down.
+    const stored = JSON.parse(result[0].value) as Partial<ThemeConfig>
+    return {
+      ...defaultTheme,
+      ...stored,
+      light: { ...defaultTheme.light, ...stored.light },
+      dark: { ...defaultTheme.dark, ...stored.dark },
+      typography: {
+        ...defaultTheme.typography,
+        ...stored.typography,
+        fontSize: { ...defaultTheme.typography.fontSize, ...stored.typography?.fontSize },
+        fontWeight: { ...defaultTheme.typography.fontWeight, ...stored.typography?.fontWeight },
+        lineHeight: { ...defaultTheme.typography.lineHeight, ...stored.typography?.lineHeight },
+      },
+      spacing: {
+        ...defaultTheme.spacing,
+        ...stored.spacing,
+        borderRadius: { ...defaultTheme.spacing.borderRadius, ...stored.spacing?.borderRadius },
+        spacing: { ...defaultTheme.spacing.spacing, ...stored.spacing?.spacing },
+      },
+    }
   } catch (error) {
     console.error('Failed to get theme config:', error)
     return defaultTheme

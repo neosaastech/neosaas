@@ -1,3 +1,14 @@
+## [1.6.1](https://github.com/neosaastech/Neosaas-app/compare/v1.6.0...v1.6.1) (2026-07-08)
+
+### Bug Fixes
+
+* **seo:** remove alternates.languages — crashing every page in production ([1e68bab](https://github.com/neosaastech/Neosaas-app/commit/1e68babf194c28d90faa06db6a4fa1f72bc6ba89))
+* **theme:** getThemeConfig deep-merges with defaults — root cause of the outage ([5cb8156](https://github.com/neosaastech/Neosaas-app/commit/5cb8156dfe4ff7753b491acc11473bc6ede66400))
+
+### Reverts
+
+* **i18n+seo:** full rollback — removing alternates alone did not fix prod 500 ([b5d79c2](https://github.com/neosaastech/Neosaas-app/commit/b5d79c24e8d4435ed64616ffd4b526ad431d3ffc))
+
 ## [1.6.0](https://github.com/neosaastech/Neosaas-app/compare/v1.5.1...v1.6.0) (2026-07-08)
 
 ### Features
