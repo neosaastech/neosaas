@@ -111,9 +111,10 @@ export async function getContentPages(
 
 export async function getContentPage(
   id: string | number,
+  locale: string = "fr",
 ): Promise<{ success: true; data: PayloadPageDoc } | { success: false; error: string }> {
   try {
-    const page = await getPage(id)
+    const page = await getPage(id, locale)
     return { success: true, data: page }
   } catch (error) {
     console.error("Failed to fetch content page from Payload:", error)
@@ -124,6 +125,7 @@ export async function getContentPage(
 export async function saveContentPage(
   id: string | number | null,
   input: PageWriteInput,
+  locale: string = "fr",
 ): Promise<{ success: true; data: PayloadPageDoc } | { success: false; error: string }> {
   const currentUser = await getCurrentUser()
   if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
@@ -131,7 +133,7 @@ export async function saveContentPage(
   }
 
   try {
-    const page = id ? await updatePage(id, input) : await createPage(input)
+    const page = id ? await updatePage(id, input, locale) : await createPage(input, locale)
     revalidatePath("/admin/pages")
     return { success: true, data: page }
   } catch (error) {
@@ -187,9 +189,10 @@ export async function getContentArticles(
 
 export async function getContentArticle(
   id: string | number,
+  locale: string = "fr",
 ): Promise<{ success: true; data: PayloadBlogPostDoc } | { success: false; error: string }> {
   try {
-    const article = await getBlogPost(id)
+    const article = await getBlogPost(id, locale)
     return { success: true, data: article }
   } catch (error) {
     console.error("Failed to fetch content article from Payload:", error)
@@ -200,6 +203,7 @@ export async function getContentArticle(
 export async function saveContentArticle(
   id: string | number | null,
   input: BlogPostWriteInput,
+  locale: string = "fr",
 ): Promise<{ success: true; data: PayloadBlogPostDoc } | { success: false; error: string }> {
   const currentUser = await getCurrentUser()
   if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
@@ -207,7 +211,7 @@ export async function saveContentArticle(
   }
 
   try {
-    const article = id ? await updateBlogPost(id, input) : await createBlogPost(input)
+    const article = id ? await updateBlogPost(id, input, locale) : await createBlogPost(input, locale)
     revalidatePath("/admin/pages")
     return { success: true, data: article }
   } catch (error) {
@@ -235,11 +239,11 @@ export async function removeContentArticle(id: string | number): Promise<{ succe
   }
 }
 
-export async function getContentCategories(): Promise<
+export async function getContentCategories(locale: string = "fr"): Promise<
   { success: true; data: PayloadCategorySummary[] } | { success: false; error: string }
 > {
   try {
-    const categories = await listCategories()
+    const categories = await listCategories(locale)
     return { success: true, data: categories }
   } catch (error) {
     console.error("Failed to fetch categories from Payload:", error)

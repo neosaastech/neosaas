@@ -135,8 +135,8 @@ export async function listPages(options: ListPagesOptions = {}): Promise<Paginat
   return res.json()
 }
 
-export async function getPage(id: string | number): Promise<PayloadPageDoc> {
-  const res = await payloadFetch(`/pages/${id}?depth=1`)
+export async function getPage(id: string | number, locale: string = "fr"): Promise<PayloadPageDoc> {
+  const res = await payloadFetch(`/pages/${id}?depth=1&locale=${locale}`)
   if (!res.ok) {
     throw new Error(`Payload bridge: getPage(${id}) failed (${res.status})`)
   }
@@ -179,8 +179,8 @@ export interface PageWriteInput {
 }
 
 /** Always tagged with this site's own tenant — a bridge caller can't write into another site. */
-export async function createPage(input: PageWriteInput): Promise<PayloadPageDoc> {
-  const res = await payloadFetch(`/pages`, {
+export async function createPage(input: PageWriteInput, locale: string = "fr"): Promise<PayloadPageDoc> {
+  const res = await payloadFetch(`/pages?locale=${locale}`, {
     method: "POST",
     body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
   })
@@ -192,11 +192,17 @@ export async function createPage(input: PageWriteInput): Promise<PayloadPageDoc>
   return data.doc as PayloadPageDoc
 }
 
+// Without `?locale=`, Payload writes localized fields to its defaultLocale
+// (fr) no matter which language an editor thinks they're editing — the
+// Content Hub's language filter only ever drove what the *list* displayed
+// (Charles, 2026-07-08: "il manque encore des actions" — opening Edit while
+// EN was selected silently read AND wrote the fr slot).
 export async function updatePage(
   id: string | number,
   input: Partial<PageWriteInput>,
+  locale: string = "fr",
 ): Promise<PayloadPageDoc> {
-  const res = await payloadFetch(`/pages/${id}`, {
+  const res = await payloadFetch(`/pages/${id}?locale=${locale}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   })
@@ -234,9 +240,9 @@ export interface PayloadCategorySummary {
 }
 
 /** Categories are typically few (tens, not hundreds) — no pagination needed for a filter dropdown. */
-export async function listCategories(): Promise<PayloadCategorySummary[]> {
+export async function listCategories(locale: string = "fr"): Promise<PayloadCategorySummary[]> {
   const res = await payloadFetch(
-    `/categories?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=0&limit=200&sort=path`,
+    `/categories?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=0&limit=200&sort=path&locale=${locale}`,
   )
   if (!res.ok) {
     throw new Error(`Payload bridge: listCategories failed (${res.status})`)
@@ -337,8 +343,8 @@ export async function listBlogPosts(
   return res.json()
 }
 
-export async function getBlogPost(id: string | number): Promise<PayloadBlogPostDoc> {
-  const res = await payloadFetch(`/blog-posts/${id}?depth=1`)
+export async function getBlogPost(id: string | number, locale: string = "fr"): Promise<PayloadBlogPostDoc> {
+  const res = await payloadFetch(`/blog-posts/${id}?depth=1&locale=${locale}`)
   if (!res.ok) {
     throw new Error(`Payload bridge: getBlogPost(${id}) failed (${res.status})`)
   }
@@ -363,8 +369,8 @@ export interface BlogPostWriteInput {
   _status: "draft" | "published"
 }
 
-export async function createBlogPost(input: BlogPostWriteInput): Promise<PayloadBlogPostDoc> {
-  const res = await payloadFetch(`/blog-posts`, {
+export async function createBlogPost(input: BlogPostWriteInput, locale: string = "fr"): Promise<PayloadBlogPostDoc> {
+  const res = await payloadFetch(`/blog-posts?locale=${locale}`, {
     method: "POST",
     body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
   })
@@ -376,11 +382,13 @@ export async function createBlogPost(input: BlogPostWriteInput): Promise<Payload
   return data.doc as PayloadBlogPostDoc
 }
 
+// Same fix as updatePage — locale wasn't forwarded, so an edit always wrote fr.
 export async function updateBlogPost(
   id: string | number,
   input: Partial<BlogPostWriteInput>,
+  locale: string = "fr",
 ): Promise<PayloadBlogPostDoc> {
-  const res = await payloadFetch(`/blog-posts/${id}`, {
+  const res = await payloadFetch(`/blog-posts/${id}?locale=${locale}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   })

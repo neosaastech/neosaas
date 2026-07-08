@@ -1,3 +1,9 @@
+## [1.7.0](https://github.com/neosaastech/Neosaas-app/compare/v1.6.1...v1.7.0) (2026-07-08)
+
+### Features
+
+* **content-hub:** editor becomes locale-aware, categories localized, SEO preview ([6f33e8e](https://github.com/neosaastech/Neosaas-app/commit/6f33e8ed6f4a2a8841332a4bd9b06e20d21dc3c5))
+
 ## [1.6.1](https://github.com/neosaastech/Neosaas-app/compare/v1.6.0...v1.6.1) (2026-07-08)
 
 ### Bug Fixes

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus } from "lucide-react"
+import { Plus, Globe } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { saveContentPage, getContentCategories } from "@/app/actions/pages"
@@ -14,8 +14,19 @@ import type { PayloadPageDoc, PayloadPageBlock, PayloadCategorySummary } from "@
 import { AVAILABLE_BLOCK_TYPES, BlockEditor } from "./block-editor"
 import { BlockPreview } from "./block-preview"
 import { TemplateVariablesHint } from "./template-variables-hint"
+import { Badge } from "@/components/ui/badge"
 
-export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onSaved?: () => void }) {
+const LOCALE_LABELS: Record<string, string> = { fr: "Français", en: "English" }
+
+export function PageEditor({
+  page,
+  locale = "fr",
+  onSaved,
+}: {
+  page: PayloadPageDoc | null
+  locale?: string
+  onSaved?: () => void
+}) {
   const router = useRouter()
   const [title, setTitle] = useState(page?.title ?? "")
   const [slug, setSlug] = useState(page?.slug ?? "")
@@ -72,15 +83,19 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
       // promise would reject, isSaving would stay stuck true forever, and
       // nothing — no toast, no server log — would ever show why.
       const sanitizedLayout = JSON.parse(JSON.stringify(layout))
-      const result = await saveContentPage(page?.id ?? null, {
-        title,
-        slug,
-        pageType: pageType || undefined,
-        category: categoryId || null,
-        layout: sanitizedLayout,
-        seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
-        _status: status,
-      })
+      const result = await saveContentPage(
+        page?.id ?? null,
+        {
+          title,
+          slug,
+          pageType: pageType || undefined,
+          category: categoryId || null,
+          layout: sanitizedLayout,
+          seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
+          _status: status,
+        },
+        locale,
+      )
       if (result.success) {
         toast.success(status === "published" ? "Page publiée" : "Brouillon enregistré")
         if (onSaved) {
@@ -104,8 +119,12 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="flex flex-col gap-6">
         <Card shadow="flat">
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Informations de la page</CardTitle>
+            <Badge variant="outline" className="gap-1">
+              <Globe className="h-3 w-3" />
+              {LOCALE_LABELS[locale] ?? locale}
+            </Badge>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="space-y-2">
@@ -158,6 +177,21 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
                 value={metaDescription}
                 onChange={(e) => setMetaDescription(e.target.value)}
               />
+            </div>
+            {/* Payload's plugin-seo has a real preview panel; neosaas-v2's
+                own editor had none even though this SEO data now actually
+                drives generateMetadata() on the live site (2026-07-08) —
+                same "content going live with no visual feedback" pattern
+                as the empty-blocks warning added earlier today. */}
+            <div className="space-y-1.5 rounded-md border p-3">
+              <p className="text-xs font-medium text-muted-foreground">Aperçu Google</p>
+              <p className="truncate text-sm text-[#1a0dab]">{metaTitle || title || "Titre de la page"}</p>
+              <p className="truncate text-xs text-[#006621]">
+                {page?.path || slug ? `neosaas.tech/${locale}${page?.path || `/${slug}`}` : "neosaas.tech"}
+              </p>
+              <p className="line-clamp-2 text-xs text-muted-foreground">
+                {metaDescription || "Aucune description — le site utilisera la description par défaut du site."}
+              </p>
             </div>
           </CardContent>
         </Card>

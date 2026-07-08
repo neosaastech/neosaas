@@ -121,7 +121,7 @@ function PagesPanel() {
   async function openEdit(id: string | number) {
     setSheetOpen(true)
     setIsLoadingDoc(true)
-    const result = await getContentPage(id)
+    const result = await getContentPage(id, locale)
     if (result.success) {
       setEditingDoc(result.data)
     } else {
@@ -299,6 +299,7 @@ function PagesPanel() {
         ) : (
           <PageEditor
             page={editingDoc}
+            locale={locale}
             onSaved={() => {
               setSheetOpen(false)
               load()
@@ -325,10 +326,14 @@ function ArticlesPanel() {
   const [isLoadingDoc, setIsLoadingDoc] = useState(false)
 
   useEffect(() => {
-    getContentCategories().then((result) => {
+    // Categories.name is localized in Payload — was always fetched in the
+    // default locale (fr) regardless of the language filter above, so
+    // switching to EN never actually translated the category dropdown/column
+    // (Charles, 2026-07-08).
+    getContentCategories(locale).then((result) => {
       if (result.success) setCategories(result.data)
     })
-  }, [])
+  }, [locale])
 
   async function load() {
     setIsLoading(true)
@@ -357,7 +362,7 @@ function ArticlesPanel() {
   async function openEdit(id: string | number) {
     setSheetOpen(true)
     setIsLoadingDoc(true)
-    const result = await getContentArticle(id)
+    const result = await getContentArticle(id, locale)
     if (result.success) {
       setEditingDoc(result.data)
     } else {
@@ -513,6 +518,7 @@ function ArticlesPanel() {
         ) : (
           <ArticleEditor
             article={editingDoc}
+            locale={locale}
             onSaved={() => {
               setSheetOpen(false)
               load()

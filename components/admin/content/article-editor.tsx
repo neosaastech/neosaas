@@ -12,8 +12,20 @@ import { useRouter } from "next/navigation"
 import { saveContentArticle, getContentCategories } from "@/app/actions/pages"
 import type { PayloadBlogPostDoc, PayloadCategorySummary } from "@/lib/payload-bridge"
 import { RichTextEditor, RichTextPreview } from "@/components/admin/content/rich-text-editor"
+import { Badge } from "@/components/ui/badge"
+import { Globe } from "lucide-react"
 
-export function ArticleEditor({ article, onSaved }: { article: PayloadBlogPostDoc | null; onSaved?: () => void }) {
+const LOCALE_LABELS: Record<string, string> = { fr: "Français", en: "English" }
+
+export function ArticleEditor({
+  article,
+  locale = "fr",
+  onSaved,
+}: {
+  article: PayloadBlogPostDoc | null
+  locale?: string
+  onSaved?: () => void
+}) {
   const router = useRouter()
   const [title, setTitle] = useState(article?.title ?? "")
   const [slug, setSlug] = useState(article?.slug ?? "")
@@ -26,23 +38,27 @@ export function ArticleEditor({ article, onSaved }: { article: PayloadBlogPostDo
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
-    getContentCategories().then((result) => {
+    getContentCategories(locale).then((result) => {
       if (result.success) setCategories(result.data)
     })
-  }, [])
+  }, [locale])
 
   async function handleSave(status: "draft" | "published") {
     setIsSaving(true)
     try {
-      const result = await saveContentArticle(article?.id ?? null, {
-        title,
-        slug,
-        category: categoryId || undefined,
-        excerpt: excerpt || undefined,
-        body,
-        seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
-        _status: status,
-      })
+      const result = await saveContentArticle(
+        article?.id ?? null,
+        {
+          title,
+          slug,
+          category: categoryId || undefined,
+          excerpt: excerpt || undefined,
+          body,
+          seo: { metaTitle: metaTitle || undefined, metaDescription: metaDescription || undefined },
+          _status: status,
+        },
+        locale,
+      )
       if (result.success) {
         toast.success(status === "published" ? "Article publié" : "Brouillon enregistré")
         if (onSaved) {
@@ -66,8 +82,12 @@ export function ArticleEditor({ article, onSaved }: { article: PayloadBlogPostDo
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="flex flex-col gap-6">
         <Card shadow="flat">
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Informations de l&apos;article</CardTitle>
+            <Badge variant="outline" className="gap-1">
+              <Globe className="h-3 w-3" />
+              {LOCALE_LABELS[locale] ?? locale}
+            </Badge>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="space-y-2">
@@ -113,6 +133,14 @@ export function ArticleEditor({ article, onSaved }: { article: PayloadBlogPostDo
                 value={metaDescription}
                 onChange={(e) => setMetaDescription(e.target.value)}
               />
+            </div>
+            <div className="space-y-1.5 rounded-md border p-3">
+              <p className="text-xs font-medium text-muted-foreground">Aperçu Google</p>
+              <p className="truncate text-sm text-[#1a0dab]">{metaTitle || title || "Titre de l'article"}</p>
+              <p className="truncate text-xs text-[#006621]">{slug ? `neosaas.tech/${locale}/blog/${slug}` : "neosaas.tech/blog"}</p>
+              <p className="line-clamp-2 text-xs text-muted-foreground">
+                {metaDescription || excerpt || "Aucune description — le site utilisera l'extrait ou la description par défaut."}
+              </p>
             </div>
           </CardContent>
         </Card>
