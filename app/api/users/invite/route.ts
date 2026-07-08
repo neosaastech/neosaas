@@ -4,7 +4,7 @@ import { users, userRoles, roles, rolePermissions, permissions, userInvitations,
 import { getCurrentUser } from "@/lib/auth"
 import { eq, and } from "drizzle-orm"
 import crypto from "crypto"
-import { emailRouter, emailTemplateRepository } from "@/lib/email"
+import { emailRouter } from "@/lib/email"
 import { getPlatformConfig } from "@/lib/config"
 
 /**
@@ -105,54 +105,39 @@ export async function POST(request: NextRequest) {
 
     // Send invitation email
     try {
-      const template = await emailTemplateRepository.getTemplate("user_invitation")
-      if (template && template.isActive) {
-        const host = request.headers.get("host") || "localhost:3000"
-        const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
-        const inviteUrl = `${protocol}://${host}/auth/accept-invite?token=${token}`
+      const host = request.headers.get("host") || "localhost:3000"
+      const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
+      const inviteUrl = `${protocol}://${host}/auth/accept-invite?token=${token}`
 
-        let htmlContent = template.htmlContent || ""
-        let textContent = template.textContent || ""
-        const subject = template.subject.replace("{{siteName}}", "NeoSaaS")
+      // Get current user info for the inviter name
+      const inviter = await db.query.users.findFirst({
+        where: eq(users.id, currentUser.userId),
+      })
 
-        // Get current user info for the inviter name
-        const inviter = await db.query.users.findFirst({
-          where: eq(users.id, currentUser.userId),
-        })
+      // Get company info
+      const company = await db.query.companies.findFirst({
+        where: eq(companies.id, currentUser.companyId!),
+      })
 
-        // Get company info
-        const company = await db.query.companies.findFirst({
-          where: eq(companies.id, currentUser.companyId!),
-        })
+      const platformConfig = await getPlatformConfig()
 
-        // Replace variables
-        const variables = {
+      const result = await emailRouter.sendEmail({
+        to: [email],
+        template: "user_invitation",
+        data: {
+          email,
           inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : "Someone",
           companyName: company?.name || "the team",
           actionUrl: inviteUrl,
-          siteName: "NeoSaaS",
+          siteName: platformConfig.siteName,
           roleName: roleName === "writer" ? "Writer (Read & Write)" : "Reader (Read only)",
-        }
+        },
+      })
 
-        Object.entries(variables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g")
-          htmlContent = htmlContent.replace(regex, value)
-          textContent = textContent.replace(regex, value)
-        })
-
-        const platformConfig = await getPlatformConfig()
-
-        await emailRouter.sendEmail({
-          to: [email],
-          from: template.fromEmail || platformConfig.defaultSenderEmail || "no-reply@neosaas.tech",
-          fromName: template.fromName || undefined,
-          subject: subject,
-          htmlContent: htmlContent,
-          textContent: textContent,
-        })
+      if (result.success) {
         console.log(`[v0] Invitation email sent to ${email}`)
       } else {
-        console.warn("[v0] user_invitation template not found or inactive, invitation created but email not sent")
+        console.warn(`[v0] user_invitation email not sent: ${result.error}`)
       }
     } catch (emailError) {
       console.error("[v0] Failed to send invitation email:", emailError)

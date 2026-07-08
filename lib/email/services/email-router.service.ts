@@ -98,14 +98,20 @@ export class EmailRouterService {
   /**
    * Resolve a DB template: fetch by type, replace {{variables}} with data,
    * and fill in subject / htmlContent / textContent / from if not already set.
+   *
+   * A hardcoded `message.subject` (as several call sites used to pass
+   * alongside `template`) still wins over the DB subject — that's
+   * intentional for callers with no admin-editable subject of their own —
+   * but the DB subject, once used, gets the exact same full {{var}}
+   * substitution as the body instead of a partial hand-rolled replace.
    */
-  private async resolveTemplate(message: EmailMessage): Promise<EmailMessage> {
-    if (!message.template) return message;
+  private async resolveTemplate(message: EmailMessage): Promise<{ message: EmailMessage; failed: boolean }> {
+    if (!message.template) return { message, failed: false };
 
     const tpl = await emailTemplateRepository.getTemplate(message.template);
-    if (!tpl) {
-      emailLogger.warn(`Template '${message.template}' not found in DB — sending with raw fields`);
-      return message;
+    if (!tpl || !tpl.isActive) {
+      emailLogger.warn(`Template '${message.template}' not found or inactive — email not sent`);
+      return { message, failed: true };
     }
 
     const vars: Record<string, string> = {};
@@ -125,12 +131,15 @@ export class EmailRouterService {
     };
 
     return {
-      ...message,
-      subject: message.subject || replace(tpl.subject),
-      htmlContent: message.htmlContent || replace(tpl.htmlContent),
-      textContent: message.textContent || replace(tpl.textContent),
-      from: message.from || tpl.fromEmail || 'no-reply@neosaas.tech',
-      fromName: message.fromName || tpl.fromName || 'NeoSaaS Platform',
+      message: {
+        ...message,
+        subject: message.subject || replace(tpl.subject),
+        htmlContent: message.htmlContent || replace(tpl.htmlContent),
+        textContent: message.textContent || replace(tpl.textContent),
+        from: message.from || tpl.fromEmail || 'no-reply@neosaas.tech',
+        fromName: message.fromName || tpl.fromName || 'NeoSaaS Platform',
+      },
+      failed: false,
     };
   }
 
@@ -145,7 +154,17 @@ export class EmailRouterService {
     await this.initialize();
 
     // --- Template resolution ---
-    message = await this.resolveTemplate(message);
+    const templateType = message.template;
+    const resolved = await this.resolveTemplate(message);
+    if (resolved.failed) {
+      return {
+        success: false,
+        error: `Email template '${templateType}' not found or inactive`,
+        messageId: undefined,
+        provider: providerName || ('none' as EmailProvider),
+      };
+    }
+    message = resolved.message;
 
     let provider: IEmailProvider | undefined;
 

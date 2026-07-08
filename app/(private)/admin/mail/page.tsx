@@ -24,7 +24,8 @@ function ScalewayIcon({ className }: { className?: string }) {
 
 const emailTypes = [
   // --- Account ---
-  { id: "registration", name: "Welcome / Registration", description: "Sent when a new user signs up", group: "account" },
+  { id: "email_verification", name: "Welcome / Registration", description: "Sent when a new user signs up and must verify their email", group: "account" },
+  { id: "password_reset", name: "Password Reset", description: "Sent when a user requests a password reset", group: "account" },
   { id: "user_invitation", name: "Team Invitation", description: "Sent when inviting a member to a team", group: "account" },
   { id: "account_deletion", name: "Account Deletion", description: "Sent when a user account is deleted", group: "account" },
   { id: "email_update_notification", name: "Email Update", description: "Sent when a user changes their email", group: "account" },
@@ -37,35 +38,72 @@ const emailTypes = [
   { id: "payment_confirmation", name: "Payment Received", description: "Payment receipt sent for every successful payment", group: "payment" },
 ]
 
-const variablesByGroup: Record<string, { name: string; value: string }[]> = {
-  common: [
-    { name: "User First Name", value: "{{firstName}}" },
-    { name: "User Last Name", value: "{{lastName}}" },
-    { name: "User Email", value: "{{email}}" },
-    { name: "Company Name", value: "{{companyName}}" },
-    { name: "Action URL", value: "{{actionUrl}}" },
-    { name: "Site Name", value: "{{siteName}}" },
-  ],
-  commerce: [
-    { name: "Order Number", value: "{{orderNumber}}" },
-    { name: "Order Date", value: "{{orderDate}}" },
-    { name: "Order Total", value: "{{total}}" },
-    { name: "Currency", value: "{{currency}}" },
-    { name: "Items (JSON)", value: "{{items}}" },
-  ],
-  digital: [
-    { name: "License Key", value: "{{licenseKey}}" },
-    { name: "License Instructions", value: "{{licenseInstructions}}" },
-    { name: "Download URL", value: "{{downloadUrl}}" },
-  ],
-  subscription: [
-    { name: "Plan Name", value: "{{planName}}" },
-    { name: "Billing Interval", value: "{{billingInterval}}" },
-    { name: "Next Renewal Date", value: "{{nextRenewalDate}}" },
-  ],
-  payment: [
-    { name: "Payment Method", value: "{{paymentMethod}}" },
-  ],
+// Sample values used both for the in-editor Preview tab and for Send Test —
+// keeping a single source means test emails always match what Preview shows.
+const EXAMPLE_VALUES: Record<string, string> = {
+  firstName: 'John',
+  lastName: 'Doe',
+  email: 'john@example.com',
+  companyName: 'Acme Corp',
+  actionUrl: '#',
+  siteName: 'NeoSaaS',
+  orderNumber: 'ORD-2026-0042',
+  orderDate: '2026-02-16',
+  total: '129.00',
+  currency: 'EUR',
+  items: '[{"name":"Widget Pro","qty":2,"price":"49.50"}]',
+  licenseKey: 'XXXX-XXXX-XXXX-XXXX',
+  licenseInstructions: 'Go to Settings > Activate',
+  downloadUrl: 'https://example.com/download/abc123',
+  planName: 'Pro Monthly',
+  billingInterval: 'month',
+  nextRenewalDate: '2026-03-16',
+  paymentMethod: 'Visa •••• 4242',
+}
+
+function substituteExampleValues(text: string): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, key) => EXAMPLE_VALUES[key] || key)
+}
+
+// Display name for every variable key that some template can use.
+const VARIABLE_LABELS: Record<string, string> = {
+  firstName: "User First Name",
+  lastName: "User Last Name",
+  email: "User Email",
+  companyName: "Company Name",
+  actionUrl: "Action URL",
+  siteName: "Site Name",
+  inviterName: "Inviter Name",
+  roleName: "Invited Role",
+  newEmail: "New Email Address",
+  orderNumber: "Order Number",
+  orderDate: "Order Date",
+  total: "Order Total",
+  currency: "Currency",
+  items: "Items (JSON)",
+  licenseKey: "License Key",
+  licenseInstructions: "License Instructions",
+  downloadUrl: "Download URL",
+  planName: "Plan Name",
+  billingInterval: "Billing Interval",
+  nextRenewalDate: "Next Renewal Date",
+  paymentMethod: "Payment Method",
+}
+
+// Exactly the variable keys each template TYPE actually receives from the
+// real send code (app/actions/*, app/api/**/route.ts) — kept in sync with
+// those call sites so the picker never offers a tag that won't be replaced.
+const variablesByType: Record<string, string[]> = {
+  email_verification: ["firstName", "lastName", "email", "companyName", "siteName", "actionUrl"],
+  password_reset: ["firstName", "lastName", "email", "siteName", "actionUrl"],
+  user_invitation: ["email", "inviterName", "companyName", "siteName", "actionUrl", "roleName"],
+  account_deletion: ["firstName", "lastName", "email", "siteName"],
+  email_update_notification: ["firstName", "lastName", "siteName", "newEmail", "companyName"],
+  order_confirmation: ["firstName", "siteName", "orderNumber", "orderDate", "total", "currency", "items", "actionUrl"],
+  order_confirmation_physical: ["firstName", "siteName", "orderNumber", "orderDate", "total", "currency", "items", "actionUrl"],
+  order_confirmation_digital: ["firstName", "siteName", "orderNumber", "orderDate", "total", "currency", "licenseKey", "licenseInstructions", "downloadUrl", "actionUrl"],
+  order_confirmation_subscription: ["firstName", "siteName", "orderNumber", "orderDate", "planName", "billingInterval", "nextRenewalDate", "total", "currency", "actionUrl"],
+  payment_confirmation: ["firstName", "siteName", "orderNumber", "orderDate", "total", "currency", "paymentMethod", "items", "actionUrl"],
 }
 
 export default function MailPage() {
@@ -145,9 +183,11 @@ export default function MailPage() {
           to: testEmail,
           from: fromEmail,
           fromName,
-          subject,
-          htmlContent,
-          textContent,
+          // Substitute with the same sample values as the Preview tab, so a
+          // test email never ships with raw, unresolved {{tags}}.
+          subject: substituteExampleValues(subject),
+          htmlContent: substituteExampleValues(htmlContent),
+          textContent: substituteExampleValues(textContent),
           provider: selectedProvider === 'scaleway' ? 'scaleway-tem' : selectedProvider === 'aws' ? 'aws-ses' : selectedProvider,
           tags: ['test', selectedType],
         }),
@@ -310,25 +350,16 @@ export default function MailPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64 max-h-72 overflow-y-auto">
-                      {(() => {
-                        const selectedGroup = emailTypes.find(t => t.id === selectedType)?.group ?? 'account';
-                        const groups = ['common'];
-                        if (['commerce', 'payment'].includes(selectedGroup)) groups.push('commerce');
-                        if (selectedGroup === 'commerce' && selectedType.includes('digital')) groups.push('digital');
-                        if (selectedGroup === 'commerce' && selectedType.includes('subscription')) groups.push('subscription');
-                        if (selectedGroup === 'payment') groups.push('payment');
-                        const vars = groups.flatMap(g => variablesByGroup[g] ?? []);
-                        return vars.map((variable) => (
-                          <DropdownMenuItem
-                            key={variable.value}
-                            onClick={() => handleCopy(variable.value)}
-                            className="flex justify-between cursor-pointer"
-                          >
-                            <span>{variable.name}</span>
-                            <code className="text-xs bg-muted px-1 rounded">{variable.value}</code>
-                          </DropdownMenuItem>
-                        ));
-                      })()}
+                      {(variablesByType[selectedType] ?? []).map((key) => (
+                        <DropdownMenuItem
+                          key={key}
+                          onClick={() => handleCopy(`{{${key}}}`)}
+                          className="flex justify-between cursor-pointer"
+                        >
+                          <span>{VARIABLE_LABELS[key] ?? key}</span>
+                          <code className="text-xs bg-muted px-1 rounded">{`{{${key}}}`}</code>
+                        </DropdownMenuItem>
+                      ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
 
@@ -387,29 +418,7 @@ export default function MailPage() {
                     </TabsContent>
                     <TabsContent value="preview" className="mt-4">
                       <div className="border rounded-lg p-6 min-h-[300px] prose max-w-none">
-                        <div dangerouslySetInnerHTML={{ __html: htmlContent.replace(/\{\{(\w+)\}\}/g, (_, key) => {
-                          const examples: Record<string, string> = {
-                            firstName: 'John',
-                            lastName: 'Doe',
-                            email: 'john@example.com',
-                            companyName: 'Acme Corp',
-                            actionUrl: '#',
-                            siteName: 'NeoSaaS',
-                            orderNumber: 'ORD-2026-0042',
-                            orderDate: '2026-02-16',
-                            total: '129.00',
-                            currency: 'EUR',
-                            items: '[{"name":"Widget Pro","qty":2,"price":"49.50"}]',
-                            licenseKey: 'XXXX-XXXX-XXXX-XXXX',
-                            licenseInstructions: 'Go to Settings > Activate',
-                            downloadUrl: 'https://example.com/download/abc123',
-                            planName: 'Pro Monthly',
-                            billingInterval: 'month',
-                            nextRenewalDate: '2026-03-16',
-                            paymentMethod: 'Visa •••• 4242',
-                          }
-                          return examples[key] || key
-                        }) }} />
+                        <div dangerouslySetInnerHTML={{ __html: substituteExampleValues(htmlContent) }} />
                       </div>
                     </TabsContent>
                   </Tabs>

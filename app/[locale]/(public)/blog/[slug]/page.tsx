@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { db } from "@/db"
 import { blogPosts, pageLayers } from "@/db/schema"
 import { BlockRenderer } from "@/components/layers/block-renderer"
+import { buildPageTemplateContext, interpolateTemplateString } from "@/lib/pages/template-variables"
 
 /**
  * Cover/title/author/body stay this fixed template (proven, low-risk) —
@@ -30,6 +31,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
   const headerLayer = extraLayers.find((layer) => layer.layerType === "article-header")
   const afterBodyLayers = extraLayers.filter((layer) => layer.layerType !== "article-header")
 
+  const templateContext = await buildPageTemplateContext(locale)
+  const bodyHtml = interpolateTemplateString(post.bodyHtml, templateContext)
+
   return (
     <article className="container max-w-3xl py-12 md:py-24">
       {headerLayer ? (
@@ -46,7 +50,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
       )}
       <div
         className="mt-8 space-y-4 [&_a]:text-primary [&_a]:underline [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-6 [&_ul]:list-disc [&_ol]:list-decimal"
-        dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
+        dangerouslySetInnerHTML={{ __html: bodyHtml }}
       />
       {afterBodyLayers.length > 0 && (
         <div className="mt-12">

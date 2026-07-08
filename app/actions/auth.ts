@@ -3,11 +3,12 @@
 import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { emailTemplateRepository, emailRouter } from '@/lib/email';
+import { emailRouter } from '@/lib/email';
 import { createToken, verifyToken, hashPassword } from '@/lib/auth';
 import { headers } from 'next/headers';
 import { notifyAdminClientAction } from '@/lib/notifications/admin-notifications';
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { getPlatformConfig } from '@/lib/config';
 
 const RECOVER_PASSWORD_RATE_LIMIT = { max: 3, windowMs: 60 * 60 * 1000 }; // 3 / hour
 
@@ -61,35 +62,21 @@ export async function recoverPassword(formData: FormData) {
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const actionUrl = `${protocol}://${host}/auth/reset-password?token=${token}`;
 
-    // Get template
-    const template = await emailTemplateRepository.getTemplate('password_reset');
-    
-    if (template) {
-       let htmlContent = template.htmlContent || "";
-       let textContent = template.textContent || "";
-       
-       const variables = {
-          firstName: user.firstName || 'User',
-          actionUrl: actionUrl,
-          siteName: 'NeoSaaS',
-       };
+    const platformConfig = await getPlatformConfig();
+    const result = await emailRouter.sendEmail({
+      to: user.email,
+      template: 'password_reset',
+      data: {
+        firstName: user.firstName || 'User',
+        lastName: user.lastName || '',
+        email: user.email,
+        actionUrl: actionUrl,
+        siteName: platformConfig.siteName,
+      },
+    });
 
-       Object.entries(variables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{${key}}}`, "g");
-          htmlContent = htmlContent.replace(regex, value);
-          textContent = textContent.replace(regex, value);
-       });
-
-       await emailRouter.sendEmail({
-        to: user.email,
-        from: template.fromEmail,
-        fromName: template.fromName || undefined,
-        subject: template.subject,
-        htmlContent: htmlContent,
-        textContent: textContent,
-      });
-    } else {
-        console.warn('Password reset template not found');
+    if (!result.success) {
+      console.warn('Password reset email not sent:', result.error);
     }
 
     return { success: true, message: 'If an account exists with this email, you will receive a password reset link.' };

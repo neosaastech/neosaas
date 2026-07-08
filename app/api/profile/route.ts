@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, validateDatabaseUrl } from '@/db';
-import { users } from '@/db/schema';
+import { users, companies } from '@/db/schema';
 import { getCurrentUser } from '@/lib/auth';
 import { eq, and, ne, or } from 'drizzle-orm';
-import { emailRouter, emailTemplateRepository } from '@/lib/email';
+import { emailRouter } from '@/lib/email';
 import { notifyAdminClientAction } from '@/lib/notifications/admin-notifications';
+import { getPlatformConfig } from '@/lib/config';
 
 /**
  * POST /api/profile
@@ -92,44 +93,22 @@ export async function POST(request: NextRequest) {
     // Send notification email if email changed
     if (emailChanged) {
       try {
-        const template = await emailTemplateRepository.getTemplate('email_update_notification');
-        if (template && template.isActive) {
-          let htmlContent = template.htmlContent || '';
-          let textContent = template.textContent || '';
-          const subject = template.subject.replace('{{siteName}}', 'NeoSaaS');
+        const platformConfig = await getPlatformConfig();
+        const company = updatedUser.companyId
+          ? await db.query.companies.findFirst({ where: eq(companies.id, updatedUser.companyId) })
+          : null
+        const data = {
+          firstName,
+          lastName,
+          siteName: platformConfig.siteName,
+          newEmail: email,
+          companyName: company?.name || platformConfig.siteName,
+        };
 
-          const variables = {
-            firstName: firstName,
-            siteName: 'NeoSaaS',
-            newEmail: email,
-            companyName: 'NeoSaaS Inc.'
-          };
-
-          Object.entries(variables).forEach(([key, value]) => {
-            const regex = new RegExp(`{{${key}}}`, 'g');
-            htmlContent = htmlContent.replace(regex, value);
-            textContent = textContent.replace(regex, value);
-          });
-
-          await emailRouter.sendEmail({
-            to: [email], // Send to new email
-            from: { name: template.fromName, email: template.fromEmail },
-            subject: subject,
-            html: htmlContent,
-            text: textContent,
-            templateId: template.type,
-          });
-          
-          // Optionally send to old email as well for security
-          await emailRouter.sendEmail({
-            to: [currentUserData.email], // Send to old email
-            from: { name: template.fromName, email: template.fromEmail },
-            subject: subject,
-            html: htmlContent,
-            text: textContent,
-            templateId: template.type,
-          });
-        }
+        // Send to new email
+        await emailRouter.sendEmail({ to: [email], template: 'email_update_notification', data });
+        // Also notify the old email address for security
+        await emailRouter.sendEmail({ to: [currentUserData.email], template: 'email_update_notification', data });
       } catch (emailError) {
         console.error('Failed to send email update notification:', emailError);
         // Don't fail the request

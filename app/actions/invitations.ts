@@ -5,7 +5,7 @@ import { userInvitations, users, companies, roles, userRoles } from "@/db/schema
 import { eq, and } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getCurrentUser, hashPassword, createToken, setAuthCookie } from "@/lib/auth"
-import { emailRouter, emailTemplateRepository } from "@/lib/email"
+import { emailRouter } from "@/lib/email"
 import { headers } from "next/headers"
 import { getPlatformConfig } from "@/lib/config"
 
@@ -41,57 +41,41 @@ export async function resendInvitation(invitationId: string) {
 
     // Send invitation email
     try {
-      const template = await emailTemplateRepository.getTemplate("user_invitation")
-      if (template && template.isActive) {
-        let host = "localhost:3000"
-        try {
-          const headersList = await headers()
-          host = headersList.get("host") || "localhost:3000"
-        } catch (e) {
-          console.error("Error getting headers:", e)
-        }
-        const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
-        const inviteUrl = `${protocol}://${host}/auth/accept-invite?token=${invitation.token}`
+      let host = "localhost:3000"
+      try {
+        const headersList = await headers()
+        host = headersList.get("host") || "localhost:3000"
+      } catch (e) {
+        console.error("Error getting headers:", e)
+      }
+      const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
+      const inviteUrl = `${protocol}://${host}/auth/accept-invite?token=${invitation.token}`
 
-        let htmlContent = template.htmlContent || ""
-        let textContent = template.textContent || ""
-        const subject = template.subject.replace("{{siteName}}", "NeoSaaS")
+      // Get inviter info (current user doing the resend)
+      const inviter = await db.query.users.findFirst({
+        where: eq(users.id, currentUser.userId),
+      })
 
-        // Get inviter info (current user doing the resend)
-        const inviter = await db.query.users.findFirst({
-          where: eq(users.id, currentUser.userId),
-        })
+      const platformConfig = await getPlatformConfig()
 
-        // Replace variables
-        const variables = {
+      const result = await emailRouter.sendEmail({
+        to: [invitation.email],
+        template: "user_invitation",
+        data: {
+          email: invitation.email,
           inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : "Someone",
           companyName: invitation.company?.name || "the team",
           actionUrl: inviteUrl,
-          siteName: "NeoSaaS",
+          siteName: platformConfig.siteName,
           roleName: invitation.role?.name === "writer" ? "Writer (Read & Write)" : "Reader (Read only)",
-        }
+        },
+      })
 
-        Object.entries(variables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g")
-          htmlContent = htmlContent.replace(regex, value)
-          textContent = textContent.replace(regex, value)
-        })
-
-        const platformConfig = await getPlatformConfig()
-
-        await emailRouter.sendEmail({
-          to: [invitation.email],
-          from: template.fromEmail || platformConfig.defaultSenderEmail || "no-reply@neosaas.tech",
-          fromName: template.fromName || undefined,
-          subject: subject,
-          htmlContent: htmlContent,
-          textContent: textContent,
-        })
-        
-        return { success: true, message: "Invitation resent successfully" }
-      } else {
-        return { success: false, error: "Email template not found or inactive" }
+      if (!result.success) {
+        return { success: false, error: result.error || "Email template not found or inactive" }
       }
+
+      return { success: true, message: "Invitation resent successfully" }
     } catch (emailError) {
       console.error("Failed to resend invitation email:", emailError)
       return { success: false, error: "Failed to send email" }

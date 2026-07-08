@@ -34,7 +34,7 @@ const templates = [
           <p style="margin: 0 0 20px; color: #666666;">Votre rôle sera : <strong>{{roleName}}</strong></p>
           <table role="presentation" style="margin: 30px 0;">
             <tr><td style="text-align: center;">
-              <a href="{{inviteUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #CD7F32; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
+              <a href="{{actionUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #CD7F32; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
                 Accepter l'invitation
               </a>
             </td></tr>
@@ -51,10 +51,10 @@ const templates = [
   </table>
 </body>
 </html>`,
-    textContent: `Vous êtes invité(e) à rejoindre {{companyName}} sur {{siteName}}!\n\n{{inviterName}} vous a invité(e). Votre rôle sera : {{roleName}}\n\nAcceptez l'invitation : {{inviteUrl}}\n\nCette invitation expire dans 7 jours.`,
+    textContent: `Vous êtes invité(e) à rejoindre {{companyName}} sur {{siteName}}!\n\n{{inviterName}} vous a invité(e). Votre rôle sera : {{roleName}}\n\nAcceptez l'invitation : {{actionUrl}}\n\nCette invitation expire dans 7 jours.`,
   },
   {
-    type: "registration",
+    type: "email_verification",
     name: "Bienvenue - Inscription",
     description: "Email envoyé lors de l'inscription d'un nouvel utilisateur",
     subject: "Bienvenue sur {{siteName}} ! 🎉",
@@ -97,44 +97,35 @@ const templates = [
     textContent: `Bienvenue sur {{siteName}} !\n\nBonjour {{firstName}},\n\nVotre compte a été créé avec succès pour {{companyName}}.\n\nAccéder à mon compte : {{actionUrl}}`,
   },
   {
-    type: "account_update",
-    name: "Modification de compte",
-    description: "Email envoyé lors de la modification des informations de compte",
-    subject: "Votre compte {{siteName}} a été modifié",
+    type: "password_reset",
+    name: "Réinitialisation de mot de passe",
+    description: "Email envoyé lors d'une demande de réinitialisation de mot de passe",
+    subject: "Réinitialisez votre mot de passe {{siteName}}",
     htmlContent: `<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr><td align="center" style="padding: 40px 0;">
-      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px;">
-        <tr><td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Modification de compte</h1>
+      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <tr><td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #CD7F32 0%, #B86F28 100%); border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
+          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Réinitialisation de mot de passe</h1>
         </td></tr>
         <tr><td style="padding: 40px;">
           <p style="margin: 0 0 20px; color: #333333; font-size: 16px;">Bonjour <strong>{{firstName}}</strong>,</p>
           <p style="margin: 0 0 20px; color: #666666; font-size: 16px;">
-            Vos informations de compte ont été modifiées avec succès.
-          </p>
-          <div style="margin: 20px 0; padding: 20px; background-color: #f3f4f6; border-left: 4px solid #CD7F32; border-radius: 4px;">
-            <p style="margin: 0; color: #333; font-size: 14px;"><strong>Modifications effectuées :</strong></p>
-            <p style="margin: 10px 0 0; color: #666; font-size: 14px;">{{updateDetails}}</p>
-          </div>
-          <p style="margin: 20px 0; color: #666;">
-            <strong>Informations actuelles :</strong><br>
-            Email : {{email}}<br>
-            Nom : {{firstName}} {{lastName}}<br>
-            Entreprise : {{companyName}}
+            Vous avez demandé la réinitialisation de votre mot de passe sur {{siteName}}.
           </p>
           <table role="presentation" style="margin: 30px 0;">
             <tr><td style="text-align: center;">
-              <a href="{{dashboardUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #CD7F32; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
-                Voir mon profil
+              <a href="{{actionUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #CD7F32; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                Réinitialiser mon mot de passe
               </a>
             </td></tr>
           </table>
-          <p style="margin: 20px 0 0; color: #999; font-size: 13px;">
-            Si vous n'êtes pas à l'origine de ces modifications, contactez-nous immédiatement.
+          <p style="margin: 30px 0 0; color: #999999; font-size: 14px;">
+            Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.
           </p>
         </td></tr>
         <tr><td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
@@ -145,51 +136,171 @@ const templates = [
   </table>
 </body>
 </html>`,
-    textContent: `Modification de compte\n\nBonjour {{firstName}},\n\nVos informations ont été modifiées:\n{{updateDetails}}\n\nInformations actuelles:\nEmail: {{email}}\nNom: {{firstName}} {{lastName}}\nEntreprise: {{companyName}}\n\nVoir mon profil: {{dashboardUrl}}`,
+    textContent: `Réinitialisation de mot de passe\n\nBonjour {{firstName}},\n\nVous avez demandé la réinitialisation de votre mot de passe sur {{siteName}}.\n\nRéinitialisez-le ici : {{actionUrl}}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
   },
   {
-    type: "admin_notification",
-    name: "Notification Admin",
-    description: "Email envoyé aux super admins pour les changements importants",
-    subject: "[Admin] {{notificationType}} - {{siteName}}",
+    type: "order_confirmation_physical",
+    name: "Order — Physical Product",
+    description: "Confirmation for physical product orders (shipping info)",
+    subject: "Order Confirmed — #{{orderNumber}}",
     htmlContent: `<!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
     <tr><td align="center" style="padding: 40px 0;">
-      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px;">
-        <tr><td style="padding: 40px 40px 20px; text-align: center; background: #1a1a1a; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">🔔 Notification Admin</h1>
+      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <tr><td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">📦</div>
+          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Order Confirmed!</h1>
         </td></tr>
         <tr><td style="padding: 40px;">
-          <h2 style="margin: 0 0 20px; color: #333; font-size: 20px;">{{notificationType}}</h2>
-          <div style="margin: 20px 0; padding: 20px; background-color: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
-            <p style="margin: 0; color: #92400e; font-size: 14px;"><strong>Détails de l'événement:</strong></p>
-            <p style="margin: 10px 0 0; color: #92400e; font-size: 14px;">{{eventDetails}}</p>
-            <p style="margin: 10px 0 0; color: #92400e; font-size: 13px;"><strong>Date:</strong> {{timestamp}}</p>
+          <p style="margin: 0 0 20px; color: #333333; font-size: 16px;">Hello <strong>{{firstName}}</strong>,</p>
+          <p style="margin: 0 0 20px; color: #666666; font-size: 16px;">Thank you for your order! It's being prepared for shipping.</p>
+          <div style="margin: 30px 0; padding: 20px; background-color: #f3f4f6; border-radius: 6px;">
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Order Number:</strong> {{orderNumber}}</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Date:</strong> {{orderDate}}</p>
+            <p style="margin: 0; color: #666666; font-size: 14px;"><strong style="color: #333333;">Total:</strong> {{total}} {{currency}}</p>
           </div>
-          <p style="margin: 20px 0; color: #666;">
-            <strong>Informations utilisateur :</strong><br>
-            {{userInfo}}
-          </p>
           <table role="presentation" style="margin: 30px 0;">
             <tr><td style="text-align: center;">
-              <a href="{{adminUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #1a1a1a; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">
-                Voir dans l'admin
-              </a>
+              <a href="{{actionUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">View Order</a>
             </td></tr>
           </table>
         </td></tr>
         <tr><td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
-          <p style="margin: 0; color: #999999; font-size: 12px;">Notification automatique - {{siteName}}</p>
+          <p style="margin: 0; color: #999999; font-size: 12px;">© 2025 {{siteName}}. All rights reserved.</p>
         </td></tr>
       </table>
     </td></tr>
   </table>
 </body>
 </html>`,
-    textContent: `[Admin] {{notificationType}}\n\nDétails: {{eventDetails}}\nDate: {{timestamp}}\n\nUtilisateur: {{userInfo}}\n\nVoir dans l'admin: {{adminUrl}}`,
+    textContent: `Order Confirmed!\n\nHello {{firstName}},\n\nThank you for your order! It's being prepared for shipping.\n\nOrder Number: {{orderNumber}}\nDate: {{orderDate}}\nTotal: {{total}} {{currency}}\n\nView your order: {{actionUrl}}`,
+  },
+  {
+    type: "order_confirmation_digital",
+    name: "Order — Digital Product",
+    description: "Confirmation for digital product orders (license key, download)",
+    subject: "Your Purchase is Ready — #{{orderNumber}}",
+    htmlContent: `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr><td align="center" style="padding: 40px 0;">
+      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <tr><td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">💾</div>
+          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Your Purchase is Ready!</h1>
+        </td></tr>
+        <tr><td style="padding: 40px;">
+          <p style="margin: 0 0 20px; color: #333333; font-size: 16px;">Hello <strong>{{firstName}}</strong>,</p>
+          <p style="margin: 0 0 20px; color: #666666; font-size: 16px;">Thank you for your purchase! Here's everything you need to get started.</p>
+          <div style="margin: 30px 0; padding: 20px; background-color: #f3f4f6; border-radius: 6px;">
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Order Number:</strong> {{orderNumber}}</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Total:</strong> {{total}} {{currency}}</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">License Key:</strong> {{licenseKey}}</p>
+            <p style="margin: 0; color: #666666; font-size: 14px;">{{licenseInstructions}}</p>
+          </div>
+          <table role="presentation" style="margin: 30px 0;">
+            <tr><td style="text-align: center;">
+              <a href="{{downloadUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">Download Now</a>
+            </td></tr>
+          </table>
+          <p style="margin: 0; color: #999999; font-size: 13px; text-align: center;">Or view your order: <a href="{{actionUrl}}">{{actionUrl}}</a></p>
+        </td></tr>
+        <tr><td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
+          <p style="margin: 0; color: #999999; font-size: 12px;">© 2025 {{siteName}}. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    textContent: `Your Purchase is Ready!\n\nHello {{firstName}},\n\nOrder Number: {{orderNumber}}\nTotal: {{total}} {{currency}}\nLicense Key: {{licenseKey}}\n{{licenseInstructions}}\n\nDownload: {{downloadUrl}}\nView order: {{actionUrl}}`,
+  },
+  {
+    type: "order_confirmation_subscription",
+    name: "Order — Subscription",
+    description: "Confirmation for subscription activation",
+    subject: "Subscription Activated — #{{orderNumber}}",
+    htmlContent: `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr><td align="center" style="padding: 40px 0;">
+      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <tr><td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">⭐</div>
+          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Subscription Activated!</h1>
+        </td></tr>
+        <tr><td style="padding: 40px;">
+          <p style="margin: 0 0 20px; color: #333333; font-size: 16px;">Hello <strong>{{firstName}}</strong>,</p>
+          <p style="margin: 0 0 20px; color: #666666; font-size: 16px;">Your subscription is now active. Welcome aboard!</p>
+          <div style="margin: 30px 0; padding: 20px; background-color: #f3f4f6; border-radius: 6px;">
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Plan:</strong> {{planName}} ({{billingInterval}})</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Order Number:</strong> {{orderNumber}}</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Total:</strong> {{total}} {{currency}}</p>
+            <p style="margin: 0; color: #666666; font-size: 14px;"><strong style="color: #333333;">Next renewal:</strong> {{nextRenewalDate}}</p>
+          </div>
+          <table role="presentation" style="margin: 30px 0;">
+            <tr><td style="text-align: center;">
+              <a href="{{actionUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #10b981; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">Manage Subscription</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
+          <p style="margin: 0; color: #999999; font-size: 12px;">© 2025 {{siteName}}. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    textContent: `Subscription Activated!\n\nHello {{firstName}},\n\nPlan: {{planName}} ({{billingInterval}})\nOrder Number: {{orderNumber}}\nTotal: {{total}} {{currency}}\nNext renewal: {{nextRenewalDate}}\n\nManage your subscription: {{actionUrl}}`,
+  },
+  {
+    type: "payment_confirmation",
+    name: "Payment Received",
+    description: "Payment receipt sent for every successful payment",
+    subject: "Payment Received — #{{orderNumber}}",
+    htmlContent: `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr><td align="center" style="padding: 40px 0;">
+      <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <tr><td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 8px 8px 0 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">💳</div>
+          <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Payment Received</h1>
+        </td></tr>
+        <tr><td style="padding: 40px;">
+          <p style="margin: 0 0 20px; color: #333333; font-size: 16px;">Hello <strong>{{firstName}}</strong>,</p>
+          <p style="margin: 0 0 20px; color: #666666; font-size: 16px;">This confirms we've received your payment. Here's your receipt.</p>
+          <div style="margin: 30px 0; padding: 20px; background-color: #f3f4f6; border-radius: 6px;">
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Order Number:</strong> {{orderNumber}}</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Date:</strong> {{orderDate}}</p>
+            <p style="margin: 0 0 10px; color: #666666; font-size: 14px;"><strong style="color: #333333;">Payment Method:</strong> {{paymentMethod}}</p>
+            <p style="margin: 0; color: #666666; font-size: 14px;"><strong style="color: #333333;">Total Paid:</strong> {{total}} {{currency}}</p>
+          </div>
+          <table role="presentation" style="margin: 30px 0;">
+            <tr><td style="text-align: center;">
+              <a href="{{actionUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">View Receipt</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding: 30px 40px; background-color: #f9fafb; border-radius: 0 0 8px 8px; text-align: center;">
+          <p style="margin: 0; color: #999999; font-size: 12px;">© 2025 {{siteName}}. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+    textContent: `Payment Received\n\nHello {{firstName}},\n\nOrder Number: {{orderNumber}}\nDate: {{orderDate}}\nPayment Method: {{paymentMethod}}\nTotal Paid: {{total}} {{currency}}\n\nView receipt: {{actionUrl}}`,
   },
 ]
 

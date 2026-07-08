@@ -3,7 +3,7 @@ import { db, validateDatabaseUrl } from "@/db"
 import { users, companies, roles, userRoles, verificationTokens } from "@/db/schema"
 import { hashPassword, createToken, setAuthCookie } from "@/lib/auth"
 import { eq, or } from "drizzle-orm"
-import { emailRouter, emailTemplateRepository } from "@/lib/email"
+import { emailRouter } from "@/lib/email"
 import { randomBytes } from "crypto"
 import { getPlatformConfig } from "@/lib/config"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
@@ -169,51 +169,37 @@ export async function POST(request: NextRequest) {
       const protocol = process.env.NODE_ENV === "production" ? "https" : "http"
       const verificationUrl = `${protocol}://${host}/auth/verify?token=${verificationToken}&email=${encodeURIComponent(newUser.email)}`
       
-      let subject = "Verify your account - NeoSaaS"
-      let htmlContent = `
-        <h1>Welcome to NeoSaaS!</h1>
-        <p>Please click the link below to verify your account and complete your profile:</p>
-        <p><a href="${verificationUrl}">Verify Account</a></p>
-        <p>Or copy and paste this link: ${verificationUrl}</p>
-      `
-      let textContent = `Welcome to NeoSaaS!\n\nPlease verify your account by visiting: ${verificationUrl}`
-
       const platformConfig = await getPlatformConfig()
-      let fromAddress = platformConfig.defaultSenderEmail || "no-reply@neosaas.tech"
-      let fromName: string | undefined = undefined
 
-      const template = await emailTemplateRepository.getTemplate("email_verification")
-      if (template && template.isActive) {
-        subject = template.subject.replace("{{siteName}}", "NeoSaaS")
-        htmlContent = template.htmlContent || htmlContent
-        textContent = template.textContent || textContent
-
-        if (template.fromEmail) {
-          fromAddress = template.fromEmail
-          fromName = template.fromName || undefined
-        }
-
-        const variables = {
+      const result = await emailRouter.sendEmail({
+        to: [newUser.email],
+        template: "email_verification",
+        data: {
           firstName: newUser.firstName,
-          siteName: "NeoSaaS",
+          lastName: newUser.lastName,
+          email: newUser.email,
+          companyName: company.name,
+          siteName: platformConfig.siteName,
           actionUrl: verificationUrl,
-        }
+        },
+      })
 
-        Object.entries(variables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g")
-          htmlContent = htmlContent.replace(regex, value)
-          textContent = textContent.replace(regex, value)
+      if (!result.success) {
+        // No admin-editable "email_verification" template configured yet —
+        // fall back to a minimal hardcoded email so signup still works.
+        await emailRouter.sendEmail({
+          to: [newUser.email],
+          from: platformConfig.defaultSenderEmail || "no-reply@neosaas.tech",
+          subject: `Verify your account - ${platformConfig.siteName}`,
+          htmlContent: `
+            <h1>Welcome to ${platformConfig.siteName}!</h1>
+            <p>Please click the link below to verify your account and complete your profile:</p>
+            <p><a href="${verificationUrl}">Verify Account</a></p>
+            <p>Or copy and paste this link: ${verificationUrl}</p>
+          `,
+          textContent: `Welcome to ${platformConfig.siteName}!\n\nPlease verify your account by visiting: ${verificationUrl}`,
         })
       }
-
-      await emailRouter.sendEmail({
-        to: [newUser.email],
-        from: fromAddress,
-        fromName: fromName,
-        subject: subject,
-        htmlContent: htmlContent,
-        textContent: textContent,
-      })
       console.log(`[v0] Verification email sent to ${newUser.email}`)
     } catch (emailError) {
       console.error("[v0] Failed to send verification email:", emailError)

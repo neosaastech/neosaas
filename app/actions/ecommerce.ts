@@ -1521,6 +1521,7 @@ export async function processCheckout(
     console.log('[processCheckout] 📧 Sending order confirmation + payment receipt emails', { to: user.email })
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://neosaas.com'
+      const siteName = (await getPlatformConfig()).siteName
       const firstName = user.name?.split(' ')[0] || 'Customer'
       const orderDate = new Date().toLocaleDateString('fr-FR')
       const orderUrl = `${appUrl}/orders/${order.id}`
@@ -1552,9 +1553,9 @@ export async function processCheckout(
         await emailRouter.sendEmail({
           to: [user.email],
           template: 'order_confirmation_subscription',
-          subject: `Subscription Activated — ${subItem?.product?.title} #${orderNumber}`,
           data: {
             firstName,
+            siteName,
             orderNumber,
             orderDate,
             planName: subItem?.product?.title || 'Subscription Plan',
@@ -1574,9 +1575,9 @@ export async function processCheckout(
         await emailRouter.sendEmail({
           to: [user.email],
           template: 'order_confirmation_digital',
-          subject: `Your Purchase is Ready — #${orderNumber}`,
           data: {
             firstName,
+            siteName,
             orderNumber,
             orderDate,
             total: totalFormatted,
@@ -1591,9 +1592,9 @@ export async function processCheckout(
         await emailRouter.sendEmail({
           to: [user.email],
           template: 'order_confirmation_physical',
-          subject: `Order Confirmed — #${orderNumber}`,
           data: {
             firstName,
+            siteName,
             orderNumber,
             orderDate,
             total: totalFormatted,
@@ -1612,9 +1613,9 @@ export async function processCheckout(
         await emailRouter.sendEmail({
           to: [user.email],
           template: 'order_confirmation',
-          subject: `Rendez-vous confirmé — ${apptItem?.product?.title || 'Appointment'} #${orderNumber}`,
           data: {
             firstName,
+            siteName,
             orderNumber,
             orderDate,
             items: [{
@@ -1632,9 +1633,9 @@ export async function processCheckout(
         await emailRouter.sendEmail({
           to: [user.email],
           template: 'order_confirmation',
-          subject: `Order Confirmation #${orderNumber}`,
           data: {
             firstName,
+            siteName,
             orderNumber,
             orderDate,
             items: itemsSummary,
@@ -1648,9 +1649,9 @@ export async function processCheckout(
       await emailRouter.sendEmail({
         to: [user.email],
         template: 'payment_confirmation',
-        subject: `Payment Received — #${orderNumber}`,
         data: {
           firstName,
+          siteName,
           orderNumber,
           orderDate,
           total: totalFormatted,

@@ -5,7 +5,7 @@ import { users, companies, roles, userRoles, systemLogs, termsOfService, payment
 import { eq, and, ne, or, inArray, isNotNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { hashPassword, verifyPassword, getCurrentUser } from "@/lib/auth"
-import { emailRouter, emailTemplateRepository } from "@/lib/email"
+import { emailRouter } from "@/lib/email"
 import { getPlatformConfig } from "@/lib/config"
 import { ensureStripeCustomer, updateStripeCustomerMetadata, deleteStripeCustomer } from "@/lib/stripe-customers"
 
@@ -259,35 +259,17 @@ export async function deleteUser(userId: string) {
 
     // Send deletion email
     try {
-      const template = await emailTemplateRepository.getTemplate('account_deletion')
-      if (template) {
-        let htmlContent = template.htmlContent || ""
-        let textContent = template.textContent || ""
-        const subject = template.subject.replace('{{siteName}}', 'NeoSaaS')
-
-        // Replace variables
-        const variables = {
+      const platformConfig = await getPlatformConfig()
+      await emailRouter.sendEmail({
+        to: [userToDelete.email],
+        template: 'account_deletion',
+        data: {
           firstName: userToDelete.firstName,
-          siteName: 'NeoSaaS'
-        }
-
-        Object.entries(variables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g')
-          htmlContent = htmlContent.replace(regex, value)
-          textContent = textContent.replace(regex, value)
-        })
-
-        const platformConfig = await getPlatformConfig()
-
-        await emailRouter.sendEmail({
-          to: [userToDelete.email],
-          from: template.fromEmail || platformConfig.defaultSenderEmail || "no-reply@neosaas.tech",
-          fromName: template.fromName || undefined,
-          subject: subject,
-          htmlContent: htmlContent,
-          textContent: textContent,
-        })
-      }
+          lastName: userToDelete.lastName,
+          email: userToDelete.email,
+          siteName: platformConfig.siteName,
+        },
+      })
     } catch (emailError) {
       console.error("Failed to send deletion email:", emailError)
       // Don't fail the deletion if email fails
@@ -506,37 +488,25 @@ export async function updateUser(userId: string, data: {
     // Send email notification if email changed
     if (data.email && data.email !== currentUserData.email) {
       try {
-        const template = await emailTemplateRepository.getTemplate('email_update_notification')
-        if (template) {
-          let htmlContent = template.htmlContent || ""
-          let textContent = template.textContent || ""
-          const subject = template.subject.replace('{{siteName}}', 'NeoSaaS')
+        const platformConfig = await getPlatformConfig()
+        const company = updatedUser.companyId
+          ? await db.query.companies.findFirst({ where: eq(companies.id, updatedUser.companyId) })
+          : null
 
-          const variables = {
+        // Send to the NEW email
+        await emailRouter.sendEmail({
+          to: [updatedUser.email],
+          template: 'email_update_notification',
+          data: {
             firstName: updatedUser.firstName,
-            siteName: 'NeoSaaS',
+            lastName: updatedUser.lastName,
+            siteName: platformConfig.siteName,
             newEmail: updatedUser.email,
-            companyName: 'NeoSaaS'
-          }
+            companyName: company?.name || platformConfig.siteName,
+          },
+        })
 
-          Object.entries(variables).forEach(([key, value]) => {
-            const regex = new RegExp(`{{${key}}}`, 'g')
-            htmlContent = htmlContent.replace(regex, value)
-            textContent = textContent.replace(regex, value)
-          })
-
-          // Send to the NEW email
-          await emailRouter.sendEmail({
-            to: [updatedUser.email],
-            from: template.fromEmail,
-            fromName: template.fromName || undefined,
-            subject: subject,
-            htmlContent: htmlContent,
-            textContent: textContent,
-          })
-          
-          // Optional: Send to OLD email as well for security
-        }
+        // Optional: Send to OLD email as well for security
       } catch (emailError) {
         console.error("Failed to send email update notification:", emailError)
       }
