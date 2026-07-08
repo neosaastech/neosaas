@@ -106,6 +106,9 @@ export function PageEditor({ page, onSaved }: { page: PayloadPageDoc | null; onS
             <div className="space-y-2">
               <Label htmlFor="page-slug">Slug</Label>
               <Input id="page-slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                Laisser vide pour la page d&apos;accueil (chemin &quot;/&quot;) — obligatoire pour toute autre page.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="page-type">Type de page</Label>
