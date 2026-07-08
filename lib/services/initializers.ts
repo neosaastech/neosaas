@@ -160,29 +160,39 @@ export async function initLago(environment: ServiceEnvironment = 'production') {
  * `workflowFile` so the update mechanism
  * (app/api/admin/system/update/route.ts) can dispatch apply-update.yml on
  * this site's own repo without a second, separate credential entry.
+ *
+ * Falls back to the legacy UPDATE_GITHUB_TOKEN/UPDATE_GITHUB_REPO env vars
+ * when no DB config is saved yet — neosaas-website is already live on that
+ * older mechanism (confirmed 2026-07-07); without this fallback its next
+ * "Appliquer le correctif" click breaks the moment it pulls this version,
+ * until someone re-enters the token in admin/api.
  */
 export async function initGithub(environment: ServiceEnvironment = 'production') {
   const config = await serviceApiRepository.getConfig('github_api', environment) as
     | { isActive: boolean; config: { personalAccessToken: string; repo?: string; workflowFile?: string } }
     | null;
 
-  if (!config) {
-    throw new Error(`GitHub configuration not found for environment: ${environment}`);
+  if (config?.isActive && config.config.repo) {
+    return {
+      token: config.config.personalAccessToken,
+      repo: config.config.repo,
+      workflowFile: config.config.workflowFile || 'apply-update.yml',
+    };
   }
 
-  if (!config.isActive) {
-    throw new Error(`GitHub configuration is not active for environment: ${environment}`);
+  if (process.env.UPDATE_GITHUB_TOKEN && process.env.UPDATE_GITHUB_REPO) {
+    return {
+      token: process.env.UPDATE_GITHUB_TOKEN,
+      repo: process.env.UPDATE_GITHUB_REPO,
+      workflowFile: process.env.UPDATE_WORKFLOW_FILE || 'apply-update.yml',
+    };
   }
 
-  if (!config.config.repo) {
+  if (config && !config.config.repo) {
     throw new Error(`Dépôt cible manquant — renseigne "repo" dans la configuration GitHub API (ex: neosaastech/neosaas-website)`);
   }
 
-  return {
-    token: config.config.personalAccessToken,
-    repo: config.config.repo,
-    workflowFile: config.config.workflowFile || 'apply-update.yml',
-  };
+  throw new Error(`GitHub configuration not found for environment: ${environment}`);
 }
 
 /**
