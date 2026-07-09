@@ -1,6 +1,7 @@
 import { z } from "zod"
 import type { ComponentType } from "react"
 import { HeroLayer, type HeroLayerProps } from "@/components/layers/hero-layer"
+import { HeroSplitLayer, type HeroSplitLayerProps } from "@/components/layers/hero-split-layer"
 import { FeatureGridLayer, type FeatureGridLayerProps } from "@/components/layers/feature-grid-layer"
 import { PricingTableLayer, type PricingTableLayerProps } from "@/components/layers/pricing-table-layer"
 import { TestimonialsLayer, type TestimonialsLayerProps } from "@/components/layers/testimonials-layer"
@@ -67,6 +68,12 @@ const iconShowcaseItemSchema = z.object({
   highlighted: z.boolean().optional(),
 })
 
+const heroSplitHighlightSchema = z.object({
+  icon: z.string(),
+  label: z.string(),
+  featured: z.boolean().optional(),
+})
+
 const formFieldSchema = z.object({
   name: z.string(),
   label: z.string(),
@@ -89,6 +96,21 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       imageUrl: z.string().optional(),
       videoUrl: z.string().optional(),
     }) satisfies z.ZodType<HeroLayerProps>,
+  },
+  "hero-split": {
+    component: HeroSplitLayer,
+    propsSchema: z.object({
+      eyebrow: z.string().optional(),
+      brandName: z.string().optional(),
+      title: z.string(),
+      subtitle: z.string().optional(),
+      highlights: z.array(heroSplitHighlightSchema).optional(),
+      ctaLabel: z.string().optional(),
+      ctaHref: z.string().optional(),
+      secondaryCtaLabel: z.string().optional(),
+      secondaryCtaHref: z.string().optional(),
+      imageUrl: z.string().optional(),
+    }) satisfies z.ZodType<HeroSplitLayerProps>,
   },
   "feature-grid": {
     component: FeatureGridLayer,

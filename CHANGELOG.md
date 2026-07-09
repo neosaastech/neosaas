@@ -1,3 +1,9 @@
+## [1.7.1](https://github.com/neosaastech/Neosaas-app/compare/v1.7.0...v1.7.1) (2026-07-09)
+
+### Bug Fixes
+
+* **blocks:** implement hero-split end-to-end, fix stale preview link mapping ([0dfe945](https://github.com/neosaastech/Neosaas-app/commit/0dfe945e4fc77fdb60b14ca093756b318c633a94))
+
 ## [1.7.0](https://github.com/neosaastech/Neosaas-app/compare/v1.6.1...v1.7.0) (2026-07-08)
 
 ### Features
