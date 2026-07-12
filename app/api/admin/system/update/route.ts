@@ -10,6 +10,7 @@ import { platformConfig } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { logSystemEvent } from '@/app/actions/logs'
 import { initGithub } from '@/lib/services/initializers'
+import packageJson from '../../../../../package.json'
 
 const CONFIG_KEY = 'system_update_status'
 
@@ -37,15 +38,21 @@ const GitHubTagSchema = z.object({
 })
 const GitHubTagsResponseSchema = z.array(GitHubTagSchema)
 
+// Reads package.json directly instead of a NEXT_PUBLIC_APP_VERSION env var —
+// that var has to be set by hand per site and nothing in the apply-update
+// sync touches it, so it silently goes stale (confirmed live: stuck on
+// "1.1.2" for months while package.json/the actual deployed code moved
+// through several real releases up to v1.8.0). package.json's version is
+// the one field the sync genuinely keeps current on every run.
 function getCurrentVersion(): string {
-  return process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0'
+  return packageJson.version || '0.0.0'
 }
 
 /**
  * Git tags conventionally carry a leading "v" (e.g. "v1.0.1") while
- * package.json/NEXT_PUBLIC_APP_VERSION usually don't ("1.0.1") — confirmed
- * against the real repo (`v1.0.1` tag vs `1.0.1` in package.json). Comparing
- * the raw strings would report "update available" when actually up to date.
+ * package.json usually doesn't ("1.0.1") — confirmed against the real repo
+ * (`v1.0.1` tag vs `1.0.1` in package.json). Comparing the raw strings would
+ * report "update available" when actually up to date.
  */
 function normalizeVersion(version: string): string {
   return version.replace(/^v/i, '')

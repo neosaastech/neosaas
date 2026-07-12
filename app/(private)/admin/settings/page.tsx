@@ -592,7 +592,7 @@ export default function AdminSettingsPage() {
             System Logs
           </TabsTrigger>
           <TabsTrigger value="updates" className="data-[state=active]:bg-brand data-[state=active]:text-white">
-            Mises à jour
+            Updates
           </TabsTrigger>
         </TabsList>
 

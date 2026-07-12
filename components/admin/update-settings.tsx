@@ -135,7 +135,7 @@ export function UpdateSettings() {
         <div className="flex flex-wrap gap-3 pt-2">
           <Button variant="outline" onClick={handleCheck} disabled={checking} className="gap-2">
             {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Rechercher des mises à jour
+            Check for updates
           </Button>
 
           <AlertDialog>
@@ -145,7 +145,7 @@ export function UpdateSettings() {
                 className="gap-2 bg-brand hover:bg-brand/90"
               >
                 {deploying && <Loader2 className="h-4 w-4 animate-spin" />}
-                Appliquer le correctif
+                Apply update
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

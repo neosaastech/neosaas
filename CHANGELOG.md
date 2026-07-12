@@ -1,3 +1,9 @@
+## [1.8.1](https://github.com/neosaastech/Neosaas-app/compare/v1.8.0...v1.8.1) (2026-07-12)
+
+### Bug Fixes
+
+* **admin:** read app version from package.json, not a stale env var ([ba4fc20](https://github.com/neosaastech/Neosaas-app/commit/ba4fc20903b3528694f25dd14a0e0398c3a8a078))
+
 ## [1.8.0](https://github.com/neosaastech/Neosaas-app/compare/v1.7.1...v1.8.0) (2026-07-12)
 
 ### Features
