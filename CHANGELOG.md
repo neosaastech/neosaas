@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/neosaastech/Neosaas-app/compare/v1.8.1...v1.9.0) (2026-07-12)
+
+### Features
+
+* **docs:** add logo + adapted footer to Documentation layout ([0a6487a](https://github.com/neosaastech/Neosaas-app/commit/0a6487ad1ffc644c78dcc55cee1a2b9aaefa4210))
+
 ## [1.8.1](https://github.com/neosaastech/Neosaas-app/compare/v1.8.0...v1.8.1) (2026-07-12)
 
 ### Bug Fixes
