@@ -1,3 +1,9 @@
+## [1.10.1](https://github.com/neosaastech/Neosaas-app/compare/v1.10.0...v1.10.1) (2026-07-12)
+
+### Bug Fixes
+
+* **docs:** remove duplicate broken theme toggle in sidebar footer ([#62](https://github.com/neosaastech/Neosaas-app/issues/62)) ([8f5d069](https://github.com/neosaastech/Neosaas-app/commit/8f5d06931ad3e7dd9be91a8423f8e84ad1c9e18b))
+
 ## [1.10.0](https://github.com/neosaastech/Neosaas-app/compare/v1.9.0...v1.10.0) (2026-07-12)
 
 ### Features

@@ -24,14 +24,18 @@ import { ThemeToggle } from "@/components/common/theme-toggle"
  *    logo/site-name lockup already used at /dashboard — now shares
  *    BrandMark (extracted from PrivateSidebar) so it's visually the same
  *    component, not a re-implementation that can drift.
- * 2) fumadocs-ui's DocsLayout renders a DEFAULT sidebar footer (a search
- *    box + its own theme toggle) that is NOT governed by the `search`/
- *    `theme`/`searchToggle` props above — those only affect the nav bar.
- *    That default footer is what Charles saw: a search input that silently
- *    does nothing (no search provider registered) and a theme toggle that
- *    doesn't work (fumadocs' own theme context is intentionally disabled).
- *    `sidebar.footer` below replaces it with just the site's real,
- *    functional ThemeToggle — no search UI until an actual index exists.
+ * 2) fumadocs-ui's Sidebar renders its OWN default theme-switch button
+ *    (slots.themeSwitch, from the top-level `themeSwitch` prop — a
+ *    SEPARATE gate from `search`/`theme` on RootProvider, easy to miss)
+ *    independent of whatever `sidebar.footer` renders — the first pass
+ *    added a working ThemeToggle via `sidebar.footer` but never actually
+ *    disabled the broken default, so both showed up side by side
+ *    (confirmed via the live DOM: two buttons, "Toggle Theme" and "Toggle
+ *    theme"). `themeSwitch={{ enabled: false }}` below removes fumadocs'
+ *    own broken one; `sidebar.footer` still supplies the real one. Search
+ *    was already correctly disabled by `searchToggle={{ enabled: false }}`
+ *    — no search UI renders at all (verified via the accessibility tree,
+ *    not just a screenshot).
  */
 export default async function DocumentationLayout({
   params,
@@ -64,6 +68,7 @@ export default async function DocumentationLayout({
         nav={{ title: navTitle, url: `/${locale}/documentation` }}
         links={[{ type: "main", url: `/${locale}`, text: "Retour au site", icon: <ArrowLeft className="h-4 w-4" /> }]}
         searchToggle={{ enabled: false }}
+        themeSwitch={{ enabled: false }}
         sidebar={{ footer: <ThemeToggle /> }}
       >
         {children}
