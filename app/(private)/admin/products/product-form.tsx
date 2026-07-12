@@ -1104,7 +1104,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
                       className={`
                         relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all
                         ${enabledRecurrences.weekly
-                          ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 shadow-sm'
+                          ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 shadow-xs'
                           : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-indigo-300'
                         }
                       `}
@@ -1139,7 +1139,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
                       className={`
                         relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all
                         ${enabledRecurrences.monthly
-                          ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 shadow-sm'
+                          ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 shadow-xs'
                           : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-indigo-300'
                         }
                       `}
@@ -1174,7 +1174,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
                       className={`
                         relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all
                         ${enabledRecurrences.yearly
-                          ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 shadow-sm'
+                          ? 'border-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 shadow-xs'
                           : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-indigo-300'
                         }
                       `}
@@ -1436,7 +1436,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
         {requiresPayment && (initialData?.id || formData.price) && (
           <div
             ref={couponSectionRef}
-            className="space-y-4 border p-4 rounded-md bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20"
+            className="space-y-4 border p-4 rounded-md bg-linear-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

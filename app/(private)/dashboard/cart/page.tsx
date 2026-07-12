@@ -223,7 +223,7 @@ export default function CartPage() {
                 <CardContent className="p-6">
                   <div className="flex gap-4">
                     {/* Product Image */}
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       {item.product.imageUrl ? (
                         <img 
                           src={item.product.imageUrl} 

@@ -595,7 +595,7 @@ export default function CheckoutPage() {
                     </div>
                     {item.type === 'appointment' && (
                       <Button
-                        variant={appointmentsData.has(item.id) ? "secondary" : "outline"}
+                        variant={appointmentsData.has(item.id) ? "secondary" : "outline-solid"}
                         size="sm"
                         className="mt-2 w-full"
                         onClick={() => {

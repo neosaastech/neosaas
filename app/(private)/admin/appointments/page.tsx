@@ -453,7 +453,7 @@ export default function AdminAppointmentsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={status.variant === "warning" ? "outline" : status.variant}>
+                        <Badge variant={status.variant === "warning" ? "outline-solid" : status.variant}>
                           <StatusIcon className="mr-1 h-3 w-3" />
                           {status.label}
                         </Badge>

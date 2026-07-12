@@ -14,6 +14,7 @@
 - 🎨 **Modern UI** — Tailwind CSS + shadcn/ui
 - 📞 **Contact form** — email-based support
 - ⚙️ **API Manager** — centralised third-party service configuration
+- 🤖 **MCP agent API** — JSON-RPC control plane for AI agents (`POST /api/mcp`)
 
 ## Quick Start
 
@@ -68,6 +69,7 @@ Full developer reference: **[docs/PROJECT.md](./docs/PROJECT.md)**
 | Architecture | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) |
 | Vercel deployment | [docs/deployment/VERCEL.md](./docs/deployment/VERCEL.md) |
 | Project status | [STATUS.md](./STATUS.md) |
+| **MCP (AI agents)** | [docs/mcp-neosaas.md](./docs/mcp-neosaas.md) |
 
 ## OAuth Configuration
 

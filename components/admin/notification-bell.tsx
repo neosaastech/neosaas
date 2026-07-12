@@ -303,14 +303,14 @@ export function NotificationBell() {
                         <div className="flex gap-3">
                           {/* User avatar or type icon */}
                           {meta.userImage || meta.userName ? (
-                            <Avatar className="h-10 w-10 flex-shrink-0">
+                            <Avatar className="h-10 w-10 shrink-0">
                               <AvatarImage src={meta.userImage} />
                               <AvatarFallback className={config.bg}>
                                 {meta.userName?.charAt(0) || 'U'}
                               </AvatarFallback>
                             </Avatar>
                           ) : (
-                            <div className={`h-10 w-10 rounded-full ${config.bg} flex items-center justify-center flex-shrink-0`}>
+                            <div className={`h-10 w-10 rounded-full ${config.bg} flex items-center justify-center shrink-0`}>
                               {notification.type === 'order' ? getOrderIcon() : getTypeIcon(notification.type)}
                             </div>
                           )}
@@ -336,7 +336,7 @@ export function NotificationBell() {
                               </div>
                               <div className="flex flex-col items-end gap-1">
                                 {notification.actionRequired && (
-                                  <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-xs flex-shrink-0">
+                                  <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-xs shrink-0">
                                     Action
                                   </Badge>
                                 )}

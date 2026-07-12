@@ -646,7 +646,7 @@ export default function ChatPage() {
                       >
                         <div className="flex items-end gap-2 max-w-[70%]">
                           {!isAdmin && (
-                            <Avatar className="h-8 w-8 flex-shrink-0">
+                            <Avatar className="h-8 w-8 shrink-0">
                               <AvatarImage src={selectedContact.user?.profileImage || undefined} />
                               <AvatarFallback className="text-xs bg-primary/10 text-primary">
                                 {getInitials(getContactName(selectedContact))}

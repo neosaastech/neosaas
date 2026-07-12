@@ -431,7 +431,7 @@ export function ThemeSettings() {
                 <Button
                   key={pair.id}
                   type="button"
-                  variant={theme.fontPairId === pair.id ? 'default' : 'outline'}
+                  variant={theme.fontPairId === pair.id ? 'default' : 'outline-solid'}
                   size="sm"
                   onClick={() => updateFontPair(pair.id)}
                 >

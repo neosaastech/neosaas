@@ -417,7 +417,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
                       variant={
                         invoice.status === "paid" ? "default" :
                         invoice.status === "pending" ? "secondary" :
-                        invoice.status === "refunded" ? "outline" :
+                        invoice.status === "refunded" ? "outline-solid" :
                         "destructive"
                       }
                     >
@@ -464,7 +464,7 @@ export function InvoicesTable({ invoices }: InvoicesTableProps) {
                     variant={
                       invoice.status === "paid" ? "default" : 
                       invoice.status === "pending" ? "secondary" :
-                      invoice.status === "refunded" ? "outline" :
+                      invoice.status === "refunded" ? "outline-solid" :
                       "destructive"
                     }
                   >

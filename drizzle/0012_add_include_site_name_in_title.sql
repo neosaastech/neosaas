@@ -1,0 +1,2 @@
+ALTER TABLE "blog_posts" ADD COLUMN "include_site_name_in_title" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "page_seo" ADD COLUMN "include_site_name_in_title" boolean DEFAULT true NOT NULL;

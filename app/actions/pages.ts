@@ -23,6 +23,14 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  listMedia,
+  uploadMedia,
+  deleteMedia,
+  transformMedia,
+  renameMedia,
+  updateMediaAlt,
+  fetchMediaAsDataUrl,
+  replaceMediaFile,
   type PayloadPageSummary,
   type PayloadPageDoc,
   type PageWriteInput,
@@ -34,6 +42,9 @@ import {
   type PaginatedResult,
   type ListPagesOptions,
   type ListBlogPostsOptions,
+  type PayloadMediaSummary,
+  type ListMediaOptions,
+  type MediaTransformInput,
 } from "@/lib/payload-bridge"
 
 // Was its own "public" | "user" | "admin" | "super-admin" (hyphen) union,
@@ -124,7 +135,7 @@ export async function getContentPage(
 
 export async function saveContentPage(
   id: string | number | null,
-  input: PageWriteInput,
+  input: PageWriteInput | Partial<PageWriteInput>,
   locale: string = "fr",
 ): Promise<{ success: true; data: PayloadPageDoc } | { success: false; error: string }> {
   const currentUser = await getCurrentUser()
@@ -133,7 +144,10 @@ export async function saveContentPage(
   }
 
   try {
-    const page = id ? await updatePage(id, input, locale) : await createPage(input, locale)
+    // Partial when id is set (inline edit / bulk actions on an existing doc
+    // — Payload's PATCH only validates the fields actually sent), full
+    // PageWriteInput required for a create (id === null).
+    const page = id ? await updatePage(id, input, locale) : await createPage(input as PageWriteInput, locale)
     revalidatePath("/admin/pages")
     return { success: true, data: page }
   } catch (error) {
@@ -202,7 +216,7 @@ export async function getContentArticle(
 
 export async function saveContentArticle(
   id: string | number | null,
-  input: BlogPostWriteInput,
+  input: BlogPostWriteInput | Partial<BlogPostWriteInput>,
   locale: string = "fr",
 ): Promise<{ success: true; data: PayloadBlogPostDoc } | { success: false; error: string }> {
   const currentUser = await getCurrentUser()
@@ -211,7 +225,7 @@ export async function saveContentArticle(
   }
 
   try {
-    const article = id ? await updateBlogPost(id, input, locale) : await createBlogPost(input, locale)
+    const article = id ? await updateBlogPost(id, input, locale) : await createBlogPost(input as BlogPostWriteInput, locale)
     revalidatePath("/admin/pages")
     return { success: true, data: article }
   } catch (error) {
@@ -249,6 +263,221 @@ export async function getContentCategories(locale: string = "fr"): Promise<
     console.error("Failed to fetch categories from Payload:", error)
     return { success: false, error: "Failed to fetch categories" }
   }
+}
+
+/** Backs MediaPickerField's search — Media.access.read is public in Payload, no role gate needed to read. */
+export async function getContentMedia(
+  options: ListMediaOptions = {},
+): Promise<{ success: true; data: PayloadMediaSummary[] } | { success: false; error: string }> {
+  try {
+    const result = await listMedia(options)
+    return { success: true, data: result.docs }
+  } catch (error) {
+    console.error("Failed to fetch media from Payload:", error)
+    return { success: false, error: "Failed to fetch media" }
+  }
+}
+
+/**
+ * Generic media upload — Charles (2026-07-11): "j'ai un lien direct vers
+ * payload [pour la médiathèque]. c'est pas génial. je dois avoir les
+ * mêmes fonctionnalités depuis l'ui [neosaas-app]." Same write-role gate
+ * as saveContentPage/saveCategory (Media.access.read is public in Payload,
+ * but write isn't exposed to visitors — this action is the only path).
+ * Not scoped to any one field/collection, unlike the older
+ * company-logo-upload.tsx route (which also writes to a completely
+ * different, non-Payload storage) — this is the general "add to the
+ * shared media library" entry point every block/page picker reads from.
+ */
+export async function uploadContentMedia(
+  formData: FormData,
+): Promise<{ success: true; data: PayloadMediaSummary } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  const file = formData.get("file")
+  if (!(file instanceof File)) {
+    return { success: false, error: "No file provided" }
+  }
+  const alt = formData.get("alt")
+  try {
+    const doc = await uploadMedia(file, typeof alt === "string" ? alt : undefined)
+    revalidatePath("/admin/pages")
+    return { success: true, data: doc }
+  } catch (error) {
+    console.error("Failed to upload media to Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to upload media"
+    return { success: false, error: message }
+  }
+}
+
+export async function removeContentMedia(id: string | number): Promise<{ success: true } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    await deleteMedia(id)
+    revalidatePath("/admin/pages")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete media from Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to delete media"
+    return { success: false, error: message }
+  }
+}
+
+export async function transformContentMedia(
+  id: string | number,
+  input: MediaTransformInput,
+): Promise<{ success: true; data: PayloadMediaSummary } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const doc = await transformMedia(id, input)
+    revalidatePath("/admin/pages")
+    return { success: true, data: doc }
+  } catch (error) {
+    console.error("Failed to transform media in Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to transform media"
+    return { success: false, error: message }
+  }
+}
+
+export async function renameContentMedia(
+  id: string | number,
+  filename: string,
+): Promise<{ success: true; data: PayloadMediaSummary } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const doc = await renameMedia(id, filename)
+    revalidatePath("/admin/pages")
+    return { success: true, data: doc }
+  } catch (error) {
+    console.error("Failed to rename media in Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to rename media"
+    return { success: false, error: message }
+  }
+}
+
+export async function updateContentMediaAlt(
+  id: string | number,
+  alt: string,
+): Promise<{ success: true; data: PayloadMediaSummary } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const doc = await updateMediaAlt(id, alt)
+    revalidatePath("/admin/pages")
+    return { success: true, data: doc }
+  } catch (error) {
+    console.error("Failed to update media alt text in Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to update media alt text"
+    return { success: false, error: message }
+  }
+}
+
+// Charles (2026-07-11): "on a encore quelques fonctionnalités de
+// modification d'image. tel que le redimensionnement ou la découpe dans
+// l'édition." Crop (unlike resize/rotate/quality) needs the actual pixel
+// bytes client-side for react-easy-crop's interactive preview — this
+// fetches them server-side as a data: URL to avoid a CORS-tainted canvas
+// from loading the raw S3 url directly in the browser.
+export async function getContentMediaDataUrl(
+  id: string | number,
+): Promise<{ success: true; dataUrl: string; mimeType: string } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const result = await fetchMediaAsDataUrl(id)
+    return { success: true, ...result }
+  } catch (error) {
+    console.error("Failed to fetch media as data URL:", error)
+    const message = error instanceof Error ? error.message : "Failed to load image"
+    return { success: false, error: message }
+  }
+}
+
+export async function replaceContentMediaFile(
+  id: string | number,
+  formData: FormData,
+): Promise<{ success: true; data: PayloadMediaSummary } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  const file = formData.get("file")
+  if (!(file instanceof File)) {
+    return { success: false, error: "No file provided" }
+  }
+  try {
+    const doc = await replaceMediaFile(id, file)
+    revalidatePath("/admin/pages")
+    return { success: true, data: doc }
+  } catch (error) {
+    console.error("Failed to replace media file in Payload:", error)
+    const message = error instanceof Error ? error.message : "Failed to save cropped image"
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * Bulk delete — Charles (2026-07-11): "on devrait avoir des sélections
+ * multiples pour modifier en masse les images." Loops rather than a single
+ * Payload `where[id][in]` bulk call: deleteMedia's per-id error handling
+ * (and the S3 object cleanup it triggers via Payload's afterDelete hook)
+ * stays identical to the single-delete path, and a partial failure still
+ * reports exactly which ids failed instead of an all-or-nothing result.
+ */
+export async function removeContentMediaBulk(
+  ids: (string | number)[],
+): Promise<{ success: true; failed: (string | number)[] } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  const failed: (string | number)[] = []
+  for (const id of ids) {
+    try {
+      await deleteMedia(id)
+    } catch (error) {
+      console.error(`Failed to delete media ${id} from Payload:`, error)
+      failed.push(id)
+    }
+  }
+  revalidatePath("/admin/pages")
+  return { success: true, failed }
+}
+
+export async function updateContentMediaAltBulk(
+  ids: (string | number)[],
+  alt: string,
+): Promise<{ success: true; failed: (string | number)[] } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  const failed: (string | number)[] = []
+  for (const id of ids) {
+    try {
+      await updateMediaAlt(id, alt)
+    } catch (error) {
+      console.error(`Failed to update alt for media ${id} in Payload:`, error)
+      failed.push(id)
+    }
+  }
+  revalidatePath("/admin/pages")
+  return { success: true, failed }
 }
 
 // ─── Categories (shared taxonomy for Pages and Articles) ───

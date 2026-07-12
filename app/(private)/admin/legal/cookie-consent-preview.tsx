@@ -43,7 +43,7 @@ export function CookieConsentPreview({
           isOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-50 grayscale"
         )}
       >
-        <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-background/80 p-6 shadow-2xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 dark:border-white/10 dark:bg-black/40">
+        <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-background/80 p-6 shadow-2xl backdrop-blur-xl supports-backdrop-filter:bg-background/60 dark:border-white/10 dark:bg-black/40">
           {/* Decorative gradient blob */}
           <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-primary/20 blur-3xl" />
           

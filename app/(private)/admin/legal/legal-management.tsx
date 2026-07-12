@@ -458,7 +458,7 @@ export function LegalManagement({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center min-h-[400px] relative p-0 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-background to-muted/50" />
+                  <div className="absolute inset-0 bg-linear-to-br from-background to-muted/50" />
                   <div className="relative w-full px-6">
                     <CookieConsentPreview 
                       logo={initialConfig.logo}

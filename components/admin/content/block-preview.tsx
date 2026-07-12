@@ -1,5 +1,6 @@
 "use client"
 
+import { convertLexicalToHTML } from "@payloadcms/richtext-lexical/html"
 import { clientLayerRegistry } from "@/lib/layers/registry-client"
 import type { PayloadPageBlock } from "@/lib/payload-bridge"
 import { BlockWrapper } from "@/components/layers/block-wrapper"
@@ -27,6 +28,16 @@ function stripNulls<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v === null ? undefined : v])) as T
 }
 
+// `subtitle` is edited as Lexical JSON (RichTextEditor, dynamic-field.tsx)
+// but every Layer component's propsSchema still declares it a plain string
+// — same HTML conversion payload-cms/lib/layers/from-payload.ts apply at
+// publish/preview time, needed here too since this preview renders the
+// real Layer components directly from in-progress (unsaved) form state.
+function resolveSubtitle<T extends Record<string, unknown>>(obj: T): T {
+  if (!("subtitle" in obj) || typeof obj.subtitle !== "object" || obj.subtitle === null) return obj
+  return { ...obj, subtitle: convertLexicalToHTML({ data: obj.subtitle as never, disableContainer: true }) }
+}
+
 export function BlockPreview({ block }: { block: PayloadPageBlock }) {
   const def = clientLayerRegistry[block.blockType]
   if (!def) return null
@@ -39,7 +50,19 @@ export function BlockPreview({ block }: { block: PayloadPageBlock }) {
     )
   }
 
-  const parsed = def.propsSchema.safeParse(stripNulls(block))
+  // "columns" (nested container, ColumnsBlockEditor in block-editor.tsx)
+  // holds arbitrary child blocks per column — same "no meaningful live
+  // preview from in-progress form state" reasoning as blog-list, not a real
+  // recursive render of the nested blocks.
+  if (block.blockType === "columns") {
+    return (
+      <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+        Aperçu non disponible pour ce bloc — voir le rendu réel sur le site publié.
+      </div>
+    )
+  }
+
+  const parsed = def.propsSchema.safeParse(resolveSubtitle(stripNulls(block)))
   if (!parsed.success) {
     return (
       <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">

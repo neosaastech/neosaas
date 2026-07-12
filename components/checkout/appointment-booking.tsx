@@ -287,7 +287,7 @@ export function AppointmentBooking({
   return (
     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary to-primary/80 p-6 text-white">
+      <div className="bg-linear-to-r from-primary to-primary/80 p-6 text-white">
         <h2 className="text-xl font-bold">{productTitle}</h2>
         <p className="text-white/80">
           {productPrice > 0 ? formatPrice(productPrice) : 'Free'}
@@ -348,7 +348,7 @@ export function AppointmentBooking({
       <div className="p-6">
         {error && (
           <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <AlertCircle className="w-5 h-5 shrink-0" />
             <span>{error}</span>
           </div>
         )}

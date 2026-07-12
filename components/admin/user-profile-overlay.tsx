@@ -115,7 +115,7 @@ export function UserProfileOverlay({ isOpen, onClose, userId, userData: initialD
       {/* Overlay Panel */}
       <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-50 animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-primary/10 to-primary/5">
+        <div className="flex items-center justify-between p-4 border-b bg-linear-to-r from-primary/10 to-primary/5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <User className="h-5 w-5 text-primary" />

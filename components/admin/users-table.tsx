@@ -713,7 +713,7 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
       case "writer":
         return "secondary"
       default:
-        return "outline"
+        return "outline-solid"
     }
   }
 

@@ -3,7 +3,7 @@ import { draftMode } from "next/headers"
 import { and, asc, eq } from "drizzle-orm"
 import type { Metadata } from "next"
 import { db } from "@/db"
-import { pageLayers } from "@/db/schema"
+import { pageLayers, pageSeo } from "@/db/schema"
 import { BlockRenderer, type PageLayerRow } from "@/components/layers/block-renderer"
 import { PreviewChrome } from "@/components/common/preview-chrome"
 import { loadPreviewLayers } from "@/lib/pages/preview-layers"
@@ -35,15 +35,25 @@ export default async function DynamicPage({
   const { isEnabled: isPreview } = await draftMode()
 
   let layers: PageLayerRow[] = []
+  let headerImageUrl: string | null = null
 
   if (isPreview) {
     layers = await loadPreviewLayers(pagePath, locale)
   } else {
     try {
-      layers = await db.query.pageLayers.findMany({
-        where: and(eq(pageLayers.pagePath, pagePath), eq(pageLayers.locale, locale), eq(pageLayers.isActive, true)),
-        orderBy: asc(pageLayers.position),
-      })
+      const [layerRows, seoRow] = await Promise.all([
+        db.query.pageLayers.findMany({
+          where: and(eq(pageLayers.pagePath, pagePath), eq(pageLayers.locale, locale), eq(pageLayers.isActive, true)),
+          orderBy: asc(pageLayers.position),
+        }),
+        db.query.pageSeo
+          .findFirst({
+            where: and(eq(pageSeo.pagePath, pagePath), eq(pageSeo.locale, locale), eq(pageSeo.isActive, true)),
+          })
+          .catch(() => undefined),
+      ])
+      layers = layerRows
+      headerImageUrl = seoRow?.headerImageUrl ?? null
     } catch (error) {
       console.error(`Failed to load page layers for ${pagePath}:`, error)
     }
@@ -56,6 +66,13 @@ export default async function DynamicPage({
   return (
     <div className="container py-12 md:py-24">
       {isPreview && <PreviewChrome />}
+      {/* Charles (2026-07-11): "laisse la possibilité au module d'afficher
+          une telle image" — same banner treatment as blog/[slug]/page.tsx's
+          coverImageUrl, sourced from the same header image the meta tags
+          above (buildPageMetadata) already use. */}
+      {headerImageUrl && (
+        <img src={headerImageUrl} alt="" className="mb-8 aspect-video w-full rounded-xl object-cover" />
+      )}
       <BlockRenderer layers={layers} pagePath={pagePath} locale={locale} />
     </div>
   )

@@ -220,7 +220,7 @@ export default function CheckoutTestPage() {
               key={step.id}
               className="flex items-start gap-4 p-4 rounded-lg border bg-card"
             >
-              <div className="flex-shrink-0 mt-1">
+              <div className="shrink-0 mt-1">
                 {getStepIcon(step)}
               </div>
               

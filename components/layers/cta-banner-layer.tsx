@@ -8,8 +8,11 @@ export interface CtaBannerLayerProps {
   eyebrow?: string
   title: string
   subtitle?: string
-  ctaLabel: string
-  ctaHref: string
+  // A "reference"-type cta left unset by the editor resolves to undefined
+  // (no ctaLabel/ctaHref) — Payload allows saving that state, so this must
+  // stay optional and the button must not render rather than crash the page.
+  ctaLabel?: string
+  ctaHref?: string
 }
 
 export function CtaBannerLayer({ eyebrow, title, subtitle, ctaLabel, ctaHref }: CtaBannerLayerProps) {
@@ -17,10 +20,12 @@ export function CtaBannerLayer({ eyebrow, title, subtitle, ctaLabel, ctaHref }: 
     <div className="mx-auto mt-16 max-w-4xl rounded-2xl bg-brand px-6 py-12 text-center text-white sm:px-12">
       {eyebrow && <Eyebrow className="text-white/80">{eyebrow}</Eyebrow>}
       <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
-      {subtitle && <p className="mt-3 text-white/80">{subtitle}</p>}
-      <Button asChild size="lg" className="mt-6 bg-white text-brand hover:bg-white/90">
-        <a href={ctaHref}>{ctaLabel}</a>
-      </Button>
+      {subtitle && <div className="mt-3 text-white/80 [&_p]:m-0" dangerouslySetInnerHTML={{ __html: subtitle }} />}
+      {ctaHref && (
+        <Button asChild size="lg" className="mt-6 bg-white text-brand hover:bg-white/90">
+          <a href={ctaHref}>{ctaLabel}</a>
+        </Button>
+      )}
     </div>
   )
 }

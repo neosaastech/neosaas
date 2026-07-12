@@ -39,6 +39,52 @@ async function payloadFetch(path: string, init?: RequestInit): Promise<Response>
   return res
 }
 
+// Pages/BlogPosts' actual Payload field is `meta` — @payloadcms/plugin-seo's
+// own group name (payload.config.ts's seoPlugin, migrated from a hand-rolled
+// `seo` group). Every interface and caller in this file still calls it `seo`
+// (the pre-migration name), so every read/write below went straight past
+// Payload's real field: reads always got `undefined` (defaulting every
+// noIndex/noFollow checkbox and the Index & Follow table badges to false
+// regardless of the stored value) and writes were silently discarded (no
+// error — `seo` just isn't a field Payload recognizes, so plugin-seo's
+// group never received it). Confirmed live 2026-07-10: toggling noIndex
+// from the table returned 200/"Draft saved successfully" with the value
+// unchanged on immediate re-read. These two helpers translate at this
+// file's boundary only — every caller elsewhere keeps using `.seo`, no
+// need to touch page-editor.tsx/article-editor.tsx/pages-settings.tsx/the
+// MCP content-hub tools.
+function metaToSeo(doc: unknown): Record<string, unknown> {
+  const { meta, ...rest } = doc as Record<string, unknown>
+  return { ...rest, seo: meta }
+}
+
+function seoToMetaBody(input: unknown): Record<string, unknown> {
+  const { seo, ...rest } = input as Record<string, unknown>
+  return seo === undefined ? rest : { ...rest, meta: seo }
+}
+
+// READ direction — `seo.image` arrives as Payload's populated media relation
+// ({id, url} at depth=1) via metaToSeo's generic rename; unpacked to a plain
+// absolute URL string here so callers (PageEditor/ArticleEditor's
+// MediaPickerField) see the exact same shape as any other imageUrl field.
+function unpackSeoImage<T extends { seo?: { image?: unknown } | null }>(doc: T): T {
+  if (!doc.seo || !("image" in doc.seo)) return doc
+  return { ...doc, seo: { ...doc.seo, image: unpackImage(doc.seo.image) } }
+}
+
+// WRITE direction — the mirror of unpackSeoImage: a plain URL string (or
+// null to clear) coming from MediaPickerField, resolved to the media
+// relation ID plugin-seo's meta.image actually stores. Only touches `.image`
+// when the caller explicitly set the key (undefined means "not editing SEO
+// image on this save", same convention as the rest of this bridge).
+async function resolveSeoImage<T extends { image?: string | null }>(
+  seo: T | undefined,
+): Promise<(Omit<T, "image"> & { image?: string | number | null }) | undefined> {
+  if (!seo || !("image" in seo)) return seo
+  const { image, ...rest } = seo
+  return { ...rest, image: image ? await resolveMediaIdByUrl(image) : null }
+}
+
 // Written by payload-cms's syncPageAfterChange/syncBlogPostAfterChange right
 // after a sync attempt — surfaces what used to be a server-only log line, so
 // "Published" in this table can't silently mean "actually 404s on the real
@@ -61,13 +107,18 @@ export interface PayloadPageSummary {
   // opaque relationship IDs (Charles, 2026-07-05: "on doit avoir... le nom
   // du créateur, la catégorie de page").
   category?: { id: string | number; name: string; slug: string } | null
-  // Payload's Users collection only has `email` (no name fields) — that's
-  // the real display identity for "creator", not a placeholder.
-  author?: { id: string | number; email: string } | null
+  // Payload's Users gained an optional `name` field 2026-07-09 (Charles:
+  // the Content Hub showed a raw email) — `name` is null for any user who
+  // hasn't set one, callers fall back to `email`.
+  author?: { id: string | number; email: string; name?: string | null } | null
   publishedAt?: string | null
   _status: "draft" | "published"
   updatedAt: string
   syncStatus?: PayloadSyncStatus | null
+  // Charles (2026-07-10): index/follow visible directly in the recap table,
+  // not just inside the SEO tab — listPages already returns every top-level
+  // field, this just types what was already coming back unused.
+  seo?: { noIndex?: boolean | null; noFollow?: boolean | null }
 }
 
 export interface PayloadPageBlock {
@@ -76,9 +127,252 @@ export interface PayloadPageBlock {
   [key: string]: unknown
 }
 
+// Content Hub's own generic form builder (registry-client.ts propsSchema,
+// dynamic-field.tsx) only ever knew a flat shape (imageUrl, ctaHref,
+// ctaLabel) — but Payload's real block schemas (payload-cms's Hero.ts,
+// @neomnia/ui's hero-split/cta-banner/testimonials/pricing-table configs)
+// declare `image` as an upload RELATION (expects a Media doc ID, not a URL)
+// and `cta`/`secondaryCta` as a nested linkField GROUP
+// ({type,reference,url,label}), not flat strings. Content Hub PATCHed the
+// flat shape straight to Payload's REST API, which silently drops any
+// field it doesn't recognize — confirmed live 2026-07-09 (selected a real
+// media item via MediaPickerField, saved, re-fetched from Payload: `image`
+// was still null). This predates today; lib/layers/from-payload.ts and
+// payload-cms's own sync/targets/neosaas-app.ts already do this same
+// translation for the LIVE SITE's read path (Live Preview / publish sync) —
+// this is the missing third leg, for Content Hub's own edit bridge.
+// fromPayloadBlock runs on every getPage() read; toPayloadBlock runs on
+// every createPage()/updatePage() write. Only Pages go through BlockEditor
+// (ArticleEditor has no `layout` field at all — BlogPostWriteInput doesn't
+// declare one), so BlogPosts are untouched.
+interface PayloadLinkValue {
+  type?: "reference" | "custom"
+  newTab?: boolean | null
+  reference?: { relationTo?: string; value?: unknown } | string | number | null
+  url?: string | null
+  label?: string | null
+}
+
+// feature-grid's and pricing-table's `items[].bullets` is a Payload array of
+// `{ text }` rows (@neomnia/ui's config.ts), but Content Hub's generic
+// BlockEditor form (registry-client.ts's featureGridItemSchema/
+// pricingTablePlanSchema) only ever knew `bullets: string[]` — the same flat-
+// vs-nested mismatch already fixed for image/cta/link fields above, just not
+// yet for this one. Unnoticed until now because a required, minRows:1 array
+// field rejects a plain string row outright (Payload can't read `.text` off
+// a string), which is the "Features"/"Plans" 400 this fixes.
+function unpackBullets(bullets: unknown): string[] {
+  if (!Array.isArray(bullets)) return []
+  return (bullets as Array<{ text?: string } | string>).map((b) => (typeof b === "string" ? b : b.text ?? ""))
+}
+
+function packBullets(bullets: unknown): { text: string }[] {
+  if (!Array.isArray(bullets)) return []
+  return (bullets as string[]).map((text) => ({ text }))
+}
+
+function unpackLink(link: unknown): { label?: string; href?: string } {
+  if (!link || typeof link !== "object") return {}
+  const l = link as PayloadLinkValue
+  if (l.type === "reference" && l.reference) {
+    const populated =
+      typeof l.reference === "object" && l.reference !== null && "value" in l.reference
+        ? (l.reference as { value: unknown }).value
+        : l.reference
+    const href = populated && typeof populated === "object" && "path" in populated ? (populated as { path?: string }).path : undefined
+    return { label: l.label ?? undefined, href }
+  }
+  return { label: l.label ?? undefined, href: l.url ?? undefined }
+}
+
+function unpackImage(image: unknown): string | undefined {
+  if (!image || typeof image !== "object" || !("url" in image)) return undefined
+  const url = (image as { url?: string }).url
+  // Same relative-URL gotcha as listMedia() below (Payload has no
+  // serverURL configured) — made absolute here too so a block's existing
+  // imageUrl always matches listMedia()'s own absolute URLs, letting
+  // MediaPickerField's `options.find((m) => m.url === value)` resolve the
+  // combobox's display label instead of falling back to "Select media...".
+  return url && url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${url}` : (url ?? undefined)
+}
+
+/** READ direction — Payload's raw block shape → the flat shape BlockEditor's generic form expects. */
+function fromPayloadBlock(block: PayloadPageBlock): PayloadPageBlock {
+  const next: PayloadPageBlock = { ...block }
+
+  if (block.blockType === "columns" && Array.isArray(block.columns)) {
+    next.columns = (block.columns as Array<Record<string, unknown>>).map((col) => ({
+      ...col,
+      blocks: Array.isArray(col.blocks) ? (col.blocks as PayloadPageBlock[]).map(fromPayloadBlock) : col.blocks,
+    }))
+    return next
+  }
+
+  if (["hero", "hero-split", "cta-banner"].includes(block.blockType)) {
+    if ("cta" in block) {
+      const { label, href } = unpackLink(block.cta)
+      next.ctaLabel = label
+      next.ctaHref = href
+    }
+    if ("secondaryCta" in block) {
+      const { label, href } = unpackLink(block.secondaryCta)
+      next.secondaryCtaLabel = label
+      next.secondaryCtaHref = href
+    }
+  }
+
+  if (["hero", "hero-split"].includes(block.blockType) && "image" in block) {
+    next.imageUrl = unpackImage(block.image)
+  }
+
+  if (block.blockType === "icon-showcase") {
+    if ("image" in block) next.imageUrl = unpackImage(block.image)
+    if ("video" in block) next.videoUrl = unpackImage(block.video)
+  }
+
+  if (block.blockType === "testimonials" && Array.isArray(block.items)) {
+    next.items = (block.items as Array<Record<string, unknown>>).map((item) => ({ ...item, imageUrl: unpackImage(item.image) }))
+  }
+
+  if (block.blockType === "feature-grid" && Array.isArray(block.items)) {
+    next.items = (block.items as Array<Record<string, unknown>>).map((item) => ({ ...item, bullets: unpackBullets(item.bullets) }))
+  }
+
+  if (block.blockType === "pricing-table" && Array.isArray(block.items)) {
+    next.items = (block.items as Array<Record<string, unknown>>).map((item) => {
+      const { label, href } = unpackLink(item.cta)
+      return { ...item, ctaLabel: label, ctaHref: href, bullets: unpackBullets(item.bullets) }
+    })
+  }
+
+  return next
+}
+
+// Payload's Media doc ID isn't known client-side (MediaPickerField only
+// carries the resolved absolute URL, for display) — resolved by filename,
+// the one stable identifier both sides share. Returns null (not throwing)
+// on no match — a raw external URL not in Payload's media library has no
+// relation to point to, so the image field is cleared rather than the
+// whole save failing.
+async function resolveMediaIdByUrl(url: string | undefined): Promise<string | number | null> {
+  if (!url) return null
+  const filename = url.split("/").pop()
+  if (!filename) return null
+  const params = new URLSearchParams({
+    "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
+    "where[filename][equals]": filename,
+    limit: "1",
+  })
+  const result = await listCollection<{ id: string | number }>("media", params)
+  return result.docs[0]?.id ?? null
+}
+
+// Content Hub's LinkFieldInput already resolves an "existing page" choice
+// down to a plain path string (including hardcoded pages like /pricing that
+// aren't real Payload docs at all — see link-field-input.tsx) — there's no
+// page ID to hand Payload's `reference` relation, so every write goes back
+// as type:"custom" with that path as `url`. Loses Payload's own "auto-heals
+// if the target page is renamed" behavior for reference-type links edited
+// via Payload's own admin, but matches what Content Hub already promises
+// (this is the same value the UI showed and the user picked).
+function packLink(href: unknown, label: unknown, existing: unknown): PayloadLinkValue {
+  const existingLink = existing && typeof existing === "object" ? (existing as PayloadLinkValue) : undefined
+  return {
+    type: "custom",
+    url: (href as string) || undefined,
+    label: (label as string) || undefined,
+    newTab: existingLink?.newTab ?? false,
+  }
+}
+
+/** WRITE direction — the flat shape BlockEditor produces → Payload's real block shape. */
+async function toPayloadBlock(block: PayloadPageBlock): Promise<PayloadPageBlock> {
+  const next: PayloadPageBlock = { ...block }
+
+  if (block.blockType === "columns" && Array.isArray(block.columns)) {
+    next.columns = await Promise.all(
+      (block.columns as Array<Record<string, unknown>>).map(async (col) => ({
+        ...col,
+        blocks: Array.isArray(col.blocks) ? await Promise.all((col.blocks as PayloadPageBlock[]).map(toPayloadBlock)) : col.blocks,
+      })),
+    )
+    return next
+  }
+
+  if (["hero", "hero-split", "cta-banner"].includes(block.blockType)) {
+    if ("ctaHref" in block || "ctaLabel" in block) {
+      next.cta = packLink(block.ctaHref, block.ctaLabel, block.cta)
+      delete next.ctaHref
+      delete next.ctaLabel
+    }
+    if ("secondaryCtaHref" in block || "secondaryCtaLabel" in block) {
+      next.secondaryCta = packLink(block.secondaryCtaHref, block.secondaryCtaLabel, block.secondaryCta)
+      delete next.secondaryCtaHref
+      delete next.secondaryCtaLabel
+    }
+  }
+
+  if (["hero", "hero-split"].includes(block.blockType) && "imageUrl" in block) {
+    next.image = await resolveMediaIdByUrl(block.imageUrl as string | undefined)
+    delete next.imageUrl
+  }
+
+  if (block.blockType === "icon-showcase") {
+    if ("imageUrl" in block) {
+      next.image = await resolveMediaIdByUrl(block.imageUrl as string | undefined)
+      delete next.imageUrl
+    }
+    if ("videoUrl" in block) {
+      next.video = await resolveMediaIdByUrl(block.videoUrl as string | undefined)
+      delete next.videoUrl
+    }
+  }
+
+  if (block.blockType === "testimonials" && Array.isArray(block.items)) {
+    next.items = await Promise.all(
+      (block.items as Array<Record<string, unknown>>).map(async (item) => {
+        const { imageUrl, ...rest } = item
+        return { ...rest, image: await resolveMediaIdByUrl(imageUrl as string | undefined) }
+      }),
+    )
+  }
+
+  if (block.blockType === "feature-grid" && Array.isArray(block.items)) {
+    next.items = (block.items as Array<Record<string, unknown>>).map((item) => ({ ...item, bullets: packBullets(item.bullets) }))
+  }
+
+  if (block.blockType === "pricing-table" && Array.isArray(block.items)) {
+    next.items = (block.items as Array<Record<string, unknown>>).map((item) => {
+      const { ctaHref, ctaLabel, bullets, ...rest } = item
+      const cta = "ctaHref" in item || "ctaLabel" in item ? packLink(ctaHref, ctaLabel, item.cta) : item.cta
+      return { ...rest, cta, bullets: packBullets(bullets) }
+    })
+  }
+
+  return next
+}
+
 export interface PayloadPageDoc extends PayloadPageSummary {
   layout: PayloadPageBlock[]
-  seo?: { metaTitle?: string | null; metaDescription?: string | null }
+  seo?: {
+    metaTitle?: string | null
+    metaDescription?: string | null
+    noIndex?: boolean | null
+    noFollow?: boolean | null
+    // plugin-seo's meta.image (Charles, 2026-07-11: header/featured image) —
+    // single shared field feeding both og:image/Twitter Card and the public
+    // page's visual banner. Unpacked to an absolute URL by unpackSeoImage.
+    image?: string
+  }
+  // Top-level Payload field (Pages.ts's Organisation tab), not part of
+  // plugin-seo's `meta` group — Charles (2026-07-09): "ajouter le nom du
+  // site ou non sur le SEO dans la balise title."
+  includeSiteNameInTitle?: boolean
+  // Charles (2026-07-10): "délai de publication"/"délai de dépublication" —
+  // acted on by payload-cms's runScheduledPublishing.ts interval, not a
+  // display-only date.
+  scheduledPublishAt?: string | null
+  scheduledUnpublishAt?: string | null
 }
 
 export interface PaginatedResult<T> {
@@ -132,15 +426,24 @@ export async function listPages(options: ListPagesOptions = {}): Promise<Paginat
   if (!res.ok) {
     throw new Error(`Payload bridge: listPages failed (${res.status})`)
   }
-  return res.json()
+  const data = (await res.json()) as PaginatedResult<PayloadPageSummary>
+  return { ...data, docs: data.docs.map(metaToSeo).map(unpackSeoImage) as unknown as PayloadPageSummary[] }
 }
 
+// getPage()'s one caller (getContentPage, app/actions/pages.ts) only ever
+// feeds the Content Hub edit form — draft=true so a reopened page shows the
+// latest autosaved draft, not the stale main-row snapshot that only moves on
+// publish (versions.drafts:true, Pages.ts). Without it, every autosave past
+// the first was invisible on reopen: found verifying the feature-grid/
+// pricing-table bullets fix (2026-07-10) — page 51 showed 0 blocks in the
+// editor despite a newer draft version existing in Postgres.
 export async function getPage(id: string | number, locale: string = "fr"): Promise<PayloadPageDoc> {
-  const res = await payloadFetch(`/pages/${id}?depth=1&locale=${locale}`)
+  const res = await payloadFetch(`/pages/${id}?depth=1&locale=${locale}&draft=true`)
   if (!res.ok) {
     throw new Error(`Payload bridge: getPage(${id}) failed (${res.status})`)
   }
-  return res.json()
+  const doc = (await res.json()) as PayloadPageDoc
+  return { ...(unpackSeoImage(metaToSeo(doc) as unknown as PayloadPageDoc)), layout: doc.layout.map(fromPayloadBlock) }
 }
 
 /**
@@ -174,22 +477,48 @@ export interface PageWriteInput {
   pageType?: string
   category?: string | number | null
   layout: PayloadPageBlock[]
-  seo?: { metaTitle?: string; metaDescription?: string }
+  seo?: { metaTitle?: string; metaDescription?: string; noIndex?: boolean; noFollow?: boolean; image?: string | null }
+  includeSiteNameInTitle?: boolean
+  scheduledPublishAt?: string | null
+  scheduledUnpublishAt?: string | null
   _status: "draft" | "published"
+}
+
+/**
+ * `draft=true` is only sent when the write's own `_status` is `"draft"` —
+ * this is Payload's real draft-versioning flag, not just a label. On
+ * `update`, Payload would actually ignore `draft=true` once `_status` is
+ * `"published"` anyway (it treats that combination as a real publish), but
+ * on `create` it does NOT: `draft=true` unconditionally forces the brand-new
+ * document to save as a draft regardless of what `_status` says, which would
+ * silently fail a first-time Publish on a page that was never saved before.
+ * Deriving the flag from `_status` instead of hardcoding it keeps both
+ * operations correct with one shared rule (found 2026-07-10 while wiring
+ * PageEditor/ArticleEditor's autosave — see also sync/dispatch.ts's
+ * `isDraftOnlySave` check on the payload-cms side, which relies on this same
+ * flag to avoid deactivating an already-published page on every autosave).
+ */
+function draftQueryParam(status: "draft" | "published" | undefined): string {
+  return status === "draft" ? "&draft=true" : ""
 }
 
 /** Always tagged with this site's own tenant — a bridge caller can't write into another site. */
 export async function createPage(input: PageWriteInput, locale: string = "fr"): Promise<PayloadPageDoc> {
-  const res = await payloadFetch(`/pages?locale=${locale}`, {
+  const seo = await resolveSeoImage(input.seo)
+  const res = await payloadFetch(`/pages?locale=${locale}${draftQueryParam(input._status)}`, {
     method: "POST",
-    body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
+    body: JSON.stringify({
+      ...seoToMetaBody({ ...input, seo }),
+      layout: await Promise.all(input.layout.map(toPayloadBlock)),
+      tenant: PAYLOAD_TENANT_ID,
+    }),
   })
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Payload bridge: createPage failed (${res.status}): ${body}`)
   }
   const data = await res.json()
-  return data.doc as PayloadPageDoc
+  return unpackSeoImage(metaToSeo(data.doc) as unknown as PayloadPageDoc)
 }
 
 // Without `?locale=`, Payload writes localized fields to its defaultLocale
@@ -202,16 +531,20 @@ export async function updatePage(
   input: Partial<PageWriteInput>,
   locale: string = "fr",
 ): Promise<PayloadPageDoc> {
-  const res = await payloadFetch(`/pages/${id}?locale=${locale}`, {
+  const seo = await resolveSeoImage(input.seo)
+  const res = await payloadFetch(`/pages/${id}?locale=${locale}${draftQueryParam(input._status)}`, {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...seoToMetaBody({ ...input, seo }),
+      ...(input.layout ? { layout: await Promise.all(input.layout.map(toPayloadBlock)) } : {}),
+    }),
   })
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Payload bridge: updatePage(${id}) failed (${res.status}): ${body}`)
   }
   const data = await res.json()
-  return data.doc as PayloadPageDoc
+  return unpackSeoImage(metaToSeo(data.doc) as unknown as PayloadPageDoc)
 }
 
 /**
@@ -237,51 +570,70 @@ export interface PayloadCategorySummary {
   slug: string
   path: string
   parent: string | number | null
+  // Populated at depth=1, unpacked to a plain absolute URL — standalone
+  // field (relationTo media), not part of a plugin-seo meta group like
+  // Pages, since Categories has no title/description generation needs.
+  headerImage?: string
 }
 
 /** Categories are typically few (tens, not hundreds) — no pagination needed for a filter dropdown. */
 export async function listCategories(locale: string = "fr"): Promise<PayloadCategorySummary[]> {
   const res = await payloadFetch(
-    `/categories?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=0&limit=200&sort=path&locale=${locale}`,
+    // depth=1 (was 0) so headerImage comes back as {id,url} to unpack, same
+    // reasoning as listBlogPosts' coverImage.
+    `/categories?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=1&limit=200&sort=path&locale=${locale}`,
   )
   if (!res.ok) {
     throw new Error(`Payload bridge: listCategories failed (${res.status})`)
   }
   const data = await res.json()
-  return data.docs as PayloadCategorySummary[]
+  return (data.docs as Array<PayloadCategorySummary & { headerImage?: unknown }>).map((doc) => ({
+    ...doc,
+    headerImage: unpackImage(doc.headerImage),
+  }))
 }
 
 export interface CategoryWriteInput {
   name: string
   slug: string
   parent?: string | number | null
+  headerImage?: string | null
 }
 
 /** Always tagged with this site's own tenant, same rule as createPage/createBlogPost. */
 export async function createCategory(input: CategoryWriteInput): Promise<PayloadCategorySummary> {
+  const { headerImage, ...rest } = input
   const res = await payloadFetch(`/categories`, {
     method: "POST",
-    body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
+    body: JSON.stringify({
+      ...rest,
+      ...(headerImage !== undefined ? { headerImage: headerImage ? await resolveMediaIdByUrl(headerImage) : null } : {}),
+      tenant: PAYLOAD_TENANT_ID,
+    }),
   })
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Payload bridge: createCategory failed (${res.status}): ${body}`)
   }
   const data = await res.json()
-  return data.doc as PayloadCategorySummary
+  return { ...(data.doc as PayloadCategorySummary), headerImage: unpackImage(data.doc.headerImage) }
 }
 
 export async function updateCategory(id: string | number, input: CategoryWriteInput): Promise<PayloadCategorySummary> {
+  const { headerImage, ...rest } = input
   const res = await payloadFetch(`/categories/${id}`, {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...rest,
+      ...(headerImage !== undefined ? { headerImage: headerImage ? await resolveMediaIdByUrl(headerImage) : null } : {}),
+    }),
   })
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Payload bridge: updateCategory(${id}) failed (${res.status}): ${body}`)
   }
   const data = await res.json()
-  return data.doc as PayloadCategorySummary
+  return { ...(data.doc as PayloadCategorySummary), headerImage: unpackImage(data.doc.headerImage) }
 }
 
 export async function deleteCategory(id: string | number): Promise<void> {
@@ -302,14 +654,21 @@ export interface PayloadBlogPostSummary {
   _status: "draft" | "published"
   updatedAt: string
   syncStatus?: PayloadSyncStatus | null
-  // Populated {id, url} at depth=1 (see listBlogPosts) — a bare ID at
-  // depth=0 isn't a usable thumbnail src.
-  coverImage?: { id: string | number; url: string } | null
+  // Populated at depth=1 (see listBlogPosts) and unpacked to a plain
+  // absolute URL by unpackImage — same shape as every other imageUrl field
+  // in this bridge, not Payload's raw {id, url} relation object. Doubles as
+  // this collection's header/SEO image (BlogPostWriteInput.coverImage,
+  // og:image/twitter — see blog/[slug]/page.tsx) rather than adding a
+  // second, competing plugin-seo meta.image field.
+  coverImage?: string
 }
 
 export interface PayloadBlogPostDoc extends PayloadBlogPostSummary {
   body?: unknown
-  seo?: { metaTitle?: string | null; metaDescription?: string | null }
+  seo?: { metaTitle?: string | null; metaDescription?: string | null; noIndex?: boolean | null; noFollow?: boolean | null }
+  includeSiteNameInTitle?: boolean
+  scheduledPublishAt?: string | null
+  scheduledUnpublishAt?: string | null
 }
 
 export interface ListBlogPostsOptions {
@@ -340,7 +699,11 @@ export async function listBlogPosts(
   if (!res.ok) {
     throw new Error(`Payload bridge: listBlogPosts failed (${res.status})`)
   }
-  return res.json()
+  const data = (await res.json()) as PaginatedResult<PayloadBlogPostSummary>
+  return {
+    ...data,
+    docs: data.docs.map((doc) => ({ ...(metaToSeo(doc) as unknown as PayloadBlogPostSummary), coverImage: unpackImage(doc.coverImage) })),
+  }
 }
 
 export async function getBlogPost(id: string | number, locale: string = "fr"): Promise<PayloadBlogPostDoc> {
@@ -348,7 +711,8 @@ export async function getBlogPost(id: string | number, locale: string = "fr"): P
   if (!res.ok) {
     throw new Error(`Payload bridge: getBlogPost(${id}) failed (${res.status})`)
   }
-  return res.json()
+  const doc = (await res.json()) as PayloadBlogPostDoc
+  return { ...(metaToSeo(doc) as unknown as PayloadBlogPostDoc), coverImage: unpackImage(doc.coverImage) }
 }
 
 export interface BlogPostWriteInput {
@@ -365,21 +729,33 @@ export interface BlogPostWriteInput {
    */
   body?: unknown
   publishedAt?: string | null
-  seo?: { metaTitle?: string; metaDescription?: string }
+  seo?: { metaTitle?: string; metaDescription?: string; noIndex?: boolean; noFollow?: boolean }
+  includeSiteNameInTitle?: boolean
+  scheduledPublishAt?: string | null
+  scheduledUnpublishAt?: string | null
+  // This collection's header/SEO image — Payload's own `coverImage` field
+  // (not plugin-seo's meta.image, which the plugin also adds to this
+  // collection but is deliberately left unused here, see payload.config.ts).
+  coverImage?: string | null
   _status: "draft" | "published"
 }
 
 export async function createBlogPost(input: BlogPostWriteInput, locale: string = "fr"): Promise<PayloadBlogPostDoc> {
-  const res = await payloadFetch(`/blog-posts?locale=${locale}`, {
+  const { coverImage, ...rest } = input
+  const res = await payloadFetch(`/blog-posts?locale=${locale}${draftQueryParam(input._status)}`, {
     method: "POST",
-    body: JSON.stringify({ ...input, tenant: PAYLOAD_TENANT_ID }),
+    body: JSON.stringify({
+      ...seoToMetaBody(rest),
+      ...(coverImage !== undefined ? { coverImage: coverImage ? await resolveMediaIdByUrl(coverImage) : null } : {}),
+      tenant: PAYLOAD_TENANT_ID,
+    }),
   })
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Payload bridge: createBlogPost failed (${res.status}): ${body}`)
   }
   const data = await res.json()
-  return data.doc as PayloadBlogPostDoc
+  return { ...(metaToSeo(data.doc) as unknown as PayloadBlogPostDoc), coverImage: unpackImage(data.doc.coverImage) }
 }
 
 // Same fix as updatePage — locale wasn't forwarded, so an edit always wrote fr.
@@ -388,16 +764,20 @@ export async function updateBlogPost(
   input: Partial<BlogPostWriteInput>,
   locale: string = "fr",
 ): Promise<PayloadBlogPostDoc> {
-  const res = await payloadFetch(`/blog-posts/${id}?locale=${locale}`, {
+  const { coverImage, ...rest } = input
+  const res = await payloadFetch(`/blog-posts/${id}?locale=${locale}${draftQueryParam(input._status)}`, {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...seoToMetaBody(rest),
+      ...(coverImage !== undefined ? { coverImage: coverImage ? await resolveMediaIdByUrl(coverImage) : null } : {}),
+    }),
   })
   if (!res.ok) {
     const body = await res.text()
     throw new Error(`Payload bridge: updateBlogPost(${id}) failed (${res.status}): ${body}`)
   }
   const data = await res.json()
-  return data.doc as PayloadBlogPostDoc
+  return { ...(metaToSeo(data.doc) as unknown as PayloadBlogPostDoc), coverImage: unpackImage(data.doc.coverImage) }
 }
 
 /** Same rationale as deletePage — target site is already deactivated by the sync hook first. */
@@ -426,15 +806,233 @@ export interface PayloadListResult<T = Record<string, unknown>> {
   hasPrevPage: boolean
 }
 
-export async function listCollection(
+export async function listCollection<T = Record<string, unknown>>(
   slug: string,
   searchParams: URLSearchParams,
-): Promise<PayloadListResult> {
+): Promise<PayloadListResult<T>> {
   const res = await payloadFetch(`/${slug}?${searchParams.toString()}`)
   if (!res.ok) {
     throw new Error(`Payload bridge: listCollection(${slug}) failed (${res.status})`)
   }
   return res.json()
+}
+
+// Charles (2026-07-09): "on doit avoir une vignette preview depuis chaque
+// champs media" — payload-cms's Media collection (upload: true, access.read
+// public) has no dedicated bridge helper yet, every imageUrl/videoUrl field
+// in Content Hub is a bare text input. Tenant-scoped the same way
+// listPages/listBlogPosts are (plugin-multi-tenant auto-injects `tenant`,
+// never declared in Media.ts itself).
+export interface PayloadMediaSummary {
+  id: string | number
+  filename: string
+  alt?: string | null
+  url: string
+  mimeType?: string | null
+  filesize?: number | null
+  width?: number | null
+  height?: number | null
+  // Payload adds this to every doc automatically; wasn't declared here
+  // since nothing read it — needed now for Media Gallery's date sort.
+  createdAt?: string | null
+}
+
+export interface ListMediaOptions {
+  limit?: number
+  search?: string
+}
+
+// Payload's config has no `serverURL` set, so an upload's `url` comes back
+// relative ("/api/media/file/xxx.jpg") — fine for the Payload admin itself
+// (same origin) but resolves against neosaas-v2's own origin everywhere
+// else, 404ing. Confirmed live 2026-07-09: MediaPickerField's own thumbnail
+// broke on this exact issue. Made absolute here, once, since this is the
+// only place in neosaas-v2 that lists raw Media docs — extractMediaUrl
+// (lib/layers/from-payload.ts) and mapBlockToProps (payload-cms's own
+// neosaas-app.ts) read `image.url` off already-populated relation fields on
+// Pages/BlogPosts, a separate path this fix doesn't touch.
+const PAYLOAD_ORIGIN = PAYLOAD_API_URL?.replace(/\/api\/?$/, "")
+
+export async function listMedia(options: ListMediaOptions = {}): Promise<PayloadListResult<PayloadMediaSummary>> {
+  const { limit = 100, search } = options
+  const params = new URLSearchParams({
+    "where[tenant][equals]": String(PAYLOAD_TENANT_ID),
+    limit: String(limit),
+    sort: "-createdAt",
+  })
+  if (search) params.set("where[filename][contains]", search)
+  const result = await listCollection<PayloadMediaSummary>("media", params)
+  return {
+    ...result,
+    docs: result.docs.map((doc) => ({
+      ...doc,
+      url: doc.url && doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url,
+    })),
+  }
+}
+
+/**
+ * Uploads a file into Payload's Media collection — the same collection
+ * MediaPickerField/listMedia already read from, previously only writable
+ * via Payload's own native admin (Charles, 2026-07-11: "on a un lien
+ * direct vers payload. c'est pas génial. je dois avoir les mêmes
+ * fonctionnalités de neosaas app depuis l'ui"). Deliberately bypasses
+ * payloadFetch() — it hardcodes `Content-Type: application/json`, which
+ * breaks a multipart upload (the browser/runtime needs to set its own
+ * boundary). `tenant` is appended as a plain form field, same value
+ * every other create call here sends as JSON — Payload's REST API accepts
+ * non-file fields alongside the file in the same multipart body.
+ */
+export async function uploadMedia(file: File, alt?: string): Promise<PayloadMediaSummary> {
+  assertConfigured()
+  const formData = new FormData()
+  formData.append("file", file)
+  // Payload's REST API multipart convention: non-file fields must ride in a
+  // single `_payload` JSON string alongside the file, not as individual
+  // form fields — appending `tenant`/`alt` directly 400s with "This field
+  // is required" even though the value is right there in the form data.
+  formData.append("_payload", JSON.stringify({ tenant: PAYLOAD_TENANT_ID, alt: alt ?? undefined }))
+
+  const res = await fetch(`${PAYLOAD_API_URL}/media`, {
+    method: "POST",
+    headers: { Authorization: `users API-Key ${PAYLOAD_SERVICE_API_KEY}` },
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: uploadMedia failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  const doc = data.doc as PayloadMediaSummary
+  return { ...doc, url: doc.url && doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url }
+}
+
+export async function deleteMedia(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/media/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deleteMedia(${id}) failed (${res.status}): ${body}`)
+  }
+}
+
+/**
+ * Fetches an already-uploaded image's bytes server-side and returns them as
+ * a data: URL — the escape hatch for feeding an existing S3-hosted image
+ * into ImageCropper (react-easy-crop), which only ever received data URLs
+ * before (CroppedFileInput's FileReader.readAsDataURL, same-origin by
+ * construction). Loading the raw Scaleway S3 url directly into a canvas
+ * client-side risks a CORS-tainted canvas depending on the bucket's CORS
+ * config; a server-side fetch has no such restriction (same trick
+ * mediaTransformHandler already uses to refetch doc.url before a Sharp
+ * transform), and the result is same-origin data once it reaches the
+ * browser.
+ */
+export async function fetchMediaAsDataUrl(id: string | number): Promise<{ dataUrl: string; mimeType: string }> {
+  const res = await payloadFetch(`/media/${id}`)
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: fetchMediaAsDataUrl(${id}) failed to load doc (${res.status}): ${body}`)
+  }
+  const doc = (await res.json()) as PayloadMediaSummary
+  if (!doc.url) throw new Error(`Payload bridge: fetchMediaAsDataUrl(${id}) — doc has no url`)
+  const absoluteUrl = doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url
+  const fileRes = await fetch(absoluteUrl)
+  if (!fileRes.ok) throw new Error(`Payload bridge: fetchMediaAsDataUrl(${id}) — could not fetch file bytes (${fileRes.status})`)
+  const buffer = Buffer.from(await fileRes.arrayBuffer())
+  const mimeType = doc.mimeType ?? fileRes.headers.get("content-type") ?? "image/jpeg"
+  return { dataUrl: `data:${mimeType};base64,${buffer.toString("base64")}`, mimeType }
+}
+
+/**
+ * Replaces an already-uploaded Media doc's actual pixel content in place —
+ * the crop result (a Blob from ImageCropper) is uploaded through the same
+ * multipart path as a fresh upload, but PATCHed against the existing doc id
+ * instead of POSTed as a new one, so the doc's id/alt/url slug are kept and
+ * only the underlying file changes. Same _payload convention as uploadMedia
+ * (Payload's REST multipart quirk: non-file fields must ride in a single
+ * JSON string field, not as individual form fields).
+ */
+export async function replaceMediaFile(id: string | number, file: File): Promise<PayloadMediaSummary> {
+  assertConfigured()
+  const formData = new FormData()
+  formData.append("file", file)
+  formData.append("_payload", JSON.stringify({}))
+  const res = await fetch(`${PAYLOAD_API_URL}/media/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `users API-Key ${PAYLOAD_SERVICE_API_KEY}` },
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: replaceMediaFile(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  const doc = data.doc as PayloadMediaSummary
+  return { ...doc, url: doc.url && doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url }
+}
+
+export interface MediaTransformInput {
+  rotate?: number
+  flip?: "horizontal" | "vertical"
+  width?: number
+  height?: number
+  quality?: number
+}
+
+/**
+ * Applies an in-place transform (rotate/flip/resize/quality) to an
+ * already-uploaded image — proxies payload-cms's existing
+ * `POST /api/media/:id/transform` endpoint (src/endpoints/mediaTransform.ts,
+ * Sharp-based, already functional, previously only reachable from Payload's
+ * own admin via MediaTransformControls). Images only — video isn't
+ * supported by that endpoint yet (needs ffmpeg, a separate backend task).
+ */
+export async function transformMedia(id: string | number, input: MediaTransformInput): Promise<PayloadMediaSummary> {
+  const res = await payloadFetch(`/media/${id}/transform`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: transformMedia(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  const doc = (data.doc ?? data) as PayloadMediaSummary
+  return { ...doc, url: doc.url && doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url }
+}
+
+/**
+ * Renames the underlying file of an already-uploaded Media doc — proxies
+ * payload-cms's `POST /api/media/:id/rename` (src/endpoints/mediaRename.ts).
+ * Unlike `alt` (a plain metadata PATCH via updateCollectionDoc), the
+ * filename is part of the doc's public `url`, so it needs the dedicated
+ * endpoint that re-runs Payload's own upload path instead of a bare field
+ * PATCH (which would desync the DB filename from the actual S3 object).
+ * Works for any mimetype — PDFs included, the actual motivating case
+ * (Charles, 2026-07-11: PDFs "doivent être publiables avec une URL... on ne
+ * peut agir sur le nom des fichiers").
+ */
+export async function renameMedia(id: string | number, filename: string): Promise<PayloadMediaSummary> {
+  const res = await payloadFetch(`/media/${id}/rename`, {
+    method: "POST",
+    body: JSON.stringify({ filename }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: renameMedia(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  const doc = (data.doc ?? data) as PayloadMediaSummary
+  return { ...doc, url: doc.url && doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url }
+}
+
+/**
+ * Plain metadata update (alt text only so far) — a normal PATCH via
+ * updateCollectionDoc, no file involved, so no risk of desyncing storage.
+ */
+export async function updateMediaAlt(id: string | number, alt: string): Promise<PayloadMediaSummary> {
+  const doc = (await updateCollectionDoc("media", id, { alt })) as unknown as PayloadMediaSummary
+  return { ...doc, url: doc.url && doc.url.startsWith("/") && PAYLOAD_ORIGIN ? `${PAYLOAD_ORIGIN}${doc.url}` : doc.url }
 }
 
 export async function createCollectionDoc(

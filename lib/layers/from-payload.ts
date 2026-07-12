@@ -55,6 +55,16 @@ function resolveLinkFieldSync(value: unknown): { label?: string; href?: string }
   return { label: link.label ?? undefined, href }
 }
 
+// Same conversion payload-cms's sync/targets/neosaas-app.ts applies at
+// publish time (convertSubtitle) — Live Preview fetches drafts straight
+// from Payload, bypassing that sync path entirely, so `subtitle`'s Lexical
+// JSON (fromRegistry.ts's convertField override) would otherwise reach the
+// site as a raw object instead of the HTML string every Layer component
+// expects.
+function convertSubtitle(subtitle: unknown): string | undefined {
+  return subtitle ? convertLexicalToHTML({ data: subtitle as never, disableContainer: true }) : undefined
+}
+
 function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
   switch (block.blockType) {
     case "hero": {
@@ -63,7 +73,7 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
       return {
         eyebrow: block.eyebrow ?? undefined,
         title: block.title,
-        subtitle: block.subtitle ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
         trustPills: ((block.trustPills as Array<{ icon: string; label: string }>) ?? []).length
           ? (block.trustPills as Array<{ icon: string; label: string }>).map((p) => ({ icon: p.icon, label: p.label }))
           : undefined,
@@ -83,8 +93,10 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
         eyebrow: block.eyebrow ?? undefined,
         brandName: block.brandName ?? undefined,
         title: block.title,
-        subtitle: block.subtitle ?? undefined,
-        highlights: highlights.length ? highlights.map((h) => ({ icon: h.icon, label: h.label, featured: h.featured })) : undefined,
+        subtitle: convertSubtitle(block.subtitle),
+        highlights: highlights.length
+          ? highlights.map((h) => ({ icon: h.icon, label: h.label, featured: h.featured ?? undefined }))
+          : undefined,
         ctaLabel: cta?.label,
         ctaHref: cta?.href,
         secondaryCtaLabel: secondaryCta?.label,
@@ -112,6 +124,7 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
         title: block.title ?? undefined,
         items: items.map((item) => ({
           icon: item.icon,
+          iconSize: item.iconSize ?? undefined,
           title: item.title,
           description: item.description,
           bullets: ((item.bullets as Array<{ text: string }>) ?? []).map((b) => b.text),
@@ -154,7 +167,7 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
       return {
         eyebrow: block.eyebrow ?? undefined,
         title: block.title,
-        subtitle: block.subtitle ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
         ctaLabel: cta?.label,
         ctaHref: cta?.href,
       }
@@ -184,7 +197,7 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
       return {
         eyebrow: block.eyebrow ?? undefined,
         title: block.title ?? undefined,
-        subtitle: block.subtitle ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
         name: block.name,
         items: items.map((item) => ({
           name: item.name,
@@ -200,14 +213,45 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
       return {
         eyebrow: block.eyebrow ?? undefined,
         title: block.title ?? undefined,
-        subtitle: block.subtitle ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
         limit: block.limit ?? undefined,
         categorySlug: block.categorySlug ?? undefined,
       }
     case "content":
       return {
-        bodyHtml: block.body ? convertLexicalToHTML({ data: block.body as never }) : "",
+        bodyHtml: block.body ? convertLexicalToHTML({ data: block.body as never, disableContainer: true }) : "",
       }
+    case "code-showcase":
+      return {
+        title: block.title ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
+        blockTitle: block.blockTitle ?? undefined,
+        blockDescription: block.blockDescription ?? undefined,
+        code: block.code,
+      }
+    case "features-list": {
+      const items = (block.items as Array<Record<string, unknown>>) ?? []
+      return {
+        eyebrow: block.eyebrow ?? undefined,
+        title: block.title ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
+        items: items.map((item) => ({ title: item.title, description: item.description })),
+        imageUrl: extractMediaUrl(block.image),
+      }
+    }
+    case "logo-cloud": {
+      const items = (block.items as Array<Record<string, unknown>>) ?? []
+      return {
+        eyebrow: block.eyebrow ?? undefined,
+        title: block.title ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
+        items: items.map((item) => ({
+          name: item.name,
+          imageUrl: extractMediaUrl(item.image),
+          markup: item.markup ?? undefined,
+        })),
+      }
+    }
     default:
       throw new Error(`[preview] Unknown block type: ${block.blockType}`)
   }

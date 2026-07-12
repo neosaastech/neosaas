@@ -155,14 +155,14 @@ export function CouponsPageClient({ coupons: initialCoupons, products }: Coupons
 
         <div className="flex gap-2 flex-wrap">
           <Button
-            variant={activeFilter === "all" ? "default" : "outline"}
+            variant={activeFilter === "all" ? "default" : "outline-solid"}
             size="sm"
             onClick={() => setActiveFilter("all")}
           >
             All
           </Button>
           <Button
-            variant={activeFilter === "active" ? "default" : "outline"}
+            variant={activeFilter === "active" ? "default" : "outline-solid"}
             size="sm"
             onClick={() => setActiveFilter("active")}
             className={activeFilter === "active" ? "bg-green-600 hover:bg-green-700" : ""}
@@ -170,7 +170,7 @@ export function CouponsPageClient({ coupons: initialCoupons, products }: Coupons
             Active
           </Button>
           <Button
-            variant={activeFilter === "expired" ? "default" : "outline"}
+            variant={activeFilter === "expired" ? "default" : "outline-solid"}
             size="sm"
             onClick={() => setActiveFilter("expired")}
             className={activeFilter === "expired" ? "bg-orange-600 hover:bg-orange-700" : ""}
@@ -178,7 +178,7 @@ export function CouponsPageClient({ coupons: initialCoupons, products }: Coupons
             Expired
           </Button>
           <Button
-            variant={activeFilter === "used-up" ? "default" : "outline"}
+            variant={activeFilter === "used-up" ? "default" : "outline-solid"}
             size="sm"
             onClick={() => setActiveFilter("used-up")}
             className={activeFilter === "used-up" ? "bg-red-600 hover:bg-red-700" : ""}

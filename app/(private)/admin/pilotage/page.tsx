@@ -163,7 +163,7 @@ export default function PilotagePage() {
             <div className="space-y-2 pt-2 border-t">
               {results.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
-                  <Badge variant={r.status === "error" ? "destructive" : "outline"}>{r.status}</Badge>
+                  <Badge variant={r.status === "error" ? "destructive" : "outline-solid"}>{r.status}</Badge>
                   <code>{r.action}</code>
                   {r.error && <span className="text-destructive text-xs">{r.error}</span>}
                 </div>
@@ -191,7 +191,7 @@ export default function PilotagePage() {
                   <div className="flex items-center gap-2">
                     <Badge
                       variant={
-                        log.result === "success" ? "outline" : log.result === "failed" ? "destructive" : "secondary"
+                        log.result === "success" ? "outline-solid" : log.result === "failed" ? "destructive" : "secondary"
                       }
                     >
                       {log.result}

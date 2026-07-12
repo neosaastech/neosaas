@@ -1,6 +1,169 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import 'tw-animate-css';
+/*
+  Fumadocs UI's own required baseline (layout primitives, animation
+  keyframes, custom @variant/@utility declarations used by its compiled
+  components — not optional/cosmetic, the docs sidebar is visually broken
+  without it) + the shadcn.css color preset, which remaps fd-* tokens onto
+  our own --background/--primary/etc. variables below instead of Fumadocs'
+  own default palette, so /documentation matches the rest of the site.
+*/
+@import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-ui/css/shadcn.css';
+
+@source '../*.{js,ts,jsx,tsx,mdx}';
+@source '../node_modules/preline/preline.js';
+@source '../node_modules/fumadocs-ui/dist/**/*.js';
+
+@custom-variant dark (&:is(.dark *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-brand-50: hsl(var(--brand-50));
+  --color-brand-100: hsl(var(--brand-100));
+  --color-brand-200: hsl(var(--brand-200));
+  --color-brand-300: hsl(var(--brand-300));
+  --color-brand-400: hsl(var(--brand-400));
+  --color-brand-500: hsl(var(--brand-500));
+  --color-brand-600: hsl(var(--brand-600));
+  --color-brand-700: hsl(var(--brand-700));
+  --color-brand-800: hsl(var(--brand-800));
+  --color-brand-900: hsl(var(--brand-900));
+  --color-brand-950: hsl(var(--brand-950));
+  --color-brand: hsl(var(--brand-500));
+  --color-brand-hover: hsl(var(--brand-600));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --shadow-flat: var(--shadow-flat);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-floating: var(--shadow-floating);
+
+  --font-sans: var(--font-family), system-ui, sans-serif;
+  --font-heading: var(--font-family-heading), system-ui, sans-serif;
+  --font-mono: var(--font-family-mono), monospace;
+
+  --text-xs: var(--font-size-xs, 0.75rem);
+  --text-sm: var(--font-size-sm, 0.875rem);
+  --text-base: var(--font-size-base, 1rem);
+  --text-lg: var(--font-size-lg, 1.125rem);
+  --text-xl: var(--font-size-xl, 1.25rem);
+  --text-2xl: var(--font-size-2xl, 1.5rem);
+  --text-3xl: var(--font-size-3xl, 1.875rem);
+  --text-4xl: var(--font-size-4xl, 2.25rem);
+
+  --font-weight-light: var(--font-weight-light, 300);
+  --font-weight-normal: var(--font-weight-normal, 400);
+  --font-weight-medium: var(--font-weight-medium, 500);
+  --font-weight-semibold: var(--font-weight-semibold, 600);
+  --font-weight-bold: var(--font-weight-bold, 700);
+
+  --leading-tight: var(--line-height-tight, 1.25);
+  --leading-normal: var(--line-height-normal, 1.5);
+  --leading-relaxed: var(--line-height-relaxed, 1.75);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility table-container {
+  /* Force select content to be full width on mobile */
+
+  /* Improve table horizontal scroll on mobile */
+  @media (max-width: 768px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 
 @layer base {
   :root {
@@ -134,7 +297,6 @@
 
 /* Admin tables responsive improvements */
 @layer components {
-  /* Force select content to be full width on mobile */
   @media (max-width: 640px) {
     [role="listbox"], 
     [data-radix-select-content] {
@@ -142,13 +304,7 @@
       max-width: 95vw !important;
     }
   }
-  
-  /* Improve table horizontal scroll on mobile */
   @media (max-width: 768px) {
-    .table-container {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
     
     /* Ensure table doesn't break layout */
     table {

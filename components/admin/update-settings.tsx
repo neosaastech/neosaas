@@ -91,7 +91,7 @@ export function UpdateSettings() {
   }
 
   const upToDate = status?.upToDate
-  const badgeVariant = upToDate === true ? "default" : upToDate === false ? "destructive" : "outline"
+  const badgeVariant = upToDate === true ? "default" : upToDate === false ? "destructive" : "outline-solid"
   const badgeLabel = upToDate === true ? "Up to date" : upToDate === false ? "Update available" : "Not checked yet"
 
   return (

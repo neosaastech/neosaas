@@ -27,7 +27,7 @@ export default function AdminPagesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-[#1A1A1A]">Content</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Content Management</h1>
         <p className="text-muted-foreground mt-1">Create and manage Pages and Articles.</p>
       </div>
       <ContentHub />

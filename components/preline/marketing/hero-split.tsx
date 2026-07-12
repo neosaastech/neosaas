@@ -38,7 +38,7 @@ export function PrelineHeroSplit({
   videoUrl,
 }: PrelineHeroSplitProps) {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-background to-muted/40">
+    <div className="relative overflow-hidden bg-linear-to-b from-background to-muted/40">
       <div className="container px-4 py-12 sm:px-6 md:py-20 lg:py-24">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
           {/* Copy */}
@@ -52,7 +52,10 @@ export function PrelineHeroSplit({
               {title}
             </h1>
             {subtitle && (
-              <p className="mt-4 text-lg text-muted-foreground md:text-xl">{subtitle}</p>
+              <div
+                className="mt-4 text-lg text-muted-foreground md:text-xl [&_p]:m-0"
+                dangerouslySetInnerHTML={{ __html: subtitle }}
+              />
             )}
 
             {trustPills && trustPills.length > 0 && (
@@ -62,7 +65,7 @@ export function PrelineHeroSplit({
                   return (
                     <span
                       key={pill.label}
-                      className="inline-flex items-center gap-x-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm"
+                      className="inline-flex items-center gap-x-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-xs"
                     >
                       {Icon ? <Icon className="size-4 text-brand" /> : null}
                       {pill.label}
@@ -76,7 +79,7 @@ export function PrelineHeroSplit({
               {ctaLabel && ctaHref && (
                 <Link
                   href={ctaHref}
-                  className="inline-flex items-center justify-center gap-x-2 rounded-lg border border-transparent bg-brand px-4 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-brand/90 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2"
+                  className="inline-flex items-center justify-center gap-x-2 rounded-lg border border-transparent bg-brand px-4 py-3 text-sm font-medium text-white shadow-xs transition hover:bg-brand/90 focus:outline-hidden focus:ring-2 focus:ring-brand focus:ring-offset-2"
                 >
                   {ctaLabel}
                 </Link>
@@ -84,7 +87,7 @@ export function PrelineHeroSplit({
               {secondaryCtaLabel && secondaryCtaHref && (
                 <Link
                   href={secondaryCtaHref}
-                  className="inline-flex items-center justify-center gap-x-2 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2"
+                  className="inline-flex items-center justify-center gap-x-2 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground shadow-xs transition hover:bg-muted focus:outline-hidden focus:ring-2 focus:ring-brand focus:ring-offset-2"
                 >
                   {secondaryCtaLabel}
                 </Link>
@@ -114,11 +117,11 @@ export function PrelineHeroSplit({
                 imageUrl={imageUrl}
                 videoUrl={videoUrl}
                 overlayIcons={!(imageUrl || videoUrl)}
-                className="aspect-[4/3] h-auto max-w-full w-full"
+                className="aspect-4/3 h-auto max-w-full w-full"
               />
             </div>
-            <div className="pointer-events-none absolute -end-6 -top-6 size-24 rounded-full bg-brand/20 blur-2xl" />
-            <div className="pointer-events-none absolute -bottom-6 -start-6 size-32 rounded-full bg-brand/10 blur-3xl" />
+            <div className="pointer-events-none absolute -inset-e-6 -top-6 size-24 rounded-full bg-brand/20 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-6 -inset-s-6 size-32 rounded-full bg-brand/10 blur-3xl" />
           </div>
         </div>
       </div>

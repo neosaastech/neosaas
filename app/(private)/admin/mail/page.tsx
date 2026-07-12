@@ -364,7 +364,7 @@ export default function MailPage() {
                   </DropdownMenu>
 
                   <Button
-                    variant={isEditing ? "default" : "outline"}
+                    variant={isEditing ? "default" : "outline-solid"}
                     size="sm"
                     onClick={() => setIsEditing(!isEditing)}
                     className={isEditing ? "bg-brand hover:bg-[#B8691C]" : ""}

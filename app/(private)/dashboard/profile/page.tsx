@@ -269,13 +269,13 @@ export default function ProfilePage() {
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="relative group">
-              <Avatar className="h-24 w-24 border-4 border-background shadow-sm">
+              <Avatar className="h-24 w-24 border-4 border-background shadow-xs">
                 <AvatarImage src={user.profileImage || "/placeholder.svg"} alt={user.firstName} />
                 <AvatarFallback className="text-xl bg-[#5B8FF9] text-white">{user.firstName[0]}</AvatarFallback>
               </Avatar>
               <button
                 onClick={() => fileInputRef.current?.open()}
-                className="absolute bottom-0 right-0 p-1.5 bg-brand text-white rounded-full hover:bg-brand-hover transition-colors shadow-sm"
+                className="absolute bottom-0 right-0 p-1.5 bg-brand text-white rounded-full hover:bg-brand-hover transition-colors shadow-xs"
               >
                 <Camera className="h-4 w-4" />
               </button>

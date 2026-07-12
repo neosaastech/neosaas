@@ -1,6 +1,6 @@
 "use client"
 
-import { LogOut, User, CreditCard, Search, ShoppingCart } from "lucide-react"
+import { LogOut, User, CreditCard, Search, ShoppingCart, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -37,7 +37,7 @@ interface UserData {
   isAdmin?: boolean
 }
 
-export function PrivateHeader() {
+export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const router = useRouter()
   const { logo, siteName } = usePlatformConfig()
   const { itemCount } = useCart()
@@ -197,6 +197,12 @@ export function PrivateHeader() {
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background/90 px-4 backdrop-blur-md sm:px-6">
 
+      {/* Mobile menu trigger — opens PrivateSidebar's own mobile drawer (isOpen/onClose),
+          which already had all the transform/backdrop logic but nothing to open it. */}
+      <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick} aria-label="Open menu">
+        <Menu className="h-5 w-5" />
+      </Button>
+
       {/* Mobile Logo */}
       <div className="md:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
          {logo ? (
@@ -220,7 +226,7 @@ export function PrivateHeader() {
               placeholder="Search admin pages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-64 rounded-lg border border-border bg-background ps-9 pe-4 text-sm text-foreground shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="h-9 w-64 rounded-lg border border-border bg-background ps-9 pe-4 text-sm text-foreground shadow-xs focus:border-brand focus:outline-hidden focus:ring-2 focus:ring-brand/20"
             />
           </div>
 
@@ -239,7 +245,7 @@ export function PrivateHeader() {
                       }}
                       className="w-full px-4 py-3 text-left hover:bg-muted transition-colors flex items-start gap-3 border-b last:border-b-0 border-border/50"
                     >
-                      <Search className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
+                      <Search className="h-4 w-4 text-brand mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-sm truncate">{result.name}</span>

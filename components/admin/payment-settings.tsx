@@ -329,7 +329,7 @@ export function PaymentSettings() {
                 {/* Test button */}
                 <Button
                   type="button"
-                  variant={config.stripeMode === 'test' ? 'default' : 'outline'}
+                  variant={config.stripeMode === 'test' ? 'default' : 'outline-solid'}
                   size="sm"
                   className={cn(
                     "flex items-center gap-2 transition-all",
@@ -347,7 +347,7 @@ export function PaymentSettings() {
                 {/* Live button */}
                 <Button
                   type="button"
-                  variant={config.stripeMode === 'live' ? 'default' : 'outline'}
+                  variant={config.stripeMode === 'live' ? 'default' : 'outline-solid'}
                   size="sm"
                   className={cn(
                     "flex items-center gap-2 transition-all",

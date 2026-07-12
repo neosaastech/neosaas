@@ -43,7 +43,7 @@ export function UserCompanyAvatar({
       {companyLogo && (
         <span
           className={cn(
-            "absolute z-10 overflow-hidden rounded-full border-2 border-background bg-background shadow-sm",
+            "absolute z-10 overflow-hidden rounded-full border-2 border-background bg-background shadow-xs",
             badgeSize,
             badgeOffset,
           )}
@@ -56,7 +56,7 @@ export function UserCompanyAvatar({
       {!companyLogo && companyName && (
         <span
           className={cn(
-            "absolute z-10 flex items-center justify-center rounded-full border-2 border-background bg-muted text-muted-foreground shadow-sm",
+            "absolute z-10 flex items-center justify-center rounded-full border-2 border-background bg-muted text-muted-foreground shadow-xs",
             badgeSize,
             badgeOffset,
           )}

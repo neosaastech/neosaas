@@ -25,12 +25,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const title = post.metaTitle || post.title
   const description = post.metaDescription || post.excerpt || seo.description
   const image = post.coverImageUrl || seo.ogImage
+  // Same title.template bypass as buildPageMetadata (lib/seo/page-metadata.ts).
+  const titleField = post.includeSiteNameInTitle === false ? { absolute: title } : title
 
   const languages: Record<string, string> = {}
   for (const l of LOCALES) languages[l] = `/${l}/blog/${slug}`
 
   return {
-    title,
+    title: titleField,
     description,
     alternates: { languages },
     openGraph: {

@@ -231,11 +231,11 @@ export default function AppointmentDetailPage() {
           <div>
             <h1 className="text-2xl font-bold">{appointment.title}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant={status.variant === "warning" ? "outline" : status.variant}>
+              <Badge variant={status.variant === "warning" ? "outline-solid" : status.variant}>
                 {status.label}
               </Badge>
               {appointment.type === "paid" && (
-                <Badge variant={appointment.isPaid ? "default" : "outline"}>
+                <Badge variant={appointment.isPaid ? "default" : "outline-solid"}>
                   {appointment.isPaid ? "Payé" : "Non payé"}
                 </Badge>
               )}
@@ -398,7 +398,7 @@ export default function AppointmentDetailPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Statut</span>
-              <Badge variant={appointment.isPaid ? "default" : "outline"}>
+              <Badge variant={appointment.isPaid ? "default" : "outline-solid"}>
                 {appointment.isPaid ? "Payé" : "En attente"}
               </Badge>
             </div>

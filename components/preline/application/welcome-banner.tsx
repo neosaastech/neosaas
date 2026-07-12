@@ -13,10 +13,12 @@ export interface PrelineWelcomeBannerProps {
 
 export function PrelineWelcomeBanner({ title, subtitle, ctaLabel, ctaHref }: PrelineWelcomeBannerProps) {
   return (
-    <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-[#1A1A1A] to-brand p-8 text-white">
+    <div className="relative overflow-hidden rounded-lg bg-linear-to-r from-[#1A1A1A] to-brand p-8 text-white">
       <div className="relative z-10">
         <h1 className="mb-2 text-3xl font-bold">{title}</h1>
-        {subtitle && <p className="max-w-2xl text-white/90">{subtitle}</p>}
+        {subtitle && (
+          <div className="max-w-2xl text-white/90 [&_p]:m-0" dangerouslySetInnerHTML={{ __html: subtitle }} />
+        )}
         {ctaLabel && ctaHref && (
           <Link
             href={ctaHref}
@@ -26,7 +28,7 @@ export function PrelineWelcomeBanner({ title, subtitle, ctaLabel, ctaHref }: Pre
           </Link>
         )}
       </div>
-      <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/10 to-transparent" />
+      <div className="absolute right-0 top-0 h-full w-1/3 bg-linear-to-l from-white/10 to-transparent" />
     </div>
   )
 }

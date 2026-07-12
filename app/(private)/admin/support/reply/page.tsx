@@ -483,7 +483,7 @@ export default function SupportReplyPage() {
 
               return (
                 <div key={msg.id} className="flex gap-4">
-                  <Avatar className="h-10 w-10 flex-shrink-0">
+                  <Avatar className="h-10 w-10 shrink-0">
                     <AvatarImage
                       src={isAdmin
                         ? msg.sender?.profileImage || undefined

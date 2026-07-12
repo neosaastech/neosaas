@@ -863,8 +863,31 @@ export const pageSeo = pgTable("page_seo", {
   id: uuid("id").defaultRandom().primaryKey(),
   pagePath: text("page_path").notNull(),
   locale: text("locale").notNull().default("fr"),
+  // Page title (Payload's doc.title, synced by neosaas-app.ts's
+  // syncPageToNeosaasApp) — distinct from metaTitle: this is the page's real
+  // name/label used for navigation trees (e.g. Fumadocs' sidebar), metaTitle
+  // is the SEO <title> override which may differ or be unset entirely.
+  title: text("title"),
+  // Payload's Pages.pageType (landing/article/documentation) — explicit
+  // signal for wiki membership (lib/docs/fumadocs-source.ts filters on
+  // pageType='documentation'), replacing the earlier pagePath-prefix
+  // guess which had no editor visibility and could silently misclassify
+  // pages with unrelated parents.
+  pageType: text("page_type"),
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
+  // Payload's plugin-seo meta.image (Charles, 2026-07-11: "on doit pouvoir
+  // intégrer cet élément qui apparaîtra sur les SERP"). Single shared field —
+  // feeds both og:image/Twitter Card (lib/seo/page-metadata.ts) and the
+  // visual banner rendered above BlockRenderer on the public page.
+  headerImageUrl: text("header_image_url"),
+  // Charles (2026-07-09): "on doit pouvoir ajouter le nom du site ou non
+  // sur le SEO dans la balise title" — synced from Payload's
+  // includeSiteNameInTitle (Pages.ts). When false, buildPageMetadata
+  // (lib/seo/page-metadata.ts) returns title.absolute to bypass the root
+  // layout's title.template, which otherwise appends the site name to
+  // every page with no per-page opt-out.
+  includeSiteNameInTitle: boolean("include_site_name_in_title").default(true).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -924,6 +947,9 @@ export const blogPosts = pgTable("blog_posts", {
   // per post already, so plain columns instead of a separate table.
   metaTitle: text("meta_title"),
   metaDescription: text("meta_description"),
+  // Same rationale as pageSeo.includeSiteNameInTitle — synced from
+  // Payload's BlogPosts.includeSiteNameInTitle.
+  includeSiteNameInTitle: boolean("include_site_name_in_title").default(true).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -931,6 +957,33 @@ export const blogPosts = pgTable("blog_posts", {
 
 export type BlogPost = typeof blogPosts.$inferSelect
 export type NewBlogPost = typeof blogPosts.$inferInsert
+
+/**
+ * Mirror of Payload's Categories collection, pushed here by the sync
+ * adapter (syncCategoryToNeosaasApp) on every save — net-new table, added
+ * 2026-07-11 alongside the header-image feature (Categories previously had
+ * no sync path at all, only ever denormalized as blogPosts.categorySlug/
+ * categoryPath). No draft/publish workflow on Categories in Payload, so
+ * unlike pageSeo/blogPosts this table has no meta_title/description —
+ * headerImageUrl is metadata-only today (no public category listing page
+ * exists yet to render a banner into).
+ */
+export const categories = pgTable("categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  slug: text("slug").notNull(),
+  path: text("path").notNull(),
+  locale: text("locale").notNull().default("fr"),
+  name: text("name").notNull(),
+  headerImageUrl: text("header_image_url"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  pathLocaleUnique: uniqueIndex("categories_path_locale_unique").on(table.path, table.locale),
+}))
+
+export type Category = typeof categories.$inferSelect
+export type NewCategory = typeof categories.$inferInsert
 
 // =============================================================================
 // PILOT ACTIONS LOG - Declarative admin/agent actions (Pilier E — pilotage JSON)

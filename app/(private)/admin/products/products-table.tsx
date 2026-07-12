@@ -1008,7 +1008,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
     }
     
     return (
-      <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-br from-brand/20 to-brand/5 border border-brand/20">
+      <div className="flex items-center justify-center h-12 w-12 rounded-md bg-linear-to-br from-brand/20 to-brand/5 border border-brand/20">
         {renderIcon(product.icon)}
       </div>
     )
@@ -1765,7 +1765,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
                         </div>
                       </div>
                     ) : (
-                      <div className="relative flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-br from-brand/20 to-brand/5 border border-brand/20 group">
+                      <div className="relative flex items-center justify-center h-12 w-12 rounded-md bg-linear-to-br from-brand/20 to-brand/5 border border-brand/20 group">
                         {renderIcon(editValues.icon)}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <input

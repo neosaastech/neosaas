@@ -297,7 +297,7 @@ export function CreditCardSheet({ open, onOpenChange, cards, onRefresh }: Credit
                   className="flex items-center gap-3 rounded-lg border p-4 hover:bg-accent/50 transition-colors"
                 >
                   {/* Brand Logo */}
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     {getCardBrandLogo(card.brand, "w-12 h-8")}
                   </div>
 
@@ -395,9 +395,9 @@ export function CreditCardItem({
   isSettingDefault?: boolean
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border-2 hover:border-brand transition-colors p-5 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
+    <div className="relative overflow-hidden rounded-xl border-2 hover:border-brand transition-colors p-5 bg-linear-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-950">
       <div className="flex items-start justify-between mb-6">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {getCardBrandLogo(card.brand, "w-14 h-9")}
         </div>
         {card.is_default && (

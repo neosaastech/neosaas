@@ -41,6 +41,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ---
 
+### 🤖 MCP (AI Agents)
+
+Token used by agents calling `POST /api/mcp` with `Authorization: Bearer <token>`.
+
+```env
+# Generate with: openssl rand -hex 32
+NEOSAAS_MCP_TOKEN=<secret-agent-token>
+```
+
+See [docs/mcp-neosaas.md](../mcp-neosaas.md) for tools, build flow, and tests (`pnpm test:mcp`).
+
+---
+
 ### 🤖 IA / Anthropic (via Vercel AI Gateway)
 
 NeoSaaS utilise Claude via la passerelle IA de Vercel (Vercel Copilot Platform).  

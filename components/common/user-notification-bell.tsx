@@ -198,7 +198,7 @@ export function UserNotificationBell() {
                         }`}
                       >
                         <div className="flex gap-3">
-                          <div className={`h-10 w-10 rounded-full ${config.bg} flex items-center justify-center flex-shrink-0`}>
+                          <div className={`h-10 w-10 rounded-full ${config.bg} flex items-center justify-center shrink-0`}>
                             {meta.hasDigital && !meta.hasPhysical ? (
                               <Download className="h-4 w-4 text-green-600" />
                             ) : (

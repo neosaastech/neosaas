@@ -134,7 +134,7 @@ function CardFormInner({ clientSecret, onSuccess, onCancel }: CardFormInnerProps
 
       {error && (
         <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -292,7 +292,7 @@ export function StripeCardFormAuto({ onSuccess, onCancel }: StripeCardFormAutoPr
     return (
       <div className="flex flex-col gap-3 py-4">
         <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
         <Button variant="outline" size="sm" onClick={() => { setError(null); setLoading(true) }}>

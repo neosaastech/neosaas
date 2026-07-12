@@ -42,6 +42,18 @@ export async function buildPageMetadata({
   const seo = config.seoSettings || {}
   const title = seoRow?.metaTitle || fallbackTitle || seo.ogTitle || config.siteName
   const description = seoRow?.metaDescription || fallbackDescription || seo.description
+  // Charles (2026-07-09): "on doit pouvoir ajouter le nom du site ou non
+  // sur le SEO dans la balise title." app/layout.tsx's title.template
+  // ('%s | SiteName') applies to every page automatically — title.absolute
+  // is the documented Next.js escape hatch to render a page's title with
+  // no template appended at all.
+  const titleField = seoRow?.includeSiteNameInTitle === false ? { absolute: title } : title
+
+  // Charles (2026-07-11): "on doit pouvoir intégrer cet élément qui
+  // apparaîtra sur les SERP" — Payload's plugin-seo meta.image, synced onto
+  // pageSeo.headerImageUrl, overrides the site-wide og:image the same way
+  // metaTitle/metaDescription already override the site-wide title/description.
+  const image = seoRow?.headerImageUrl || seo.ogImage
 
   // alternates.languages needs an absolute or root-relative URL per locale
   // — the home page's pagePath is "/", every other page keeps its own path
@@ -52,13 +64,13 @@ export async function buildPageMetadata({
   }
 
   return {
-    title,
+    title: titleField,
     description,
     alternates: { languages },
     openGraph: {
       title,
       description,
-      images: seo.ogImage ? [{ url: seo.ogImage }] : undefined,
+      images: image ? [{ url: image }] : undefined,
       siteName: config.siteName,
       locale,
     },
@@ -66,7 +78,7 @@ export async function buildPageMetadata({
       card: "summary_large_image",
       title,
       description,
-      images: seo.ogImage ? [seo.ogImage] : undefined,
+      images: image ? [image] : undefined,
     },
   }
 }

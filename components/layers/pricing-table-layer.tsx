@@ -54,7 +54,7 @@ export function PricingTableLayer({ eyebrow, title, items }: PricingTableLayerPr
                   </li>
                 ))}
               </ul>
-              <Button asChild variant={plan.highlighted ? "default" : "outline"} className="w-full">
+              <Button asChild variant={plan.highlighted ? "default" : "outline-solid"} className="w-full">
                 <a href={plan.ctaHref}>{plan.ctaLabel}</a>
               </Button>
             </CardContent>

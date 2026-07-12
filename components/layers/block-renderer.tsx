@@ -35,7 +35,16 @@ export async function BlockRenderer({
         const raw = (layer.props ?? {}) as Record<string, unknown>
         const { blockSettings, ...rest } = raw
         const resolved = interpolateDeep(rest, variables)
-        const props = def.propsSchema.parse(resolved)
+        // .safeParse, not .parse: one malformed row (stale sync, hand-edited
+        // DB row, a field shape that changed since the row was written) must
+        // not take the whole page down with a 500 — skip just that block,
+        // same as the unknown-layerType branch above already does.
+        const result = def.propsSchema.safeParse(resolved)
+        if (!result.success) {
+          console.error(`Invalid props for layerType "${layer.layerType}"${pagePath ? ` on ${pagePath}` : ""}:`, result.error.issues)
+          return null
+        }
+        const props = result.data
         const Component = def.component
         return (
           <BlockWrapper key={layer.id} settings={blockSettings}>

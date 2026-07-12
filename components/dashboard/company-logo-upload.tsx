@@ -87,14 +87,14 @@ export function CompanyLogoUpload({
           {logoPreview ? (
             <img src={logoPreview} alt="Company logo" className="h-full w-full object-cover rounded-lg" />
           ) : (
-            <AvatarFallback className="rounded-lg bg-gradient-to-br from-brand/80 to-brand text-white">
+            <AvatarFallback className="rounded-lg bg-linear-to-br from-brand/80 to-brand text-white">
               <Building2 className="h-8 w-8" />
             </AvatarFallback>
           )}
         </Avatar>
       </div>
 
-      <div className="pt-14 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
+      <div className="pt-14 pb-4 bg-linear-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
         <div className="flex flex-col items-center gap-2 pt-2">
           {(companyName || companyEmail) && (
             <div className="text-center">

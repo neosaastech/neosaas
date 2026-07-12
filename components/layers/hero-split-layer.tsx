@@ -14,7 +14,9 @@ import { PrelineHeroSplit, type PrelineTrustPill } from "@/components/preline/ma
 export interface HeroSplitHighlight {
   icon: string
   label: string
-  featured?: boolean
+  // Payload gives null for an unset checkbox — kept nullable here to match
+  // the Zod schema's defensive .nullable() (registry.ts), not just undefined.
+  featured?: boolean | null
 }
 
 export interface HeroSplitLayerProps {

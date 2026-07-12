@@ -119,10 +119,10 @@ export function ThemeExampleComponent() {
           <input
             type="text"
             placeholder="Input avec bordure thématique"
-            className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full px-3 py-2 rounded-md border border-input bg-background text-foreground focus:outline-hidden focus:ring-2 focus:ring-ring"
           />
           
-          <button className="px-4 py-2 rounded-md bg-accent text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <button className="px-4 py-2 rounded-md bg-accent text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2">
             Bouton avec ring de focus
           </button>
         </CardContent>

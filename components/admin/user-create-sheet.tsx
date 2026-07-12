@@ -61,13 +61,13 @@ export function UserCreateSheet({ open, onOpenChange, onSave, companies, isLoadi
           <div className="absolute left-1/2 -translate-x-1/2 -top-12 z-10">
             <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
               <AvatarImage src={profileImagePreview || ""} alt="New user" />
-              <AvatarFallback className="text-2xl bg-gradient-to-br from-brand to-brand-hover text-white">
+              <AvatarFallback className="text-2xl bg-linear-to-br from-brand to-brand-hover text-white">
                 <User className="h-10 w-10" />
               </AvatarFallback>
             </Avatar>
           </div>
           
-          <div className="pt-16 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
+          <div className="pt-16 pb-4 bg-linear-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
             <div className="flex flex-col items-center gap-2 pt-2">
               <CroppedFileInput
                 ref={fileInputRef}

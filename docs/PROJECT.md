@@ -8,7 +8,8 @@
 4. [Architecture](#architecture)
 5. [Database Schema](#database-schema)
 6. [Getting Started](#getting-started)
-7. [Available Scripts](#available-scripts)
+7. [MCP (AI Agents)](#mcp-ai-agents)
+8. [Available Scripts](#available-scripts)
 
 ---
 
@@ -348,6 +349,21 @@ Open `http://localhost:3000`. For the initial admin account, navigate to `/confi
 
 ---
 
+## MCP (AI Agents)
+
+NeoSaaS ships an MCP-compatible JSON-RPC endpoint at `POST /api/mcp` so agents can discover dashboard modules, validate build change sets, preview diffs, and apply pilot actions under admin/token auth.
+
+**Full reference:** [docs/mcp-neosaas.md](./mcp-neosaas.md)
+
+| Item | Location |
+|------|----------|
+| HTTP route | `app/api/mcp/route.ts` |
+| Server logic | `lib/mcp/neosaas-server.ts` |
+| Auth | `lib/mcp/auth.ts` (`NEOSAAS_MCP_TOKEN` or admin session) |
+| Tests | `pnpm test:mcp` |
+
+---
+
 ## Available Scripts
 
 ```bash
@@ -376,6 +392,7 @@ pnpm seed:pages            # Sync page permissions
 
 # Quality
 pnpm check:email-config    # Verify email configuration
+pnpm test:mcp              # MCP smoke, contract, and build-scenario tests
 pnpm lint                  # Run ESLint
 ```
 

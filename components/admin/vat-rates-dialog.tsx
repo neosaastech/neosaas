@@ -172,7 +172,7 @@ export function VatRatesDialog({ open, onOpenChange, onRatesUpdated }: VatRatesD
       <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-md bg-gradient-to-br from-brand/20 to-brand/5 border border-brand/20">
+            <div className="flex items-center justify-center h-10 w-10 rounded-md bg-linear-to-br from-brand/20 to-brand/5 border border-brand/20">
               <Percent className="h-5 w-5 text-brand" />
             </div>
             <span>Manage VAT Rates</span>

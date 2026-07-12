@@ -167,8 +167,8 @@ export default function AcceptInvitePage() {
       </div>
       <div className="hidden bg-muted md:flex items-center justify-center p-8">
         <div className="relative w-full max-w-lg">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
-          <div className="relative rounded-2xl border bg-background/50 backdrop-blur-sm p-12">
+          <div className="absolute inset-0 bg-linear-to-br from-primary/20 to-primary/5 rounded-3xl blur-3xl" />
+          <div className="relative rounded-2xl border bg-background/50 backdrop-blur-xs p-12">
             <div className="flex flex-col items-center space-y-8">
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-bold">Welcome to NeoSaaS</h2>

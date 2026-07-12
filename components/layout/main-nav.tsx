@@ -7,7 +7,7 @@ import { useLocale } from "@/lib/i18n/use-locale"
 import type { NavLink } from "@/types/site-nav"
 
 const linkClass =
-  "inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  "inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
 
 function NavLinks({ items }: { items: { href: string; label: string }[] }) {
   const pathname = usePathname()
@@ -41,6 +41,7 @@ export function MainNav({ items }: { items?: NavLink[] }) {
       items={[
         { href: "", label: "Home" },
         { href: "/pricing", label: "Pricing" },
+        { href: "/documentation", label: "Documentation" },
         { href: "/legal/privacy", label: "Privacy" },
         { href: "/legal/terms", label: "Terms" },
       ]}

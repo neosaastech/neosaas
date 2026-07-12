@@ -1,0 +1,1 @@
+ALTER TABLE "page_seo" ADD COLUMN "page_type" text;

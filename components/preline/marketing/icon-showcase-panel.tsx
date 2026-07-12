@@ -80,7 +80,7 @@ export function PrelineIconShowcasePanel({
   return (
     <div
       className={cn(
-        "relative h-[400px] w-full max-w-[500px] overflow-hidden rounded-lg border border-brand/20 bg-gradient-to-br from-brand/10 to-background shadow-xl",
+        "relative h-[400px] w-full max-w-[500px] overflow-hidden rounded-lg border border-brand/20 bg-linear-to-br from-brand/10 to-background shadow-xl",
         className,
       )}
     >
@@ -102,14 +102,14 @@ export function PrelineIconShowcasePanel({
       )}
 
       {hasMedia && showIcons && (
-        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/40 to-background/20" />
+        <div className="absolute inset-0 bg-linear-to-t from-background/80 via-background/40 to-background/20" />
       )}
 
       {showIcons && (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <div
             className={cn(
-              hasMedia && overlayIcons && "rounded-xl bg-background/60 p-2 shadow-lg backdrop-blur-sm",
+              hasMedia && overlayIcons && "rounded-xl bg-background/60 p-2 shadow-lg backdrop-blur-xs",
             )}
           >
             <IconShowcaseGrid items={items} />

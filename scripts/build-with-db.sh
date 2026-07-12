@@ -195,8 +195,15 @@ if [ -n "$VERCEL" ] || [ -n "$CI" ]; then
     fi
   fi
 
-  # ALWAYS ensure bootstrap admin — even when migrations are external/skipped
-  ensure_bootstrap_super_admin
+  # Preview/dev only — a known-password super_admin (admin@exemple.com / admin)
+  # must never exist in production (same rationale as seed-dev-admin.ts, which
+  # this call site had drifted from: this one ran unconditionally, with no
+  # VERCEL_ENV gate at all, confirmed live in a production build log
+  # 2026-07-09 — "Bootstrap user already exists (admin@exemple.com)" printed
+  # for a target:"production" deployment).
+  if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
+    ensure_bootstrap_super_admin
+  fi
 
   if [ "$VERCEL_ENV" = "preview" ] || [ "$VERCEL_ENV" = "development" ]; then
     echo "🔧 Correction des configurations email (Preview/Dev)..."

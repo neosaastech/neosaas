@@ -93,7 +93,7 @@ export default function DashboardPage() {
               <Card key={product.id} className="flex flex-col overflow-hidden">
                 {/* Image du produit */}
                 {product.imageUrl && (
-                  <div className="relative w-full h-48 bg-gradient-to-br from-brand/10 to-[#1A1A1A]/5">
+                  <div className="relative w-full h-48 bg-linear-to-br from-brand/10 to-[#1A1A1A]/5">
                     <img 
                       src={product.imageUrl} 
                       alt={product.title}

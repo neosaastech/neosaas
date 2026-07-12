@@ -132,13 +132,13 @@ export function HomeFallback({ locale }: { locale: string }) {
       </section>
 
       <section className="container py-12 md:py-24 lg:py-32">
-        <div className="mx-auto flex max-w-[58rem] flex-col items-center justify-center gap-4 text-center">
+        <div className="mx-auto flex max-w-232 flex-col items-center justify-center gap-4 text-center">
           <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-5xl">Built for scale</h2>
           <p className="max-w-[85%] leading-normal text-muted-foreground sm:text-lg sm:leading-7">
             NeoSaaS is designed with a modular architecture that allows you to scale each component independently.
           </p>
         </div>
-        <div className="mx-auto grid justify-center gap-4 md:max-w-[64rem] mt-8">
+        <div className="mx-auto grid justify-center gap-4 md:max-w-5xl mt-8">
           <div className="relative overflow-hidden rounded-lg border bg-background p-2 max-w-2xl mx-auto">
             <div className="flex h-full flex-col justify-between rounded-md p-6">
               <div className="space-y-2">

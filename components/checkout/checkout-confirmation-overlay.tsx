@@ -125,7 +125,7 @@ export function CheckoutConfirmationOverlay({ orderId, isOpen, onClose }: Checko
       {/* Close button */}
       <button
         onClick={onClose}
-        className="fixed top-4 right-4 z-[60] p-2 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-800 transition-colors shadow-lg"
+        className="fixed top-4 right-4 z-60 p-2 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs hover:bg-white dark:hover:bg-gray-800 transition-colors shadow-lg"
         aria-label="Close"
       >
         <X className="w-5 h-5" />

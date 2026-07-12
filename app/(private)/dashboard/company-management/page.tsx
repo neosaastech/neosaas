@@ -581,7 +581,7 @@ export default function CompanyManagementPage() {
                           </Badge>
                         ) : (
                           <Badge
-                            variant={member.isActive ? "secondary" : "outline"}
+                            variant={member.isActive ? "secondary" : "outline-solid"}
                             className={member.isActive ? "bg-brand/10 text-brand" : ""}
                           >
                             {member.isActive ? "Active" : "Inactive"}

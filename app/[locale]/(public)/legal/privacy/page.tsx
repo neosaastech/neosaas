@@ -87,7 +87,7 @@ export default async function PrivacyPolicyPage() {
       </div>
 
       {company && (
-        <div className="mt-12 border rounded-xl overflow-hidden bg-card shadow-sm">
+        <div className="mt-12 border rounded-xl overflow-hidden bg-card shadow-xs">
             <div className="bg-muted/50 p-4 border-b flex items-center gap-2">
                 {company.isPerson ? <User className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
                 <h3 className="font-semibold text-lg">

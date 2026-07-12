@@ -119,7 +119,7 @@ function NavLink({
         isActive ? "bg-brand text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
-      <Icon className="h-5 w-5 flex-shrink-0" />
+      <Icon className="h-5 w-5 shrink-0" />
       {!isCollapsed && item.name}
     </Link>
   )

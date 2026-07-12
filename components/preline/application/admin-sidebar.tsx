@@ -105,7 +105,7 @@ export function PrelineAdminSidebar({ onClose }: PrelineAdminSidebarProps) {
     <aside
       className={cn(
         "flex h-full shrink-0 flex-col border-e border-border bg-background transition-[width] duration-300",
-        showLabels ? "w-64 max-md:w-[4.5rem]" : "w-[4.5rem]",
+        showLabels ? "w-64 max-md:w-18" : "w-18",
       )}
       aria-label="Sidebar"
     >

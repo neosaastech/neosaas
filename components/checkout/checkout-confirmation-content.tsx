@@ -210,7 +210,7 @@ export function CheckoutConfirmationContent({
 
       <div className="min-h-screen flex flex-col">
         {/* Success Header */}
-        <div className={`bg-gradient-to-r ${headerGradient} transition-all duration-700 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`bg-linear-to-r ${headerGradient} transition-all duration-700 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
           <div className="max-w-3xl mx-auto px-4 py-12 text-center text-white">
             <div className={`w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-500 delay-200 ${isVisible ? 'scale-100' : 'scale-0'}`}>
               <HeaderIcon className="w-10 h-10" />
@@ -358,7 +358,7 @@ export function CheckoutConfirmationContent({
                           const hasLicense = !!item.metadata?.generatedLicenseKey
 
                           return (
-                          <div key={idx} className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-5 space-y-4">
+                          <div key={idx} className="bg-linear-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-5 space-y-4">
                             <div className="flex items-start justify-between">
                               <div>
                                 <p className="font-semibold text-lg">{item.itemName}</p>
@@ -456,7 +456,7 @@ export function CheckoutConfirmationContent({
                         const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000)
 
                         return (
-                          <div key={idx} className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden">
+                          <div key={idx} className="bg-linear-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden">
                             {/* Header with status */}
                             <div className="bg-amber-100/50 dark:bg-amber-900/30 px-4 py-3 flex items-center justify-between border-b border-amber-200 dark:border-amber-800">
                               <p className="font-semibold text-lg">{apt.title}</p>

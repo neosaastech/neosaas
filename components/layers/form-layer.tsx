@@ -65,7 +65,9 @@ export function FormLayer({ eyebrow, title, subtitle, name, items, submitLabel, 
     <div className="mx-auto mt-16 max-w-xl">
       {eyebrow && <Eyebrow className="mb-2 text-center">{eyebrow}</Eyebrow>}
       {title && <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
-      {subtitle && <p className="mt-3 text-center text-muted-foreground">{subtitle}</p>}
+      {subtitle && (
+        <div className="mt-3 text-center text-muted-foreground [&_p]:m-0" dangerouslySetInnerHTML={{ __html: subtitle }} />
+      )}
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         {items.map((field) => (
           <div key={field.name} className="space-y-2">

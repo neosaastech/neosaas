@@ -1,0 +1,6 @@
+{
+  "requiredModuleFields": ["title", "status"],
+  "warnings": [
+    "Vertical default rules applied — confirm compliance before publish"
+  ]
+}

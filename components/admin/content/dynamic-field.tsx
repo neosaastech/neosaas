@@ -9,6 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, Trash2 } from "lucide-react"
+import { LinkFieldInput } from "./link-field-input"
+import { MediaPickerField } from "./media-picker-field"
+import { IconPickerField } from "./icon-picker-field"
+import { RichTextEditor } from "./rich-text-editor"
 
 /**
  * Generic form field renderer driven directly by a block's Zod propsSchema
@@ -68,6 +72,31 @@ function DynamicField({
     return <DynamicArrayField name={name} elementSchema={inner.element} value={(value as unknown[]) ?? []} onChange={onChange} />
   }
 
+  // Charles (2026-07-10): "un autre selecteur ajoute une taille" — paired
+  // with the icon picker below, same name-based special-case convention,
+  // readable labels instead of the generic ZodEnum branch's raw sm/md/lg
+  // values. Must come before that generic branch or it never fires.
+  if (name === "iconSize" && inner instanceof z.ZodEnum) {
+    const sizeLabels: Record<string, string> = { sm: "Small", md: "Medium", lg: "Large" }
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={name}>Icon size</Label>
+        <Select value={(value as string) ?? "md"} onValueChange={onChange}>
+          <SelectTrigger id={name}>
+            <SelectValue placeholder="Choose size..." />
+          </SelectTrigger>
+          <SelectContent>
+            {inner.options.map((opt: string) => (
+              <SelectItem key={opt} value={opt}>
+                {sizeLabels[opt] ?? opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )
+  }
+
   if (inner instanceof z.ZodEnum) {
     return (
       <div className="space-y-2">
@@ -111,6 +140,47 @@ function DynamicField({
           value={(value as number) ?? ""}
           onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
         />
+      </div>
+    )
+  }
+
+  // A field ending in "Href" (ctaHref, secondaryCtaHref, href on the
+  // Reference block) targets an internal link — pick from existing
+  // published pages/articles instead of typing a URL from memory.
+  if (/href$/i.test(name)) {
+    return <LinkFieldInput name={name} value={(value as string) ?? ""} onChange={onChange} />
+  }
+
+  // Charles (2026-07-09): "on a pas mal d'endroit à traiter dans cet api
+  // pour les media où on a qu'un simple champs url. et on doit avoir une
+  // vignette preview depuis chaque champs media." Every imageUrl/videoUrl
+  // field (hero, hero-split, icon-showcase, article-header, reference,
+  // testimonials[]) fell through to the plain <Input> below — same
+  // name-based special-case convention as the href picker above.
+  if (/imageUrl|videoUrl/i.test(name)) {
+    return <MediaPickerField name={name} kind={/video/i.test(name) ? "video" : "image"} value={(value as string) ?? ""} onChange={onChange} />
+  }
+
+  // Charles (2026-07-09): "il faut un éditeur ... sur les descriptifs."
+  // `subtitle` is a Payload richText (Lexical) field (fromRegistry.ts's
+  // convertField override) — the same RichTextEditor already used for
+  // article body, producing Lexical JSON, converted to HTML server-side at
+  // publish time (payload-cms's convertSubtitle) and in Live Preview
+  // (lib/layers/from-payload.ts's convertSubtitle). Every other "long text"
+  // field below stays plain — subtitle is the only one Payload's schema
+  // actually declares as richText.
+  // Charles (2026-07-10): "on doit recuperer toutes [les icones] avec un
+  // moteur de recherche a l'interieur du selecteur" — plain text input
+  // replaced by a searchable combobox over every lucide-react icon.
+  if (name === "icon") {
+    return <IconPickerField name={name} value={(value as string) ?? ""} onChange={onChange} />
+  }
+
+  if (name === "subtitle") {
+    return (
+      <div className="space-y-2">
+        <Label>{name}</Label>
+        <RichTextEditor initialValue={value} onChange={onChange} />
       </div>
     )
   }

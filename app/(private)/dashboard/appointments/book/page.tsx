@@ -273,7 +273,7 @@ export default function BookAppointmentPage() {
   if (allBooked) {
     return (
       <div className="max-w-2xl mx-auto space-y-6 p-6">
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white text-center">
+        <div className="bg-linear-to-r from-green-500 to-green-600 rounded-lg p-6 text-white text-center">
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="w-10 h-10" />
           </div>
@@ -293,7 +293,7 @@ export default function BookAppointmentPage() {
               const booking = bookedAppointments.get(item.id)
               return (
                 <div key={item.id} className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
                   <div className="flex-1">
                     <p className="font-medium">{item.itemName}</p>
                     {booking && (
@@ -459,7 +459,7 @@ export default function BookAppointmentPage() {
                 <h4 className="font-medium text-gray-900">Prochaines etapes :</h4>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-brand/10 rounded-full flex items-center justify-center">
+                  <div className="shrink-0 w-6 h-6 bg-brand/10 rounded-full flex items-center justify-center">
                     <Mail className="w-3.5 h-3.5 text-brand" />
                   </div>
                   <div>
@@ -474,7 +474,7 @@ export default function BookAppointmentPage() {
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-brand/10 rounded-full flex items-center justify-center">
+                  <div className="shrink-0 w-6 h-6 bg-brand/10 rounded-full flex items-center justify-center">
                     <Phone className="w-3.5 h-3.5 text-brand" />
                   </div>
                   <div>
@@ -486,7 +486,7 @@ export default function BookAppointmentPage() {
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 bg-brand/10 rounded-full flex items-center justify-center">
+                  <div className="shrink-0 w-6 h-6 bg-brand/10 rounded-full flex items-center justify-center">
                     <Calendar className="w-3.5 h-3.5 text-brand" />
                   </div>
                   <div>

@@ -10,19 +10,19 @@ export interface PageTemplateVariableDefinition {
 
 /** Catalog shown in /admin/pages and Puck — syntax: `{{key}}` */
 export const PAGE_TEMPLATE_VARIABLE_CATALOG: PageTemplateVariableDefinition[] = [
-  { key: "siteName", label: "Nom du site", description: "Nom configuré dans Paramètres", example: "NeoSaaS", group: "site" },
-  { key: "domain", label: "Domaine", description: "Hostname du site (SEO ou APP_URL)", example: "neosaas.tech", group: "site" },
-  { key: "locale", label: "Locale", description: "Langue de la page", example: "fr", group: "site" },
-  { key: "contactEmail", label: "Email contact", description: "Email expéditeur par défaut", example: "no-reply@neosaas.tech", group: "site" },
-  { key: "year", label: "Année", description: "Année courante", example: "2026", group: "date" },
-  { key: "date", label: "Date", description: "Date du jour (locale)", example: "05/07/2026", group: "date" },
-  { key: "dateTime", label: "Date et heure", description: "Horodatage du rendu", example: "05/07/2026 14:30", group: "date" },
-  { key: "firstName", label: "Prénom", description: "Utilisateur connecté — vide si visiteur", example: "Marie", group: "user" },
-  { key: "lastName", label: "Nom", description: "Utilisateur connecté — vide si visiteur", example: "Dupont", group: "user" },
-  { key: "userName", label: "Nom complet", description: "Prénom + nom — vide si visiteur", example: "Marie Dupont", group: "user" },
-  { key: "userEmail", label: "Email utilisateur", description: "Email de session — vide si visiteur", example: "marie@exemple.com", group: "user" },
-  { key: "isLoggedIn", label: "Connecté", description: "true ou false", example: "true", group: "user" },
-  { key: "companyName", label: "Entreprise", description: "Société de l'utilisateur — vide si visiteur", example: "Acme SAS", group: "company" },
+  { key: "siteName", label: "Site name", description: "Name configured in Settings", example: "NeoSaaS", group: "site" },
+  { key: "domain", label: "Domain", description: "Site hostname (SEO or APP_URL)", example: "neosaas.tech", group: "site" },
+  { key: "locale", label: "Locale", description: "Page language", example: "fr", group: "site" },
+  { key: "contactEmail", label: "Contact email", description: "Default sender email", example: "no-reply@neosaas.tech", group: "site" },
+  { key: "year", label: "Year", description: "Current year", example: "2026", group: "date" },
+  { key: "date", label: "Date", description: "Today's date (localized)", example: "05/07/2026", group: "date" },
+  { key: "dateTime", label: "Date and time", description: "Render timestamp", example: "05/07/2026 14:30", group: "date" },
+  { key: "firstName", label: "First name", description: "Signed-in user — empty for a visitor", example: "Marie", group: "user" },
+  { key: "lastName", label: "Last name", description: "Signed-in user — empty for a visitor", example: "Dupont", group: "user" },
+  { key: "userName", label: "Full name", description: "First + last name — empty for a visitor", example: "Marie Dupont", group: "user" },
+  { key: "userEmail", label: "User email", description: "Session email — empty for a visitor", example: "marie@example.com", group: "user" },
+  { key: "isLoggedIn", label: "Logged in", description: "true or false", example: "true", group: "user" },
+  { key: "companyName", label: "Company", description: "User's company — empty for a visitor", example: "Acme SAS", group: "company" },
 ]
 
 /** Replaces `{{key}}` and legacy `{site_name}` in a string. Unknown keys → empty string. */

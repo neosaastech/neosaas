@@ -384,7 +384,7 @@ export default function AppointmentsListPage() {
                                     {status.label}
                                   </Badge>
                                   {apt.type === "paid" && (
-                                    <Badge variant={apt.isPaid ? "default" : "outline"} className="text-xs shrink-0">
+                                    <Badge variant={apt.isPaid ? "default" : "outline-solid"} className="text-xs shrink-0">
                                       {apt.isPaid ? "Payé" : formatPrice(apt.price, apt.currency)}
                                     </Badge>
                                   )}

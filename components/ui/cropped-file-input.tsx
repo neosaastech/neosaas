@@ -18,6 +18,9 @@ interface CroppedFileInputProps {
 export interface CroppedFileInputHandle {
   open: () => void
   clear: () => void
+  /** Routes an already-obtained File (e.g. from a drop event) straight into
+   *  the crop step, bypassing the native file picker. */
+  openWithFile: (file: File) => void
 }
 
 /**
@@ -33,22 +36,27 @@ export const CroppedFileInput = forwardRef<CroppedFileInputHandle, CroppedFileIn
     const [imageSrc, setImageSrc] = useState<string | null>(null)
     const [cropperOpen, setCropperOpen] = useState(false)
 
-    useImperativeHandle(ref, () => ({
-      open: () => inputRef.current?.click(),
-      clear: () => {
-        if (inputRef.current) inputRef.current.value = ""
-      },
-    }))
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
+    const readAndOpenCropper = (file: File) => {
       const reader = new FileReader()
       reader.onloadend = () => {
         setImageSrc(reader.result as string)
         setCropperOpen(true)
       }
       reader.readAsDataURL(file)
+    }
+
+    useImperativeHandle(ref, () => ({
+      open: () => inputRef.current?.click(),
+      clear: () => {
+        if (inputRef.current) inputRef.current.value = ""
+      },
+      openWithFile: readAndOpenCropper,
+    }))
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      readAndOpenCropper(file)
     }
 
     const handleCropComplete = (blob: Blob) => {

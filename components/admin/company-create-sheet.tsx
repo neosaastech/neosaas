@@ -55,14 +55,14 @@ export function CompanyCreateSheet({ open, onOpenChange, onSave, isLoading }: Co
               {logoPreview ? (
                 <img src={logoPreview} alt="Company logo" className="object-cover" />
               ) : (
-                <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-lg">
+                <AvatarFallback className="text-2xl bg-linear-to-br from-blue-500 to-blue-700 text-white rounded-lg">
                   <Building2 className="h-10 w-10" />
                 </AvatarFallback>
               )}
             </Avatar>
           </div>
           
-          <div className="pt-16 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
+          <div className="pt-16 pb-4 bg-linear-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
             <div className="flex flex-col items-center gap-2 pt-2">
               <CroppedFileInput
                 ref={fileInputRef}

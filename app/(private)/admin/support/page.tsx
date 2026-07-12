@@ -601,7 +601,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                     categoryFilter === "all"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -612,7 +612,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
                     categoryFilter === "info"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -624,7 +624,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
                     categoryFilter === "action"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -636,7 +636,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1",
                     categoryFilter === "urgent"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -652,7 +652,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                     statusFilter === "all"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -663,7 +663,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                     statusFilter === "resolved"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -674,7 +674,7 @@ export default function SupportListPage() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                     statusFilter === "pending"
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -814,7 +814,7 @@ export default function SupportListPage() {
                       <TableCell className="font-mono text-sm">
                         <div className="flex items-center gap-2">
                           {conv.unreadCount && conv.unreadCount > 0 && (
-                            <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                            <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
                           )}
                           <span>{getTicketId(conv.id)}</span>
                         </div>
@@ -830,7 +830,7 @@ export default function SupportListPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 flex-shrink-0">
+                          <Avatar className="h-9 w-9 shrink-0">
                             <AvatarImage src={conv.user?.profileImage || undefined} />
                             <AvatarFallback className="text-xs bg-primary/10 text-primary font-medium">
                               {getInitials(customerName)}
@@ -934,7 +934,7 @@ export default function SupportListPage() {
               return (
                 <Button
                   key={pageNum}
-                  variant={currentPage === pageNum ? "default" : "outline"}
+                  variant={currentPage === pageNum ? "default" : "outline-solid"}
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => setCurrentPage(pageNum)}

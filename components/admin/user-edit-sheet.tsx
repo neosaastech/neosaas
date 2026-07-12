@@ -153,13 +153,13 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
           <div className="absolute left-1/2 -translate-x-1/2 -top-12 z-10">
             <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
               <AvatarImage src={profileImagePreview || user.profileImage || ""} alt={user.username || "User"} />
-              <AvatarFallback className="text-2xl bg-gradient-to-br from-brand to-brand-hover text-white">
+              <AvatarFallback className="text-2xl bg-linear-to-br from-brand to-brand-hover text-white">
                 {user.firstName[0]}{user.lastName[0]}
               </AvatarFallback>
             </Avatar>
           </div>
           
-          <div className="pt-16 pb-4 bg-gradient-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
+          <div className="pt-16 pb-4 bg-linear-to-b from-muted/50 to-transparent rounded-lg border border-dashed border-muted-foreground/20">
             <div className="flex flex-col items-center gap-2 pt-2">
               <CroppedFileInput ref={fileInputRef} onFileReady={handleImageReady} fileName="avatar.png" name="profileImage" />
               <div className="flex gap-2">

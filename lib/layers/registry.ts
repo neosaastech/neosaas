@@ -15,6 +15,9 @@ import { ColumnsLayer, type ColumnsLayerProps } from "@/components/layers/column
 import { ArticleHeaderLayer, type ArticleHeaderLayerProps } from "@/components/layers/article-header-layer"
 import { ReferenceCardLayer, type ReferenceCardLayerProps } from "@/components/layers/reference-card-layer"
 import { GrapesJsDesignLayer, type GrapesJsDesignLayerProps } from "@/components/layers/grapesjs-design-layer"
+import { CodeShowcaseLayer, type CodeShowcaseLayerProps } from "@/components/layers/code-showcase-layer"
+import { FeaturesListLayer, type FeaturesListLayerProps } from "@/components/layers/features-list-layer"
+import { LogoCloudLayer, type LogoCloudLayerProps } from "@/components/layers/logo-cloud-layer"
 
 /**
  * Single source of truth for page layer types (Pilier G — Normes de nommage & design tokens).
@@ -29,10 +32,14 @@ export interface LayerDefinition {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   component: ComponentType<any>
   propsSchema: z.ZodObject<z.ZodRawShape>
+  // See registry-client.ts's LayerDefinition for the full rationale — kept
+  // in sync between both registries (client picker + server-side parsing).
+  source: "global" | "neosaas" | "project"
 }
 
 const featureGridItemSchema = z.object({
   icon: z.string(),
+  iconSize: z.enum(["sm", "md", "lg"]).optional(),
   title: z.string(),
   description: z.string(),
   bullets: z.array(z.string()),
@@ -71,7 +78,12 @@ const iconShowcaseItemSchema = z.object({
 const heroSplitHighlightSchema = z.object({
   icon: z.string(),
   label: z.string(),
-  featured: z.boolean().optional(),
+  // Payload gives null for an unset checkbox, not undefined — .optional()
+  // alone rejects null and crashes the whole page render at .parse() time
+  // (confirmed live 2026-07-09, same root cause as the theme_config
+  // incident: an unvalidated assumption about "unset" shape). Mappers
+  // already coerce to undefined too; this is the schema-level backstop.
+  featured: z.boolean().nullable().optional(),
 })
 
 const formFieldSchema = z.object({
@@ -79,6 +91,17 @@ const formFieldSchema = z.object({
   label: z.string(),
   type: z.enum(["text", "email", "textarea", "checkbox"]),
   required: z.boolean().optional(),
+})
+
+const featuresListItemSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+})
+
+const logoCloudItemSchema = z.object({
+  name: z.string(),
+  imageUrl: z.string().optional(),
+  markup: z.string().optional(),
 })
 
 export const layerRegistry: Record<string, LayerDefinition> = {
@@ -96,6 +119,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       imageUrl: z.string().optional(),
       videoUrl: z.string().optional(),
     }) satisfies z.ZodType<HeroLayerProps>,
+    source: "global",
   },
   "hero-split": {
     component: HeroSplitLayer,
@@ -111,6 +135,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       secondaryCtaHref: z.string().optional(),
       imageUrl: z.string().optional(),
     }) satisfies z.ZodType<HeroSplitLayerProps>,
+    source: "global",
   },
   "feature-grid": {
     component: FeatureGridLayer,
@@ -119,6 +144,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       title: z.string().optional(),
       items: z.array(featureGridItemSchema),
     }) satisfies z.ZodType<FeatureGridLayerProps>,
+    source: "global",
   },
   "pricing-table": {
     component: PricingTableLayer,
@@ -127,6 +153,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       title: z.string().optional(),
       items: z.array(pricingTablePlanSchema),
     }) satisfies z.ZodType<PricingTableLayerProps>,
+    source: "global",
   },
   testimonials: {
     component: TestimonialsLayer,
@@ -135,6 +162,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       title: z.string().optional(),
       items: z.array(testimonialItemSchema),
     }) satisfies z.ZodType<TestimonialsLayerProps>,
+    source: "global",
   },
   "cta-banner": {
     component: CtaBannerLayer,
@@ -142,9 +170,13 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       eyebrow: z.string().optional(),
       title: z.string(),
       subtitle: z.string().optional(),
-      ctaLabel: z.string(),
-      ctaHref: z.string(),
+      // Unset "reference"-type cta resolves to undefined — must stay
+      // optional or .parse() throws and crashes the whole page render
+      // (confirmed live 2026-07-09 on /documentation, 21 occurrences).
+      ctaLabel: z.string().optional(),
+      ctaHref: z.string().optional(),
     }) satisfies z.ZodType<CtaBannerLayerProps>,
+    source: "global",
   },
   "welcome-banner": {
     component: WelcomeBannerLayer,
@@ -154,6 +186,9 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       ctaLabel: z.string().optional(),
       ctaHref: z.string().optional(),
     }) satisfies z.ZodType<WelcomeBannerLayerProps>,
+    // Dashboard-style welcome banner — a NeoSaaS boilerplate concept (the
+    // private app shell), not a generic marketing block any site would use.
+    source: "neosaas",
   },
   "icon-showcase": {
     component: IconShowcaseLayer,
@@ -163,6 +198,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       videoUrl: z.string().optional(),
       overlayIcons: z.boolean().optional(),
     }) satisfies z.ZodType<IconShowcaseLayerProps>,
+    source: "global",
   },
   form: {
     component: FormLayer,
@@ -175,6 +211,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       submitLabel: z.string().optional(),
       successMessage: z.string().optional(),
     }) satisfies z.ZodType<FormLayerProps>,
+    source: "global",
   },
   "blog-list": {
     component: BlogListLayer,
@@ -185,12 +222,14 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       limit: z.number().optional(),
       categorySlug: z.string().optional(),
     }) satisfies z.ZodType<BlogListLayerProps>,
+    source: "global",
   },
   content: {
     component: ContentLayer,
     propsSchema: z.object({
       bodyHtml: z.string(),
     }) satisfies z.ZodType<ContentLayerProps>,
+    source: "global",
   },
   "article-header": {
     component: ArticleHeaderLayer,
@@ -200,6 +239,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       authorName: z.string().optional(),
       publishedAt: z.string().optional(),
     }) satisfies z.ZodType<ArticleHeaderLayerProps>,
+    source: "global",
   },
   "grapesjs-design": {
     component: GrapesJsDesignLayer,
@@ -207,6 +247,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       html: z.string().optional(),
       css: z.string().optional(),
     }) satisfies z.ZodType<GrapesJsDesignLayerProps>,
+    source: "global",
   },
   reference: {
     component: ReferenceCardLayer,
@@ -216,6 +257,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       imageUrl: z.string().optional(),
       href: z.string().optional(),
     }) satisfies z.ZodType<ReferenceCardLayerProps>,
+    source: "global",
   },
   columns: {
     component: ColumnsLayer,
@@ -236,5 +278,38 @@ export const layerRegistry: Record<string, LayerDefinition> = {
         }),
       ),
     }) satisfies z.ZodType<ColumnsLayerProps>,
+    source: "global",
+  },
+  "code-showcase": {
+    component: CodeShowcaseLayer,
+    propsSchema: z.object({
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      blockTitle: z.string().optional(),
+      blockDescription: z.string().optional(),
+      code: z.string(),
+    }) satisfies z.ZodType<CodeShowcaseLayerProps>,
+    source: "global",
+  },
+  "features-list": {
+    component: FeaturesListLayer,
+    propsSchema: z.object({
+      eyebrow: z.string().optional(),
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      items: z.array(featuresListItemSchema),
+      imageUrl: z.string().optional(),
+    }) satisfies z.ZodType<FeaturesListLayerProps>,
+    source: "global",
+  },
+  "logo-cloud": {
+    component: LogoCloudLayer,
+    propsSchema: z.object({
+      eyebrow: z.string().optional(),
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      items: z.array(logoCloudItemSchema),
+    }) satisfies z.ZodType<LogoCloudLayerProps>,
+    source: "global",
   },
 }

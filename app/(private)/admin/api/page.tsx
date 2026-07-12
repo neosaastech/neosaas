@@ -1124,7 +1124,7 @@ export default function AdminApiPage() {
                           variant="outline"
                           size="icon"
                           onClick={() => copyToClipboard(callbackUrl)}
-                          className="flex-shrink-0"
+                          className="shrink-0"
                         >
                           {copiedUrl ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                         </Button>
@@ -1581,9 +1581,9 @@ export default function AdminApiPage() {
                     key={config.id}
                     className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
                       isPayment && isProd
-                        ? 'bg-purple-50/50 border-purple-200 hover:bg-purple-50 shadow-sm'
+                        ? 'bg-purple-50/50 border-purple-200 hover:bg-purple-50 shadow-xs'
                         : isPayment && isTest
-                        ? 'bg-amber-50/50 border-amber-200 hover:bg-amber-50 shadow-sm'
+                        ? 'bg-amber-50/50 border-amber-200 hover:bg-amber-50 shadow-xs'
                         : 'bg-card hover:bg-accent/50'
                     }`}
                   >
@@ -1701,7 +1701,7 @@ export default function AdminApiPage() {
                 onValueChange={setSelectedService}
                 disabled={!!editingConfig}
               >
-                <SelectTrigger className="h-auto py-3 shadow-sm">
+                <SelectTrigger className="h-auto py-3 shadow-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-[400px]">

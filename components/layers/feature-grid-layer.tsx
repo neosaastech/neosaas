@@ -11,6 +11,7 @@ import { Eyebrow } from "@/components/ui/eyebrow"
 
 export interface FeatureGridItem {
   icon: string
+  iconSize?: "sm" | "md" | "lg"
   title: string
   description: string
   bullets: string[]
@@ -20,6 +21,12 @@ export interface FeatureGridLayerProps {
   eyebrow?: string
   title?: string
   items: FeatureGridItem[]
+}
+
+const ICON_SIZE_CLASSES: Record<"sm" | "md" | "lg", string> = {
+  sm: "h-6 w-6",
+  md: "h-10 w-10",
+  lg: "h-14 w-14",
 }
 
 export function FeatureGridLayer({ eyebrow, title, items }: FeatureGridLayerProps) {
@@ -33,7 +40,9 @@ export function FeatureGridLayer({ eyebrow, title, items }: FeatureGridLayerProp
           return (
             <Card key={item.title}>
               <CardHeader>
-                {IconComponent && <IconComponent className="h-10 w-10 text-primary mb-4" />}
+                {IconComponent && (
+                  <IconComponent className={`${ICON_SIZE_CLASSES[item.iconSize ?? "md"]} text-primary mb-4`} />
+                )}
                 <CardTitle>{item.title}</CardTitle>
                 <CardDescription>{item.description}</CardDescription>
               </CardHeader>

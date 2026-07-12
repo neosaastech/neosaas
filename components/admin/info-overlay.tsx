@@ -247,7 +247,7 @@ export function InfoOverlay({ isOpen, onClose, notification }: InfoOverlayProps)
                             <code className="flex-1 text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded border text-gray-600 dark:text-gray-400 truncate">
                               {change.from}
                             </code>
-                            <ArrowRight className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                            <ArrowRight className="h-3 w-3 text-blue-500 shrink-0" />
                             <code className="flex-1 text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded border text-blue-600 dark:text-blue-400 truncate">
                               {change.to}
                             </code>
@@ -267,7 +267,7 @@ export function InfoOverlay({ isOpen, onClose, notification }: InfoOverlayProps)
                             {changeDetails.previousValue || '(empty)'}
                           </p>
                         </div>
-                        <ArrowRight className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                        <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />
                         <div className="flex-1">
                           <p className="text-xs text-muted-foreground mb-1">New Value</p>
                           <p className="text-sm font-mono bg-white dark:bg-gray-800 px-2 py-1 rounded border text-blue-600 dark:text-blue-400">
@@ -360,7 +360,7 @@ export function InfoOverlay({ isOpen, onClose, notification }: InfoOverlayProps)
                         <span className="text-sm text-muted-foreground">
                           {formatFieldName(key)}
                         </span>
-                        <span className="text-sm font-medium text-right max-w-[200px] break-words">
+                        <span className="text-sm font-medium text-right max-w-[200px] wrap-break-word">
                           {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                         </span>
                       </div>

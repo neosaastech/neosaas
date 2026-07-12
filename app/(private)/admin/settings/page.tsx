@@ -574,7 +574,7 @@ export default function AdminSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#1A1A1A] to-white bg-clip-text text-transparent">Parameters</h1>
+          <h1 className="text-3xl font-bold bg-linear-to-r from-[#1A1A1A] to-white bg-clip-text text-transparent">Parameters</h1>
           <p className="text-muted-foreground mt-1">Manage your site configuration, SEO, and integrations</p>
         </div>
         <SaveStatusIndicator />
@@ -805,7 +805,7 @@ export default function AdminSettingsPage() {
                       </p>
                     </div>
                     <Button
-                      variant={forceHttps ? "outline" : "default"}
+                      variant={forceHttps ? "outline-solid" : "default"}
                       size="sm"
                       className={!forceHttps ? "bg-brand hover:bg-[#B8691C]" : ""}
                       onClick={() => setForceHttps(!forceHttps)}

@@ -34,7 +34,9 @@ export async function BlogListLayer({ eyebrow, title, subtitle, limit, categoryS
     <div className="mx-auto mt-16 max-w-5xl">
       {eyebrow && <Eyebrow className="mb-2 text-center">{eyebrow}</Eyebrow>}
       {title && <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
-      {subtitle && <p className="mt-3 text-center text-muted-foreground">{subtitle}</p>}
+      {subtitle && (
+        <div className="mt-3 text-center text-muted-foreground [&_p]:m-0" dangerouslySetInnerHTML={{ __html: subtitle }} />
+      )}
       <div className="mt-10 grid gap-6 md:grid-cols-3">
         {posts.map((post) => (
           <Link key={post.slug} href={`/blog/${post.slug}`}>
