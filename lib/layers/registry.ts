@@ -10,6 +10,7 @@ import { WelcomeBannerLayer, type WelcomeBannerLayerProps } from "@/components/l
 import { IconShowcaseLayer, type IconShowcaseLayerProps } from "@/components/layers/icon-showcase-layer"
 import { FormLayer, type FormLayerProps } from "@/components/layers/form-layer"
 import { BlogListLayer, type BlogListLayerProps } from "@/components/layers/blog-list-layer"
+import { CategoryListLayer, type CategoryListLayerProps } from "@/components/layers/category-list-layer"
 import { ContentLayer, type ContentLayerProps } from "@/components/layers/content-layer"
 import { ColumnsLayer, type ColumnsLayerProps } from "@/components/layers/columns-layer"
 import { ArticleHeaderLayer, type ArticleHeaderLayerProps } from "@/components/layers/article-header-layer"
@@ -222,6 +223,16 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       limit: z.number().optional(),
       categorySlug: z.string().optional(),
     }) satisfies z.ZodType<BlogListLayerProps>,
+    source: "global",
+  },
+  "category-list": {
+    component: CategoryListLayer,
+    propsSchema: z.object({
+      eyebrow: z.string().optional(),
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      limit: z.number().optional(),
+    }) satisfies z.ZodType<CategoryListLayerProps>,
     source: "global",
   },
   content: {

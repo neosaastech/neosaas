@@ -1,3 +1,14 @@
+## [1.10.0](https://github.com/neosaastech/Neosaas-app/compare/v1.9.0...v1.10.0) (2026-07-12)
+
+### Features
+
+* **admin:** Content Hub table improvements + fix docs header/theme/search ([#59](https://github.com/neosaastech/Neosaas-app/issues/59)) ([486b5df](https://github.com/neosaastech/Neosaas-app/commit/486b5df333e2ee52f3d111d9d9539a9dc25303c9))
+* **content-hub:** add category description field + category-list block ([f97705b](https://github.com/neosaastech/Neosaas-app/commit/f97705beaf90282de90276f0befcc01ec6b78ee3))
+
+### Bug Fixes
+
+* **admin:** avoid setState-in-effect for column widths initial read ([#61](https://github.com/neosaastech/Neosaas-app/issues/61)) ([3ba4f0c](https://github.com/neosaastech/Neosaas-app/commit/3ba4f0cfb5afbc1dc3aa3824de716f84fb0049a7))
+
 ## [1.9.0](https://github.com/neosaastech/Neosaas-app/compare/v1.8.1...v1.9.0) (2026-07-12)
 
 ### Features

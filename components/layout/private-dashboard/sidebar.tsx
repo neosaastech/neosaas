@@ -31,6 +31,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner"
 import { useUser } from "@/lib/contexts/user-context"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { BrandMark } from "@/components/common/brand-mark"
 
 /** Product catalog — client home (/dashboard) */
 const catalogueItem = {
@@ -180,7 +181,6 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
     isCollapsed || logoDisplayMode === "logo" || logoDisplayMode === "both"
   const showSiteNameInHeader =
     !isCollapsed && (logoDisplayMode === "text" || logoDisplayMode === "both")
-  const logoInitials = siteName.substring(0, 2).toUpperCase()
   const visibleAdminItems = adminItems.filter((item) => !item.superAdminOnly || isSuperAdmin)
 
   const handleLinkClick = () => {
@@ -214,20 +214,7 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
       >
         <div className={cn("flex h-16 items-center border-b", isCollapsed ? "px-3 justify-center" : "px-6")}>
           <Link href="/dashboard" className="flex items-center gap-2" onClick={handleLinkClick}>
-            {showLogoInHeader &&
-              (logo ? (
-                <img src={logo} alt={siteName} className="h-8 w-8 object-contain" />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-primary-foreground font-bold">
-                  {logoInitials}
-                </div>
-              ))}
-            {showSiteNameInHeader && (
-              <span className="font-bold text-xl">
-                <span className="text-foreground">{siteName.substring(0, 3)}</span>
-                <span className="text-brand">{siteName.substring(3)}</span>
-              </span>
-            )}
+            <BrandMark siteName={siteName} logo={logo} showLogo={showLogoInHeader} showSiteName={showSiteNameInHeader} />
           </Link>
           <div className={cn("ml-auto flex items-center", isCollapsed && "hidden")}>
             {isOpen && !isCollapsed && (

@@ -10,6 +10,7 @@ import { WelcomeBannerLayer, type WelcomeBannerLayerProps } from "@/components/l
 import { IconShowcaseLayer, type IconShowcaseLayerProps } from "@/components/layers/icon-showcase-layer"
 import { FormLayer, type FormLayerProps } from "@/components/layers/form-layer"
 import type { BlogListLayerProps } from "@/components/layers/blog-list-layer"
+import type { CategoryListLayerProps } from "@/components/layers/category-list-layer"
 import { ContentLayer, type ContentLayerProps } from "@/components/layers/content-layer"
 import { CodeShowcaseLayer, type CodeShowcaseLayerProps } from "@/components/layers/code-showcase-layer"
 import { FeaturesListLayer, type FeaturesListLayerProps } from "@/components/layers/features-list-layer"
@@ -215,6 +216,16 @@ export const clientLayerRegistry: Record<string, LayerDefinition> = {
       limit: z.number().optional(),
       categorySlug: z.string().optional(),
     }) satisfies z.ZodType<BlogListLayerProps>,
+    source: "global",
+  },
+  "category-list": {
+    component: NoopLayer,
+    propsSchema: z.object({
+      eyebrow: z.string().optional(),
+      title: z.string().optional(),
+      subtitle: z.string().optional(),
+      limit: z.number().optional(),
+    }) satisfies z.ZodType<CategoryListLayerProps>,
     source: "global",
   },
   content: {

@@ -100,7 +100,11 @@ export interface PayloadPageSummary {
   title: string
   slug: string
   path: string
-  parent: string | number | null
+  // Populated at depth=1 same as category/author below — was typed as a
+  // bare id (never true at runtime for this call), which made a "Parent"
+  // column impossible without a second lookup. relationId()/relationLabel()
+  // in pages-settings.tsx unwrap this consistently.
+  parent: string | number | { id: string | number; title?: string; path?: string } | null
   pageType?: string | null
   // Populated objects (not bare IDs) — listPages fetches at depth=1
   // specifically so the Content Hub table can show real names instead of
@@ -113,6 +117,7 @@ export interface PayloadPageSummary {
   author?: { id: string | number; email: string; name?: string | null } | null
   publishedAt?: string | null
   _status: "draft" | "published"
+  createdAt: string
   updatedAt: string
   syncStatus?: PayloadSyncStatus | null
   // Charles (2026-07-10): index/follow visible directly in the recap table,
@@ -569,7 +574,15 @@ export interface PayloadCategorySummary {
   name: string
   slug: string
   path: string
-  parent: string | number | null
+  // Populated at depth=1, same caveat as PayloadPageSummary.parent — was
+  // typed as a bare id, never true at runtime for this call.
+  parent: string | number | { id: string | number; name?: string; path?: string } | null
+  // Payload's Lexical editor state (richText field, 2026-07-12) — same
+  // opaque JSON shape RichTextEditor/RichTextPreview already handle for
+  // BlogPost.body, never a plain string.
+  description?: unknown
+  createdAt: string
+  updatedAt: string
   // Populated at depth=1, unpacked to a plain absolute URL — standalone
   // field (relationTo media), not part of a plugin-seo meta group like
   // Pages, since Categories has no title/description generation needs.
@@ -597,6 +610,7 @@ export interface CategoryWriteInput {
   name: string
   slug: string
   parent?: string | number | null
+  description?: unknown
   headerImage?: string | null
 }
 
@@ -648,10 +662,13 @@ export interface PayloadBlogPostSummary {
   id: string | number
   title: string
   slug: string
-  category: string | number | null
+  // Populated at depth=1 (see listBlogPosts) — was typed as a bare id,
+  // never true at runtime for this call (same fix as PayloadPageSummary.parent).
+  category: string | number | { id: string | number; name?: string; path?: string } | null
   excerpt?: string | null
   publishedAt?: string | null
   _status: "draft" | "published"
+  createdAt: string
   updatedAt: string
   syncStatus?: PayloadSyncStatus | null
   // Populated at depth=1 (see listBlogPosts) and unpacked to a plain

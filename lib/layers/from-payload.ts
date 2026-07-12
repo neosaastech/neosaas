@@ -217,6 +217,13 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
         limit: block.limit ?? undefined,
         categorySlug: block.categorySlug ?? undefined,
       }
+    case "category-list":
+      return {
+        eyebrow: block.eyebrow ?? undefined,
+        title: block.title ?? undefined,
+        subtitle: convertSubtitle(block.subtitle),
+        limit: block.limit ?? undefined,
+      }
     case "content":
       return {
         bodyHtml: block.body ? convertLexicalToHTML({ data: block.body as never, disableContainer: true }) : "",

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -55,7 +56,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   getContentPages,
@@ -83,6 +84,7 @@ import { PageEditor } from "./content/page-editor"
 import { ArticleEditor } from "./content/article-editor"
 import { MediaPickerField } from "./content/media-picker-field"
 import { MediaGallery } from "./content/media-gallery"
+import { RichTextEditor } from "./content/rich-text-editor"
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100]
 // Fetched once per locale/type filter, then searched/sorted/paginated
@@ -168,6 +170,8 @@ function SortableHeader({
   onSort,
   className,
   children,
+  width,
+  onResizeStart,
 }: {
   field: string
   sortField: string | null
@@ -175,16 +179,122 @@ function SortableHeader({
   onSort: (field: string) => void
   className?: string
   children: React.ReactNode
+  width?: number
+  onResizeStart?: (e: React.MouseEvent) => void
 }) {
   const isSorted = sortField === field
   return (
-    <TableHead className={`cursor-pointer select-none hover:bg-muted/50 ${className ?? ""}`} onClick={() => onSort(field)}>
-      <div className="flex items-center gap-1">
+    <TableHead
+      className={`relative cursor-pointer select-none hover:bg-muted/50 ${className ?? ""}`}
+      style={width ? { width, minWidth: width, maxWidth: width } : undefined}
+      onClick={() => onSort(field)}
+    >
+      <div className="flex items-center gap-1 overflow-hidden">
         {children}
         {isSorted && <span>{sortDirection === "asc" ? "↑" : "↓"}</span>}
       </div>
+      {onResizeStart && <ColumnResizeHandle onMouseDown={onResizeStart} />}
     </TableHead>
   )
+}
+
+/** Plain (non-sortable) resizable header — Type/Category/Parent columns. */
+function ResizableHead({
+  className,
+  children,
+  width,
+  onResizeStart,
+}: {
+  className?: string
+  children?: React.ReactNode
+  width?: number
+  onResizeStart?: (e: React.MouseEvent) => void
+}) {
+  return (
+    <TableHead className={`relative ${className ?? ""}`} style={width ? { width, minWidth: width, maxWidth: width } : undefined}>
+      {children}
+      {onResizeStart && <ColumnResizeHandle onMouseDown={onResizeStart} />}
+    </TableHead>
+  )
+}
+
+/** Drag handle on a column's right edge — stopPropagation so it doesn't also trigger SortableHeader's onClick sort toggle. */
+function ColumnResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize select-none hover:bg-brand/40 active:bg-brand/60"
+    />
+  )
+}
+
+const CONTENT_HUB_COLUMN_WIDTHS_KEY = "content-hub-column-widths"
+const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
+  title: 220,
+  type: 140,
+  path: 180,
+  category: 140,
+  parent: 160,
+  status: 110,
+  created: 110,
+  updated: 110,
+}
+
+/** User-draggable column widths, persisted across sessions (Charles, 2026-07-12: "les colonnes peuvent être modifiées dans leur largeur"). */
+function useColumnWidths() {
+  // Read once as the lazy initial state rather than useEffect+setState on
+  // mount (React's react-hooks/set-state-in-effect: an effect calling
+  // setState synchronously causes an avoidable extra render) — safe here
+  // since this is a "use client" component and the guard covers the one
+  // server-render pass that still evaluates it.
+  const [widths, setWidths] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return DEFAULT_COLUMN_WIDTHS
+    try {
+      const stored = localStorage.getItem(CONTENT_HUB_COLUMN_WIDTHS_KEY)
+      return stored ? { ...DEFAULT_COLUMN_WIDTHS, ...JSON.parse(stored) } : DEFAULT_COLUMN_WIDTHS
+    } catch {
+      // Ignore malformed/blocked storage — falls back to defaults.
+      return DEFAULT_COLUMN_WIDTHS
+    }
+  })
+  const resizing = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
+
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      const r = resizing.current
+      if (!r) return
+      const next = Math.max(70, r.startWidth + (e.clientX - r.startX))
+      setWidths((w) => ({ ...w, [r.key]: next }))
+    }
+    function onMouseUp() {
+      if (!resizing.current) return
+      resizing.current = null
+      setWidths((w) => {
+        try {
+          localStorage.setItem(CONTENT_HUB_COLUMN_WIDTHS_KEY, JSON.stringify(w))
+        } catch {
+          // Ignore — widths still work for this session even if persistence fails.
+        }
+        return w
+      })
+    }
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+    }
+  }, [])
+
+  function startResize(key: string) {
+    return (e: React.MouseEvent) => {
+      e.preventDefault()
+      resizing.current = { key, startX: e.clientX, startWidth: widths[key] ?? 100 }
+    }
+  }
+
+  return { widths, startResize }
 }
 
 type ContentKind = "page" | "article" | "category"
@@ -196,11 +306,17 @@ interface ContentRow {
   path: string
   pageType?: string | null
   categoryName?: string | null
+  // Articles never have a parent (blog posts are flat). Pages/Categories
+  // do — set from the populated `parent` relation, resolved to the actual
+  // row so clicking it can open that row's editor (see the Parent cell).
+  parentId?: string | number | null
+  parentTitle?: string | null
   // Categories have no publish/status concept — `status` stays "published"
   // so they always sort/filter as visible, but the table renders no
   // toggle for category rows (see the Status cell below).
   status: "draft" | "published"
-  publishedAt?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
   syncStatus?: PayloadSyncStatus | null
 }
 
@@ -210,6 +326,37 @@ const CONTENT_TYPE_OPTIONS = [
   { value: "article", label: "Article (blog)" },
   { value: "category", label: "Category" },
 ]
+
+// One color per type key so the Type column reads at a glance instead of
+// every row showing the same neutral outline badge (Charles, 2026-07-12).
+const TYPE_BADGE_STYLES: Record<string, string> = {
+  landing: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300",
+  documentation:
+    "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900 dark:bg-purple-950 dark:text-purple-300",
+  article:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300",
+  category:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
+}
+
+/**
+ * Pages/Categories/BlogPosts are all fetched at depth=1, so `parent`/
+ * `category` relationship fields come back as populated objects
+ * ({id, title|name, path}), never bare ids — payload-bridge.ts's summary
+ * types were stale on this point (typed as `string | number | null`) which
+ * made `categoryName()`/`category?.parent` reads below silently resolve to
+ * nothing for any row with a real parent. These two helpers are the single
+ * place that unwraps either shape.
+ */
+function relationId(value: string | number | { id: string | number } | null | undefined): string | number | null {
+  if (value == null) return null
+  return typeof value === "object" ? value.id : value
+}
+
+function relationLabel(value: { title?: string; name?: string } | string | number | null | undefined): string | null {
+  if (value == null || typeof value !== "object") return null
+  return value.title ?? value.name ?? null
+}
 
 /**
  * Unified list for Pages, Articles, and Categories (Charles, 2026-07-11:
@@ -235,6 +382,7 @@ const CONTENT_TYPE_OPTIONS = [
  * is meant to reduce.
  */
 function ContentPanel() {
+  const { widths: colWidths, startResize } = useColumnWidths()
   const [allPages, setAllPages] = useState<PayloadPageSummary[]>([])
   const [allArticles, setAllArticles] = useState<PayloadBlogPostSummary[]>([])
   const [categories, setCategories] = useState<PayloadCategorySummary[]>([])
@@ -263,6 +411,7 @@ function ContentPanel() {
   const [categoryFormName, setCategoryFormName] = useState("")
   const [categorySlug, setCategorySlug] = useState("")
   const [categoryParentId, setCategoryParentId] = useState("")
+  const [categoryDescription, setCategoryDescription] = useState<unknown>(undefined)
   const [categoryHeaderImage, setCategoryHeaderImage] = useState("")
   const [isSavingCategory, setIsSavingCategory] = useState(false)
   const [isLoadingDoc, setIsLoadingDoc] = useState(false)
@@ -301,8 +450,8 @@ function ContentPanel() {
     setCurrentPage(1)
   }, [search, itemsPerPage, sortField, sortDirection, typeFilter])
 
-  const categoryName = (id: string | number | null | undefined) =>
-    categories.find((c) => String(c.id) === String(id))?.path
+  const categoryName = (id: string | number | { id: string | number } | null | undefined) =>
+    categories.find((c) => String(c.id) === String(relationId(id)))?.path
 
   const allRows: ContentRow[] = useMemo(() => {
     const pageRows: ContentRow[] = allPages.map((p) => ({
@@ -312,8 +461,11 @@ function ContentPanel() {
       path: p.path,
       pageType: p.pageType ?? "landing",
       categoryName: p.category?.name ?? null,
+      parentId: relationId(p.parent),
+      parentTitle: relationLabel(p.parent),
       status: p._status,
-      publishedAt: p.publishedAt,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
       syncStatus: p.syncStatus,
     }))
     const articleRows: ContentRow[] = allArticles.map((a) => ({
@@ -323,8 +475,11 @@ function ContentPanel() {
       path: `/blog/${a.slug}`,
       pageType: null,
       categoryName: categoryName(a.category),
+      parentId: null,
+      parentTitle: null,
       status: a._status,
-      publishedAt: a.publishedAt,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
       syncStatus: a.syncStatus,
     }))
     const categoryRows: ContentRow[] = categories.map((c) => ({
@@ -334,13 +489,26 @@ function ContentPanel() {
       path: c.path,
       pageType: null,
       categoryName: c.parent ? categoryName(c.parent) : null,
+      parentId: relationId(c.parent),
+      parentTitle: relationLabel(c.parent),
       status: "published",
-      publishedAt: null,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
       syncStatus: null,
     }))
     return [...pageRows, ...articleRows, ...categoryRows]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allPages, allArticles, categories])
+
+  // O(1) parent lookup for the Parent column — a page's/category's parent
+  // is always the same kind (Payload's relationTo is scoped that way), so
+  // `${r.kind}:${r.parentId}` always hits the right row when it exists.
+  const rowsByKey = useMemo(() => {
+    const map = new Map<string, ContentRow>()
+    allRows.forEach((row) => map.set(rowKey(row.kind, row.id), row))
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -408,6 +576,7 @@ function ContentPanel() {
       setCategoryFormName("")
       setCategorySlug("")
       setCategoryParentId("")
+      setCategoryDescription(undefined)
       setCategoryHeaderImage("")
     }
     setSheetOpen(true)
@@ -422,7 +591,8 @@ function ContentPanel() {
       setEditingCategory(category)
       setCategoryFormName(category?.name ?? "")
       setCategorySlug(category?.slug ?? "")
-      setCategoryParentId(category?.parent ? String(category.parent) : "")
+      setCategoryParentId(category?.parent ? String(relationId(category.parent)) : "")
+      setCategoryDescription(category?.description)
       setCategoryHeaderImage(category?.headerImage ?? "")
       return
     }
@@ -451,6 +621,7 @@ function ContentPanel() {
       name: categoryFormName,
       slug: categorySlug,
       parent: categoryParentId || null,
+      description: categoryDescription,
       headerImage: categoryHeaderImage || null,
     })
     setIsSavingCategory(false)
@@ -567,15 +738,17 @@ function ContentPanel() {
       toast.error("No content to export")
       return
     }
-    const headers = ["Title", "Kind", "Type", "Path", "Category", "Status", "Published At"]
+    const headers = ["Title", "Kind", "Type", "Path", "Category", "Parent", "Status", "Created At", "Updated At"]
     const rows = filtered.map((r) => [
       `"${r.title.replace(/"/g, '""')}"`,
       r.kind,
       r.pageType ?? "",
       r.path,
       r.categoryName ?? "",
+      r.parentTitle ?? "",
       r.status,
-      r.publishedAt ?? "",
+      r.createdAt ?? "",
+      r.updatedAt ?? "",
     ])
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
@@ -797,7 +970,7 @@ function ContentPanel() {
           </SheetContent>
         </Sheet>
         <div className="rounded-md border overflow-x-auto">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[44px]">
@@ -808,39 +981,86 @@ function ContentPanel() {
                   />
                 </TableHead>
                 <TableHead className="w-[56px]"></TableHead>
-                <SortableHeader field="title" sortField={sortField} sortDirection={sortDirection} onSort={toggleSort} className="min-w-[150px]">
+                <SortableHeader
+                  field="title"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                  width={colWidths.title}
+                  onResizeStart={startResize("title")}
+                >
                   Title
                 </SortableHeader>
-                <TableHead className="min-w-[100px]">Type</TableHead>
-                <SortableHeader field="path" sortField={sortField} sortDirection={sortDirection} onSort={toggleSort} className="min-w-[150px]">
+                <ResizableHead width={colWidths.type} onResizeStart={startResize("type")}>
+                  Type
+                </ResizableHead>
+                <SortableHeader
+                  field="path"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                  width={colWidths.path}
+                  onResizeStart={startResize("path")}
+                >
                   Path
                 </SortableHeader>
-                <TableHead className="min-w-[120px]">Category</TableHead>
-                <SortableHeader field="status" sortField={sortField} sortDirection={sortDirection} onSort={toggleSort} className="min-w-[100px]">
+                <ResizableHead width={colWidths.category} onResizeStart={startResize("category")}>
+                  Category
+                </ResizableHead>
+                <ResizableHead width={colWidths.parent} onResizeStart={startResize("parent")}>
+                  Parent
+                </ResizableHead>
+                <SortableHeader
+                  field="status"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                  width={colWidths.status}
+                  onResizeStart={startResize("status")}
+                >
                   Status
                 </SortableHeader>
-                <SortableHeader field="publishedAt" sortField={sortField} sortDirection={sortDirection} onSort={toggleSort} className="min-w-[140px]">
-                  Published
+                <SortableHeader
+                  field="createdAt"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                  width={colWidths.created}
+                  onResizeStart={startResize("created")}
+                >
+                  Created
                 </SortableHeader>
-                <TableHead className="min-w-[80px]"></TableHead>
+                <SortableHeader
+                  field="updatedAt"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                  width={colWidths.updated}
+                  onResizeStart={startResize("updated")}
+                >
+                  Updated
+                </SortableHeader>
+                <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center">
+                  <TableCell colSpan={11} className="h-24 text-center">
                     Loading content...
                   </TableCell>
                 </TableRow>
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center">
+                  <TableCell colSpan={11} className="h-24 text-center">
                     {search ? "No results for this search." : "No content yet."}
                   </TableCell>
                 </TableRow>
               ) : (
                 paginated.map((r) => {
                   const key = rowKey(r.kind, r.id)
+                  const typeKey = r.kind === "article" || r.kind === "category" ? r.kind : (r.pageType ?? "landing")
+                  const parentRow = r.parentId != null ? rowsByKey.get(rowKey(r.kind, r.parentId)) : undefined
                   return (
                     <TableRow key={key} className="group">
                       <TableCell>
@@ -870,19 +1090,23 @@ function ContentPanel() {
                             className="h-8"
                           />
                         ) : (
-                          <div onClick={() => setEditingTitleId(key)} className="cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
+                          <div
+                            onClick={() => setEditingTitleId(key)}
+                            title={r.title}
+                            className="cursor-pointer truncate rounded px-2 py-1 hover:bg-muted/50"
+                          >
                             {r.title}
                           </div>
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
+                        <Badge variant="outline" className={TYPE_BADGE_STYLES[typeKey]}>
                           {r.kind === "article" || r.kind === "category"
                             ? r.kind
                             : (CONTENT_TYPE_OPTIONS.find((o) => o.value === (r.pageType ?? "landing"))?.label ?? r.pageType)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell className="truncate font-mono text-xs">
                         {r.status === "published" ? (
                           <a
                             href={`/${locale}${r.path}`}
@@ -892,7 +1116,7 @@ function ContentPanel() {
                             className="inline-flex items-center gap-1 text-primary hover:underline"
                           >
                             {r.path}
-                            <ExternalLink className="h-3 w-3" />
+                            <ExternalLink className="h-3 w-3 shrink-0" />
                           </a>
                         ) : (
                           <Tooltip>
@@ -907,7 +1131,23 @@ function ContentPanel() {
                       </TableCell>
                       <TableCell>
                         {r.categoryName ? (
-                          <Badge variant="outline">{r.categoryName}</Badge>
+                          <Badge variant="outline" className="max-w-full truncate">
+                            {r.categoryName}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {parentRow ? (
+                          <button
+                            type="button"
+                            onClick={() => openEdit(parentRow)}
+                            title={`Edit "${parentRow.title}"`}
+                            className="max-w-full truncate rounded px-2 py-1 text-xs text-primary hover:bg-muted/50 hover:underline"
+                          >
+                            {parentRow.title}
+                          </button>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
@@ -917,19 +1157,12 @@ function ContentPanel() {
                           <span className="text-muted-foreground text-xs">—</span>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleToggleStatus(r)}
-                              className={`h-8 w-8 transition-colors ${
-                                r.status === "published"
-                                  ? "text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  : "text-red-600 hover:text-red-700 hover:bg-red-50"
-                              }`}
-                              title={r.status === "published" ? "Published - Click to unpublish" : "Draft - Click to publish"}
-                            >
-                              {r.status === "published" ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                            </Button>
+                            <Switch
+                              checked={r.status === "published"}
+                              onCheckedChange={() => handleToggleStatus(r)}
+                              aria-label={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
+                              title={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
+                            />
                             {r.syncStatus?.ok === false && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -943,10 +1176,25 @@ function ContentPanel() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {r.publishedAt
-                          ? new Date(r.publishedAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
-                          : "—"}
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.createdAt ? (
+                          <>
+                            <div>{new Date(r.createdAt).toLocaleDateString()}</div>
+                            <div className="text-[10px]">{new Date(r.createdAt).toLocaleTimeString()}</div>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.updatedAt ? (
+                          <>
+                            <div>{new Date(r.updatedAt).toLocaleDateString()}</div>
+                            <div className="text-[10px]">{new Date(r.updatedAt).toLocaleTimeString()}</div>
+                          </>
+                        ) : (
+                          <span>—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
@@ -999,11 +1247,13 @@ function ContentPanel() {
             name={categoryFormName}
             slug={categorySlug}
             parentId={categoryParentId}
+            description={categoryDescription}
             headerImage={categoryHeaderImage}
             isSaving={isSavingCategory}
             onNameChange={setCategoryFormName}
             onSlugChange={setCategorySlug}
             onParentChange={setCategoryParentId}
+            onDescriptionChange={setCategoryDescription}
             onHeaderImageChange={setCategoryHeaderImage}
             onSave={handleSaveCategory}
           />
@@ -1055,11 +1305,13 @@ function CategoryEditorFields({
   name,
   slug,
   parentId,
+  description,
   headerImage,
   isSaving,
   onNameChange,
   onSlugChange,
   onParentChange,
+  onDescriptionChange,
   onHeaderImageChange,
   onSave,
 }: {
@@ -1068,11 +1320,13 @@ function CategoryEditorFields({
   name: string
   slug: string
   parentId: string
+  description: unknown
   headerImage: string
   isSaving: boolean
   onNameChange: (v: string) => void
   onSlugChange: (v: string) => void
   onParentChange: (v: string) => void
+  onDescriptionChange: (v: unknown) => void
   onHeaderImageChange: (v: string) => void
   onSave: () => void
 }) {
@@ -1105,9 +1359,14 @@ function CategoryEditorFields({
         </Select>
       </div>
       <div className="space-y-2">
+        <Label>Description</Label>
+        {/* Same Lexical editor as an article's body (Charles, 2026-07-12:
+            "un éditeur complet") — rendered by the category-list Content Hub
+            block and on each category's own listing card. */}
+        <RichTextEditor initialValue={description} onChange={onDescriptionChange} />
+      </div>
+      <div className="space-y-2">
         <Label>Header image</Label>
-        {/* Charles (2026-07-11): metadata-only for now — no public category
-            listing page exists yet to render a visual banner into. */}
         <MediaPickerField name="categoryHeaderImage" kind="image" value={headerImage} onChange={onHeaderImageChange} />
       </div>
       <Button onClick={onSave} disabled={isSaving || !name || !slug} className="mt-2">

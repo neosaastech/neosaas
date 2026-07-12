@@ -974,6 +974,7 @@ export const categories = pgTable("categories", {
   path: text("path").notNull(),
   locale: text("locale").notNull().default("fr"),
   name: text("name").notNull(),
+  description: text("description"),
   headerImageUrl: text("header_image_url"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
