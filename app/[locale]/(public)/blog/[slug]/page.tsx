@@ -35,6 +35,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: titleField,
     description,
     alternates: { languages },
+    // Same gap/fix as lib/seo/page-metadata.ts's buildPageMetadata.
+    robots: { index: !post.noIndex, follow: !post.noFollow },
     openGraph: {
       title,
       description,

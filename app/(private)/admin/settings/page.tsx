@@ -86,6 +86,10 @@ export default function AdminSettingsPage() {
     ogTitle: "NeoSaaS - Modern Admin Dashboard",
     ogDescription: "The ultimate solution for your SaaS application.",
     ogImage: "",
+    // Charles (2026-07-13): "dans paramètre on doit avoir un espace dédié
+    // à la rédaction du /robots.txt" — empty means "use the default
+    // Allow: / + Sitemap template" (see config/seo/generateRobots.ts).
+    robotsTxt: "",
   })
 
   const [socialLinks, setSocialLinks] = useState({
@@ -1102,6 +1106,20 @@ export default function AdminSettingsPage() {
                     placeholder="Enter a brief description of your site..."
                     rows={3}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>robots.txt</Label>
+                  <Textarea
+                    value={seoSettings.robotsTxt}
+                    onChange={(e) => setSeoSettings({...seoSettings, robotsTxt: e.target.value})}
+                    placeholder={"User-agent: *\nAllow: /\n\nSitemap: https://yourdomain.com/sitemap.xml"}
+                    rows={6}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty to use the default (Allow all + Sitemap link). Served as-is at /robots.txt when set.
+                  </p>
                 </div>
               </CardContent>
             </Card>

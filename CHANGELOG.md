@@ -1,3 +1,9 @@
+## [1.10.2](https://github.com/neosaastech/Neosaas-app/compare/v1.10.1...v1.10.2) (2026-07-12)
+
+### Bug Fixes
+
+* **seo): sitemap completeness, robots.txt editor, noIndex wiring; fix(admin:** status toggle no longer reloads the table ([#64](https://github.com/neosaastech/Neosaas-app/issues/64)) ([44e25e7](https://github.com/neosaastech/Neosaas-app/commit/44e25e783fdaab7d945e950559642d1764c1f639))
+
 ## [1.10.1](https://github.com/neosaastech/Neosaas-app/compare/v1.10.0...v1.10.1) (2026-07-12)
 
 ### Bug Fixes

@@ -888,6 +888,12 @@ export const pageSeo = pgTable("page_seo", {
   // layout's title.template, which otherwise appends the site name to
   // every page with no per-page opt-out.
   includeSiteNameInTitle: boolean("include_site_name_in_title").default(true).notNull(),
+  // Synced from Payload's plugin-seo meta.noIndex/meta.noFollow (Charles,
+  // 2026-07-13: pages had the toggle in the admin editor but it never
+  // reached the public site's actual <meta name="robots"> tag — purely
+  // decorative until buildPageMetadata started reading these).
+  noIndex: boolean("no_index").default(false).notNull(),
+  noFollow: boolean("no_follow").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -950,6 +956,9 @@ export const blogPosts = pgTable("blog_posts", {
   // Same rationale as pageSeo.includeSiteNameInTitle — synced from
   // Payload's BlogPosts.includeSiteNameInTitle.
   includeSiteNameInTitle: boolean("include_site_name_in_title").default(true).notNull(),
+  // Same gap/fix as pageSeo.noIndex/noFollow above.
+  noIndex: boolean("no_index").default(false).notNull(),
+  noFollow: boolean("no_follow").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

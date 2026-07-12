@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/db"
-import { pageLayers } from "@/db/schema"
+import { pageSeo, blogPosts, categories } from "@/db/schema"
 import { loadNeosaasConfig } from "@/server/loadConfig"
 import { LOCALES } from "@/app/[locale]/layout"
 
@@ -15,8 +15,17 @@ interface SitemapUrl {
  * Real sitemap, not a hardcoded list (found 2026-07-04: the previous version
  * only ever listed 4 fixed URLs — including a "/contact" page that doesn't
  * exist — and never picked up pages created through the Content Hub /
- * Payload). Pulls every active page_layers path and blog_posts slug, one
- * <url> per locale, alongside a small set of always-present static routes.
+ * Payload). Pulls every active page, blog post, and category, one <url>
+ * per locale, alongside a small set of always-present static routes.
+ *
+ * Charles (2026-07-13): "le sitemap doit récupérer toutes les pages
+ * indexées" — this previously only ever queried page_layers (Pages),
+ * despite the comment above already claiming blog_posts was included.
+ * Now also queries blog_posts and categories, and excludes anything
+ * flagged noIndex (a page search engines are told not to index shouldn't
+ * also be listed in the sitemap asking them to crawl it — same fields
+ * lib/seo/page-metadata.ts's buildPageMetadata reads for the actual
+ * <meta name="robots"> tag).
  */
 export async function generateSitemapXml() {
   const config = await loadNeosaasConfig()
@@ -46,20 +55,55 @@ export async function generateSitemapXml() {
     }
   }
 
-  // CMS-authored pages (Payload -> page_layers), one entry per locale that
-  // actually has active layers — a page only published in "en" shouldn't
-  // produce a dead "fr" sitemap entry.
+  // CMS-authored pages (Payload -> page_seo), one entry per locale that's
+  // actually active and not flagged noIndex.
   const cmsPages = await db
-    .selectDistinct({ pagePath: pageLayers.pagePath, locale: pageLayers.locale })
-    .from(pageLayers)
-    .where(eq(pageLayers.isActive, true))
+    .select({ pagePath: pageSeo.pagePath, locale: pageSeo.locale })
+    .from(pageSeo)
+    .where(and(eq(pageSeo.isActive, true), eq(pageSeo.noIndex, false)))
 
   for (const page of cmsPages) {
-    if (staticPaths.includes(page.pagePath)) continue
+    // "/" is already the hardcoded first entry above (with its own image
+    // set) and "/pricing" is a static route — both would otherwise appear
+    // twice, once here and once above.
+    if (page.pagePath === "/" || staticPaths.includes(page.pagePath)) continue
     pages.push({
       loc: `${siteUrl}/${page.locale}${page.pagePath}`,
       changefreq: "monthly",
       priority: 0.6,
+    })
+  }
+
+  // Blog posts — slug is globally unique (one row, not one per locale), but
+  // both /fr/blog/[slug] and /en/blog/[slug] serve it (locale only picks
+  // which translation of the content renders), so one <url> per locale.
+  const cmsPosts = await db
+    .select({ slug: blogPosts.slug })
+    .from(blogPosts)
+    .where(and(eq(blogPosts.isActive, true), eq(blogPosts.noIndex, false)))
+
+  for (const post of cmsPosts) {
+    for (const locale of LOCALES) {
+      pages.push({
+        loc: `${siteUrl}/${locale}/blog/${post.slug}`,
+        changefreq: "monthly",
+        priority: 0.6,
+      })
+    }
+  }
+
+  // Categories — same per-(path, locale)-row shape as page_seo, no noIndex
+  // concept (categories aren't individually flaggable in Payload today).
+  const cmsCategories = await db
+    .select({ path: categories.path, locale: categories.locale })
+    .from(categories)
+    .where(eq(categories.isActive, true))
+
+  for (const category of cmsCategories) {
+    pages.push({
+      loc: `${siteUrl}/${category.locale}${category.path}`,
+      changefreq: "monthly",
+      priority: 0.5,
     })
   }
 

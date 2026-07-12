@@ -39,6 +39,7 @@ import {
   ExternalLink,
   Trash,
   SlidersHorizontal,
+  Loader2,
 } from "lucide-react"
 import {
   Tooltip,
@@ -400,6 +401,11 @@ function ContentPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ContentRow | null>(null)
+  // Rows currently saving a status toggle — shows a per-row spinner instead
+  // of the old behavior (Charles, 2026-07-13: "une modification ne doit pas
+  // entrainer un reload de la page, mais juste de la ligne") of calling
+  // load() and flipping the whole table to its loading state.
+  const [savingStatusKeys, setSavingStatusKeys] = useState<Set<string>>(new Set())
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [creatingKind, setCreatingKind] = useState<ContentKind | null>(null)
@@ -679,14 +685,29 @@ function ContentPanel() {
 
   async function handleToggleStatus(row: ContentRow) {
     if (row.kind === "category") return // no publish concept for categories
+    const key = rowKey(row.kind, row.id)
     const next = row.status === "published" ? "draft" : "published"
+    setSavingStatusKeys((prev) => new Set(prev).add(key))
     const result =
       row.kind === "page"
         ? await saveContentPage(row.id, { _status: next }, locale)
         : await saveContentArticle(row.id, { _status: next }, locale)
+    setSavingStatusKeys((prev) => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
     if (result.success) {
       toast.success(next === "published" ? "Published" : "Unpublished")
-      load()
+      // Patch just this row in place instead of load() (a full refetch of
+      // every page/article) — that used to flip the whole table back to
+      // its "Loading content..." state for a single toggle.
+      const patch = { _status: result.data._status, updatedAt: result.data.updatedAt, syncStatus: result.data.syncStatus }
+      if (row.kind === "page") {
+        setAllPages((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...patch } : p)))
+      } else {
+        setAllArticles((prev) => prev.map((a) => (a.id === row.id ? { ...a, ...patch } : a)))
+      }
     } else {
       toast.error(result.error)
     }
@@ -1157,12 +1178,16 @@ function ContentPanel() {
                           <span className="text-muted-foreground text-xs">—</span>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <Switch
-                              checked={r.status === "published"}
-                              onCheckedChange={() => handleToggleStatus(r)}
-                              aria-label={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
-                              title={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
-                            />
+                            {savingStatusKeys.has(key) ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Switch
+                                checked={r.status === "published"}
+                                onCheckedChange={() => handleToggleStatus(r)}
+                                aria-label={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
+                                title={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
+                              />
+                            )}
                             {r.syncStatus?.ok === false && (
                               <Tooltip>
                                 <TooltipTrigger asChild>

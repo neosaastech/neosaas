@@ -67,6 +67,11 @@ export async function buildPageMetadata({
     title: titleField,
     description,
     alternates: { languages },
+    // Synced from Payload's plugin-seo meta.noIndex/noFollow (Charles,
+    // 2026-07-13) — the admin editor's toggle had no effect on the actual
+    // page before this; index/follow default true when unset, matching
+    // every search engine's own default.
+    robots: { index: !seoRow?.noIndex, follow: !seoRow?.noFollow },
     openGraph: {
       title,
       description,
