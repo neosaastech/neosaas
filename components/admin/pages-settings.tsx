@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   DropdownMenu,
@@ -29,13 +28,12 @@ import {
   FolderTree,
   AlertTriangle,
   FileText,
-  Image as ImageIcon,
+  House,
   Search,
   Settings,
   CheckSquare,
   Eye,
   EyeOff,
-  Download,
   ExternalLink,
   Trash,
   SlidersHorizontal,
@@ -79,13 +77,17 @@ import type {
   PayloadBlogPostDoc,
   PayloadCategorySummary,
   PayloadSyncStatus,
+  PageWriteInput,
+  BlogPostWriteInput,
+  CategoryWriteInput,
 } from "@/lib/payload-bridge"
 import { ContentSheet } from "./content/content-sheet"
 import { PageEditor } from "./content/page-editor"
 import { ArticleEditor } from "./content/article-editor"
 import { MediaPickerField } from "./content/media-picker-field"
-import { MediaGallery } from "./content/media-gallery"
 import { RichTextEditor } from "./content/rich-text-editor"
+import { ContentImportExportBar } from "./content/content-import-export-bar"
+import { downloadJson, parseCsv, scopeRefToId } from "@/lib/admin/content-io"
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100]
 // Fetched once per locale/type filter, then searched/sorted/paginated
@@ -112,49 +114,35 @@ const FETCH_ALL_LIMIT = 200
  * s'inspirer de la page produits") — brought over from /admin/products:
  * search, sortable headers, column visibility toggle, row selection with
  * bulk publish/unpublish/delete, and inline click-to-edit on the title.
- * Left out on purpose (not asked for, no clear content equivalent): CSV
- * import/export, the ID column, date-range filters.
+ * Left out on purpose (not asked for, no clear content equivalent):
+ * date-range filters.
+ *
+ * Export/Import (2026-07-15, Charles: "on doit être capable de uploader ou
+ * downloader les contenus... en csv ou json") — CSV stays a flat summary
+ * (title/status, safe to bulk-edit and re-import); JSON carries the full
+ * doc (layout blocks, SEO...) for real backup/restore/migration. Categories
+ * have no draft/publish concept, so CSV import only touches pages/articles.
  */
 export function ContentHub() {
   return (
     // No TooltipProvider wraps the admin layout anywhere above this —
     // Radix's Tooltip.Root throws without one. The pre-existing sync-status
     // warning icon never hit this because its condition (syncStatus.ok ===
-    // false) was never true in practice; the new per-row publish/unpublish
+    // false) was never true in practice; the per-row publish/unpublish
     // toggle below renders unconditionally and surfaced it immediately
     // (confirmed live 2026-07-09: `Tooltip must be used within TooltipProvider`).
+    //
+    // Media used to live in a "Media" tab here (Charles, 2026-07-11) — moved
+    // to its own admin page (/admin/pages?type=media, see
+    // app/(private)/admin/pages/page.tsx) alongside Header/Footer, same
+    // pattern as the sidebar's Content sub-links (Charles, 2026-07-14: "sa
+    // propre page au lieu d'un onglet en sous menu de content"). Only one
+    // tab left, so the Tabs wrapper is gone too.
     <TooltipProvider>
-      <Tabs defaultValue="content" className="space-y-4">
-        {/* Charles (2026-07-11): "ils méritent deux onglets qui bordent toute
-            la page de la même manière que les onglets parameters pour l'UX
-            design. on garde les repères iconographiques." Same structure as
-            /admin/settings's TabsList (w-full grid + brand active state),
-            icons kept unlike Parameters (which has none) — explicit choice. */}
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="content" className="data-[state=active]:bg-brand data-[state=active]:text-white">
-            <Layers className="h-3.5 w-3.5" /> Content
-          </TabsTrigger>
-          <TabsTrigger value="media" className="data-[state=active]:bg-brand data-[state=active]:text-white">
-            <ImageIcon className="h-3.5 w-3.5" /> Media
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="content">
-          <ContentPanel />
-        </TabsContent>
-        <TabsContent value="media">
-          <MediaGallery />
-        </TabsContent>
-      </Tabs>
+      <ContentPanel />
     </TooltipProvider>
   )
 }
-
-// Payload's Media collection is still the single source of truth (same as
-// every other content type here) — MediaGallery (./content/media-gallery)
-// now reads/writes it directly through payload-bridge.ts instead of only
-// linking out to Payload's own admin (Charles, 2026-07-11: "j'ai un lien
-// direct vers payload. c'est pas génial. je dois avoir les mêmes
-// fonctionnalités de neosaas app depuis l'ui").
 
 type SortDirection = "asc" | "desc"
 
@@ -230,6 +218,9 @@ function ColumnResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent
   )
 }
 
+const LOCALE_LABELS: Record<string, string> = { fr: "Français", en: "English" }
+const LOCALE_FLAGS: Record<string, string> = { fr: "🇫🇷", en: "🇬🇧" }
+
 const CONTENT_HUB_COLUMN_WIDTHS_KEY = "content-hub-column-widths"
 const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   title: 220,
@@ -237,6 +228,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   path: 180,
   category: 140,
   parent: 160,
+  author: 140,
   status: 110,
   created: 110,
   updated: 110,
@@ -319,6 +311,21 @@ interface ContentRow {
   createdAt?: string | null
   updatedAt?: string | null
   syncStatus?: PayloadSyncStatus | null
+  // Charles (2026-07-15): "un bouton cliquable qui détermine une page comme
+  // page d'accueil de sa langue" — read-only display, Payload's own admin
+  // is the only place this is editable (payload-cms Pages.homeForLocale).
+  homeForLocale?: "" | "fr" | "en" | null
+  // Only populated in "all languages" mode (locale === "all") — which
+  // locales this page/article actually has real (non-fallback) content in,
+  // used to render one flag per language instead of just the currently
+  // selected one. In single-locale mode this is just [locale] (every
+  // visible row is already filtered down to real content in that language).
+  translatedLocales?: string[]
+  // Charles (2026-07-15): "par utilisateur (qui lui a perdu sa colonne)" —
+  // the old per-kind tabs had an Author column, dropped when Pages/Articles/
+  // Categories merged into one table. Categories have no author field.
+  authorId?: string | number | null
+  authorName?: string | null
 }
 
 const CONTENT_TYPE_OPTIONS = [
@@ -388,11 +395,35 @@ function ContentPanel() {
   const [allArticles, setAllArticles] = useState<PayloadBlogPostSummary[]>([])
   const [categories, setCategories] = useState<PayloadCategorySummary[]>([])
   const [typeFilter, setTypeFilter] = useState<string>("all")
+  // "all" is a display mode, not a real Payload locale — see load()'s
+  // special-cased fetch below (fr+en merged) and editingLocale (which
+  // locale the editor sheet actually opens on, since "all" itself can't be
+  // passed to getContentPage).
   const [locale, setLocale] = useState<string>("fr")
+  const [editingLocale, setEditingLocale] = useState<string>("fr")
+  // Keyed by rowKey(kind, id) — which locales have real content, only
+  // populated when locale === "all" (see load()).
+  const [translatedLocalesByKey, setTranslatedLocalesByKey] = useState<Record<string, string[]>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [search, setSearch] = useState("")
+  const [authorFilter, setAuthorFilter] = useState<string>("all")
+  const [startDateFilter, setStartDateFilter] = useState("")
+  const [endDateFilter, setEndDateFilter] = useState("")
+  // Same pattern as /admin/products (Charles, 2026-07-15: "c'est plus
+  // logique" — Columns/Export/Import together, filters below) — Title is
+  // always shown (required, matches Products keeping Title non-toggleable).
+  const [visibleColumns, setVisibleColumns] = useState({
+    category: true,
+    parent: true,
+    author: true,
+    created: true,
+    updated: true,
+  })
+  const toggleColumn = (column: keyof typeof visibleColumns) => {
+    setVisibleColumns((prev) => ({ ...prev, [column]: !prev[column] }))
+  }
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
@@ -406,6 +437,7 @@ function ContentPanel() {
   // entrainer un reload de la page, mais juste de la ligne") of calling
   // load() and flipping the whole table to its loading state.
   const [savingStatusKeys, setSavingStatusKeys] = useState<Set<string>>(new Set())
+  const [savingHomeKeys, setSavingHomeKeys] = useState<Set<string>>(new Set())
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [creatingKind, setCreatingKind] = useState<ContentKind | null>(null)
@@ -427,21 +459,77 @@ function ContentPanel() {
   // sequences) — every selection/lookup below keys off this, never the
   // bare id.
   const rowKey = (kind: ContentKind, id: string | number) => `${kind}:${id}`
+  // "all" is a display mode, not a real Payload locale (see load()) — every
+  // inline table action (title edit, publish toggle, home toggle) needs one
+  // real locale to save against; defaults to fr, matching this table's
+  // pre-existing default everywhere else.
+  const saveLocale = locale === "all" ? "fr" : locale
 
   useEffect(() => {
-    getContentCategories(locale).then((result) => {
+    // Categories aren't localized (out of scope, see payload-cms's
+    // Categories.ts) — "all" isn't a real Payload locale, fetch fr always.
+    getContentCategories(locale === "all" ? "fr" : locale).then((result) => {
       if (result.success) setCategories(result.data)
     })
   }, [locale])
 
+  // Merges the fr and en fetch of the same collection into one row per id —
+  // Payload's list always returns every doc regardless of locale (fallback
+  // disabled per-request, see lib/payload-bridge.ts), just with `title`
+  // empty when that locale has no real content — so both arrays already
+  // share the same ids. Picks fr's fields as the display source when
+  // translated, else falls back to en's, and records which locale(s) are
+  // real for the flag column.
+  function mergeLocales<T extends { id: string | number; title: string }>(
+    frDocs: T[],
+    enDocs: T[],
+  ): { doc: T; locales: string[] }[] {
+    const enById = new Map(enDocs.map((d) => [String(d.id), d]))
+    return frDocs.map((frDoc) => {
+      const enDoc = enById.get(String(frDoc.id))
+      const locales: string[] = []
+      if (frDoc.title) locales.push("fr")
+      if (enDoc?.title) locales.push("en")
+      return { doc: frDoc.title ? frDoc : (enDoc ?? frDoc), locales }
+    })
+  }
+
   async function load() {
     setIsLoading(true)
+    if (locale === "all") {
+      const [pagesFr, pagesEn, articlesFr, articlesEn] = await Promise.all([
+        getContentPages({ limit: FETCH_ALL_LIMIT, locale: "fr" }),
+        getContentPages({ limit: FETCH_ALL_LIMIT, locale: "en" }),
+        getContentArticles({ limit: FETCH_ALL_LIMIT, locale: "fr" }),
+        getContentArticles({ limit: FETCH_ALL_LIMIT, locale: "en" }),
+      ])
+      const localesByKey: Record<string, string[]> = {}
+      if (pagesFr.success && pagesEn.success) {
+        const merged = mergeLocales(pagesFr.data.docs, pagesEn.data.docs)
+        setAllPages(merged.map((m) => m.doc))
+        merged.forEach((m) => (localesByKey[rowKey("page", m.doc.id)] = m.locales))
+      }
+      if (articlesFr.success && articlesEn.success) {
+        const merged = mergeLocales(articlesFr.data.docs, articlesEn.data.docs)
+        setAllArticles(merged.map((m) => m.doc))
+        merged.forEach((m) => (localesByKey[rowKey("article", m.doc.id)] = m.locales))
+      }
+      setTranslatedLocalesByKey(localesByKey)
+      setError(
+        !pagesFr.success ? pagesFr.error : !pagesEn.success ? pagesEn.error
+        : !articlesFr.success ? articlesFr.error : !articlesEn.success ? articlesEn.error : null,
+      )
+      setIsLoading(false)
+      return
+    }
+
     const [pagesResult, articlesResult] = await Promise.all([
       getContentPages({ limit: FETCH_ALL_LIMIT, locale }),
       getContentArticles({ limit: FETCH_ALL_LIMIT, locale }),
     ])
     if (pagesResult.success) setAllPages(pagesResult.data.docs)
     if (articlesResult.success) setAllArticles(articlesResult.data.docs)
+    setTranslatedLocalesByKey({})
     setError(!pagesResult.success ? pagesResult.error : !articlesResult.success ? articlesResult.error : null)
     setIsLoading(false)
   }
@@ -454,7 +542,7 @@ function ContentPanel() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, itemsPerPage, sortField, sortDirection, typeFilter])
+  }, [search, itemsPerPage, sortField, sortDirection, typeFilter, authorFilter, startDateFilter, endDateFilter])
 
   const categoryName = (id: string | number | { id: string | number } | null | undefined) =>
     categories.find((c) => String(c.id) === String(relationId(id)))?.path
@@ -473,6 +561,10 @@ function ContentPanel() {
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       syncStatus: p.syncStatus,
+      homeForLocale: p.homeForLocale,
+      translatedLocales: translatedLocalesByKey[rowKey("page", p.id)] ?? [locale],
+      authorId: p.author?.id ?? null,
+      authorName: p.author?.name ?? p.author?.email ?? null,
     }))
     const articleRows: ContentRow[] = allArticles.map((a) => ({
       kind: "article",
@@ -487,6 +579,9 @@ function ContentPanel() {
       createdAt: a.createdAt,
       updatedAt: a.updatedAt,
       syncStatus: a.syncStatus,
+      translatedLocales: translatedLocalesByKey[rowKey("article", a.id)] ?? [locale],
+      authorId: a.author?.id ?? null,
+      authorName: a.author?.name ?? a.author?.email ?? null,
     }))
     const categoryRows: ContentRow[] = categories.map((c) => ({
       kind: "category",
@@ -504,7 +599,7 @@ function ContentPanel() {
     }))
     return [...pageRows, ...articleRows, ...categoryRows]
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPages, allArticles, categories])
+  }, [allPages, allArticles, categories, translatedLocalesByKey, locale])
 
   // O(1) parent lookup for the Parent column — a page's/category's parent
   // is always the same kind (Payload's relationTo is scoped that way), so
@@ -516,13 +611,47 @@ function ContentPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allRows])
 
+  // 8 fixed columns (checkbox, locale flag, home, Title, Type, Path, Status,
+  // Actions) + however many optional columns are currently toggled on.
+  const visibleColumnCount = 8 + Object.values(visibleColumns).filter(Boolean).length
+
+  const authorOptions = useMemo(() => {
+    const byId = new Map<string, string>()
+    allRows.forEach((r) => {
+      if (r.authorId != null) byId.set(String(r.authorId), r.authorName ?? String(r.authorId))
+    })
+    return Array.from(byId, ([id, name]) => ({ id, name }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list = allRows
+    // Pages/Articles are localized (Payload's `fallback: true` normally
+    // means an untranslated one still returns with French content quietly
+    // standing in) — allPages/allArticles are fetched with fallback-locale
+    // disabled (lib/payload-bridge.ts's listPages/listBlogPosts) so `title`
+    // comes back genuinely empty here for a page/article with no real
+    // content in `locale` yet. Filtering those out is what makes switching
+    // the language selector actually change which rows show, instead of
+    // relisting the same rows with silently-French text (Charles,
+    // 2026-07-15: "quelle que soit la langue concernée, tout est affiché").
+    // Categories aren't localized — always shown regardless of `locale`.
+    let list = allRows.filter((r) => r.kind === "category" || Boolean(r.title))
     if (typeFilter !== "all") {
       list = list.filter((r) =>
         r.kind === "article" || r.kind === "category" ? r.kind === typeFilter : r.pageType === typeFilter,
       )
+    }
+    if (authorFilter !== "all") {
+      list = list.filter((r) => String(r.authorId ?? "") === authorFilter)
+    }
+    if (startDateFilter) {
+      const start = new Date(startDateFilter).getTime()
+      list = list.filter((r) => r.createdAt && new Date(r.createdAt).getTime() >= start)
+    }
+    if (endDateFilter) {
+      const end = new Date(endDateFilter).getTime() + 24 * 60 * 60 * 1000 - 1
+      list = list.filter((r) => r.createdAt && new Date(r.createdAt).getTime() <= end)
     }
     if (q) {
       list = list.filter((r) => r.title.toLowerCase().includes(q) || r.path.toLowerCase().includes(q))
@@ -537,7 +666,7 @@ function ContentPanel() {
       })
     }
     return list
-  }, [allRows, search, sortField, sortDirection, typeFilter])
+  }, [allRows, search, sortField, sortDirection, typeFilter, authorFilter, startDateFilter, endDateFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
@@ -572,6 +701,7 @@ function ContentPanel() {
   }
 
   function openCreate(kind: ContentKind, pageType = "landing") {
+    setEditingLocale(locale === "all" ? "fr" : locale)
     setCreatingKind(kind)
     setCreatingPageType(pageType)
     setEditingKind(kind)
@@ -588,7 +718,13 @@ function ContentPanel() {
     setSheetOpen(true)
   }
 
-  async function openEdit(row: ContentRow) {
+  // `targetLocale` lets a flag click in "all languages" mode (locale ===
+  // "all", not itself a real Payload locale) open the editor directly on
+  // one specific language — defaults to the outer `locale` filter, falling
+  // back to fr when that filter is "all" and no specific flag was clicked.
+  async function openEdit(row: ContentRow, targetLocale?: string) {
+    const openLocale = targetLocale ?? (locale === "all" ? "fr" : locale)
+    setEditingLocale(openLocale)
     setSheetOpen(true)
     setEditingKind(row.kind)
     setCreatingKind(null)
@@ -604,14 +740,14 @@ function ContentPanel() {
     }
     setIsLoadingDoc(true)
     if (row.kind === "page") {
-      const result = await getContentPage(row.id, locale)
+      const result = await getContentPage(row.id, openLocale)
       if (result.success) setEditingPageDoc(result.data)
       else {
         toast.error(result.error)
         setSheetOpen(false)
       }
     } else {
-      const result = await getContentArticle(row.id, locale)
+      const result = await getContentArticle(row.id, openLocale)
       if (result.success) setEditingArticleDoc(result.data)
       else {
         toast.error(result.error)
@@ -670,9 +806,9 @@ function ContentPanel() {
     }
     const result =
       row.kind === "page"
-        ? await saveContentPage(row.id, { title: title.trim() }, locale)
+        ? await saveContentPage(row.id, { title: title.trim() }, saveLocale)
         : row.kind === "article"
-          ? await saveContentArticle(row.id, { title: title.trim() }, locale)
+          ? await saveContentArticle(row.id, { title: title.trim() }, saveLocale)
           : await saveCategory(row.id, { name: title.trim(), slug: categories.find((c) => c.id === row.id)?.slug ?? "" })
     if (result.success) {
       toast.success("Title updated")
@@ -690,8 +826,8 @@ function ContentPanel() {
     setSavingStatusKeys((prev) => new Set(prev).add(key))
     const result =
       row.kind === "page"
-        ? await saveContentPage(row.id, { _status: next }, locale)
-        : await saveContentArticle(row.id, { _status: next }, locale)
+        ? await saveContentPage(row.id, { _status: next }, saveLocale)
+        : await saveContentArticle(row.id, { _status: next }, saveLocale)
     setSavingStatusKeys((prev) => {
       const next = new Set(prev)
       next.delete(key)
@@ -713,6 +849,31 @@ function ContentPanel() {
     }
   }
 
+  // Home-page-per-locale is a Pages-only field (payload-cms's
+  // Pages.homeForLocale) — articles/categories have no such concept.
+  // Toggling here writes straight through saveContentPage, same partial-PATCH
+  // path as handleToggleStatus above; Payload's own validateUniqueHomeForLocale
+  // rejects a second page claiming the same locale, surfaced as a toast.
+  async function handleToggleHome(row: ContentRow) {
+    if (row.kind !== "page") return
+    const key = rowKey(row.kind, row.id)
+    const isHome = row.homeForLocale === saveLocale
+    const next: "" | "fr" | "en" = isHome ? "" : (saveLocale as "fr" | "en")
+    setSavingHomeKeys((prev) => new Set(prev).add(key))
+    const result = await saveContentPage(row.id, { homeForLocale: next }, saveLocale)
+    setSavingHomeKeys((prev) => {
+      const nextSet = new Set(prev)
+      nextSet.delete(key)
+      return nextSet
+    })
+    if (result.success) {
+      toast.success(next ? `Set as home page (${saveLocale})` : "Removed as home page")
+      setAllPages((prev) => prev.map((p) => (p.id === row.id ? { ...p, homeForLocale: result.data.homeForLocale } : p)))
+    } else {
+      toast.error(result.error)
+    }
+  }
+
   async function handleBulkStatus(status: "published" | "draft") {
     // Categories have no publish concept — silently excluded from bulk
     // publish/unpublish, still included in bulk delete below.
@@ -722,8 +883,8 @@ function ContentPanel() {
     for (const row of rows) {
       const result =
         row.kind === "page"
-          ? await saveContentPage(row.id, { _status: status }, locale)
-          : await saveContentArticle(row.id, { _status: status }, locale)
+          ? await saveContentPage(row.id, { _status: status }, saveLocale)
+          : await saveContentArticle(row.id, { _status: status }, saveLocale)
       if (result.success) ok++
       else fail++
     }
@@ -759,8 +920,9 @@ function ContentPanel() {
       toast.error("No content to export")
       return
     }
-    const headers = ["Title", "Kind", "Type", "Path", "Category", "Parent", "Status", "Created At", "Updated At"]
+    const headers = ["ID", "Title", "Kind", "Type", "Path", "Category", "Parent", "Status", "Created At", "Updated At"]
     const rows = filtered.map((r) => [
+      `"${r.id}"`,
       `"${r.title.replace(/"/g, '""')}"`,
       r.kind,
       r.pageType ?? "",
@@ -778,6 +940,135 @@ function ContentPanel() {
     link.download = `content_export_${new Date().toISOString().split("T")[0]}.csv`
     link.click()
     toast.success(`${filtered.length} item(s) exported`)
+  }
+
+  // Full-fidelity backup/restore/migration — one {kind, doc} entry per row,
+  // doc being the real PageWriteInput/BlogPostWriteInput/CategoryWriteInput
+  // shape saveContentPage/saveContentArticle/saveCategory already accept.
+  async function handleExportJson() {
+    const targetRows = selectedIds.size > 0 ? filtered.filter((r) => selectedIds.has(rowKey(r.kind, r.id))) : filtered
+    if (targetRows.length === 0) {
+      toast.error("No content to export")
+      return
+    }
+    const entries = await Promise.all(
+      targetRows.map(async (row) => {
+        if (row.kind === "page") {
+          const result = await getContentPage(row.id, saveLocale)
+          return result.success ? { kind: "page" as const, doc: result.data } : null
+        }
+        if (row.kind === "article") {
+          const result = await getContentArticle(row.id, saveLocale)
+          return result.success ? { kind: "article" as const, doc: result.data } : null
+        }
+        const category = categories.find((c) => c.id === row.id)
+        return category ? { kind: "category" as const, doc: category } : null
+      }),
+    )
+    const valid = entries.filter((e): e is NonNullable<typeof e> => e !== null)
+    const failed = entries.length - valid.length
+    downloadJson("content_export", valid)
+    toast[failed > 0 ? "warning" : "success"](`${valid.length} item(s) exported${failed > 0 ? `, ${failed} failed` : ""}`)
+  }
+
+  async function importJsonEntries(entries: { kind: string; doc: Record<string, unknown> }[]) {
+    let ok = 0
+    let fail = 0
+    for (const entry of entries) {
+      const doc = entry.doc
+      try {
+        if (entry.kind === "page") {
+          const input: PageWriteInput = {
+            title: String(doc.title ?? ""),
+            slug: String(doc.slug ?? ""),
+            parent: scopeRefToId(doc.parent as never),
+            pageType: (doc.pageType as string) ?? "landing",
+            category: scopeRefToId(doc.category as never),
+            layout: (doc.layout as PageWriteInput["layout"]) ?? [],
+            seo: doc.seo as PageWriteInput["seo"],
+            includeSiteNameInTitle: doc.includeSiteNameInTitle as boolean | undefined,
+            scheduledPublishAt: doc.scheduledPublishAt as string | null | undefined,
+            scheduledUnpublishAt: doc.scheduledUnpublishAt as string | null | undefined,
+            homeForLocale: doc.homeForLocale as PageWriteInput["homeForLocale"],
+            _status: (doc._status as "draft" | "published") ?? "draft",
+          }
+          const result = await saveContentPage((doc.id as string | number) ?? null, input, saveLocale)
+          result.success ? ok++ : fail++
+        } else if (entry.kind === "article") {
+          const input: BlogPostWriteInput = {
+            title: String(doc.title ?? ""),
+            slug: String(doc.slug ?? ""),
+            category: scopeRefToId(doc.category as never),
+            excerpt: doc.excerpt as string | undefined,
+            body: doc.body,
+            publishedAt: doc.publishedAt as string | null | undefined,
+            seo: doc.seo as BlogPostWriteInput["seo"],
+            includeSiteNameInTitle: doc.includeSiteNameInTitle as boolean | undefined,
+            scheduledPublishAt: doc.scheduledPublishAt as string | null | undefined,
+            scheduledUnpublishAt: doc.scheduledUnpublishAt as string | null | undefined,
+            _status: (doc._status as "draft" | "published") ?? "draft",
+          } as BlogPostWriteInput
+          const result = await saveContentArticle((doc.id as string | number) ?? null, input, saveLocale)
+          result.success ? ok++ : fail++
+        } else if (entry.kind === "category") {
+          const input: CategoryWriteInput = {
+            name: String(doc.name ?? ""),
+            slug: String(doc.slug ?? ""),
+            parent: scopeRefToId(doc.parent as never),
+            description: doc.description,
+            headerImage: doc.headerImage as string | null | undefined,
+          }
+          const result = await saveCategory((doc.id as string | number) ?? null, input)
+          result.success ? ok++ : fail++
+        } else {
+          fail++
+        }
+      } catch {
+        fail++
+      }
+    }
+    return { ok, fail }
+  }
+
+  // CSV import stays deliberately narrow — title/status only, matched by ID
+  // + Kind (both present since the CSV export above added them), and only
+  // for pages/articles (categories have no _status to bulk-toggle). Full
+  // content restructuring (layout blocks, SEO...) goes through JSON import.
+  async function importCsvRows(text: string) {
+    const [header, ...rows] = parseCsv(text)
+    const idIdx = header.indexOf("ID")
+    const kindIdx = header.indexOf("Kind")
+    const titleIdx = header.indexOf("Title")
+    const statusIdx = header.indexOf("Status")
+    if (idIdx === -1 || kindIdx === -1) {
+      throw new Error("CSV must include ID and Kind columns (use the Export CSV button as a starting point)")
+    }
+    let ok = 0
+    let fail = 0
+    for (const row of rows) {
+      const id = row[idIdx]
+      const kind = row[kindIdx]
+      if (!id || kind === "category") continue
+      const input: Partial<PageWriteInput | BlogPostWriteInput> = {}
+      if (titleIdx !== -1 && row[titleIdx]) input.title = row[titleIdx]
+      if (statusIdx !== -1 && (row[statusIdx] === "draft" || row[statusIdx] === "published")) {
+        input._status = row[statusIdx] as "draft" | "published"
+      }
+      const result = kind === "page" ? await saveContentPage(id, input, saveLocale) : await saveContentArticle(id, input, saveLocale)
+      result.success ? ok++ : fail++
+    }
+    return { ok, fail }
+  }
+
+  async function handleImportFile(file: File) {
+    const isJson = file.name.toLowerCase().endsWith(".json")
+    try {
+      const { ok, fail } = isJson ? await importJsonEntries(JSON.parse(await file.text())) : await importCsvRows(await file.text())
+      toast[fail > 0 ? "warning" : "success"](`${ok} item(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
+      load()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Import failed")
+    }
   }
 
   const sheetTitle = creatingKind
@@ -806,10 +1097,6 @@ function ContentPanel() {
             <Layers className="h-5 w-5 text-brand" />
             Content
           </CardTitle>
-          <CardDescription>
-            Pages, articles, and categories authored centrally, editable directly here — live from Payload. Note:
-            /pricing and /legal stay hardcoded (business/payment logic) and can never be driven from here.
-          </CardDescription>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
@@ -833,9 +1120,38 @@ function ContentPanel() {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button size="sm" variant="outline" onClick={handleExportCSV}>
-            <Download className="h-3.5 w-3.5" /> Export CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Settings className="h-3.5 w-3.5" /> Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5 text-sm font-semibold">Visible Columns</div>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem checked={visibleColumns.category} onCheckedChange={() => toggleColumn("category")}>
+                Category
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={visibleColumns.parent} onCheckedChange={() => toggleColumn("parent")}>
+                Parent
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={visibleColumns.author} onCheckedChange={() => toggleColumn("author")}>
+                Author
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={visibleColumns.created} onCheckedChange={() => toggleColumn("created")}>
+                Created Date
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem checked={visibleColumns.updated} onCheckedChange={() => toggleColumn("updated")}>
+                Updated Date
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ContentImportExportBar
+            onExportJson={handleExportJson}
+            onExportCsv={handleExportCSV}
+            onImportFile={handleImportFile}
+            importAccept=".json,.csv"
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm">
@@ -889,7 +1205,7 @@ function ContentPanel() {
               Filters
             </Button>
           </div>
-          <div className="hidden gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          <div className="hidden gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -919,8 +1235,38 @@ function ContentPanel() {
               <SelectContent>
                 <SelectItem value="fr">🇫🇷 Français</SelectItem>
                 <SelectItem value="en">🇬🇧 English</SelectItem>
+                <SelectItem value="all">🌐 Toutes les langues</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={authorFilter} onValueChange={setAuthorFilter}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Author" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All authors</SelectItem>
+                {authorOptions.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2 sm:col-span-2 lg:col-span-1">
+              <Input
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="h-10 flex-1"
+                title="Created after"
+              />
+              <Input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="h-10 flex-1"
+                title="Created before"
+              />
+            </div>
             <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
               <SelectTrigger className="h-10">
                 <SelectValue />
@@ -970,6 +1316,39 @@ function ContentPanel() {
                 </Select>
               </div>
               <div className="space-y-1.5">
+                <Label>Author</Label>
+                <Select value={authorFilter} onValueChange={setAuthorFilter}>
+                  <SelectTrigger className="h-12 text-base">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All authors</SelectItem>
+                    {authorOptions.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Created between</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={startDateFilter}
+                    onChange={(e) => setStartDateFilter(e.target.value)}
+                    className="h-12 flex-1 text-base"
+                  />
+                  <Input
+                    type="date"
+                    value={endDateFilter}
+                    onChange={(e) => setEndDateFilter(e.target.value)}
+                    className="h-12 flex-1 text-base"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Items per page</Label>
                 <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
                   <SelectTrigger className="h-12 text-base">
@@ -990,7 +1369,154 @@ function ContentPanel() {
             </div>
           </SheetContent>
         </Sheet>
-        <div className="rounded-md border overflow-x-auto">
+        {/* Below md, the table's ~1350px of pinned column widths forces
+            horizontal scrolling to reach Status/Actions — Charles
+            (2026-07-15): "tout doit être visible" on mobile, no
+            horizontal-scroll table. A stacked card list replaces it there;
+            the table (with its column resize/sort UX) stays for md: and up. */}
+        <div className="space-y-2 md:hidden">
+          {isLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Loading content...</p>
+          ) : paginated.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {search ? "No results for this search." : "No content yet."}
+            </p>
+          ) : (
+            paginated.map((r) => {
+              const key = rowKey(r.kind, r.id)
+              const typeKey = r.kind === "article" || r.kind === "category" ? r.kind : (r.pageType ?? "landing")
+              const parentRow = r.parentId != null ? rowsByKey.get(rowKey(r.kind, r.parentId)) : undefined
+              return (
+                <div key={key} className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      checked={selectedIds.has(key)}
+                      onCheckedChange={() => toggleSelect(key)}
+                      aria-label={`Select ${r.title}`}
+                      className="mt-1 shrink-0"
+                    />
+                    {r.kind === "category" ? (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted">
+                        <FolderTree className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    ) : locale === "all" ? (
+                      <div className="flex shrink-0 gap-0.5">
+                        {(["fr", "en"] as const).map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => openEdit(r, loc)}
+                            title={r.translatedLocales?.includes(loc) ? `Edit ${LOCALE_LABELS[loc]} content` : `Not translated yet — add ${LOCALE_LABELS[loc]} content`}
+                            className={`flex h-9 w-4 items-center justify-center rounded-md border text-sm ${
+                              r.translatedLocales?.includes(loc) ? "bg-muted" : "bg-transparent opacity-30"
+                            }`}
+                          >
+                            {LOCALE_FLAGS[loc]}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted text-base" title={`${LOCALE_LABELS[locale] ?? locale} content`}>
+                        {LOCALE_FLAGS[locale] ?? "🌐"}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{r.title}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <Badge variant="outline" className={TYPE_BADGE_STYLES[typeKey]}>
+                          {r.kind === "article" || r.kind === "category"
+                            ? r.kind
+                            : (CONTENT_TYPE_OPTIONS.find((o) => o.value === (r.pageType ?? "landing"))?.label ?? r.pageType)}
+                        </Badge>
+                        {r.categoryName && (
+                          <Badge variant="outline" className="max-w-full truncate">
+                            {r.categoryName}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(r)}
+                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(r)}
+                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Delete"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="truncate pl-11 font-mono text-xs">
+                    {r.status === "published" ? (
+                      <a
+                        href={`/${r.translatedLocales?.[0] ?? saveLocale}${r.path}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        {r.path}
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">{r.path} (draft)</span>
+                    )}
+                  </div>
+
+                  {parentRow && (
+                    <div className="pl-11 text-xs text-muted-foreground">
+                      Parent:{" "}
+                      <button type="button" onClick={() => openEdit(parentRow)} className="text-primary hover:underline">
+                        {parentRow.title}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pl-11 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      {r.kind !== "category" && (
+                        <div className="flex items-center gap-1.5">
+                          {savingStatusKeys.has(key) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Switch
+                              checked={r.status === "published"}
+                              onCheckedChange={() => handleToggleStatus(r)}
+                              aria-label={r.status === "published" ? "Published - click to unpublish" : "Draft - click to publish"}
+                            />
+                          )}
+                          {r.syncStatus?.ok === false && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs">{r.syncStatus.message ?? "Sync to the site failed."}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span>{r.updatedAt ? `Updated ${new Date(r.updatedAt).toLocaleDateString()}` : ""}</span>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <div className="hidden rounded-md border overflow-x-auto md:block">
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
@@ -1002,6 +1528,9 @@ function ContentPanel() {
                   />
                 </TableHead>
                 <TableHead className="w-[56px]"></TableHead>
+                <TableHead className="w-[56px]" title="Home page for the selected language">
+                  <House className="h-3.5 w-3.5 text-muted-foreground" />
+                </TableHead>
                 <SortableHeader
                   field="title"
                   sortField={sortField}
@@ -1025,12 +1554,21 @@ function ContentPanel() {
                 >
                   Path
                 </SortableHeader>
-                <ResizableHead width={colWidths.category} onResizeStart={startResize("category")}>
-                  Category
-                </ResizableHead>
-                <ResizableHead width={colWidths.parent} onResizeStart={startResize("parent")}>
-                  Parent
-                </ResizableHead>
+                {visibleColumns.category && (
+                  <ResizableHead width={colWidths.category} onResizeStart={startResize("category")}>
+                    Category
+                  </ResizableHead>
+                )}
+                {visibleColumns.parent && (
+                  <ResizableHead width={colWidths.parent} onResizeStart={startResize("parent")}>
+                    Parent
+                  </ResizableHead>
+                )}
+                {visibleColumns.author && (
+                  <ResizableHead width={colWidths.author} onResizeStart={startResize("author")}>
+                    Author
+                  </ResizableHead>
+                )}
                 <SortableHeader
                   field="status"
                   sortField={sortField}
@@ -1041,39 +1579,43 @@ function ContentPanel() {
                 >
                   Status
                 </SortableHeader>
-                <SortableHeader
-                  field="createdAt"
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={toggleSort}
-                  width={colWidths.created}
-                  onResizeStart={startResize("created")}
-                >
-                  Created
-                </SortableHeader>
-                <SortableHeader
-                  field="updatedAt"
-                  sortField={sortField}
-                  sortDirection={sortDirection}
-                  onSort={toggleSort}
-                  width={colWidths.updated}
-                  onResizeStart={startResize("updated")}
-                >
-                  Updated
-                </SortableHeader>
+                {visibleColumns.created && (
+                  <SortableHeader
+                    field="createdAt"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={toggleSort}
+                    width={colWidths.created}
+                    onResizeStart={startResize("created")}
+                  >
+                    Created
+                  </SortableHeader>
+                )}
+                {visibleColumns.updated && (
+                  <SortableHeader
+                    field="updatedAt"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={toggleSort}
+                    width={colWidths.updated}
+                    onResizeStart={startResize("updated")}
+                  >
+                    Updated
+                  </SortableHeader>
+                )}
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="h-24 text-center">
+                  <TableCell colSpan={visibleColumnCount} className="h-24 text-center">
                     Loading content...
                   </TableCell>
                 </TableRow>
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="h-24 text-center">
+                  <TableCell colSpan={visibleColumnCount} className="h-24 text-center">
                     {search ? "No results for this search." : "No content yet."}
                   </TableCell>
                 </TableRow>
@@ -1088,15 +1630,81 @@ function ContentPanel() {
                         <Checkbox checked={selectedIds.has(key)} onCheckedChange={() => toggleSelect(key)} aria-label={`Select ${r.title}`} />
                       </TableCell>
                       <TableCell>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-md border bg-muted">
-                          {r.kind === "article" ? (
-                            <Newspaper className="h-4 w-4 text-muted-foreground" />
-                          ) : r.kind === "category" ? (
+                        {r.kind === "category" ? (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-md border bg-muted">
                             <FolderTree className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
+                          </div>
+                        ) : locale === "all" ? (
+                          <div className="flex gap-1">
+                            {(["fr", "en"] as const).map((loc) => {
+                              const isTranslated = r.translatedLocales?.includes(loc)
+                              return (
+                                <Tooltip key={loc}>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => openEdit(r, loc)}
+                                      className={`flex h-9 w-9 items-center justify-center rounded-md border text-base transition-colors ${
+                                        isTranslated ? "bg-muted" : "bg-transparent opacity-30 hover:opacity-60"
+                                      }`}
+                                    >
+                                      {LOCALE_FLAGS[loc]}
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>
+                                      {isTranslated
+                                        ? `Edit ${LOCALE_LABELS[loc]} content`
+                                        : `Not translated yet — click to add ${LOCALE_LABELS[loc]} content`}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-md border bg-muted text-base" title={`${LOCALE_LABELS[locale] ?? locale} content`}>
+                            {LOCALE_FLAGS[locale] ?? "🌐"}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {r.kind === "page" ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleHome(r)}
+                                disabled={savingHomeKeys.has(key)}
+                                aria-label={
+                                  r.homeForLocale === saveLocale
+                                    ? `Home page for ${saveLocale} — click to unset`
+                                    : `Set as home page for ${saveLocale}`
+                                }
+                                className={`flex h-9 w-9 items-center justify-center rounded-md border transition-colors ${
+                                  r.homeForLocale === saveLocale
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "bg-muted text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                {savingHomeKeys.has(key) ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <House className="h-4 w-4" />
+                                )}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                {r.homeForLocale === saveLocale
+                                  ? `Home page for ${saveLocale} — click to unset`
+                                  : `Set as home page for ${saveLocale}`}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center" />
+                        )}
                       </TableCell>
                       <TableCell className="font-medium">
                         {editingTitleId === key ? (
@@ -1114,9 +1722,14 @@ function ContentPanel() {
                           <div
                             onClick={() => setEditingTitleId(key)}
                             title={r.title}
-                            className="cursor-pointer truncate rounded px-2 py-1 hover:bg-muted/50"
+                            className="flex items-center gap-1.5 cursor-pointer truncate rounded px-2 py-1 hover:bg-muted/50"
                           >
-                            {r.title}
+                            <span className="truncate">{r.title}</span>
+                            {r.homeForLocale && (
+                              <Badge variant="outline" className="shrink-0 gap-1 text-xs" title={`Page d'accueil (${r.homeForLocale})`}>
+                                🏠 {r.homeForLocale}
+                              </Badge>
+                            )}
                           </div>
                         )}
                       </TableCell>
@@ -1130,7 +1743,7 @@ function ContentPanel() {
                       <TableCell className="truncate font-mono text-xs">
                         {r.status === "published" ? (
                           <a
-                            href={`/${locale}${r.path}`}
+                            href={`/${r.translatedLocales?.[0] ?? saveLocale}${r.path}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
@@ -1150,29 +1763,38 @@ function ContentPanel() {
                           </Tooltip>
                         )}
                       </TableCell>
-                      <TableCell>
-                        {r.categoryName ? (
-                          <Badge variant="outline" className="max-w-full truncate">
-                            {r.categoryName}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {parentRow ? (
-                          <button
-                            type="button"
-                            onClick={() => openEdit(parentRow)}
-                            title={`Edit "${parentRow.title}"`}
-                            className="max-w-full truncate rounded px-2 py-1 text-xs text-primary hover:bg-muted/50 hover:underline"
-                          >
-                            {parentRow.title}
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
+                      {visibleColumns.category && (
+                        <TableCell>
+                          {r.categoryName ? (
+                            <Badge variant="outline" className="max-w-full truncate">
+                              {r.categoryName}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.parent && (
+                        <TableCell>
+                          {parentRow ? (
+                            <button
+                              type="button"
+                              onClick={() => openEdit(parentRow)}
+                              title={`Edit "${parentRow.title}"`}
+                              className="max-w-full truncate rounded px-2 py-1 text-xs text-primary hover:bg-muted/50 hover:underline"
+                            >
+                              {parentRow.title}
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.author && (
+                        <TableCell className="truncate text-xs text-muted-foreground" title={r.authorName ?? undefined}>
+                          {r.authorName ?? "—"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {r.kind === "category" ? (
                           <span className="text-muted-foreground text-xs">—</span>
@@ -1201,26 +1823,30 @@ function ContentPanel() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {r.createdAt ? (
-                          <>
-                            <div>{new Date(r.createdAt).toLocaleDateString()}</div>
-                            <div className="text-[10px]">{new Date(r.createdAt).toLocaleTimeString()}</div>
-                          </>
-                        ) : (
-                          <span>—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {r.updatedAt ? (
-                          <>
-                            <div>{new Date(r.updatedAt).toLocaleDateString()}</div>
-                            <div className="text-[10px]">{new Date(r.updatedAt).toLocaleTimeString()}</div>
-                          </>
-                        ) : (
-                          <span>—</span>
-                        )}
-                      </TableCell>
+                      {visibleColumns.created && (
+                        <TableCell className="text-xs text-muted-foreground">
+                          {r.createdAt ? (
+                            <>
+                              <div>{new Date(r.createdAt).toLocaleDateString()}</div>
+                              <div className="text-[10px]">{new Date(r.createdAt).toLocaleTimeString()}</div>
+                            </>
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </TableCell>
+                      )}
+                      {visibleColumns.updated && (
+                        <TableCell className="text-xs text-muted-foreground">
+                          {r.updatedAt ? (
+                            <>
+                              <div>{new Date(r.updatedAt).toLocaleDateString()}</div>
+                              <div className="text-[10px]">{new Date(r.updatedAt).toLocaleTimeString()}</div>
+                            </>
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex items-center justify-center gap-1">
                           <Button
@@ -1259,7 +1885,7 @@ function ContentPanel() {
         ) : editingKind === "article" ? (
           <ArticleEditor
             article={editingArticleDoc}
-            locale={locale}
+            locale={editingLocale}
             onSaved={() => {
               setSheetOpen(false)
               load()
@@ -1285,7 +1911,7 @@ function ContentPanel() {
         ) : (
           <PageEditor
             page={editingPageDoc}
-            locale={locale}
+            locale={editingLocale}
             initialPageType={creatingPageType}
             onSaved={() => {
               setSheetOpen(false)

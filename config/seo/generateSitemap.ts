@@ -33,17 +33,21 @@ export async function generateSitemapXml() {
 
   const staticPaths = ["/pricing"]
 
-  const pages: SitemapUrl[] = [
-    {
-      loc: `${siteUrl}/`,
-      changefreq: "weekly",
-      priority: 1.0,
-      images: [
-        { loc: `${siteUrl}/public/clean-data-overview.png`, title: "Overview Clean Data" },
-        { loc: `${siteUrl}/public/dashboard.jpg`, title: "Dashboard Screenshot" },
-      ],
-    },
-  ]
+  // Charles (2026-07-15): "un bouton cliquable qui détermine une page comme
+  // page d'accueil de sa langue" — a locale's homepage can now be a
+  // genuinely different Page (different internal pagePath) than another
+  // locale's (page_seo.isHomepage, synced from Payload's Pages.homeForLocale).
+  // The sitemap keeps exposing a clean canonical `/{locale}/` URL regardless
+  // of which internal path actually backs it.
+  const pages: SitemapUrl[] = LOCALES.map((locale) => ({
+    loc: `${siteUrl}/${locale}/`,
+    changefreq: "weekly",
+    priority: 1.0,
+    images: [
+      { loc: `${siteUrl}/public/clean-data-overview.png`, title: "Overview Clean Data" },
+      { loc: `${siteUrl}/public/dashboard.jpg`, title: "Dashboard Screenshot" },
+    ],
+  }))
 
   for (const locale of LOCALES) {
     for (const staticPath of staticPaths) {
@@ -58,15 +62,16 @@ export async function generateSitemapXml() {
   // CMS-authored pages (Payload -> page_seo), one entry per locale that's
   // actually active and not flagged noIndex.
   const cmsPages = await db
-    .select({ pagePath: pageSeo.pagePath, locale: pageSeo.locale })
+    .select({ pagePath: pageSeo.pagePath, locale: pageSeo.locale, isHomepage: pageSeo.isHomepage })
     .from(pageSeo)
     .where(and(eq(pageSeo.isActive, true), eq(pageSeo.noIndex, false)))
 
   for (const page of cmsPages) {
-    // "/" is already the hardcoded first entry above (with its own image
-    // set) and "/pricing" is a static route — both would otherwise appear
-    // twice, once here and once above.
-    if (page.pagePath === "/" || staticPaths.includes(page.pagePath)) continue
+    // Whichever page is this locale's homepage is already covered by the
+    // canonical `/{locale}/` entry above (its own internal pagePath may not
+    // even be "/" anymore) — and "/pricing" is a static route — both would
+    // otherwise appear twice, once here and once above.
+    if (page.isHomepage || staticPaths.includes(page.pagePath)) continue
     pages.push({
       loc: `${siteUrl}/${page.locale}${page.pagePath}`,
       changefreq: "monthly",

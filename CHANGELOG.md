@@ -1,3 +1,51 @@
+## [1.11.0](https://github.com/neosaastech/Neosaas-app/compare/v1.10.2...v1.11.0) (2026-07-15)
+
+### Features
+
+* **admin:** "All languages" mode in Content Hub — clickable per-language flags ([c139889](https://github.com/neosaastech/Neosaas-app/commit/c1398891b190589e31659a1b11f0c2ccb73bb9e5))
+* **admin:** Content Hub toolbar/filters to match Products — Columns, Author, date range ([fbfeded](https://github.com/neosaastech/Neosaas-app/commit/fbfeded6ac0b7db2305fd89686338dbd8c24a067))
+* **admin:** Content parity — Media as its own page, Header/Footer table ([0165b64](https://github.com/neosaastech/Neosaas-app/commit/0165b64874b7e0df8383c679006ab542c6eb63eb))
+* **admin:** CSV/JSON export & import for Pages, Header, Footer, Modules ([9a04c2d](https://github.com/neosaastech/Neosaas-app/commit/9a04c2dee693d25ff3f0e7b5a2ff3427d7ac4174))
+* **admin:** Header/Footer automatisms — real social links, Footer ([72df9d5](https://github.com/neosaastech/Neosaas-app/commit/72df9d5388546a9ec8b6a22d0552dbf009cd299d))
+* **admin:** locale picker on Header/Footer/Modules, responsive preview, homepage badge ([0177adb](https://github.com/neosaastech/Neosaas-app/commit/0177adbd3f5a74e00dd698c64fe3f98f95ebc9b6))
+* **admin:** upload media directly from the page editor's media picker ([9adc6cd](https://github.com/neosaastech/Neosaas-app/commit/9adc6cd6b09dda8aaf791b158c80e679ba9ce2a0))
+* **footer:** configurable tagline under the logo (was hardcoded) ([19b44f2](https://github.com/neosaastech/Neosaas-app/commit/19b44f212de05d6923ffe39460198151b32f1785))
+* **footer:** distinct mobile content (tagline/copyright/modules) ([4293202](https://github.com/neosaastech/Neosaas-app/commit/429320288c903339ace681e3748e15c9ca4c4ed2))
+* **footer:** replace fixed columns/formModule with an optional modules choice ([96bdc95](https://github.com/neosaastech/Neosaas-app/commit/96bdc95f2878846635c2e9b55d0db8f5c5d3223c))
+* **footer:** reuse shared merge-tag system instead of {{year}}-only hack ([dd51a6e](https://github.com/neosaastech/Neosaas-app/commit/dd51a6e691c44f63a0b5518407f193b43dbff39a))
+* **header-footer-modules:** locale dimension (read side) ([65e0b70](https://github.com/neosaastech/Neosaas-app/commit/65e0b707ac80eadf63acaaa4590d2252368a7f80))
+* **header-footer:** scoped Header/Footer resolution, admin editors, Content nav group ([338897c](https://github.com/neosaastech/Neosaas-app/commit/338897c34c7daf9ec6f563ce8b451765ba361292))
+* **header:** brand/logo control, configurable social links, UI toggles, category links, auto-label ([fd90135](https://github.com/neosaastech/Neosaas-app/commit/fd9013539518528668e5050b1987aa64b54babb5))
+* **header:** draft/publish workflow, top-full-width preview, internal ([d508502](https://github.com/neosaastech/Neosaas-app/commit/d50850231dda600b2d117b68555273016e2a8163))
+* **i18n:** per-locale homepage UI, home column, in-editor language switch, legal/cookie bilingual ([75341d8](https://github.com/neosaastech/Neosaas-app/commit/75341d8996842d11925aa89642f1a05273637cb1))
+* **modules:** admin UI — same content table norm as Pages ([a429e56](https://github.com/neosaastech/Neosaas-app/commit/a429e56cf74b4a2b2b62a290538d3b8b8d62bfdc))
+* **modules:** brand/service icons (Simple Icons via react-icons/si) ([da861ef](https://github.com/neosaastech/Neosaas-app/commit/da861ef730dc9c13386ebf40a68c40ca1ccc39a2))
+* **modules:** DB table + precedence resolver + BlockRenderer integration ([979bcd8](https://github.com/neosaastech/Neosaas-app/commit/979bcd8b0c332e41b1f4c29b2b35f2f522479059)), closes [#118](https://github.com/neosaastech/Neosaas-app/issues/118)
+* **pages:** distinct homepage per locale (page_seo.is_homepage) ([d6c4740](https://github.com/neosaastech/Neosaas-app/commit/d6c47404b0dcd9b6ff4ceb2150d7e80eed79e061))
+* **pages:** payload_page_id link column on page_seo (cross-locale association) ([bfa17ab](https://github.com/neosaastech/Neosaas-app/commit/bfa17ab73c772548611868271bbea7b18481b476))
+* **pages:** smart locale switcher + hreflang via payload_page_id association ([d83b9ce](https://github.com/neosaastech/Neosaas-app/commit/d83b9cedddfbd9a896ef9d7f3041cdeb499524a3))
+* **pages:** version history in the Settings tab (Payload's own versions, surfaced) ([a9b0fa1](https://github.com/neosaastech/Neosaas-app/commit/a9b0fa169f39f921678e228a1438f5f58108d9a9))
+* real MCP token management, MCP/API docs tab, dedicated Style page ([437bb54](https://github.com/neosaastech/Neosaas-app/commit/437bb548c818b51f0c1cbff94242f011a939f5c8))
+* **theme:** push NeoSaaS color palette back to Payload's Tenant record ([b317bc6](https://github.com/neosaastech/Neosaas-app/commit/b317bc6c2b1e9a7115058ca76a1a069a01f8e214))
+
+### Bug Fixes
+
+* **admin:** Badge's shrink-0/w-fit base styles still overflowed the block editor header ([04cb6f2](https://github.com/neosaastech/Neosaas-app/commit/04cb6f23be2df970fd7e52282f06d95cdc3be4ad))
+* **admin:** Content Hub language filter was a no-op — disable Payload fallback on list ([9a1f5b9](https://github.com/neosaastech/Neosaas-app/commit/9a1f5b93df6c1c58adddaf96db87f7fecdfff304))
+* **admin:** iframe-based responsive preview + Header merge-tag interpolation ([31063f8](https://github.com/neosaastech/Neosaas-app/commit/31063f85daedad2f65d8c432caaa11e566a471ff))
+* **admin:** move Icons & Avatars lower on Style page, drop icon overview module ([7ec23d8](https://github.com/neosaastech/Neosaas-app/commit/7ec23d89e20ab910ba8aca98494660c56b62c8dd))
+* **admin:** responsive content tables + overflowing delete icons in block editor ([a82d1a3](https://github.com/neosaastech/Neosaas-app/commit/a82d1a39ae664ef45cd128d68da24392ce7946ba))
+* **admin:** scroll new block into view — avoids the page "jumping" on add ([5a5df0f](https://github.com/neosaastech/Neosaas-app/commit/5a5df0fa764a1f2f8f423b3e0d9fefe57d5f4eec))
+* **db:** real drizzle migration for page_seo.is_homepage ([23fef80](https://github.com/neosaastech/Neosaas-app/commit/23fef803fbc55048e291ebd0ed59d9c22f864af2))
+* **footer:** render Columns modules client-safely, not via server-only ColumnsLayer ([6e935b4](https://github.com/neosaastech/Neosaas-app/commit/6e935b4e2d091bde1310167848951425bf199b2f))
+* **footer:** revert mobile content duplication, keep only hideTaglineOnMobile ([84b893c](https://github.com/neosaastech/Neosaas-app/commit/84b893c2685c88bb1396e4534e80712c83a8dc90))
+* **footer:** tagline hide toggle + dynamic {{year}} in copyright text ([f3f4630](https://github.com/neosaastech/Neosaas-app/commit/f3f46304dd4d092c2be938e1e5771cd78282fe53))
+* **header-footer:** resolve hardcoded page links (Pricing/RGPD/Terms) in live preview ([a43a55b](https://github.com/neosaastech/Neosaas-app/commit/a43a55b542397df0842a925ed339fe7e7ddf62f6))
+* **header:** never send a bare null for the cta group field ([ce7f5f0](https://github.com/neosaastech/Neosaas-app/commit/ce7f5f00d496cbe493fd55fc9212627764acdead))
+* **header:** sub-links (dropdown menu) synced but never rendered anywhere ([70c51f0](https://github.com/neosaastech/Neosaas-app/commit/70c51f0634426a5bfd5953ecefd73cac0f29a359))
+* **layout:** revert page-wide container wrapper — it clipped full-bleed block backgrounds ([d42418f](https://github.com/neosaastech/Neosaas-app/commit/d42418fc912de8c453d34d79fa3e7a7c3f3f976a))
+* **seo): homepage duplicate content; fix(admin): missing container on "/"; feat(modules:** multi-library icon picker ([b37772b](https://github.com/neosaastech/Neosaas-app/commit/b37772b34f3b965f08408f6e33eaa5168baa0de3))
+
 ## [1.10.2](https://github.com/neosaastech/Neosaas-app/compare/v1.10.1...v1.10.2) (2026-07-12)
 
 ### Bug Fixes

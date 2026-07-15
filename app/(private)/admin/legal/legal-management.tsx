@@ -64,6 +64,10 @@ export function LegalManagement({
   const [showCookieLogo, setShowCookieLogo] = useState<boolean>(initialConfig.showCookieLogo || false)
   const [cookieEnabled, setCookieEnabled] = useState<boolean>(initialConfig.cookieConsentEnabled !== false)
   const [cookieMessage, setCookieMessage] = useState<string>(initialConfig.cookieConsentMessage || "We use cookies to enhance your experience on our site. By continuing to browse, you accept our use of cookies.")
+  // Optional English variant — a custom message is free text, so it can't be
+  // auto-translated. Left empty, /en falls back to the built-in English
+  // default instead of repeating this French text (Charles, 2026-07-15).
+  const [cookieMessageEn, setCookieMessageEn] = useState<string>(initialConfig.cookieConsentMessageEn || "")
   const [cookiePosition, setCookiePosition] = useState<"bottom-left" | "bottom-right">(initialConfig.cookiePosition || "bottom-left")
   
   // Hosting Settings
@@ -88,6 +92,7 @@ export function LegalManagement({
         showLogo: showCookieLogo,
         enabled: cookieEnabled,
         message: cookieMessage,
+        messageEn: cookieMessageEn,
         position: cookiePosition
       })
       
@@ -103,7 +108,7 @@ export function LegalManagement({
     } finally {
       setIsSavingCookie(false)
     }
-  }, [showCookieLogo, cookieEnabled, cookieMessage, cookiePosition, toast])
+  }, [showCookieLogo, cookieEnabled, cookieMessage, cookieMessageEn, cookiePosition, toast])
 
   // Auto-save hosting settings with debounce
   const autoSaveHostingSettings = useCallback(async () => {
@@ -145,7 +150,7 @@ export function LegalManagement({
         clearTimeout(cookieSettingsTimerRef.current)
       }
     }
-  }, [showCookieLogo, cookieEnabled, cookieMessage, cookiePosition, autoSaveCookieSettings])
+  }, [showCookieLogo, cookieEnabled, cookieMessage, cookieMessageEn, cookiePosition, autoSaveCookieSettings])
 
   // Effect for auto-saving hosting settings
   useEffect(() => {
@@ -347,7 +352,7 @@ export function LegalManagement({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="message">Consent Message</Label>
+                    <Label htmlFor="message">Consent Message (Français)</Label>
                     <Textarea
                       id="message"
                       value={cookieMessage}
@@ -357,6 +362,21 @@ export function LegalManagement({
                     />
                     <p className="text-xs text-muted-foreground">
                       Available tags: <code className="bg-muted px-1 rounded">{`{site_name}`}</code>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="message-en">Consent Message (English)</Label>
+                    <Textarea
+                      id="message-en"
+                      value={cookieMessageEn}
+                      onChange={(e) => setCookieMessageEn(e.target.value)}
+                      className="min-h-[100px]"
+                      placeholder="Leave empty to use the built-in English default..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Shown on /en instead of the French message above. Available tags:{" "}
+                      <code className="bg-muted px-1 rounded">{`{site_name}`}</code>
                     </p>
                   </div>
                 </CardContent>

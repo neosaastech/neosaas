@@ -21,7 +21,9 @@ export interface FeaturesListLayerProps {
 
 export function FeaturesListLayer({ eyebrow, title, subtitle, items, imageUrl }: FeaturesListLayerProps) {
   return (
-    <div className="mx-auto mt-16 grid gap-10 md:grid-cols-2 md:items-center">
+    // Charles (2026-07-15): same missing max-w-* bug as feature-grid-layer.tsx
+    // — every sibling layer constrains its own width, this one didn't.
+    <div className="mx-auto mt-16 max-w-5xl grid gap-10 md:grid-cols-2 md:items-center">
       <div>
         {eyebrow && <Eyebrow className="mb-2">{eyebrow}</Eyebrow>}
         {title && <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}

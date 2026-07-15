@@ -214,6 +214,27 @@ const REQUIRED_COLUMNS = [
     column: 'tax_amount',
     sql: `ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "tax_amount" integer`,
   },
+  // ── Page d'accueil distincte par langue (Charles, 2026-07-15) ─────────────
+  {
+    table: 'page_seo',
+    column: 'is_homepage',
+    sql: `ALTER TABLE "page_seo" ADD COLUMN IF NOT EXISTS "is_homepage" boolean DEFAULT false NOT NULL`,
+  },
+]
+
+// Indexes that must exist — CREATE [UNIQUE] INDEX IF NOT EXISTS only, safe
+// to re-run every deploy. Add new entries when schema.ts gains an index that
+// isn't a simple ADD COLUMN (partial/compound indexes, etc.).
+const REQUIRED_INDEXES = [
+  {
+    name: 'page_seo_homepage_unique',
+    // Partial unique index — db/schema.ts's homepageUnique. Closes the race
+    // validateUniqueHomeForLocale (payload-cms) can't fully prevent on its
+    // own (check-then-act, no transactional isolation): a second sync
+    // attempt that would create a duplicate "home" for one locale fails
+    // loudly here instead of silently leaving two homepages for a locale.
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS "page_seo_homepage_unique" ON "page_seo" ("locale") WHERE "is_homepage" = true`,
+  },
 ]
 
 async function main() {
@@ -286,6 +307,17 @@ async function main() {
     console.log(`✅ Added ${added} missing column(s), ${skipped} already existed`)
   } else {
     console.log(`✅ All ${skipped} columns already exist`)
+  }
+
+  // ── Step 3: Ensure required indexes exist ─────────────────────────────────
+  console.log('🔍 Ensuring critical database indexes exist...')
+  for (const idx of REQUIRED_INDEXES) {
+    try {
+      await sql.unsafe(idx.sql)
+      console.log(`  ✅ Ensured index ${idx.name}`)
+    } catch (e: unknown) {
+      console.error(`  ❌ Error on index ${idx.name}: ${(e as Error)?.message}`)
+    }
   }
 }
 

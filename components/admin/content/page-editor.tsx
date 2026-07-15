@@ -8,14 +8,22 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Globe } from "lucide-react"
+import { Globe, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { saveContentPage, getContentCategories, getContentPages } from "@/app/actions/pages"
-import type { PayloadPageDoc, PayloadPageBlock, PayloadCategorySummary, PayloadPageSummary } from "@/lib/payload-bridge"
+import {
+  saveContentPage,
+  getContentPage,
+  getContentCategories,
+  getContentPages,
+  getContentPageVersions,
+  restoreContentPageVersion,
+} from "@/app/actions/pages"
+import type { PayloadPageDoc, PayloadPageBlock, PayloadCategorySummary, PayloadPageSummary, PayloadPageVersion } from "@/lib/payload-bridge"
 import { BlockEditor } from "./block-editor"
 import { BlockPickerDialog } from "./block-picker-dialog"
 import { BlockPreview } from "./block-preview"
+import { ResponsivePreviewFrame } from "./responsive-preview-frame"
 import { TemplateVariablesHint } from "./template-variables-hint"
 import { Badge } from "@/components/ui/badge"
 import { SeoLengthIndicator } from "./seo-length-indicator"
@@ -36,6 +44,7 @@ interface PageFormValues {
   includeSiteNameInTitle: boolean
   scheduledPublishAt: string
   scheduledUnpublishAt: string
+  homeForLocale: "" | "fr" | "en"
   layout: PayloadPageBlock[]
 }
 
@@ -54,8 +63,6 @@ function localInputToIso(value: string): string | undefined {
   return new Date(value).toISOString()
 }
 
-const LOCALE_LABELS: Record<string, string> = { fr: "Français", en: "English" }
-
 export function PageEditor({
   page,
   locale = "fr",
@@ -69,6 +76,14 @@ export function PageEditor({
   initialPageType?: string
 }) {
   const router = useRouter()
+  // Which language's content is currently loaded in the form below — starts
+  // at whatever the Content Hub's list filter was on, but can be switched
+  // right here without closing the editor (Charles, 2026-07-15: "mettre la
+  // fonction de type de langue à générer dans l'éditeur" — generating/
+  // editing the other language's translation of the same page/header/
+  // footer/module without leaving the sheet).
+  const [activeLocale, setActiveLocale] = useState(locale)
+  const [isSwitchingLocale, setIsSwitchingLocale] = useState(false)
   const [title, setTitle] = useState(page?.title ?? "")
   const [slug, setSlug] = useState(page?.slug ?? "")
   const [pageType, setPageType] = useState(page?.pageType ?? initialPageType ?? "")
@@ -84,6 +99,7 @@ export function PageEditor({
   const [scheduledPublishAt, setScheduledPublishAt] = useState(isoToLocalInput(page?.scheduledPublishAt))
   const [scheduledUnpublishAt, setScheduledUnpublishAt] = useState(isoToLocalInput(page?.scheduledUnpublishAt))
   const [includeSiteNameInTitle, setIncludeSiteNameInTitle] = useState(page?.includeSiteNameInTitle ?? true)
+  const [homeForLocale, setHomeForLocale] = useState<"" | "fr" | "en">(page?.homeForLocale ?? "")
   const [layout, setLayout] = useState<PayloadPageBlock[]>(page?.layout ?? [])
   const [isPublishing, setIsPublishing] = useState(false)
   // Tracks the real document status/path for the "Final path"/"View live"
@@ -101,6 +117,24 @@ export function PageEditor({
   // (see BlockEditor's defaultExpanded); anything before it was loaded
   // with the doc and starts collapsed.
   const initialBlockCountRef = useRef(page?.layout?.length ?? 0)
+  // Charles (2026-07-15): "quand j'ajoute un module dans ma page elle
+  // saute" — a newly added block starts fully expanded (defaultExpanded
+  // above) at the BOTTOM of a possibly-long block list, while the "Add
+  // block" button the user just clicked sits at the TOP — the sudden height
+  // increase far below the viewport reads as the whole page jumping/
+  // shifting with nothing visibly changing near the cursor. Scrolling the
+  // new block into view anchors that layout shift instead of leaving it
+  // to happen off-screen.
+  const justAddedIndexRef = useRef<number | null>(null)
+  // Charles (2026-07-15): "le versionning temporel qui est une realite dans
+  // payload" — Pages already produce a version snapshot on every save
+  // (versions:{drafts:true}), just never surfaced outside Payload's own
+  // separate admin. Fetched lazily (Settings tab only) rather than on every
+  // editor open, since most edits never need it.
+  const [versions, setVersions] = useState<PayloadPageVersion[]>([])
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false)
+  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null)
+  const versionsLoadedRef = useRef(false)
 
   useEffect(() => {
     getContentCategories().then((result) => {
@@ -111,8 +145,91 @@ export function PageEditor({
     })
   }, [])
 
+  // Resets every field from a freshly-fetched doc — same mapping as the
+  // useState initializers above, factored out so switching language can
+  // reload the form in place instead of only running once at mount.
+  function applyDoc(doc: PayloadPageDoc) {
+    setTitle(doc.title ?? "")
+    setSlug(doc.slug ?? "")
+    setPageType(doc.pageType ?? "")
+    setCategoryId(doc.category ? String(doc.category.id) : "")
+    setParentId(doc.parent ? String(doc.parent) : "")
+    setMetaTitle(doc.seo?.metaTitle ?? "")
+    setMetaDescription(doc.seo?.metaDescription ?? "")
+    setHeaderImage(doc.seo?.image ?? "")
+    setNoIndex(doc.seo?.noIndex ?? false)
+    setNoFollow(doc.seo?.noFollow ?? false)
+    setScheduledPublishAt(isoToLocalInput(doc.scheduledPublishAt))
+    setScheduledUnpublishAt(isoToLocalInput(doc.scheduledUnpublishAt))
+    setIncludeSiteNameInTitle(doc.includeSiteNameInTitle ?? true)
+    setHomeForLocale(doc.homeForLocale ?? "")
+    setLayout(doc.layout ?? [])
+    setDocStatus(doc._status)
+    setDocPath(doc.path)
+    setDocPublishedAt(doc.publishedAt)
+    initialBlockCountRef.current = doc.layout?.length ?? 0
+  }
+
+  async function handleLocaleChange(nextLocale: string) {
+    if (nextLocale === activeLocale || isSwitchingLocale) return
+    // Nothing saved yet — no other-language content to fetch, just switch
+    // which language new autosaves/Publish will write to.
+    if (!docIdRef.current) {
+      setActiveLocale(nextLocale)
+      return
+    }
+    setIsSwitchingLocale(true)
+    try {
+      // Autosave the in-progress draft in the CURRENT language before
+      // switching away, so edits made just before clicking aren't lost.
+      await persist("draft", formValues)
+      const result = await getContentPage(docIdRef.current, nextLocale)
+      if (!result.success) throw new Error(result.error)
+      applyDoc(result.data)
+      setActiveLocale(nextLocale)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to switch language")
+    } finally {
+      setIsSwitchingLocale(false)
+    }
+  }
+
   function addBlock(blockType: string) {
-    setLayout([...layout, { blockType }])
+    setLayout((prev) => {
+      justAddedIndexRef.current = prev.length
+      return [...prev, { blockType }]
+    })
+  }
+
+  async function loadVersions() {
+    if (!docIdRef.current) return
+    setIsLoadingVersions(true)
+    try {
+      const result = await getContentPageVersions(docIdRef.current, activeLocale)
+      if (result.success) setVersions(result.data)
+      else toast.error(result.error)
+    } finally {
+      setIsLoadingVersions(false)
+    }
+  }
+
+  // Rewrites the live doc back to a past version, then reloads the form
+  // the same way switching locale already does (applyDoc) — no separate
+  // "preview before restoring" step, matching Payload's own admin behavior.
+  async function handleRestoreVersion(version: PayloadPageVersion) {
+    if (!confirm(`Restore this page to its version from ${new Date(version.updatedAt).toLocaleString()}? This replaces the current content.`)) return
+    setRestoringVersionId(version.id)
+    try {
+      const result = await restoreContentPageVersion(version.id, activeLocale)
+      if (!result.success) throw new Error(result.error)
+      applyDoc(result.data)
+      toast.success("Version restored")
+      await loadVersions()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to restore version")
+    } finally {
+      setRestoringVersionId(null)
+    }
   }
 
   function updateBlock(index: number, next: PayloadPageBlock) {
@@ -161,9 +278,10 @@ export function PageEditor({
         includeSiteNameInTitle: values.includeSiteNameInTitle,
         scheduledPublishAt: localInputToIso(values.scheduledPublishAt) ?? null,
         scheduledUnpublishAt: localInputToIso(values.scheduledUnpublishAt) ?? null,
+        homeForLocale: values.homeForLocale,
         _status: status,
       },
-      locale,
+      activeLocale,
     )
     if (!result.success) throw new Error(result.error)
     docIdRef.current = result.data.id
@@ -187,6 +305,7 @@ export function PageEditor({
     includeSiteNameInTitle,
     scheduledPublishAt,
     scheduledUnpublishAt,
+    homeForLocale,
     layout,
   }
 
@@ -225,13 +344,30 @@ export function PageEditor({
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">{title || "New page"}</h2>
-          <Badge variant="outline" className="gap-1">
-            <Globe className="h-3 w-3" />
-            {LOCALE_LABELS[locale] ?? locale}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {isSwitchingLocale && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            <Select value={activeLocale} onValueChange={handleLocaleChange} disabled={isSwitchingLocale}>
+              <SelectTrigger className="h-8 w-[150px] gap-1">
+                <Globe className="h-3 w-3 shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fr">🇫🇷 Français</SelectItem>
+                <SelectItem value="en">🇬🇧 English</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <Tabs defaultValue="content">
+        <Tabs
+          defaultValue="content"
+          onValueChange={(tab) => {
+            if (tab === "settings" && !versionsLoadedRef.current) {
+              versionsLoadedRef.current = true
+              void loadVersions()
+            }
+          }}
+        >
           <TabsList>
             <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="seo">SEO</TabsTrigger>
@@ -265,17 +401,29 @@ export function PageEditor({
 
             <div className="flex flex-col gap-4">
               {layout.map((block, index) => (
-                <BlockEditor
+                <div
                   key={block.id ?? index}
-                  block={block}
-                  onChange={(next) => updateBlock(index, next)}
-                  onRemove={() => removeBlock(index)}
-                  onMoveUp={() => moveBlock(index, -1)}
-                  onMoveDown={() => moveBlock(index, 1)}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < layout.length - 1}
-                  defaultExpanded={index >= initialBlockCountRef.current}
-                />
+                  ref={
+                    index === justAddedIndexRef.current
+                      ? (el) => {
+                          if (!el) return
+                          el.scrollIntoView({ behavior: "smooth", block: "center" })
+                          justAddedIndexRef.current = null
+                        }
+                      : undefined
+                  }
+                >
+                  <BlockEditor
+                    block={block}
+                    onChange={(next) => updateBlock(index, next)}
+                    onRemove={() => removeBlock(index)}
+                    onMoveUp={() => moveBlock(index, -1)}
+                    onMoveDown={() => moveBlock(index, 1)}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < layout.length - 1}
+                    defaultExpanded={index >= initialBlockCountRef.current}
+                  />
+                </div>
               ))}
             </div>
 
@@ -356,7 +504,7 @@ export function PageEditor({
                     {includeSiteNameInTitle && " | Site name"}
                   </p>
                   <p className="truncate text-xs text-[#006621]">
-                    {docPath || slug ? `neosaas.tech/${locale}${docPath || `/${slug}`}` : "neosaas.tech"}
+                    {docPath || slug ? `neosaas.tech/${activeLocale}${docPath || `/${slug}`}` : "neosaas.tech"}
                   </p>
                   <p className="line-clamp-2 text-xs text-muted-foreground">
                     {metaDescription || "No description — the site will use its default description."}
@@ -389,6 +537,27 @@ export function PageEditor({
                       Shows up in the /documentation wiki sidebar. Set a Parent page below to place it in the hierarchy.
                     </p>
                   )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="page-home-for-locale">Home page for this language</Label>
+                  <Select
+                    value={homeForLocale || "none"}
+                    onValueChange={(v) => setHomeForLocale(v === "none" ? "" : (v as "fr" | "en"))}
+                  >
+                    <SelectTrigger id="page-home-for-locale">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not a home page</SelectItem>
+                      <SelectItem value="fr">🇫🇷 Home page for Français</SelectItem>
+                      <SelectItem value="en">🇬🇧 Home page for English</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Makes this page appear at &quot;/{homeForLocale || activeLocale}&quot; instead of its own path when a
+                    visitor is on that language. Only one page per language can be the home page — saving will fail
+                    with an error if another page already claims it.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="page-category">Category</Label>
@@ -475,6 +644,46 @@ export function PageEditor({
                 </div>
               </CardContent>
             </Card>
+
+            <Card shadow="flat" className="border-l-4 border-l-primary">
+              <CardHeader>
+                <CardTitle>Version history</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!docIdRef.current ? (
+                  <p className="text-sm text-muted-foreground">Save the page at least once to see its version history.</p>
+                ) : isLoadingVersions ? (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading version history…
+                  </p>
+                ) : versions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No versions found.</p>
+                ) : (
+                  <div className="flex flex-col divide-y">
+                    {versions.map((version) => (
+                      <div key={version.id} className="flex items-center justify-between gap-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{version.version.title || "Untitled"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(version.updatedAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                            {version.version._status && ` — ${version.version._status}`}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={restoringVersionId !== null}
+                          onClick={() => handleRestoreVersion(version)}
+                        >
+                          {restoringVersionId === version.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Restore"}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
@@ -493,17 +702,19 @@ export function PageEditor({
       <div className="flex flex-col gap-4">
         <TemplateVariablesHint />
         <h3 className="text-sm font-medium">Live preview</h3>
-        <div className="rounded-lg border-2 border-dashed bg-background p-6">
-          {layout.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">Add a block to see the preview.</p>
-          ) : (
-            <div className="flex flex-col">
-              {layout.map((block, index) => (
-                <BlockPreview key={block.id ?? index} block={block} />
-              ))}
-            </div>
-          )}
-        </div>
+        <ResponsivePreviewFrame>
+          <div className="rounded-lg border-2 border-dashed bg-background p-6">
+            {layout.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground">Add a block to see the preview.</p>
+            ) : (
+              <div className="flex flex-col">
+                {layout.map((block, index) => (
+                  <BlockPreview key={block.id ?? index} block={block} />
+                ))}
+              </div>
+            )}
+          </div>
+        </ResponsivePreviewFrame>
       </div>
     </div>
   )

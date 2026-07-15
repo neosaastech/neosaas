@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { pageSeo } from "@/db/schema"
 import { getPlatformConfig } from "@/lib/config"
+import { getAlternatePagePaths } from "@/app/actions/site-nav"
 import { LOCALES, type Locale } from "@/app/[locale]/layout"
 
 /**
@@ -55,12 +56,17 @@ export async function buildPageMetadata({
   // metaTitle/metaDescription already override the site-wide title/description.
   const image = seoRow?.headerImageUrl || seo.ogImage
 
-  // alternates.languages needs an absolute or root-relative URL per locale
-  // — the home page's pagePath is "/", every other page keeps its own path
-  // under each locale prefix (see app/[locale]/layout.tsx's LOCALES).
+  // alternates.languages needs an absolute or root-relative URL per locale.
+  // Pages.slug/path are now localized (real per-language URLs, Charles
+  // 2026-07-15's "lien de la page avec sa traduction") — getAlternatePagePaths
+  // returns this page's real URL in each language when the association is
+  // known (payload_page_id), falling back to the old "same pagePath under
+  // every locale prefix" assumption for pages with no association yet.
+  const alternatePaths = await getAlternatePagePaths(pagePath, locale)
   const languages: Record<string, string> = {}
   for (const l of LOCALES) {
-    languages[l] = pagePath === "/" ? `/${l}` : `/${l}${pagePath}`
+    const alternate = alternatePaths?.[l]
+    languages[l] = alternate ? (alternate === "/" ? `/${l}` : `/${l}${alternate}`) : pagePath === "/" ? `/${l}` : `/${l}${pagePath}`
   }
 
   return {

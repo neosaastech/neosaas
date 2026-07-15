@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, uuid, boolean, primaryKey, integer, jsonb, varchar, json, pgEnum, uniqueIndex } from "drizzle-orm/pg-core"
-import { relations } from "drizzle-orm"
+import { pgTable, text, timestamp, uuid, boolean, primaryKey, integer, jsonb, varchar, json, pgEnum, uniqueIndex, index } from "drizzle-orm/pg-core"
+import { relations, sql } from "drizzle-orm"
 
 // =============================================================================
 // ENUMS
@@ -894,15 +894,118 @@ export const pageSeo = pgTable("page_seo", {
   // decorative until buildPageMetadata started reading these).
   noIndex: boolean("no_index").default(false).notNull(),
   noFollow: boolean("no_follow").default(false).notNull(),
+  // Payload's Pages.category, synced by neosaas-app.ts's syncPageToNeosaasApp
+  // — nullable, most pages have no category. Feeds Category-scoped Header/
+  // Footer resolution (getHeaderConfig/getFooterConfig, app/actions/site-nav.ts)
+  // when a page has no Page-specific override of its own.
+  categoryPath: text("category_path"),
+  // Charles (2026-07-15): "un bouton cliquable qui détermine une page comme
+  // page d'accueil de sa langue" — synced from Payload's Pages.homeForLocale
+  // (compared against this row's own `locale`). The home route (app/
+  // [locale]/(public)/page.tsx) looks up `WHERE locale = X AND is_homepage`
+  // instead of hardcoding pagePath="/", so a genuinely different Page per
+  // locale can be "home". Partial unique index below closes the race
+  // Payload's own validateUniqueHomeForLocale check-then-act can't fully
+  // prevent (same trade-off already accepted for Header/Footer scoping).
+  isHomepage: boolean("is_homepage").default(false).notNull(),
+  // Charles (2026-07-15): "un lien de la page avec sa traduction" à la
+  // Joomla (Multilingual Associations) — now that Payload's Pages.slug/path
+  // are localized (real per-language URLs, no longer the same pagePath
+  // shared across fr/en), nothing connected a page's fr row to its en row
+  // once their pagePath values diverge. Payload's own doc.id is the same
+  // across every locale of one page (only certain fields are localized, not
+  // the document itself) — this is that link, synced verbatim by
+  // syncPageToNeosaasApp. Nullable: rows synced before this column existed
+  // (or a tenant not yet on a payload-cms build that sends it) have no
+  // association yet, same "not yet linked" state Joomla shows for an
+  // untranslated item — getAlternatePagePaths (app/actions/site-nav.ts)
+  // treats null the same way (falls back to the old prefix-swap behavior).
+  payloadPageId: integer("payload_page_id"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   pathLocaleUnique: uniqueIndex("page_seo_path_locale_unique").on(table.pagePath, table.locale),
+  homepageUnique: uniqueIndex("page_seo_homepage_unique").on(table.locale).where(sql`is_homepage = true`),
+  payloadPageIdIdx: index("page_seo_payload_page_id_idx").on(table.payloadPageId),
 }))
 
 export type PageSeo = typeof pageSeo.$inferSelect
 export type NewPageSeo = typeof pageSeo.$inferInsert
+
+/**
+ * Header/Footer scoped to a specific Page/Category/PageType instead of the
+ * whole site — additive to the existing platform_config('header_config'/
+ * 'footer_config') singleton, which stays untouched and now means "the
+ * tenant-wide Default". `scopeType` is 'page'|'category'|'page_type'
+ * (matches payload-cms's HeaderFooterScope, snake_cased); `scopeValue` is a
+ * Page/Category's `path` for the first two, or the raw pageType select
+ * value for the third. `config` is the same shape platform_config's
+ * header_config/footer_config rows already carry — resolution precedence
+ * (Page > Category > PageType > Default) lives in app/actions/site-nav.ts.
+ */
+export const headerOverrides = pgTable("header_overrides", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  scopeType: text("scope_type").notNull(),
+  scopeValue: text("scope_value").notNull(),
+  // Charles (2026-07-15): "comment pourrais-je avoir un footer en anglais
+  // alors qu'on est dans une page fr ?" — Header/Footer/Modules n'avaient
+  // aucune dimension langue, une seule ligne servait toutes les langues.
+  // Default 'fr' préserve les lignes existantes sans migration de données.
+  locale: text("locale").notNull().default("fr"),
+  config: jsonb("config").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  scopeLocaleUnique: uniqueIndex("header_overrides_scope_locale_unique").on(table.scopeType, table.scopeValue, table.locale),
+}))
+
+export type HeaderOverride = typeof headerOverrides.$inferSelect
+export type NewHeaderOverride = typeof headerOverrides.$inferInsert
+
+/** Same rationale as headerOverrides, for Footer. */
+export const footerOverrides = pgTable("footer_overrides", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  scopeType: text("scope_type").notNull(),
+  scopeValue: text("scope_value").notNull(),
+  locale: text("locale").notNull().default("fr"),
+  config: jsonb("config").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  scopeLocaleUnique: uniqueIndex("footer_overrides_scope_locale_unique").on(table.scopeType, table.scopeValue, table.locale),
+}))
+
+export type FooterOverride = typeof footerOverrides.$inferSelect
+export type NewFooterOverride = typeof footerOverrides.$inferInsert
+
+/**
+ * Reusable content injected at a specific position inside a page's own
+ * layout (Charles, 2026-07-14: "des modules prêt à l'emploi avec une
+ * apparition dans un lieu de pages concernés ... entre le header et le
+ * footer") — a fourth concept alongside Pages/Header/Footer. Same scope
+ * precedence (Page > Category > PageType > Default, resolved in
+ * app/actions/site-nav.ts) as headerOverrides/footerOverrides, but with an
+ * extra `anchorKey` dimension: unlike Header/Footer (exactly one doc per
+ * scope), a scope can hold several Modules as long as each targets a
+ * different position. Position 'default' scope uses scopeValue='' as its
+ * sentinel (payload-cms side, sync/targets/neosaas-app.ts) rather than a
+ * separate platform_config singleton — a tenant can have several
+ * default-scoped Modules (one per anchorKey), so there's no single "the"
+ * default Module the way there's a single default Header/Footer.
+ */
+export const moduleOverrides = pgTable("module_overrides", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  scopeType: text("scope_type").notNull(),
+  scopeValue: text("scope_value").notNull(),
+  anchorKey: text("anchor_key").notNull(),
+  locale: text("locale").notNull().default("fr"),
+  config: jsonb("config").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  scopeAnchorLocaleUnique: uniqueIndex("module_overrides_scope_anchor_locale_unique").on(table.scopeType, table.scopeValue, table.anchorKey, table.locale),
+}))
+
+export type ModuleOverride = typeof moduleOverrides.$inferSelect
+export type NewModuleOverride = typeof moduleOverrides.$inferInsert
 
 /**
  * Submissions from the "form" page layer (lib/layers/registry.ts /

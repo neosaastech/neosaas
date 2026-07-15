@@ -127,6 +127,41 @@
       "when": 1783871502593,
       "tag": "0017_amused_spyke",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783921163970,
+      "tag": "0018_sudden_captain_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784060265533,
+      "tag": "0019_certain_mystique",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784110302422,
+      "tag": "0020_plain_ultragirl",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1784114879296,
+      "tag": "0021_blushing_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784128850337,
+      "tag": "0022_great_the_leader",
+      "breakpoints": true
     }
   ]
 }

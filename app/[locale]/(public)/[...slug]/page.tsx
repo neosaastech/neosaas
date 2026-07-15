@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { draftMode } from "next/headers"
 import { and, asc, eq } from "drizzle-orm"
 import type { Metadata } from "next"
@@ -36,6 +36,7 @@ export default async function DynamicPage({
 
   let layers: PageLayerRow[] = []
   let headerImageUrl: string | null = null
+  let isHomepage = false
 
   if (isPreview) {
     layers = await loadPreviewLayers(pagePath, locale)
@@ -54,9 +55,23 @@ export default async function DynamicPage({
       ])
       layers = layerRows
       headerImageUrl = seoRow?.headerImageUrl ?? null
+      isHomepage = seoRow?.isHomepage ?? false
     } catch (error) {
       console.error(`Failed to load page layers for ${pagePath}:`, error)
     }
+  }
+
+  // Charles (2026-07-15): "/fr et /fr/accueil sont les mêmes page, on risque
+  // d'avoir du duplicate content" — a page flagged as this locale's home
+  // (Payload's homeForLocale, synced to page_seo.is_homepage) is served at
+  // BOTH its own path (this catch-all route) and at "/" (app/[locale]/
+  // (public)/page.tsx's resolveHomePagePath) — two indexable URLs for
+  // identical content. Canonical fix: redirect the "long" URL to the real
+  // home, permanently (308) so search engines consolidate on one. Must sit
+  // OUTSIDE the try/catch above — permanentRedirect throws a framework-
+  // recognized error that a generic catch would otherwise swallow.
+  if (isHomepage) {
+    permanentRedirect(`/${locale}`)
   }
 
   if (layers.length === 0) {
@@ -64,16 +79,29 @@ export default async function DynamicPage({
   }
 
   return (
-    <div className="container py-12 md:py-24">
-      {isPreview && <PreviewChrome />}
-      {/* Charles (2026-07-11): "laisse la possibilité au module d'afficher
-          une telle image" — same banner treatment as blog/[slug]/page.tsx's
-          coverImageUrl, sourced from the same header image the meta tags
-          above (buildPageMetadata) already use. */}
-      {headerImageUrl && (
-        <img src={headerImageUrl} alt="" className="mb-8 aspect-video w-full rounded-xl object-cover" />
+    <>
+      {/* Charles (2026-07-15): NOT a `container` wrapper around BlockRenderer
+          — every block is already wrapped in a full-bleed `<section
+          className="w-full ...">` (components/layers/block-wrapper.tsx) so a
+          block like the hero can bleed its own background/gradient
+          edge-to-edge; each block manages its OWN inner content width
+          (mx-auto max-w-*). This div used to wrap everything, clipping any
+          full-bleed block's background to `container` width — the exact
+          same regression briefly reintroduced on the home route (app/
+          [locale]/(public)/page.tsx), reverted there for the same reason. */}
+      {(isPreview || headerImageUrl) && (
+        <div className="container pt-12 md:pt-24">
+          {isPreview && <PreviewChrome />}
+          {/* Charles (2026-07-11): "laisse la possibilité au module d'afficher
+              une telle image" — same banner treatment as blog/[slug]/page.tsx's
+              coverImageUrl, sourced from the same header image the meta tags
+              above (buildPageMetadata) already use. */}
+          {headerImageUrl && (
+            <img src={headerImageUrl} alt="" className="mb-8 aspect-video w-full rounded-xl object-cover" />
+          )}
+        </div>
       )}
       <BlockRenderer layers={layers} pagePath={pagePath} locale={locale} />
-    </div>
+    </>
   )
 }

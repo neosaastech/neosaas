@@ -14,6 +14,19 @@ export const PAGE_TEMPLATE_VARIABLE_CATALOG: PageTemplateVariableDefinition[] = 
   { key: "domain", label: "Domain", description: "Site hostname (SEO or APP_URL)", example: "neosaas.tech", group: "site" },
   { key: "locale", label: "Locale", description: "Page language", example: "fr", group: "site" },
   { key: "contactEmail", label: "Contact email", description: "Default sender email", example: "no-reply@neosaas.tech", group: "site" },
+  // Charles (2026-07-15): "on a bien des informations pour les réseaux
+  // sociaux, le nom du site, le mail... et le RGPD" — same catalog used by
+  // Pages (server) now also drives Header/Footer (client, see
+  // buildClientTemplateVariables below), so these are usable everywhere,
+  // not hand-rolled per field like the {{year}}-only copyright was.
+  { key: "socialTwitter", label: "Twitter/X URL", description: "Settings → Social links", example: "https://x.com/neosaas", group: "site" },
+  { key: "socialLinkedin", label: "LinkedIn URL", description: "Settings → Social links", example: "https://linkedin.com/company/neosaas", group: "site" },
+  { key: "socialFacebook", label: "Facebook URL", description: "Settings → Social links", example: "https://facebook.com/neosaas", group: "site" },
+  { key: "socialInstagram", label: "Instagram URL", description: "Settings → Social links", example: "https://instagram.com/neosaas", group: "site" },
+  { key: "socialGithub", label: "GitHub URL", description: "Settings → Social links", example: "https://github.com/neosaas", group: "site" },
+  { key: "hostingProviderName", label: "Hosting provider", description: "Settings → Legal (mentions légales / RGPD)", example: "Scaleway", group: "site" },
+  { key: "hostingProviderAddress", label: "Hosting provider address", description: "Settings → Legal (mentions légales / RGPD)", example: "8 rue de la Ville l'Évêque, 75008 Paris", group: "site" },
+  { key: "hostingProviderContact", label: "Hosting provider contact", description: "Settings → Legal (mentions légales / RGPD)", example: "contact@scaleway.com", group: "site" },
   { key: "year", label: "Year", description: "Current year", example: "2026", group: "date" },
   { key: "date", label: "Date", description: "Today's date (localized)", example: "05/07/2026", group: "date" },
   { key: "dateTime", label: "Date and time", description: "Render timestamp", example: "05/07/2026 14:30", group: "date" },
@@ -51,4 +64,61 @@ export function interpolateDeep<T>(value: T, variables: PageTemplateVariables): 
   }
 
   return value
+}
+
+const CLIENT_LOCALE_TAGS: Record<string, string> = { fr: "fr-FR", en: "en-US" }
+
+/**
+ * Client-safe counterpart to buildPageTemplateContext (lib/pages/template-
+ * variables.ts, server-only — pulls from `db`/session, crashes if imported
+ * in a "use client" component). Header/Footer render client-side (see
+ * site-footer.tsx), so they need the site/date tags built from whatever
+ * PlatformConfig already carries down via React context, with no request/
+ * session access — user-scoped tags (firstName, userEmail, etc.) are
+ * therefore always empty here, same "signed-out visitor" convention
+ * documented in TemplateVariablesHint.
+ */
+export function buildClientTemplateVariables(config: {
+  siteName?: string
+  contactEmail?: string
+  locale?: string
+  socialLinks?: {
+    twitter?: string
+    linkedin?: string
+    facebook?: string
+    instagram?: string
+    github?: string
+  } | null
+  hostingProviderName?: string
+  hostingProviderAddress?: string
+  hostingProviderContact?: string
+}): PageTemplateVariables {
+  const now = new Date()
+  const locale = config.locale ?? "fr"
+  const localeTag = CLIENT_LOCALE_TAGS[locale] ?? locale
+  const siteName = config.siteName ?? ""
+
+  return {
+    siteName,
+    site_name: siteName,
+    locale,
+    contactEmail: config.contactEmail ?? "",
+    socialTwitter: config.socialLinks?.twitter ?? "",
+    socialLinkedin: config.socialLinks?.linkedin ?? "",
+    socialFacebook: config.socialLinks?.facebook ?? "",
+    socialInstagram: config.socialLinks?.instagram ?? "",
+    socialGithub: config.socialLinks?.github ?? "",
+    hostingProviderName: config.hostingProviderName ?? "",
+    hostingProviderAddress: config.hostingProviderAddress ?? "",
+    hostingProviderContact: config.hostingProviderContact ?? "",
+    year: String(now.getFullYear()),
+    date: now.toLocaleDateString(localeTag),
+    dateTime: now.toLocaleString(localeTag),
+    firstName: "",
+    lastName: "",
+    userName: "",
+    userEmail: "",
+    companyName: "",
+    isLoggedIn: "false",
+  }
 }

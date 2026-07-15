@@ -16,25 +16,31 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 import Image from "next/image"
 import { useLocale } from "@/lib/i18n/use-locale"
+import { cookieConsentDictionary, resolveLegalLocale } from "@/lib/i18n/legal-dictionary"
 
 interface CookieConsentProps {
   logo?: string | null
   enabled?: boolean
+  /** Admin-authored custom message (French, the site's default language). */
   message?: string
+  /** Optional English variant of the custom message above — see messageEn's use below. */
+  messageEn?: string
   siteName?: string
   position?: "bottom-left" | "bottom-right"
 }
 
-export function CookieConsent({ 
-  logo, 
-  enabled = true, 
-  message, 
+export function CookieConsent({
+  logo,
+  enabled = true,
+  message,
+  messageEn,
   siteName = "NeoSaaS",
   position = "bottom-left"
 }: CookieConsentProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [hide, setHide] = React.useState(false)
   const locale = useLocale()
+  const t = cookieConsentDictionary[resolveLegalLocale(locale)]
 
   React.useEffect(() => {
     // If explicitly disabled, ensure it's closed
@@ -75,9 +81,13 @@ export function CookieConsent({
   // If hidden via user action (accept/decline), don't render
   if (hide) return null
 
-  const displayMessage = message
-    ? message.replace(/{site_name}/g, siteName)
-    : `We use cookies to ensure you get the best experience on our website.`
+  // A custom message is admin-authored free text (no automatic translation
+  // possible) — `message` is the French/default field, `messageEn` its
+  // optional English counterpart. Each locale only ever falls back to its
+  // own dictionary default, never to the other locale's custom text
+  // (Charles, 2026-07-15: "si on custom il faut prévoir les deux langues").
+  const customMessage = resolveLegalLocale(locale) === "en" ? messageEn : message
+  const displayMessage = customMessage ? customMessage.replace(/{site_name}/g, siteName) : t.defaultMessage
 
   if (!isOpen) return null
 
@@ -109,11 +119,11 @@ export function CookieConsent({
               )}
             </div>
             <div className="space-y-1">
-              <h3 className="font-semibold leading-none tracking-tight">Cookie Preferences</h3>
+              <h3 className="font-semibold leading-none tracking-tight">{t.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {displayMessage}
                 <Link href={`/${locale}/legal/privacy`} className="ml-1 font-medium text-primary hover:underline">
-                  Learn more
+                  {t.learnMore}
                 </Link>
               </p>
             </div>
@@ -125,13 +135,13 @@ export function CookieConsent({
               className="flex-1 rounded-full border-primary/20 hover:bg-primary/5 hover:text-primary" 
               onClick={decline}
             >
-              Decline
+              {t.decline}
             </Button>
-            <Button 
-              className="flex-1 rounded-full shadow-lg shadow-primary/20" 
+            <Button
+              className="flex-1 rounded-full shadow-lg shadow-primary/20"
               onClick={accept}
             >
-              Accept
+              {t.accept}
             </Button>
           </div>
         </div>

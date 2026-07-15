@@ -5,7 +5,7 @@
  * Extracted from the previously static app/(public)/features/page.tsx.
  */
 
-import * as LucideIcons from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Eyebrow } from "@/components/ui/eyebrow"
 
@@ -31,17 +31,21 @@ const ICON_SIZE_CLASSES: Record<"sm" | "md" | "lg", string> = {
 
 export function FeatureGridLayer({ eyebrow, title, items }: FeatureGridLayerProps) {
   return (
-    <div className="mx-auto mt-16">
+    // Charles (2026-07-15): "les modules sans margin sur les côtés" — every
+    // sibling layer (pricing-table, testimonials, blog-list...) constrains
+    // its own content width via mx-auto max-w-*; this one was missing the
+    // max-w-* half of that pattern entirely, so it stretched edge-to-edge
+    // inside its parent full-bleed <section> (block-wrapper.tsx).
+    <div className="mx-auto mt-16 max-w-5xl">
       {eyebrow && <Eyebrow className="mb-2 text-center">{eyebrow}</Eyebrow>}
       {title && <h2 className="mb-10 text-center text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => {
-          const IconComponent = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon]
           return (
             <Card key={item.title}>
               <CardHeader>
-                {IconComponent && (
-                  <IconComponent className={`${ICON_SIZE_CLASSES[item.iconSize ?? "md"]} text-primary mb-4`} />
+                {item.icon && (
+                  <Icon name={item.icon} className={`${ICON_SIZE_CLASSES[item.iconSize ?? "md"]} text-primary mb-4`} />
                 )}
                 <CardTitle>{item.title}</CardTitle>
                 <CardDescription>{item.description}</CardDescription>

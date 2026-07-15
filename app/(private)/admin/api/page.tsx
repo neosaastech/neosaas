@@ -23,6 +23,7 @@ import {
 import { Eye, EyeOff, Save, RefreshCw, Key, CheckCircle, XCircle, Loader2, Trash2, Plus, AlertCircle, Copy, Check, ChevronDown, Rocket, FlaskConical, ShieldAlert } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
+import { McpTokensCard } from "@/components/admin/mcp-tokens-card"
 
 
 // Service categories for organized display
@@ -1677,6 +1678,8 @@ export default function AdminApiPage() {
           )}
         </CardContent>
       </Card>
+
+      <McpTokensCard />
 
       {/* Add/Edit Sheet */}
       <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>

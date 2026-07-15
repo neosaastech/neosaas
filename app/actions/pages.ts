@@ -14,6 +14,8 @@ import {
   createPage,
   updatePage,
   deletePage,
+  listPageVersions,
+  restorePageVersion,
   listBlogPosts,
   getBlogPost,
   createBlogPost,
@@ -45,6 +47,7 @@ import {
   type PayloadMediaSummary,
   type ListMediaOptions,
   type MediaTransformInput,
+  type PayloadPageVersion,
 } from "@/lib/payload-bridge"
 
 // Was its own "public" | "user" | "admin" | "super-admin" (hyphen) union,
@@ -157,6 +160,49 @@ export async function saveContentPage(
     // a missing required field), making a genuine save failure impossible
     // to tell apart from a working save whose result just wasn't visible.
     const message = error instanceof Error ? error.message : "Failed to save content page"
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * Charles (2026-07-15): "le versionning temporel qui est une realite dans
+ * payload" — surfaces Payload's own version history (every draft/publish
+ * save already produces one, Pages.ts's versions:{drafts:true}) in the page
+ * editor's Settings tab instead of requiring the separate Payload admin.
+ * Read-only list — no role gate, same convention as getContentPage.
+ */
+export async function getContentPageVersions(
+  id: string | number,
+  locale: string = "fr",
+): Promise<{ success: true; data: PayloadPageVersion[] } | { success: false; error: string }> {
+  try {
+    const versions = await listPageVersions(id, locale)
+    return { success: true, data: versions }
+  } catch (error) {
+    console.error("Failed to fetch page versions from Payload:", error)
+    return { success: false, error: "Failed to fetch version history" }
+  }
+}
+
+/**
+ * Rewrites the live doc back to a past version — a real write, same
+ * admin/super_admin gate as saveContentPage.
+ */
+export async function restoreContentPageVersion(
+  versionId: string,
+  locale: string = "fr",
+): Promise<{ success: true; data: PayloadPageDoc } | { success: false; error: string }> {
+  const currentUser = await getCurrentUser()
+  if (!currentUser?.roles?.some((r) => ["admin", "super_admin"].includes(r))) {
+    return { success: false, error: "Unauthorized" }
+  }
+  try {
+    const page = await restorePageVersion(versionId, locale)
+    revalidatePath("/admin/pages")
+    return { success: true, data: page }
+  } catch (error) {
+    console.error("Failed to restore page version:", error)
+    const message = error instanceof Error ? error.message : "Failed to restore version"
     return { success: false, error: message }
   }
 }

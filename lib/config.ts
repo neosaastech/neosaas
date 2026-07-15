@@ -19,6 +19,10 @@ export interface PlatformConfigData {
   showCookieLogo?: boolean
   cookieConsentEnabled?: boolean
   cookieConsentMessage?: string
+  // Optional English variant of the custom message above — a custom
+  // message is admin-authored free text, not something the dictionary
+  // fallback can translate on its own (Charles, 2026-07-15).
+  cookieConsentMessageEn?: string
   cookiePosition?: "bottom-left" | "bottom-right"
   hostingProviderName?: string
   hostingProviderAddress?: string
@@ -61,7 +65,13 @@ export async function getPlatformConfig(): Promise<PlatformConfigData> {
       tosPosition: configMap['tos_position'] || 'center',
       showCookieLogo: configMap['show_cookie_logo'] === 'true' || configMap['show_cookie_logo'] === true,
       cookieConsentEnabled: configMap['cookie_consent_enabled'] !== 'false' && configMap['cookie_consent_enabled'] !== false, // Default to true
-      cookieConsentMessage: configMap['cookie_consent_message'] || "Nous utilisons des cookies pour améliorer votre expérience sur notre site. En continuant à naviguer, vous acceptez notre utilisation des cookies.",
+      // No hardcoded (French) default here anymore — an empty value lets
+      // CookieConsent fall back to its own locale-aware default message
+      // (lib/i18n/legal-dictionary.ts) instead of always showing French
+      // text on /en too (found 2026-07-15: this default was non-empty, so
+      // the component's own English fallback was dead code in practice).
+      cookieConsentMessage: configMap['cookie_consent_message'] || undefined,
+      cookieConsentMessageEn: configMap['cookie_consent_message_en'] || undefined,
       cookiePosition: configMap['cookie_position'] || 'bottom-left',
       hostingProviderName: configMap['hosting_provider_name'] || null,
       hostingProviderAddress: configMap['hosting_provider_address'] || null,

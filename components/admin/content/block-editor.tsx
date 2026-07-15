@@ -69,17 +69,23 @@ export function BlockEditor(props: BlockEditorProps) {
       <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <button
           type="button"
-          className="flex items-center gap-1.5 text-left"
+          className="flex min-w-0 items-center gap-1.5 text-left"
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
         >
-          {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-          <Badge variant="outline" className="gap-1.5">
-            <Icon className="h-3.5 w-3.5" />
-            {getBlockTypeLabel(block.blockType)}
+          {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          {/* Badge's own base styles include w-fit + shrink-0 — overriding
+              only min-width isn't enough: shrink-0 (flex-shrink:0) keeps it
+              at natural content width regardless, and w-fit fights a
+              shrunk width too. Every level down to the text span needs its
+              own min-w-0, or a long block label pushes the move/delete
+              buttons out instead of truncating. */}
+          <Badge variant="outline" className="w-auto min-w-0 shrink gap-1.5">
+            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 truncate">{getBlockTypeLabel(block.blockType)}</span>
           </Badge>
         </button>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <Button type="button" variant="ghost" size="icon-sm" disabled={!canMoveUp} onClick={onMoveUp}>
             <ChevronUp className="h-4 w-4" />
           </Button>

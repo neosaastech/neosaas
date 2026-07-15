@@ -35,10 +35,17 @@ export async function updateTosPosition(position: "center" | "bottom-left" | "bo
   }
 }
 
-export async function updateCookieSettings(settings: { 
-  showLogo: boolean, 
-  enabled: boolean, 
+export async function updateCookieSettings(settings: {
+  showLogo: boolean,
+  enabled: boolean,
   message: string,
+  // A custom cookie message is admin-authored free text, not something the
+  // dictionary-based fallback (lib/i18n/legal-dictionary.ts) can translate —
+  // a second, genuinely optional field so a custom message can still be
+  // bilingual (Charles, 2026-07-15: "si on custom il faut prévoir les deux
+  // langues"). Left empty, the popup falls back to the English dictionary
+  // default on /en instead of repeating the French custom text.
+  messageEn?: string,
   position?: "bottom-left" | "bottom-right"
 }) {
   try {
@@ -88,6 +95,21 @@ export async function updateCookieSettings(settings: {
         target: platformConfig.key,
         set: {
           value: settings.message,
+          updatedAt: new Date()
+        }
+      })
+
+    // Update cookie_consent_message_en
+    await db.insert(platformConfig)
+      .values({
+        key: "cookie_consent_message_en",
+        value: settings.messageEn ?? "",
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: platformConfig.key,
+        set: {
+          value: settings.messageEn ?? "",
           updatedAt: new Date()
         }
       })

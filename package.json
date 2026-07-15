@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "1.10.2",
+  "version": "1.11.0",
   "private": true,
   "license": "MIT",
   "author": "Charles Van den Driessche <contact@neomnia.net>",
@@ -162,6 +162,7 @@
     "react-dom": "^19.2.7",
     "react-easy-crop": "^5.5.7",
     "react-hook-form": "latest",
+    "react-icons": "^5.7.0",
     "react-resizable-panels": "latest",
     "recharts": "latest",
     "sonner": "latest",

@@ -36,8 +36,8 @@ import {
 } from "lucide-react"
 import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
 import { LogsClient } from "@/app/(private)/admin/logs/logs-client"
-import { ThemeSettings } from "@/components/admin/theme-settings"
 import { UpdateSettings } from "@/components/admin/update-settings"
+import { McpApiSettings } from "@/components/admin/mcp-api-settings"
 import { HeaderBrandingVisibilitySelectors } from "@/components/admin/header-branding-visibility-selectors"
 import {
   logoDisplayModeToVisibility,
@@ -589,8 +589,8 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="general" className="data-[state=active]:bg-brand data-[state=active]:text-white">
             General
           </TabsTrigger>
-          <TabsTrigger value="styles" className="data-[state=active]:bg-brand data-[state=active]:text-white">
-            Styles
+          <TabsTrigger value="mcp" className="data-[state=active]:bg-brand data-[state=active]:text-white">
+            MCP / API
           </TabsTrigger>
           <TabsTrigger value="logs" className="data-[state=active]:bg-brand data-[state=active]:text-white">
             System Logs
@@ -600,8 +600,8 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="styles">
-          <ThemeSettings />
+        <TabsContent value="mcp">
+          <McpApiSettings />
         </TabsContent>
 
         <TabsContent value="updates">

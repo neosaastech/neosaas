@@ -56,6 +56,39 @@ async function enforcePageAccess(request: NextRequest): Promise<NextResponse | n
 }
 
 const DEFAULT_LOCALE = "fr"
+const LOCALE_COOKIE = "preferred-locale"
+
+// Bare-domain visits (neosaas.tech, no /fr or /en) used to hardcode /fr
+// regardless of the visitor's browser — an English-speaking visitor always
+// landed on the French home page. Parses the standard Accept-Language
+// header (RFC 4647 quality values, e.g. "en-US,en;q=0.9,fr;q=0.8") and picks
+// the first supported locale in preference order — falls back to
+// DEFAULT_LOCALE if the header is missing/unparseable or names nothing we
+// support.
+function detectPreferredLocale(request: NextRequest): (typeof LOCALES)[number] {
+  const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value
+  if (LOCALES.includes(cookieLocale as (typeof LOCALES)[number])) {
+    return cookieLocale as (typeof LOCALES)[number]
+  }
+
+  const header = request.headers.get("accept-language")
+  if (!header) return DEFAULT_LOCALE as (typeof LOCALES)[number]
+
+  const ranked = header
+    .split(",")
+    .map((part) => {
+      const [tag, qPart] = part.trim().split(";q=")
+      return { tag: tag.trim().toLowerCase(), quality: qPart ? parseFloat(qPart) : 1 }
+    })
+    .sort((a, b) => b.quality - a.quality)
+
+  for (const { tag } of ranked) {
+    const base = tag.split("-")[0]
+    const match = LOCALES.find((locale) => locale === base)
+    if (match) return match
+  }
+  return DEFAULT_LOCALE as (typeof LOCALES)[number]
+}
 
 // Was a positive allowlist of specific known static routes — broke the
 // moment a page got created dynamically through the Content Hub (found
@@ -151,9 +184,17 @@ export async function proxy(request: NextRequest) {
   // locale — e.g. /features -> /fr/features. Auth/admin/dashboard/api/errors
   // routes are untouched (see PUBLIC_LOCALIZED_PREFIXES above).
   if (needsLocaleRedirect(path)) {
+    const targetLocale = detectPreferredLocale(request)
     const url = request.nextUrl.clone()
-    url.pathname = `/${DEFAULT_LOCALE}${path === "/" ? "" : path}`
-    return NextResponse.redirect(url)
+    url.pathname = `/${targetLocale}${path === "/" ? "" : path}`
+    const response = NextResponse.redirect(url)
+    // Remembers an explicit choice so a later visit to the bare domain
+    // doesn't re-run browser-language detection and flip the visitor back —
+    // set once here (redirect from "/"), read by detectPreferredLocale above
+    // and by the locale switcher (components/layout/... ) when a visitor
+    // picks a language manually.
+    response.cookies.set(LOCALE_COOKIE, targetLocale, { maxAge: 60 * 60 * 24 * 365, path: "/" })
+    return response
   }
 
   const accessDenied = await enforcePageAccess(request)
@@ -170,6 +211,10 @@ export async function proxy(request: NextRequest) {
   const locale = LOCALES.includes(localeSegment as (typeof LOCALES)[number]) ? localeSegment : DEFAULT_LOCALE
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set("x-locale", locale)
+  // Read by app/[locale]/(public)/layout.tsx to resolve which Header/Footer
+  // applies (Page > Category > PageType > Default, see app/actions/site-nav.ts)
+  // — a shared layout has no other way to know the current route.
+  requestHeaders.set("x-pathname", path)
   return NextResponse.next({ request: { headers: requestHeaders } })
 }
 

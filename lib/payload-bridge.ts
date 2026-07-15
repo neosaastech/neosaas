@@ -124,6 +124,12 @@ export interface PayloadPageSummary {
   // not just inside the SEO tab — listPages already returns every top-level
   // field, this just types what was already coming back unused.
   seo?: { noIndex?: boolean | null; noFollow?: boolean | null }
+  // Charles (2026-07-15): "un bouton cliquable qui détermine une page comme
+  // page d'accueil de sa langue" (payload-cms Pages.homeForLocale) — same
+  // "already in the response, just never typed" situation as seo above.
+  // Read-only display here: Payload's own admin is the only place this is
+  // editable, this Content Hub only surfaces it.
+  homeForLocale?: "" | "fr" | "en" | null
 }
 
 export interface PayloadPageBlock {
@@ -150,7 +156,7 @@ export interface PayloadPageBlock {
 // every createPage()/updatePage() write. Only Pages go through BlockEditor
 // (ArticleEditor has no `layout` field at all — BlogPostWriteInput doesn't
 // declare one), so BlogPosts are untouched.
-interface PayloadLinkValue {
+export interface PayloadLinkValue {
   type?: "reference" | "custom"
   newTab?: boolean | null
   reference?: { relationTo?: string; value?: unknown } | string | number | null
@@ -424,6 +430,15 @@ export async function listPages(options: ListPagesOptions = {}): Promise<Paginat
     page: String(page),
     sort: "path",
     locale,
+    // Payload's global `fallback: true` (payload.config.ts) means a plain
+    // `?locale=en` list still returns every page with French content
+    // silently standing in for a missing translation — the Content Hub's
+    // language filter looked like a no-op because of it (Charles,
+    // 2026-07-15: "quelle que soit la langue concernée, tout est affiché").
+    // Disabling fallback for THIS list call only means `title` comes back
+    // genuinely empty for an untranslated page, which the caller uses to
+    // filter the table down to real per-locale content.
+    "fallback-locale": "none",
   })
   if (pageType) params.set("where[pageType][equals]", pageType)
 
@@ -486,6 +501,10 @@ export interface PageWriteInput {
   includeSiteNameInTitle?: boolean
   scheduledPublishAt?: string | null
   scheduledUnpublishAt?: string | null
+  // "page d'accueil de sa langue" (Payload's Pages.homeForLocale, non-localized
+  // select) — set from the Content Hub editor's Settings tab, enforced unique
+  // per (tenant, locale) server-side by validateUniqueHomeForLocale.
+  homeForLocale?: "" | "fr" | "en"
   _status: "draft" | "published"
 }
 
@@ -565,6 +584,55 @@ export async function deletePage(id: string | number): Promise<void> {
     const body = await res.text()
     throw new Error(`Payload bridge: deletePage(${id}) failed (${res.status}): ${body}`)
   }
+}
+
+// Charles (2026-07-15): "le versionning temporel qui est une réalité dans
+// payload" — Pages has `versions: { drafts: true }` (Pages.ts), meaning
+// every save (draft or publish) already produces a version snapshot
+// server-side; this just surfaces Payload's own findVersions/restoreVersion
+// REST endpoints (payload-cms's default collection endpoints, not anything
+// custom) from the page editor instead of requiring the separate Payload
+// admin at cms.neokube.fr.
+export interface PayloadPageVersion {
+  id: string
+  createdAt: string
+  updatedAt: string
+  version: {
+    title?: string | null
+    _status?: "draft" | "published"
+  }
+}
+
+export async function listPageVersions(pageId: string | number, locale: string = "fr"): Promise<PayloadPageVersion[]> {
+  const params = new URLSearchParams({
+    "where[parent][equals]": String(pageId),
+    sort: "-updatedAt",
+    limit: "50",
+    depth: "0",
+    locale,
+  })
+  const res = await payloadFetch(`/pages/versions?${params.toString()}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listPageVersions(${pageId}) failed (${res.status})`)
+  }
+  const data = (await res.json()) as { docs: PayloadPageVersion[] }
+  return data.docs
+}
+
+/**
+ * Rewrites the live Page doc back to this version's snapshot (Payload's own
+ * restoreVersion operation) — NOT a soft "preview", the current draft/
+ * published content is genuinely replaced. Caller (page-editor.tsx) reloads
+ * the doc into the form afterward the same way switching locale already does.
+ */
+export async function restorePageVersion(versionId: string, locale: string = "fr"): Promise<PayloadPageDoc> {
+  const res = await payloadFetch(`/pages/versions/${versionId}?locale=${locale}`, { method: "POST" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: restorePageVersion(${versionId}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return unpackSeoImage(metaToSeo(data.doc) as unknown as PayloadPageDoc)
 }
 
 // ─── BlogPosts (Articles) — the other content-hub category alongside Pages ───
@@ -658,6 +726,318 @@ export async function deleteCategory(id: string | number): Promise<void> {
   }
 }
 
+// ─── Header / Footer ────────────────────────────────────────────────────────
+// One doc per (tenant, scope) — see payload-cms's fields/scope.ts. Unlike
+// Pages/BlogPosts/Categories, `link` fields here (linkField() in payload-cms)
+// are a structured Payload group — {type, newTab, reference, url, label} —
+// not the flat {label,href} shape the *sync* pipeline produces; this bridge
+// talks to Payload's REST API directly, so it must read/write that
+// structured shape as-is, unflattened.
+
+export type ScopeType = "default" | "page" | "category" | "pageType"
+
+// Reuses the module-local PayloadLinkValue declared above (block cta/
+// secondaryCta translation) — same structured shape linkField() produces
+// everywhere in payload-cms, no need for a second declaration.
+export interface PayloadNavItem {
+  link: PayloadLinkValue
+  children?: { link: PayloadLinkValue }[]
+}
+
+interface ScopeFields {
+  scopeType: ScopeType
+  scopePage?: string | number | { id: string | number; title?: string; path?: string } | null
+  scopeCategory?: string | number | { id: string | number; name?: string; path?: string } | null
+  scopePageType?: string | null
+}
+
+export interface PayloadHeaderSummary extends ScopeFields {
+  id: string | number
+  label: string
+  updatedAt: string
+  _status: "draft" | "published"
+}
+
+export type HeaderBrandDisplay = "inherit" | "logo" | "siteName" | "both" | "none"
+
+export interface PayloadSocialLink {
+  icon: string
+  url: string
+}
+
+export interface PayloadHeaderDoc extends PayloadHeaderSummary {
+  navItems: PayloadNavItem[]
+  cta?: PayloadLinkValue | null
+  brandDisplay?: HeaderBrandDisplay
+  logo?: string // unpacked to a plain URL, same convention as Footer.logo
+  showThemeSwitch?: boolean
+  showLocaleSwitcher?: boolean
+  showSocialLinks?: boolean
+  showAuthButtons?: boolean
+  socialLinks?: PayloadSocialLink[]
+}
+
+export interface HeaderWriteInput {
+  scopeType: ScopeType
+  scopePage?: string | number | null
+  scopeCategory?: string | number | null
+  scopePageType?: string | null
+  navItems: PayloadNavItem[]
+  cta?: PayloadLinkValue | null
+  brandDisplay?: HeaderBrandDisplay
+  logo?: string | null
+  showThemeSwitch?: boolean
+  showLocaleSwitcher?: boolean
+  showSocialLinks?: boolean
+  showAuthButtons?: boolean
+  socialLinks?: PayloadSocialLink[]
+  _status: "draft" | "published"
+}
+
+/** Header docs are typically few (one Default + a handful of overrides per tenant) — no pagination needed. draft=true so brand-new/unpublished drafts still show up in the recap table. */
+export async function listHeaders(locale: string = "fr"): Promise<PayloadHeaderSummary[]> {
+  const res = await payloadFetch(`/header?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=1&limit=200&sort=-updatedAt&draft=true&locale=${locale}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listHeaders failed (${res.status})`)
+  }
+  const data = await res.json()
+  return data.docs as PayloadHeaderSummary[]
+}
+
+/** draft=true — always load the latest version (draft or published), same reasoning as getPage. */
+export async function getHeader(id: string | number, locale: string = "fr"): Promise<PayloadHeaderDoc> {
+  const res = await payloadFetch(`/header/${id}?depth=1&draft=true&locale=${locale}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: getHeader(${id}) failed (${res.status})`)
+  }
+  const data = (await res.json()) as PayloadHeaderDoc & { logo?: unknown }
+  return { ...data, logo: unpackImage(data.logo) }
+}
+
+export async function createHeader(input: HeaderWriteInput, locale: string = "fr"): Promise<PayloadHeaderDoc> {
+  const { logo, ...rest } = input
+  const draftParam = input._status === "draft" ? "&draft=true" : ""
+  const res = await payloadFetch(`/header?locale=${locale}${draftParam}`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...rest,
+      ...(logo !== undefined ? { logo: logo ? await resolveMediaIdByUrl(logo) : null } : {}),
+      tenant: PAYLOAD_TENANT_ID,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createHeader failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return { ...(data.doc as PayloadHeaderDoc), logo: unpackImage(data.doc.logo) }
+}
+
+export async function updateHeader(id: string | number, input: HeaderWriteInput, locale: string = "fr"): Promise<PayloadHeaderDoc> {
+  const { logo, ...rest } = input
+  const draftParam = input._status === "draft" ? "&draft=true" : ""
+  const res = await payloadFetch(`/header/${id}?locale=${locale}${draftParam}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...rest,
+      ...(logo !== undefined ? { logo: logo ? await resolveMediaIdByUrl(logo) : null } : {}),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updateHeader(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return { ...(data.doc as PayloadHeaderDoc), logo: unpackImage(data.doc.logo) }
+}
+
+export async function deleteHeader(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/header/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deleteHeader(${id}) failed (${res.status}): ${body}`)
+  }
+}
+
+export interface PayloadFooterSummary extends ScopeFields {
+  id: string | number
+  label: string
+  updatedAt: string
+}
+
+// Footer.modules (Charles, 2026-07-14: choix de module — Links/Form/Columns
+// — instead of the old fixed columns/formModule fields) reuses
+// PayloadPageBlock as-is: same {id?, blockType, ...rest} shape Pages'
+// layout blocks already use, no separate type needed. `blockType` is
+// "links" | "form" | "columns"; the admin UI branches on it directly.
+export interface PayloadFooterDoc extends PayloadFooterSummary {
+  modules: PayloadPageBlock[]
+  brandDisplay?: HeaderBrandDisplay
+  logo?: string // unpacked to a plain URL, same convention as Categories' headerImage
+  copyrightText?: string | null
+  tagline?: string | null
+}
+
+export interface FooterWriteInput {
+  scopeType: ScopeType
+  scopePage?: string | number | null
+  scopeCategory?: string | number | null
+  scopePageType?: string | null
+  modules: PayloadPageBlock[]
+  brandDisplay?: HeaderBrandDisplay
+  logo?: string | null
+  copyrightText?: string | null
+  tagline?: string | null
+}
+
+export async function listFooters(locale: string = "fr"): Promise<PayloadFooterSummary[]> {
+  const res = await payloadFetch(`/footer?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=1&limit=200&sort=-updatedAt&locale=${locale}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listFooters failed (${res.status})`)
+  }
+  const data = await res.json()
+  return data.docs as PayloadFooterSummary[]
+}
+
+export async function getFooter(id: string | number, locale: string = "fr"): Promise<PayloadFooterDoc> {
+  const res = await payloadFetch(`/footer/${id}?depth=1&locale=${locale}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: getFooter(${id}) failed (${res.status})`)
+  }
+  const data = (await res.json()) as PayloadFooterDoc & { logo?: unknown }
+  return { ...data, logo: unpackImage(data.logo) }
+}
+
+export async function createFooter(input: FooterWriteInput, locale: string = "fr"): Promise<PayloadFooterDoc> {
+  const { logo, ...rest } = input
+  const res = await payloadFetch(`/footer?locale=${locale}`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...rest,
+      ...(logo !== undefined ? { logo: logo ? await resolveMediaIdByUrl(logo) : null } : {}),
+      tenant: PAYLOAD_TENANT_ID,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createFooter failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return { ...(data.doc as PayloadFooterDoc), logo: unpackImage(data.doc.logo) }
+}
+
+export async function updateFooter(id: string | number, input: FooterWriteInput, locale: string = "fr"): Promise<PayloadFooterDoc> {
+  const { logo, ...rest } = input
+  const res = await payloadFetch(`/footer/${id}?locale=${locale}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...rest,
+      ...(logo !== undefined ? { logo: logo ? await resolveMediaIdByUrl(logo) : null } : {}),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updateFooter(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return { ...(data.doc as PayloadFooterDoc), logo: unpackImage(data.doc.logo) }
+}
+
+export async function deleteFooter(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/footer/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deleteFooter(${id}) failed (${res.status}): ${body}`)
+  }
+}
+
+// ─── Modules ────────────────────────────────────────────────────────────────
+// Reusable content injected at a specific position inside a page (Charles,
+// 2026-07-14) — same ScopeFields as Header/Footer, plus `anchorKey` (a scope
+// can hold several Modules, one per anchor) and `content`, which reuses
+// Pages' own block shape/registry verbatim — same fromPayloadBlock/
+// toPayloadBlock read/write conversion `layout` already uses.
+
+export interface PayloadModuleSummary extends ScopeFields {
+  id: string | number
+  label: string
+  anchorKey: string
+  updatedAt: string
+}
+
+export interface PayloadModuleDoc extends PayloadModuleSummary {
+  content: PayloadPageBlock[]
+}
+
+export interface ModuleWriteInput {
+  scopeType: ScopeType
+  scopePage?: string | number | null
+  scopeCategory?: string | number | null
+  scopePageType?: string | null
+  anchorKey: string
+  content: PayloadPageBlock[]
+}
+
+/** Modules are typically few per tenant (like Header/Footer) — no pagination needed. */
+export async function listModules(locale: string = "fr"): Promise<PayloadModuleSummary[]> {
+  const res = await payloadFetch(`/modules?where[tenant][equals]=${PAYLOAD_TENANT_ID}&depth=1&limit=200&sort=-updatedAt&locale=${locale}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listModules failed (${res.status})`)
+  }
+  const data = await res.json()
+  return data.docs as PayloadModuleSummary[]
+}
+
+export async function getModule(id: string | number, locale: string = "fr"): Promise<PayloadModuleDoc> {
+  const res = await payloadFetch(`/modules/${id}?depth=1&locale=${locale}`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: getModule(${id}) failed (${res.status})`)
+  }
+  const data = (await res.json()) as PayloadModuleDoc
+  return { ...data, content: (data.content ?? []).map(fromPayloadBlock) }
+}
+
+export async function createModule(input: ModuleWriteInput, locale: string = "fr"): Promise<PayloadModuleDoc> {
+  const res = await payloadFetch(`/modules?locale=${locale}`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      content: await Promise.all(input.content.map(toPayloadBlock)),
+      tenant: PAYLOAD_TENANT_ID,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: createModule failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return { ...(data.doc as PayloadModuleDoc), content: (data.doc.content ?? []).map(fromPayloadBlock) }
+}
+
+export async function updateModule(id: string | number, input: ModuleWriteInput, locale: string = "fr"): Promise<PayloadModuleDoc> {
+  const res = await payloadFetch(`/modules/${id}?locale=${locale}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...input,
+      content: await Promise.all(input.content.map(toPayloadBlock)),
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: updateModule(${id}) failed (${res.status}): ${body}`)
+  }
+  const data = await res.json()
+  return { ...(data.doc as PayloadModuleDoc), content: (data.doc.content ?? []).map(fromPayloadBlock) }
+}
+
+export async function deleteModule(id: string | number): Promise<void> {
+  const res = await payloadFetch(`/modules/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Payload bridge: deleteModule(${id}) failed (${res.status}): ${body}`)
+  }
+}
+
 export interface PayloadBlogPostSummary {
   id: string | number
   title: string
@@ -678,6 +1058,12 @@ export interface PayloadBlogPostSummary {
   // og:image/twitter — see blog/[slug]/page.tsx) rather than adding a
   // second, competing plugin-seo meta.image field.
   coverImage?: string
+  // Same field as PayloadPageSummary.author (payload-cms's BlogPosts.ts
+  // has one too) — was never typed here, so the Content Hub's merged
+  // Pages+Articles table silently lost the Author column for articles
+  // when the three separate tabs became one (Charles, 2026-07-15: "qui
+  // lui a perdu sa colonne").
+  author?: { id: string | number; email: string; name?: string | null } | null
 }
 
 export interface PayloadBlogPostDoc extends PayloadBlogPostSummary {
@@ -709,6 +1095,9 @@ export async function listBlogPosts(
     page: String(page),
     sort: "-publishedAt",
     locale,
+    // Same fallback-disabling as listPages — an untranslated article's
+    // `title` comes back empty instead of silently repeating French.
+    "fallback-locale": "none",
   })
   if (category) params.set("where[category][equals]", String(category))
 
@@ -1077,4 +1466,65 @@ export async function updateCollectionDoc(
   }
   const result = await res.json()
   return result.doc
+}
+
+// ─── Tenant theme push-back (Charles, 2026-07-15) ──────────────────────────
+// Payload's Tenant "Couleurs" tab (colorPaletteFields.ts) already syncs ONE
+// way — Tenant save → payload-cms's syncTenantThemeToNeosaasApp writes
+// straight into this app's `platform_config` row. Saving the palette here
+// in theme-settings.tsx never went back the other way, so the Tenant form
+// silently went stale the moment someone edited colors from neosaas-app
+// instead ("je pilote de plus en plus depuis neosaas"). This closes that
+// loop: same 12 color roles, HSL (this app's storage format) converted back
+// to HEX (Tenant's format) — the exact inverse of payload-cms's own
+// hexToHslTriplet. Best-effort only: theme_config here is already the
+// live source for the public site regardless of whether this push succeeds.
+const THEME_COLOR_ROLES = [
+  "primary", "primaryForeground", "secondary", "secondaryForeground",
+  "accent", "accentForeground", "background", "foreground",
+  "border", "success", "warning", "destructive",
+] as const
+
+function hslTripletToHex(hsl: string): string | undefined {
+  const match = /^(-?\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%$/.exec(hsl.trim())
+  if (!match) return undefined
+  const h = Number(match[1])
+  const s = Number(match[2]) / 100
+  const l = Number(match[3]) / 100
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = l - c / 2
+  let [r, g, b] = [0, 0, 0]
+  if (h < 60) [r, g, b] = [c, x, 0]
+  else if (h < 120) [r, g, b] = [x, c, 0]
+  else if (h < 180) [r, g, b] = [0, c, x]
+  else if (h < 240) [r, g, b] = [0, x, c]
+  else if (h < 300) [r, g, b] = [x, 0, c]
+  else [r, g, b] = [c, 0, x]
+  const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, "0")
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+function paletteToHex(palette: Record<string, string> | undefined): Record<string, string> {
+  if (!palette) return {}
+  const result: Record<string, string> = {}
+  for (const role of THEME_COLOR_ROLES) {
+    const hsl = palette[role]
+    if (typeof hsl === "string" && hsl.trim()) {
+      const hex = hslTripletToHex(hsl)
+      if (hex) result[role] = hex
+    }
+  }
+  return result
+}
+
+export async function pushThemeColorsToTenant(colors: {
+  light: Record<string, string>
+  dark: Record<string, string>
+}): Promise<void> {
+  if (!PAYLOAD_TENANT_ID) return
+  await updateCollectionDoc("tenants", PAYLOAD_TENANT_ID, {
+    colorsLight: paletteToHex(colors.light),
+    colorsDark: paletteToHex(colors.dark),
+  })
 }

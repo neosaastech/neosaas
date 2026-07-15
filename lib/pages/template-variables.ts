@@ -83,6 +83,13 @@ export const buildPageTemplateContext = cache(async (locale: string): Promise<Pa
 
   const userName = [firstName, lastName].filter(Boolean).join(" ")
   const siteName = config.siteName
+  const socialLinks = (config.socialLinks ?? null) as {
+    twitter?: string
+    linkedin?: string
+    facebook?: string
+    instagram?: string
+    github?: string
+  } | null
 
   return {
     siteName,
@@ -90,6 +97,18 @@ export const buildPageTemplateContext = cache(async (locale: string): Promise<Pa
     domain: resolveDomain(baseUrl),
     locale,
     contactEmail: config.defaultSenderEmail,
+    // Charles (2026-07-15): "on a bien des informations pour les réseaux
+    // sociaux... et le RGPD" — same fields the client-side builder
+    // (buildClientTemplateVariables, template-variables-core.ts) exposes to
+    // Header/Footer, kept in sync so a tag behaves the same everywhere.
+    socialTwitter: socialLinks?.twitter ?? "",
+    socialLinkedin: socialLinks?.linkedin ?? "",
+    socialFacebook: socialLinks?.facebook ?? "",
+    socialInstagram: socialLinks?.instagram ?? "",
+    socialGithub: socialLinks?.github ?? "",
+    hostingProviderName: config.hostingProviderName ?? "",
+    hostingProviderAddress: config.hostingProviderAddress ?? "",
+    hostingProviderContact: config.hostingProviderContact ?? "",
     year: String(now.getFullYear()),
     date: now.toLocaleDateString(localeTag),
     dateTime: now.toLocaleString(localeTag),

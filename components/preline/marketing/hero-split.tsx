@@ -4,7 +4,7 @@
  */
 import Link from "next/link"
 import { Star } from "lucide-react"
-import * as LucideIcons from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { PrelineIconShowcasePanel } from "@/components/preline/marketing/icon-showcase-panel"
 
 export interface PrelineTrustPill {
@@ -61,13 +61,12 @@ export function PrelineHeroSplit({
             {trustPills && trustPills.length > 0 && (
               <div className="mt-6 flex flex-wrap gap-3">
                 {trustPills.map((pill) => {
-                  const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[pill.icon]
                   return (
                     <span
                       key={pill.label}
                       className="inline-flex items-center gap-x-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-xs"
                     >
-                      {Icon ? <Icon className="size-4 text-brand" /> : null}
+                      {pill.icon ? <Icon name={pill.icon} className="size-4 text-brand" /> : null}
                       {pill.label}
                     </span>
                   )

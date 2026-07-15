@@ -223,7 +223,14 @@ export function ThemeSettings() {
     }))
   }
 
-  const updateIconLibrary = (library: IconLibrary) => {
+  // Charles (2026-07-15): "brands" (Simple Icons — Stripe, Slack, GitHub...)
+  // was added for per-field icon pickers (feature grid, social links...),
+  // not as a sensible SITE-WIDE default icon set for generic UI glyphs —
+  // ThemeConfig.iconLibrary's own type (types/theme-config.ts) deliberately
+  // excludes it.
+  const SITE_DEFAULT_ICON_LIBRARIES = ICON_LIBRARIES.filter((l) => l !== "brands")
+
+  const updateIconLibrary = (library: Exclude<IconLibrary, "brands">) => {
     setTheme(prev => ({ ...prev, iconLibrary: library }))
   }
 
@@ -306,7 +313,6 @@ export function ThemeSettings() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
       {/* Theme Mode */}
       <Card>
         <CardHeader>
@@ -334,83 +340,6 @@ export function ThemeSettings() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Icons & Avatars (Pilier D) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Type className="h-5 w-5" />
-            Icons & Avatars
-          </CardTitle>
-          <CardDescription>
-            Icon set for UI glyphs, avatar style for generated user/company avatars
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Icon Library</Label>
-            <Select
-              value={theme.iconLibrary ?? 'lucide'}
-              onValueChange={(value: IconLibrary) => updateIconLibrary(value)}
-            >
-              <SelectTrigger className="w-full md:w-64">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ICON_LIBRARIES.map((library) => (
-                  <SelectItem key={library} value={library}>
-                    {ICON_LIBRARY_LABELS[library]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-              {ICON_PREVIEW_NAMES.map((name) => (
-                <Icon
-                  key={name}
-                  name={name}
-                  library={theme.iconLibrary ?? 'lucide'}
-                  className="h-6 w-6 text-foreground"
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Avatar Style (DiceBear)</Label>
-            <p className="text-xs text-muted-foreground -mt-1">
-              Generated per-user avatar fallback (identicon-style), not semantic UI icons.
-            </p>
-            <Select
-              value={theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE}
-              onValueChange={(style) => setTheme((prev) => ({ ...prev, avatarStyle: style }))}
-            >
-              <SelectTrigger className="w-full md:w-64">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DICEBEAR_STYLES.map((style) => (
-                  <SelectItem key={style.id} value={style.id}>
-                    {style.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-              {['Alex', 'Sam', 'Jordan', 'Taylor'].map((seed) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={seed}
-                  src={getAvatarUrl(seed, theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE)}
-                  alt={seed}
-                  className="h-10 w-10 rounded-full bg-background"
-                />
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      </div>
 
       {/* Typography (Pilier D) */}
       <Card>
@@ -659,6 +588,84 @@ export function ThemeSettings() {
                 </p>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Icons & Avatars (Pilier D) — Charles (2026-07-15): "mérite d'être
+          plus bas" — moved out of the top grid (was paired with Display
+          Mode), now its own full-width card near the bottom of the page. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Type className="h-5 w-5" />
+            Icons & Avatars
+          </CardTitle>
+          <CardDescription>
+            Icon set for UI glyphs, avatar style for generated user/company avatars
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label>Icon Library</Label>
+            <Select
+              value={theme.iconLibrary ?? 'lucide'}
+              onValueChange={(value: Exclude<IconLibrary, "brands">) => updateIconLibrary(value)}
+            >
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SITE_DEFAULT_ICON_LIBRARIES.map((library) => (
+                  <SelectItem key={library} value={library}>
+                    {ICON_LIBRARY_LABELS[library]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+              {ICON_PREVIEW_NAMES.map((name) => (
+                <Icon
+                  key={name}
+                  name={name}
+                  library={theme.iconLibrary ?? 'lucide'}
+                  className="h-6 w-6 text-foreground"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Avatar Style (DiceBear)</Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Generated per-user avatar fallback (identicon-style), not semantic UI icons.
+            </p>
+            <Select
+              value={theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE}
+              onValueChange={(style) => setTheme((prev) => ({ ...prev, avatarStyle: style }))}
+            >
+              <SelectTrigger className="w-full md:w-64">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DICEBEAR_STYLES.map((style) => (
+                  <SelectItem key={style.id} value={style.id}>
+                    {style.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+              {['Alex', 'Sam', 'Jordan', 'Taylor'].map((seed) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={seed}
+                  src={getAvatarUrl(seed, theme.avatarStyle ?? DEFAULT_DICEBEAR_STYLE)}
+                  alt={seed}
+                  className="h-10 w-10 rounded-full bg-background"
+                />
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

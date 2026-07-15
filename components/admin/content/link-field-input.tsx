@@ -9,6 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getContentPages, getContentArticles, getContentMedia } from "@/app/actions/pages"
+import { HARDCODED_LINK_OPTIONS } from "@/lib/hardcoded-pages"
 
 export interface LinkOption {
   value: string
@@ -36,19 +37,6 @@ export async function loadDocumentLinkOptions(): Promise<LinkOption[]> {
   return options
 }
 
-// Charles (2026-07-09): "des pages de type automatique comme rgpd et
-// produits" — /pricing and /legal/* are real, linkable pages but aren't
-// driven by Payload's page_layers table (hardcoded business/payment logic,
-// see pages-settings.tsx's own "stay hardcoded" note) so they never show up
-// in getContentPages(). Listed here by hand since there's no collection to
-// query them from — locale-agnostic paths, same convention as Payload
-// pages' own `path` (locale prefix is added at render time, not stored).
-const HARDCODED_PAGES: LinkOption[] = [
-  { value: "/pricing", label: "Pricing — /pricing" },
-  { value: "/legal/privacy", label: "Privacy policy — /legal/privacy" },
-  { value: "/legal/terms", label: "Terms of service — /legal/terms" },
-]
-
 // Fetched once per admin session (module-level cache) — the picker is
 // mounted per href field, and a page's own list of pages/articles doesn't
 // change mid-edit. Cleared on full reload, same lifetime as a page refresh.
@@ -60,7 +48,7 @@ export async function loadLinkOptions(): Promise<LinkOption[]> {
     getContentPages({ limit: 200 }),
     getContentArticles({ limit: 200 }),
   ])
-  const options: LinkOption[] = [...HARDCODED_PAGES]
+  const options: LinkOption[] = [...HARDCODED_LINK_OPTIONS]
   if (pagesResult.success) {
     for (const p of pagesResult.data.docs) {
       if (p._status === "published") options.push({ value: p.path, label: `${p.title} — ${p.path}` })
@@ -92,7 +80,14 @@ export async function loadLinkOptions(): Promise<LinkOption[]> {
  * used by font-source-picker.tsx. Shared between the "page" and "document"
  * modes below — they only differ in which options they list.
  */
-function LinkCombobox({
+/**
+ * Reused as-is by payload-link-editor.tsx's "Page"/"Category" selectors
+ * (Charles, 2026-07-14: "un sélecteur qui incorpore un module de recherche
+ * comme sur la gestion des pages") — same searchable Popover+Command combo,
+ * just fed a different `options` list (Payload page/category IDs instead
+ * of plain href strings).
+ */
+export function LinkCombobox({
   id,
   value,
   options,

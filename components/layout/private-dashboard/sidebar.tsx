@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import {
   LogOut,
   User,
@@ -85,6 +85,18 @@ const supportSubItems = [
   { name: "Tickets", href: "/admin/support" },
 ]
 
+// Header/Footer share /admin/pages (see app/(private)/admin/pages/page.tsx's
+// ?type= switch) rather than owning separate routes — these sub-links just
+// preset that query param.
+const contentSubItems = [
+  { name: "Pages", href: "/admin/pages" },
+  { name: "Header", href: "/admin/pages?type=header" },
+  { name: "Footer", href: "/admin/pages?type=footer" },
+  { name: "Modules", href: "/admin/pages?type=modules" },
+  { name: "Media", href: "/admin/pages?type=media" },
+  { name: "Style", href: "/admin/pages?type=style" },
+]
+
 interface NavItem {
   name: string
   href: string
@@ -164,6 +176,7 @@ function SubNavLink({
 
 export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { isAdmin, isSuperAdmin, isLoading } = useUser()
   const { siteName, logo, logoDisplayMode } = usePlatformConfig()
   const [isAdminOpen, setIsAdminOpen] = useState(
@@ -172,6 +185,16 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
   const [isSupportOpen, setIsSupportOpen] = useState(
     pathname.startsWith("/admin/support") || pathname.startsWith("/admin/chat"),
   )
+  const contentTypeParam = searchParams.get("type")
+  const [isContentOpen, setIsContentOpen] = useState(pathname === "/admin/pages")
+  // Query-param-based sub-links (?type=header/footer) can't be told apart by
+  // pathname alone the way every other sub-link here can — isPathActive's
+  // startsWith check would never see the query string.
+  const isContentSubItemActive = (href: string) => {
+    if (pathname !== "/admin/pages") return false
+    const type = href.includes("?type=") ? href.split("?type=")[1] : null
+    return type === contentTypeParam || (type === null && !contentTypeParam)
+  }
   const [isAccountOpen, setIsAccountOpen] = useState(isAnyPathActive(pathname, accountPaths))
   const [isProfileOpen, setIsProfileOpen] = useState(isAnyPathActive(pathname, profilePaths))
   const [isClientSupportOpen, setIsClientSupportOpen] = useState(isAnyPathActive(pathname, clientSupportPaths))
@@ -370,8 +393,34 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
                       </CollapsibleContent>
                     </Collapsible>
 
+                    <Collapsible open={isContentOpen} onOpenChange={setIsContentOpen}>
+                      <CollapsibleTrigger
+                        className={cn(
+                          "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                          pathname === "/admin/pages" ? "bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Layers className="h-4 w-4" />
+                          <span>Content</span>
+                        </div>
+                        <ChevronDown className={cn("h-4 w-4 transition-transform", isContentOpen && "rotate-180")} />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-1 space-y-1 pl-7">
+                        {contentSubItems.map((item) => (
+                          <SubNavLink
+                            key={item.href}
+                            name={item.name}
+                            href={item.href}
+                            isActive={isContentSubItemActive(item.href)}
+                            onClick={handleLinkClick}
+                          />
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+
                     {visibleAdminItems
-                      .filter((item) => item.href !== "/admin")
+                      .filter((item) => item.href !== "/admin" && item.href !== "/admin/pages")
                       .map((item) => {
                         const Icon = item.icon
                         const isActive = isPathActive(pathname, item.href)

@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { userApiKeys, userApiKeyUsage } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
 /**
@@ -115,6 +115,29 @@ export async function listUserApiKeys(userId: string) {
 }
 
 /**
+ * Liste toutes les clés API portant un tag donné dans `permissions`,
+ * tous utilisateurs confondus (contrairement à listUserApiKeys, scopée à
+ * un seul utilisateur) — utile pour une préoccupation admin-wide comme les
+ * tokens MCP, que plusieurs admins doivent pouvoir voir/révoquer.
+ */
+export async function listApiKeysByPermission(permission: string) {
+  return await db
+    .select({
+      id: userApiKeys.id,
+      userId: userApiKeys.userId,
+      name: userApiKeys.name,
+      keyPrefix: userApiKeys.keyPrefix,
+      permissions: userApiKeys.permissions,
+      isActive: userApiKeys.isActive,
+      expiresAt: userApiKeys.expiresAt,
+      lastUsedAt: userApiKeys.lastUsedAt,
+      createdAt: userApiKeys.createdAt,
+    })
+    .from(userApiKeys)
+    .where(sql`${userApiKeys.permissions} @> ${JSON.stringify([permission])}::jsonb`);
+}
+
+/**
  * Révoque (désactive) une clé API
  */
 export async function revokeApiKey(keyId: string, userId: string) {
@@ -122,6 +145,22 @@ export async function revokeApiKey(keyId: string, userId: string) {
     .update(userApiKeys)
     .set({ isActive: false, updatedAt: new Date() })
     .where(and(eq(userApiKeys.id, keyId), eq(userApiKeys.userId, userId)))
+    .returning();
+
+  return revokedKey;
+}
+
+/**
+ * Révoque une clé API par id seul, sans filtre userId — pour les clés
+ * admin-wide (ex. tokens MCP) où le révocateur n'est pas forcément le
+ * créateur. Le caller doit vérifier lui-même le tag `permissions` avant
+ * d'appeler ceci (voir revokeMcpToken dans app/actions/mcp-tokens.ts).
+ */
+export async function revokeApiKeyById(keyId: string) {
+  const [revokedKey] = await db
+    .update(userApiKeys)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(userApiKeys.id, keyId))
     .returning();
 
   return revokedKey;

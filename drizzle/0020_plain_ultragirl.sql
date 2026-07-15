@@ -1,0 +1,2 @@
+ALTER TABLE "page_seo" ADD COLUMN "is_homepage" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "page_seo_homepage_unique" ON "page_seo" USING btree ("locale") WHERE is_homepage = true;

@@ -22,15 +22,32 @@ const LOCALE_LABELS: Record<Locale, string> = {
  * Confirmed missing entirely (2026-07-08, Charles) — /fr and /en routing
  * existed in the code but visitors had no UI to switch between them. Swaps
  * only the leading /fr or /en segment, keeps the rest of the path (and
- * query string) intact.
+ * query string) intact — the fallback when `alternatePaths` has nothing for
+ * a locale, i.e. the same behavior this component always had before
+ * 2026-07-15.
+ *
+ * `alternatePaths` (from getAlternatePagePaths, app/actions/site-nav.ts) is
+ * this page's real Joomla-style association — now that Pages.slug/path are
+ * localized (fr and en can have genuinely different URLs), a blind prefix
+ * swap would 404 on a page whose English slug differs from its French one.
+ * Passed down from the public layout, which already resolves `pagePath`.
  */
-export function LocaleSwitcher() {
+export function LocaleSwitcher({ alternatePaths }: { alternatePaths?: Record<string, string> | null }) {
   const pathname = usePathname()
   const currentLocale = useLocale()
 
   function pathForLocale(locale: Locale): string {
+    const alternate = alternatePaths?.[locale]
+    if (alternate) return `/${locale}${alternate === "/" ? "" : alternate}`
     const rest = pathname.replace(/^\/(fr|en)/, "")
     return `/${locale}${rest || ""}`
+  }
+
+  // Persists a manual choice so a later visit to the bare domain
+  // (neosaas.tech, no /fr or /en) honors it instead of re-running the
+  // Accept-Language guess in proxy.ts's detectPreferredLocale.
+  function rememberLocale(locale: Locale) {
+    document.cookie = `preferred-locale=${locale}; path=/; max-age=${60 * 60 * 24 * 365}`
   }
 
   return (
@@ -44,7 +61,9 @@ export function LocaleSwitcher() {
       <DropdownMenuContent align="end">
         {LOCALES.map((locale) => (
           <DropdownMenuItem key={locale} asChild disabled={locale === currentLocale}>
-            <Link href={pathForLocale(locale)}>{LOCALE_LABELS[locale]}</Link>
+            <Link href={pathForLocale(locale)} onClick={() => rememberLocale(locale)}>
+              {LOCALE_LABELS[locale]}
+            </Link>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

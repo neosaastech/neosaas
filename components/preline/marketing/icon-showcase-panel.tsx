@@ -2,7 +2,7 @@
  * Preline Marketing — icon grid showcase panel with optional image/video media.
  * @see https://www.preline.co/examples/features-general.html
  */
-import * as LucideIcons from "lucide-react"
+import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
 
 export interface IconShowcaseItem {
@@ -35,7 +35,6 @@ function IconShowcaseGrid({ items }: { items: IconShowcaseItem[] }) {
   return (
     <div className="grid grid-cols-3 gap-4 p-8">
       {items.map((item) => {
-        const Icon = (LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>)[item.icon]
         const highlighted = item.highlighted === true
 
         return (
@@ -48,8 +47,8 @@ function IconShowcaseGrid({ items }: { items: IconShowcaseItem[] }) {
                   : "h-16 w-16 bg-brand/20",
               )}
             >
-              {Icon ? (
-                <Icon className={cn("text-brand", highlighted ? "h-10 w-10 text-white" : "h-8 w-8")} />
+              {item.icon ? (
+                <Icon name={item.icon} className={cn("text-brand", highlighted ? "h-10 w-10 text-white" : "h-8 w-8")} />
               ) : null}
             </div>
             <span

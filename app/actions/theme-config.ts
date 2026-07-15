@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import type { ThemeConfig } from '@/types/theme-config'
 import { defaultTheme } from '@/types/theme-config'
+import { pushThemeColorsToTenant } from '@/lib/payload-bridge'
 
 /**
  * Récupérer la configuration de thème actuelle
@@ -91,6 +92,18 @@ export async function updateThemeConfig(config: ThemeConfig): Promise<{
 
     // Revalider toutes les pages pour appliquer le nouveau thème
     revalidatePath('/', 'layout')
+
+    // Charles (2026-07-15): "je pilote de plus en plus depuis neosaas" —
+    // push the palette back to Payload's Tenant "Couleurs" tab so it
+    // doesn't silently drift stale now that this admin (not the Tenant
+    // form) is the day-to-day place colors actually get edited. Best-effort
+    // — theme_config above is already live for the public site regardless.
+    pushThemeColorsToTenant({
+      light: config.light as unknown as Record<string, string>,
+      dark: config.dark as unknown as Record<string, string>,
+    }).catch((error) => {
+      console.error('Failed to push theme colors to Payload Tenant:', error)
+    })
 
     return { success: true }
   } catch (error) {

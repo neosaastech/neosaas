@@ -3,19 +3,35 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, Lock } from "lucide-react"
+import { Menu } from "lucide-react"
 import { type JWTPayload } from "@/lib/auth"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
 import { useLocale } from "@/lib/i18n/use-locale"
+import { AuthNavButtons } from "@/components/layout/auth-nav-buttons"
+import type { NavLink } from "@/types/site-nav"
+
+const DEFAULT_ITEMS: NavLink[] = [
+  { href: "", label: "Home" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/legal/privacy", label: "Privacy" },
+  { href: "/legal/terms", label: "Terms" },
+]
 
 interface MobileMenuProps {
   user?: JWTPayload | null
+  showAuthButtons?: boolean
+  // Charles (2026-07-15): this menu never received the Payload-driven nav at
+  // all — it always rendered the same 4 hardcoded links regardless of what
+  // was configured (Header's own desktop nav had the opposite, smaller bug:
+  // it received items but silently dropped any `children`/sub-links).
+  items?: NavLink[]
 }
 
-export function MobileMenu({ user }: MobileMenuProps) {
+export function MobileMenu({ user, showAuthButtons = true, items }: MobileMenuProps) {
   const { siteName } = usePlatformConfig()
   const locale = useLocale()
   const [open, setOpen] = useState(false)
+  const navItems = items && items.length > 0 ? items : DEFAULT_ITEMS
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -34,41 +50,40 @@ export function MobileMenu({ user }: MobileMenuProps) {
         </div>
         <div className="flex flex-col gap-6 px-2 py-6">
           <nav className="flex flex-col space-y-4">
-            <Link href={`/${locale}`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
-              Home
-            </Link>
-            <Link href={`/${locale}/pricing`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
-              Pricing
-            </Link>
-            <Link href={`/${locale}/legal/privacy`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
-              Privacy
-            </Link>
-            <Link href={`/${locale}/legal/terms`} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
-              Terms
-            </Link>
+            {navItems.map((link) => {
+              const href = link.href ? `/${locale}${link.href}` : `/${locale}`
+              return (
+                <div key={link.label} className="flex flex-col">
+                  <Link href={href} className="text-lg font-medium hover:text-brand" onClick={() => setOpen(false)}>
+                    {link.label}
+                  </Link>
+                  {link.children && link.children.length > 0 && (
+                    <div className="mt-2 flex flex-col space-y-2 border-l pl-4">
+                      {link.children.map((child) => {
+                        const childHref = child.href ? `/${locale}${child.href}` : `/${locale}`
+                        return (
+                          <Link
+                            key={child.label}
+                            href={childHref}
+                            className="text-sm text-muted-foreground hover:text-brand"
+                            onClick={() => setOpen(false)}
+                          >
+                            {child.label}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </nav>
 
-          <div className="flex flex-col gap-2 mt-4">
-            {user ? (
-              <Link href="/dashboard" onClick={() => setOpen(false)}>
-                <Button className="w-full gap-2">
-                  <Lock className="h-4 w-4" />
-                  Dashboard
-                </Button>
-              </Link>
-            ) : (
-              <>
-                <Link href="/auth/login" onClick={() => setOpen(false)}>
-                  <Button variant="outline" className="w-full">
-                    Login
-                  </Button>
-                </Link>
-                <Link href="/auth/register" onClick={() => setOpen(false)}>
-                  <Button className="w-full bg-brand hover:bg-[#B26B27] text-white border-none">Sign Up</Button>
-                </Link>
-              </>
-            )}
-          </div>
+          {showAuthButtons && (
+            <div className="flex flex-col gap-2 mt-4">
+              <AuthNavButtons user={user} variant="mobile" onNavigate={() => setOpen(false)} />
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
