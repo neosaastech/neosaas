@@ -1,3 +1,9 @@
+## [1.12.0](https://github.com/neosaastech/Neosaas-app/compare/v1.11.0...v1.12.0) (2026-07-27)
+
+### Features
+
+* **ui:** move sidebar collapse to header and brand auth pages ([f435215](https://github.com/neosaastech/Neosaas-app/commit/f435215e10e9b19738695cb01d0549664fc8bb33))
+
 ## [1.11.0](https://github.com/neosaastech/Neosaas-app/compare/v1.10.2...v1.11.0) (2026-07-15)
 
 ### Features

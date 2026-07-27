@@ -1,6 +1,7 @@
 'use client'
 
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -97,9 +98,14 @@ export default function AcceptInvitePage() {
         <div className="mx-auto grid w-full max-w-md gap-6 px-4">
           <div className="grid gap-2 text-center">
             <div className="flex flex-col items-center mb-4">
-              <div className="h-12 w-12 rounded-full bg-brand/10 flex items-center justify-center mb-2">
-                <span className="text-brand font-bold text-xl">NS</span>
-              </div>
+              <Image
+                src="/images/logo_neolux.svg"
+                alt="NeoKube"
+                width={48}
+                height={48}
+                className="mb-2"
+                priority
+              />
               <h1 className="text-3xl font-bold">Accept Invitation</h1>
             </div>
             <p className="text-balance text-muted-foreground">
