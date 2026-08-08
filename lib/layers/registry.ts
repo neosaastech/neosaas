@@ -103,6 +103,7 @@ const logoCloudItemSchema = z.object({
   name: z.string(),
   imageUrl: z.string().optional(),
   markup: z.string().optional(),
+  description: z.string().optional(),
 })
 
 export const layerRegistry: Record<string, LayerDefinition> = {

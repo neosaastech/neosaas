@@ -256,6 +256,7 @@ function mapBlockToProps(block: PayloadPageBlock): Record<string, unknown> {
           name: item.name,
           imageUrl: extractMediaUrl(item.image),
           markup: item.markup ?? undefined,
+          description: item.description ?? undefined,
         })),
       }
     }

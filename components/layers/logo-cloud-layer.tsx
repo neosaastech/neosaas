@@ -10,6 +10,7 @@ export interface LogoCloudItem {
   name: string
   imageUrl?: string
   markup?: string
+  description?: string
 }
 
 export interface LogoCloudLayerProps {
@@ -30,24 +31,26 @@ export function LogoCloudLayer({ eyebrow, title, subtitle, items }: LogoCloudLay
           dangerouslySetInnerHTML={{ __html: subtitle }}
         />
       )}
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
-        {items.map((item) =>
-          item.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={item.name} src={item.imageUrl} alt={item.name} className="h-8 w-auto object-contain grayscale" />
-          ) : item.markup ? (
-            <span
-              key={item.name}
-              title={item.name}
-              className="h-8 w-auto text-muted-foreground [&_svg]:h-8 [&_svg]:w-auto"
-              dangerouslySetInnerHTML={{ __html: item.markup }}
-            />
-          ) : (
-            <span key={item.name} className="text-sm font-medium text-muted-foreground">
-              {item.name}
-            </span>
-          ),
-        )}
+      <div className="mt-10 flex flex-wrap items-start justify-center gap-x-10 gap-y-6">
+        {items.map((item) => (
+          <div key={item.name} className="flex flex-col items-center gap-1.5">
+            {item.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.imageUrl} alt={item.name} className="h-8 w-auto object-contain grayscale" />
+            ) : item.markup ? (
+              <span
+                title={item.name}
+                className="h-8 w-auto text-muted-foreground [&_svg]:h-8 [&_svg]:w-auto"
+                dangerouslySetInnerHTML={{ __html: item.markup }}
+              />
+            ) : (
+              <span className="text-sm font-medium text-muted-foreground">{item.name}</span>
+            )}
+            {item.description && (
+              <span className="text-xs text-muted-foreground">{item.description}</span>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )
