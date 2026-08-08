@@ -245,6 +245,12 @@ function fromPayloadBlock(block: PayloadPageBlock): PayloadPageBlock {
     next.items = (block.items as Array<Record<string, unknown>>).map((item) => ({ ...item, imageUrl: unpackImage(item.image) }))
   }
 
+  // See toPayloadBlock's matching logo-cloud case — same missed block type,
+  // read direction.
+  if (block.blockType === "logo-cloud" && Array.isArray(block.items)) {
+    next.items = (block.items as Array<Record<string, unknown>>).map((item) => ({ ...item, imageUrl: unpackImage(item.image) }))
+  }
+
   if (block.blockType === "feature-grid" && Array.isArray(block.items)) {
     next.items = (block.items as Array<Record<string, unknown>>).map((item) => ({ ...item, bullets: unpackBullets(item.bullets) }))
   }
@@ -340,6 +346,21 @@ async function toPayloadBlock(block: PayloadPageBlock): Promise<PayloadPageBlock
   }
 
   if (block.blockType === "testimonials" && Array.isArray(block.items)) {
+    next.items = await Promise.all(
+      (block.items as Array<Record<string, unknown>>).map(async (item) => {
+        const { imageUrl, ...rest } = item
+        return { ...rest, image: await resolveMediaIdByUrl(imageUrl as string | undefined) }
+      }),
+    )
+  }
+
+  // Missed when logo-cloud was added — items[].imageUrl (Content Hub's flat
+  // form shape) was never converted to items[].image (Payload's real
+  // relation field), so a logo picked in the editor silently never made it
+  // past this bridge: the save "succeeded" (Payload just ignores the
+  // unrecognized `imageUrl` key) but `image` stayed null forever. Same
+  // pattern as testimonials above.
+  if (block.blockType === "logo-cloud" && Array.isArray(block.items)) {
     next.items = await Promise.all(
       (block.items as Array<Record<string, unknown>>).map(async (item) => {
         const { imageUrl, ...rest } = item
