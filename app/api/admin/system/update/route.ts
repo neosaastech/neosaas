@@ -1,6 +1,6 @@
 /**
- * System Update — check the Core repo's latest tag and (optionally) trigger
- * a Kube rollout via a secured webhook. Admin/super-admin only.
+ * System Update — check the Core repo's latest release and (optionally)
+ * trigger a sync + redeploy of this site. Admin/super-admin only.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -22,21 +22,17 @@ interface UpdateStatus {
   error?: string
 }
 
-// GitHub's tags API is used (not /releases/latest) because this repo is
-// tag-only, no formal GitHub Releases — matches "comparer le dernier tag".
+// GET /tags is NOT sorted by recency (confirmed live: it once returned a
+// stale tag ahead of a just-published release, causing apply-update.yml to
+// silently apply an older version — fixed there 2026-07-07 by switching to
+// /releases/latest, which has real "latest published release" semantics).
+// This route had the same bug independently — mirroring the same fix here.
 // Every field here is treated as possibly missing/null: an unauthenticated
 // or malformed response must degrade to "couldn't check", never crash the
 // route (the exact class of bug the i18n null/undefined mismatch was).
-const GitHubTagSchema = z.object({
-  name: z.string(),
-  commit: z
-    .object({
-      sha: z.string().nullish(),
-      url: z.string().nullish(),
-    })
-    .nullish(),
+const GitHubReleaseResponseSchema = z.object({
+  tag_name: z.string(),
 })
-const GitHubTagsResponseSchema = z.array(GitHubTagSchema)
 
 // Reads package.json directly instead of a NEXT_PUBLIC_APP_VERSION env var —
 // that var has to be set by hand per site and nothing in the apply-update
@@ -115,14 +111,13 @@ async function checkForUpdate(userId?: string): Promise<UpdateStatus> {
       headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
     }
 
-    const res = await fetch(`https://api.github.com/repos/${repo}/tags?per_page=1`, { headers })
+    const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers })
     if (!res.ok) {
       throw new Error(`GitHub API returned ${res.status}`)
     }
 
     const raw = await res.json()
-    const tags = GitHubTagsResponseSchema.parse(raw)
-    const latestVersion = tags[0]?.name ?? null
+    const latestVersion = GitHubReleaseResponseSchema.parse(raw).tag_name
 
     const status: UpdateStatus = {
       currentVersion,

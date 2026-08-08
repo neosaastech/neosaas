@@ -82,7 +82,7 @@ export function UpdateSettings() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Deploy failed (${res.status})`)
       }
-      toast.success("Update triggered — the pod will restart shortly")
+      toast.success("Update triggered — the site will redeploy shortly")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to trigger update")
     } finally {
@@ -152,8 +152,8 @@ export function UpdateSettings() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Apply update {status?.latestVersion}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will trigger a rollout restart of this instance's pod on the Core image. The
-                  application will be briefly unavailable during the restart. This action cannot be undone.
+                  This will sync the latest Core release into this site and redeploy it. The
+                  application will be briefly unavailable during the redeploy. This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
