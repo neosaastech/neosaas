@@ -19,12 +19,14 @@ export async function GET() {
     // Test database connection with a simple query
     const result = await db.execute(sql`SELECT 1 as test, NOW() as timestamp`);
 
-    // Check if tables exist
+    // Check if tables exist — resolve via search_path (to_regclass), not a
+    // hardcoded 'public' schema: self-hosted/tenant deployments (Dokploy,
+    // Supabase) put app tables in a per-tenant schema (e.g. neostudio_dev),
+    // where table_schema = 'public' always reports them missing even when present.
     const tablesResult = await db.execute(sql`
       SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_name IN ('users', 'companies')
+      FROM unnest(ARRAY['users', 'companies']) AS table_name
+      WHERE to_regclass(table_name) IS NOT NULL
       ORDER BY table_name
     `);
 

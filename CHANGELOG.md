@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/neosaastech/Neosaas-app/compare/v1.12.1...v1.12.2) (2026-08-09)
+
+### Bug Fixes
+
+* **db:** use node-postgres for non-Neon hosts (Supabase/Dokploy) ([f73bdf8](https://github.com/neosaastech/Neosaas-app/commit/f73bdf825d882ccc73884aae29c4d6884810c615))
+* **health:** resolve users/companies check via search_path, not hardcoded public ([9b66e5e](https://github.com/neosaastech/Neosaas-app/commit/9b66e5ec7df8e09fdc4c6e9967eab0fd5289343f))
+
 ## [1.12.1](https://github.com/neosaastech/Neosaas-app/compare/v1.12.0...v1.12.1) (2026-08-09)
 
 ### Bug Fixes

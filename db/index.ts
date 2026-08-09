@@ -29,14 +29,18 @@ function getConnectionString(): string {
     .replace('?channel_binding=require', '');
 }
 
-function isLocalPostgres(url: string): boolean {
-  return /localhost|127\.0\.0\.1/.test(url);
+function useNodePostgres(url: string): boolean {
+  // Neon HTTP driver only works with Neon cloud endpoints (*.neon.tech).
+  // Self-hosted Postgres (Supabase, local, Dokploy) must use node-postgres.
+  if (/localhost|127\.0\.0\.1/.test(url)) return true;
+  if (!/\.neon\.tech/.test(url)) return true;
+  return false;
 }
 
 function initDb() {
   if (_db) return _db;
   const connectionString = getConnectionString();
-  if (isLocalPostgres(connectionString)) {
+  if (useNodePostgres(connectionString)) {
     _pool = new Pool({ connectionString });
     _db = drizzlePg(_pool, { schema });
   } else {
