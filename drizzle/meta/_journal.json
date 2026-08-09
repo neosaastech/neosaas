@@ -162,6 +162,13 @@
       "when": 1784128850337,
       "tag": "0022_great_the_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786272582473,
+      "tag": "0023_jittery_dakota_north",
+      "breakpoints": true
     }
   ]
 }

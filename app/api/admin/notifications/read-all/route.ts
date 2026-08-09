@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { chatMessages } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { chatMessages, contentSyncIssues } from '@/db/schema'
+import { eq, isNull } from 'drizzle-orm'
 import { requireAdmin } from '@/lib/auth/server'
 
 /**
@@ -19,6 +19,11 @@ export async function POST(request: NextRequest) {
         readAt: new Date()
       })
       .where(eq(chatMessages.senderType, 'system'))
+
+    await db
+      .update(contentSyncIssues)
+      .set({ resolvedAt: new Date() })
+      .where(isNull(contentSyncIssues.resolvedAt))
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { chatConversations, chatMessages, users, orders, orderItems, products } from '@/db/schema'
+import { chatConversations, chatMessages, users, orders, orderItems, products, contentSyncIssues } from '@/db/schema'
 import { eq, desc, and, or, sql, count, ne, isNull } from 'drizzle-orm'
 import { requireAdmin } from '@/lib/auth/server'
 
@@ -440,6 +440,43 @@ export async function GET(request: NextRequest) {
           actions: metadata.actions,
         }
       })
+    }
+
+    // 5. Fetch unresolved content sync failures — written by payload-cms's
+    // sync adapter whenever a Page/BlogPost publish fails to push here
+    // (Charles, 2026-08-09: "les échecs notifiés m'aideraient à agir sur
+    // l'erreur directement"). Always 'action' mode: a page sitting
+    // "Published" in Payload while actually 404ing here needs a fix, not
+    // just an FYI. Excluded from 'info' the same way conversations are
+    // above — there's no passive variant of this notification.
+    try {
+      const syncIssues = await db
+        .select()
+        .from(contentSyncIssues)
+        .where(isNull(contentSyncIssues.resolvedAt))
+        .orderBy(desc(contentSyncIssues.createdAt))
+        .limit(Math.floor(limit / 2))
+
+      for (const issue of syncIssues) {
+        notifications.push({
+          id: issue.id,
+          type: 'content',
+          mode: 'interactive',
+          title: `Échec de synchronisation — ${issue.path}`,
+          description: issue.message,
+          timestamp: issue.createdAt.toISOString(),
+          isRead: false,
+          actionRequired: true,
+          metadata: {
+            notificationType: 'content_sync_failure',
+            path: issue.path,
+            locale: issue.locale,
+            source: issue.source,
+          },
+        })
+      }
+    } catch (syncIssuesError) {
+      console.error('Error fetching content sync issues:', syncIssuesError)
     }
 
     // Sort all notifications by timestamp (most recent first)

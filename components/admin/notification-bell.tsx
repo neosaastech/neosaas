@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Package, Calendar, CreditCard, User, MessageSquare, Settings, CheckCircle, Info, Clock, Download, ExternalLink, Truck, FileCheck } from "lucide-react"
+import { Bell, Package, Calendar, CreditCard, User, MessageSquare, Settings, CheckCircle, Info, Clock, Download, ExternalLink, Truck, FileCheck, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -18,7 +18,7 @@ import Link from "next/link"
 
 interface Notification {
   id: string
-  type: 'order' | 'appointment' | 'payment' | 'user' | 'support' | 'system'
+  type: 'order' | 'appointment' | 'payment' | 'user' | 'support' | 'system' | 'content'
   title: string
   description: string
   timestamp: string
@@ -72,6 +72,7 @@ const typeConfig = {
   subscription: { icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30', label: 'Subscription' },
   support: { icon: MessageSquare, color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/30', label: 'Support' },
   system: { icon: Settings, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-900/30', label: 'System' },
+  content: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30', label: 'Content' },
 }
 
 export function NotificationBell() {
@@ -167,6 +168,12 @@ export function NotificationBell() {
       } else {
         router.push('/admin/users')
       }
+    } else if (notification.type === 'content') {
+      // Content sync failures don't have a per-doc URL in this admin (the
+      // Pages/BlogPosts list has no [id] route, editing happens in an
+      // overlay) — the notification's own description already carries the
+      // failing path, land the editor on the right list to search it there.
+      router.push('/admin/pages')
     } else {
       router.push('/admin/chat')
     }

@@ -1098,6 +1098,38 @@ export const categories = pgTable("categories", {
 export type Category = typeof categories.$inferSelect
 export type NewCategory = typeof categories.$inferInsert
 
+/**
+ * Content sync failures — written directly by payload-cms's sync adapter
+ * (src/sync/targets/neosaas-app.ts's notifyConsumerSyncFailure) whenever a
+ * Page/BlogPost publish fails to push to this site's own DB. Previously the
+ * only signal was Payload's own `syncStatus` field, visible only inside
+ * Payload's admin sidebar — invisible from this site's own admin, so a page
+ * could sit "Published" while actually 404ing here with zero visible signal
+ * on THIS side. Surfaced via /api/admin/notifications as a 'content'
+ * notification (Charles, 2026-08-09: "les échecs notifiés m'aideraient à
+ * agir sur l'erreur directement"). `resolvedAt` is set the next time the
+ * same path+locale syncs successfully (see notifyConsumerSyncFailure) —
+ * this table only ever holds the current failure per (path, locale), not a
+ * running log.
+ */
+export const contentSyncIssues = pgTable("content_sync_issues", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  source: text("source").notNull(), // 'page' | 'blog-post'
+  path: text("path").notNull(),
+  locale: text("locale").notNull().default("fr"),
+  title: text("title"),
+  message: text("message").notNull(),
+  payloadDocId: text("payload_doc_id"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  sourcePathLocaleUnique: uniqueIndex("content_sync_issues_source_path_locale_unique").on(table.source, table.path, table.locale),
+}))
+
+export type ContentSyncIssue = typeof contentSyncIssues.$inferSelect
+export type NewContentSyncIssue = typeof contentSyncIssues.$inferInsert
+
 // =============================================================================
 // PILOT ACTIONS LOG - Declarative admin/agent actions (Pilier E — pilotage JSON)
 // =============================================================================

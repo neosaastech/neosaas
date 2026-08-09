@@ -1,3 +1,9 @@
+## [1.13.0](https://github.com/neosaastech/Neosaas-app/compare/v1.12.9...v1.13.0) (2026-08-09)
+
+### Features
+
+* **notifications:** surface content sync failures in the admin bell ([980fdaf](https://github.com/neosaastech/Neosaas-app/commit/980fdafbac99e4a7f5e7f46d051daf8630e702d1))
+
 ## [1.12.9](https://github.com/neosaastech/Neosaas-app/compare/v1.12.8...v1.12.9) (2026-08-09)
 
 ### Bug Fixes
