@@ -1,23 +1,36 @@
-import Link from "next/link"
+import { headers } from "next/headers"
 import { DocsLayout } from "fumadocs-ui/layouts/docs"
 import { RootProvider } from "fumadocs-ui/provider/next"
 import { ArrowLeft } from "lucide-react"
 import { getDocsSource } from "@/lib/docs/fumadocs-source"
 import { getPlatformConfig } from "@/lib/config"
+import { getFooterConfig } from "@/app/actions/site-nav"
 import { shouldShowLogoInHeader, shouldShowSiteNameInHeader } from "@/lib/logo-display"
 import { BrandMark } from "@/components/common/brand-mark"
 import { ThemeToggle } from "@/components/common/theme-toggle"
+import { SiteFooter } from "@/components/layout/site-footer"
 
 /**
  * Deliberately NOT nested under app/[locale]/(public) — that layout already
  * injects SiteHeader/SiteFooter/CookieConsent, which would double up with
- * DocsLayout's own nav/sidebar chrome. app/[locale]/layout.tsx (the only
- * layout above this one) is a thin passthrough, so this route gets Fumadocs'
- * shell and nothing else. Theme/search are disabled on RootProvider: the
- * site already has its own next-themes provider at the root, and no search
- * index exists yet (Charles, 2026-07-11: explicit "mode wiki exclusif" —
- * a minimal dedicated bar, not the full marketing header, but with a real
- * way back to the site).
+ * DocsLayout's own nav/sidebar chrome (still true for the header/sidebar).
+ * app/[locale]/layout.tsx (the only layout above this one) is a thin
+ * passthrough, so this route gets Fumadocs' shell for nav/sidebar. Theme/
+ * search are disabled on RootProvider: the site already has its own
+ * next-themes provider at the root, and no search index exists yet
+ * (Charles, 2026-07-11: explicit "mode wiki exclusif" — a minimal dedicated
+ * bar, not the full marketing header, but with a real way back to the
+ * site).
+ *
+ * Footer (2026-08-09): the bottom chrome doesn't carry the same "avoid
+ * doubling the marketing header" reasoning — the docs footer had been left
+ * as a hardcoded English-only stub since the initial "wiki mode" pass,
+ * never actually finished. Charles: reuse the real site-wide Footer (same
+ * Payload-configured content, legal links, scoping) instead of maintaining
+ * a second, permanently-half-built one. Resolved with the same
+ * pagePath+locale scoping app/[locale]/(public)/layout.tsx uses, off the
+ * same `x-pathname` header stamped by proxy.ts (this route is covered by
+ * proxy.ts's matcher, confirmed — nothing docs-specific excludes it).
  *
  * Charles (2026-07-12): two follow-ups on top of the first pass —
  * 1) the nav title was a one-off plain-text span instead of the same
@@ -45,7 +58,13 @@ export default async function DocumentationLayout({
   children: React.ReactNode
 }) {
   const { locale } = await params
-  const [source, platformConfig] = await Promise.all([getDocsSource(locale), getPlatformConfig()])
+  const rawPathname = (await headers()).get("x-pathname") ?? `/${locale}/documentation`
+  const pagePath = rawPathname === `/${locale}` ? "/" : rawPathname.slice(`/${locale}`.length) || "/"
+  const [source, platformConfig, footerConfig] = await Promise.all([
+    getDocsSource(locale),
+    getPlatformConfig(),
+    getFooterConfig(pagePath, locale),
+  ])
   const { siteName, logo, logoDisplayMode } = platformConfig
 
   const navTitle = (
@@ -72,17 +91,7 @@ export default async function DocumentationLayout({
         sidebar={{ footer: <ThemeToggle /> }}
       >
         {children}
-        <footer className="mt-auto border-t px-4 py-6 md:px-6">
-          <div className="flex flex-col items-center gap-3 text-sm text-fd-muted-foreground sm:flex-row sm:justify-between">
-            <div className="flex items-center gap-2">
-              <BrandMark siteName={siteName} logo={logo} showLogo={shouldShowLogoInHeader(logoDisplayMode)} showSiteName={false} size="sm" />
-              <span>© {new Date().getFullYear()} {siteName}. All rights reserved.</span>
-            </div>
-            <Link href={`/${locale}`} className="hover:text-fd-foreground transition-colors">
-              {siteName}.tech
-            </Link>
-          </div>
-        </footer>
+        <SiteFooter footerConfig={footerConfig} />
       </DocsLayout>
     </RootProvider>
   )

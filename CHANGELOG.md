@@ -1,3 +1,9 @@
+## [1.13.2](https://github.com/neosaastech/Neosaas-app/compare/v1.13.1...v1.13.2) (2026-08-09)
+
+### Bug Fixes
+
+* **docs:** use the real site-wide Footer instead of a half-built stub ([31a938f](https://github.com/neosaastech/Neosaas-app/commit/31a938fa6f633b1008d2121df19371ea43d03958))
+
 ## [1.13.1](https://github.com/neosaastech/Neosaas-app/compare/v1.13.0...v1.13.1) (2026-08-09)
 
 ### Bug Fixes
