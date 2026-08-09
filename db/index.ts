@@ -29,25 +29,19 @@ function getConnectionString(): string {
     .replace('?channel_binding=require', '');
 }
 
-// The Neon HTTP driver (@neondatabase/serverless) derives its HTTPS API
-// endpoint from the connection string host assuming Neon's own naming
-// scheme (*.neon.tech) -- pointed at any other host (self-hosted Postgres,
-// a raw IP, localhost...) it builds a garbage URL and fails at connect
-// time. Only use it for genuine Neon hosts; everything else goes through
-// standard node-postgres over TCP.
-function isNeonHost(url: string): boolean {
-  return /\.neon\.tech/.test(url);
+function isLocalPostgres(url: string): boolean {
+  return /localhost|127\.0\.0\.1/.test(url);
 }
 
 function initDb() {
   if (_db) return _db;
   const connectionString = getConnectionString();
-  if (isNeonHost(connectionString)) {
-    _sql = neon(connectionString);
-    _db = drizzleNeon(_sql, { schema });
-  } else {
+  if (isLocalPostgres(connectionString)) {
     _pool = new Pool({ connectionString });
     _db = drizzlePg(_pool, { schema });
+  } else {
+    _sql = neon(connectionString);
+    _db = drizzleNeon(_sql, { schema });
   }
   return _db;
 }

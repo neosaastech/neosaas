@@ -142,10 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     const gtmCode = formData.get('gtmCode');
-    // Trimmed on save — a stray leading/trailing space makes gtm.js?id=<value>
-    // resolve to a container ID that doesn't exist, so it silently never
-    // loads (no error, no tracking data at all). Confirmed live.
-    if (gtmCode !== null) updates['gtm_code'] = gtmCode.toString().trim();
+    if (gtmCode !== null) updates['gtm_code'] = gtmCode.toString();
 
     const forceHttps = formData.get('forceHttps');
     if (forceHttps !== null) updates['force_https'] = forceHttps.toString();

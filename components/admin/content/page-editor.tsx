@@ -333,20 +333,7 @@ export function PageEditor({
       }
     } catch (error) {
       console.error("handlePublish threw before reaching the server:", error)
-      // Field-validation errors (payload-bridge.ts's formatPayloadError) come
-      // back as "operation : champs invalides —\n- label: message\n- ...".
-      // Split into a short title + the field list as the toast's
-      // description (longer duration — a multi-field list needs more than
-      // the default 4s to actually read) instead of dumping everything into
-      // one line, which used to run the raw Payload JSON error straight
-      // into the toast (Charles, 2026-08-09: "pas super clair").
-      const message = error instanceof Error ? error.message : "An unexpected error occurred"
-      const [title, ...rest] = message.split("\n")
-      if (rest.length > 0) {
-        toast.error(title, { description: rest.join("\n"), duration: 15000 })
-      } else {
-        toast.error(title)
-      }
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsPublishing(false)
     }

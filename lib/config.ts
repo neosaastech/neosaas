@@ -57,11 +57,7 @@ export async function getPlatformConfig(): Promise<PlatformConfigData> {
       authEnabled: configMap['auth_enabled'] === 'true',
       maintenanceMode: configMap['maintenance_mode'] === 'true' || configMap['maintenance_mode'] === true,
       defaultSenderEmail: configMap['default_sender_email'] || 'no-reply@neosaas.tech',
-      // Trimmed defensively: a stray leading/trailing space (e.g. pasted from
-      // clipboard) makes gtm.js?id=<value> resolve to a container ID that
-      // doesn't exist, so the container silently never loads — no error, no
-      // tracking data, confirmed live (id was stored as " GTM-KVRW5VPV").
-      gtmCode: typeof configMap['gtm_code'] === 'string' ? configMap['gtm_code'].trim() || null : null,
+      gtmCode: configMap['gtm_code'] || null,
       customHeaderCode: configMap['custom_header_code'] || null,
       customFooterCode: configMap['custom_footer_code'] || null,
       seoSettings: configMap['seo_settings'] || null,

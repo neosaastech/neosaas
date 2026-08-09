@@ -1,13 +1,15 @@
+import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
 import { draftMode } from "next/headers"
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, desc, eq } from "drizzle-orm"
 import type { Metadata } from "next"
 import { db } from "@/db"
-import { pageLayers, pageSeo } from "@/db/schema"
+import { blogPosts, categories, pageLayers, pageSeo } from "@/db/schema"
 import { BlockRenderer, type PageLayerRow } from "@/components/layers/block-renderer"
 import { PreviewChrome } from "@/components/common/preview-chrome"
 import { loadPreviewLayers } from "@/lib/pages/preview-layers"
 import { buildPageMetadata } from "@/lib/seo/page-metadata"
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import type { Locale } from "@/app/[locale]/layout"
 
 export async function generateMetadata({
@@ -72,6 +74,57 @@ export default async function DynamicPage({
   // recognized error that a generic catch would otherwise swallow.
   if (isHomepage) {
     permanentRedirect(`/${locale}`)
+  }
+
+  // SAAS-142: a Category has no page_layers row of its own (it isn't a
+  // Page) — its path was 404ing here even though category-list-layer.tsx
+  // already links to it (`href={category.path}`) and the sync side
+  // (categories/blog_posts tables) has worked since 2026-07-11. Only
+  // checked once the normal Pages lookup comes up empty, so an actual Page
+  // at this exact path still wins.
+  if (layers.length === 0 && !isPreview) {
+    const category = await db.query.categories.findFirst({
+      where: and(eq(categories.path, pagePath), eq(categories.locale, locale), eq(categories.isActive, true)),
+    })
+    if (category) {
+      const posts = await db.query.blogPosts.findMany({
+        where: and(eq(blogPosts.categoryPath, pagePath), eq(blogPosts.locale, locale), eq(blogPosts.isActive, true)),
+        orderBy: [desc(blogPosts.publishedAt)],
+      })
+      return (
+        <div className="container py-12 md:py-24">
+          {category.headerImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={category.headerImageUrl} alt="" className="mb-8 aspect-video w-full rounded-xl object-cover" />
+          )}
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{category.name}</h1>
+          {category.description && (
+            <div
+              className="mt-4 max-w-2xl text-muted-foreground [&_p]:m-0"
+              dangerouslySetInnerHTML={{ __html: category.description }}
+            />
+          )}
+          {posts.length > 0 && (
+            <div className="mt-10 grid gap-6 md:grid-cols-3">
+              {posts.map((post) => (
+                <Link key={post.slug} href={`/${locale}/blog/${post.slug}`}>
+                  <Card className="h-full overflow-hidden py-0">
+                    {post.coverImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={post.coverImageUrl} alt="" className="aspect-video w-full object-cover" />
+                    )}
+                    <CardHeader className="py-6">
+                      <CardTitle>{post.title}</CardTitle>
+                      {post.excerpt && <CardDescription>{post.excerpt}</CardDescription>}
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
   }
 
   if (layers.length === 0) {

@@ -70,41 +70,8 @@ export function UpdateSettings() {
     }
   }
 
-  // Trigger only reports "the GitHub Actions dispatch was accepted", not
-  // "the new version is live" — the sync + rebuild + redeploy that follows
-  // takes minutes and the old code gave zero further feedback, leaving an
-  // admin staring at a stale "Update available" badge with no way to tell
-  // whether it actually worked short of manually re-checking themselves.
-  // Poll status until currentVersion catches up to what we targeted, or
-  // give up after a few minutes without claiming failure (the deploy may
-  // still be legitimately in progress on a slow build).
-  const pollForCompletion = useCallback(async (targetVersion: string) => {
-    const maxAttempts = 30 // 30 x 10s = 5 minutes
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 10_000))
-      try {
-        const res = await fetch("/api/admin/system/update")
-        if (res.ok) {
-          const data: UpdateStatus = await res.json()
-          setStatus(data)
-          const normalized = (v: string) => v.replace(/^v/i, "")
-          if (normalized(data.currentVersion) === normalized(targetVersion)) {
-            toast.success(`Update applied — now running ${data.currentVersion}`)
-            setDeploying(false)
-            return
-          }
-        }
-      } catch {
-        // Transient failure while the site is mid-redeploy — keep polling.
-      }
-    }
-    toast.info("Still deploying — this can take a few more minutes. Refresh this page to check again.")
-    setDeploying(false)
-  }, [])
-
   const handleDeploy = async () => {
     setDeploying(true)
-    const targetVersion = status?.latestVersion
     try {
       const res = await fetch("/api/admin/system/update", {
         method: "POST",
@@ -115,14 +82,10 @@ export function UpdateSettings() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Deploy failed (${res.status})`)
       }
-      toast.success("Update triggered — syncing and redeploying, this can take a few minutes")
-      if (targetVersion) {
-        void pollForCompletion(targetVersion)
-      } else {
-        setDeploying(false)
-      }
+      toast.success("Update triggered — the pod will restart shortly")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to trigger update")
+    } finally {
       setDeploying(false)
     }
   }
@@ -189,8 +152,8 @@ export function UpdateSettings() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Apply update {status?.latestVersion}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will sync the latest Core release into this site and redeploy it. The
-                  application will be briefly unavailable during the redeploy. This action cannot be undone.
+                  This will trigger a rollout restart of this instance's pod on the Core image. The
+                  application will be briefly unavailable during the restart. This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

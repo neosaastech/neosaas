@@ -93,7 +93,6 @@ const logoCloudItemSchema = z.object({
   name: z.string(),
   imageUrl: z.string().optional(),
   markup: z.string().optional(),
-  description: z.string().optional(),
 })
 
 const NoopLayer = () => null

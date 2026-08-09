@@ -103,7 +103,6 @@ const logoCloudItemSchema = z.object({
   name: z.string(),
   imageUrl: z.string().optional(),
   markup: z.string().optional(),
-  description: z.string().optional(),
 })
 
 export const layerRegistry: Record<string, LayerDefinition> = {
@@ -223,6 +222,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       subtitle: z.string().optional(),
       limit: z.number().optional(),
       categorySlug: z.string().optional(),
+      locale: z.string().optional(),
     }) satisfies z.ZodType<BlogListLayerProps>,
     source: "global",
   },
@@ -233,6 +233,7 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       title: z.string().optional(),
       subtitle: z.string().optional(),
       limit: z.number().optional(),
+      locale: z.string().optional(),
     }) satisfies z.ZodType<CategoryListLayerProps>,
     source: "global",
   },

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { categories } from "@/db/schema"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -10,6 +10,7 @@ export interface CategoryListLayerProps {
   title?: string
   subtitle?: string
   limit?: number
+  locale?: string
 }
 
 /**
@@ -19,9 +20,9 @@ export interface CategoryListLayerProps {
  * render time rather than a snapshot, so it always reflects the current
  * category set.
  */
-export async function CategoryListLayer({ eyebrow, title, subtitle, limit }: CategoryListLayerProps) {
+export async function CategoryListLayer({ eyebrow, title, subtitle, limit, locale = "fr" }: CategoryListLayerProps) {
   const items = await db.query.categories.findMany({
-    where: eq(categories.isActive, true),
+    where: and(eq(categories.isActive, true), eq(categories.locale, locale)),
     orderBy: [desc(categories.createdAt)],
     limit: limit ?? 12,
   })
@@ -37,7 +38,7 @@ export async function CategoryListLayer({ eyebrow, title, subtitle, limit }: Cat
       )}
       <div className="mt-10 grid gap-6 md:grid-cols-3">
         {items.map((category) => (
-          <Link key={category.slug} href={category.path}>
+          <Link key={category.slug} href={`/${locale}${category.path}`}>
             <Card className="h-full overflow-hidden py-0">
               {category.headerImageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element

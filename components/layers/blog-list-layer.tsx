@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { blogPosts } from "@/db/schema"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -11,6 +11,7 @@ export interface BlogListLayerProps {
   subtitle?: string
   limit?: number
   categorySlug?: string
+  locale?: string
 }
 
 /**
@@ -21,9 +22,13 @@ export interface BlogListLayerProps {
  * a snapshot frozen when the block was authored in Payload. Props only
  * configure how many posts and which category, not the post data itself.
  */
-export async function BlogListLayer({ eyebrow, title, subtitle, limit, categorySlug }: BlogListLayerProps) {
+export async function BlogListLayer({ eyebrow, title, subtitle, limit, categorySlug, locale = "fr" }: BlogListLayerProps) {
   const posts = await db.query.blogPosts.findMany({
-    where: categorySlug ? eq(blogPosts.categorySlug, categorySlug) : undefined,
+    where: and(
+      eq(blogPosts.isActive, true),
+      eq(blogPosts.locale, locale),
+      categorySlug ? eq(blogPosts.categorySlug, categorySlug) : undefined,
+    ),
     orderBy: [desc(blogPosts.publishedAt)],
     limit: limit ?? 6,
   })
@@ -39,7 +44,7 @@ export async function BlogListLayer({ eyebrow, title, subtitle, limit, categoryS
       )}
       <div className="mt-10 grid gap-6 md:grid-cols-3">
         {posts.map((post) => (
-          <Link key={post.slug} href={`/blog/${post.slug}`}>
+          <Link key={post.slug} href={`/${locale}/blog/${post.slug}`}>
             <Card className="h-full overflow-hidden py-0">
               {post.coverImageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element

@@ -69,7 +69,13 @@ export async function BlockRenderer({
         }
         const raw = (layer.props ?? {}) as Record<string, unknown>
         const { blockSettings, ...rest } = raw
-        const resolved = interpolateDeep(rest, variables)
+        // SAAS-142: blog-list/category-list link to post/category URLs that
+        // need the `[locale]` segment — neither received `locale` at all
+        // before, so both linked to a bare path Next.js can't route (no
+        // route exists outside app/[locale]/...). Injected generically here
+        // rather than per-layer plumbing; harmless for every other schema,
+        // whose propsSchema doesn't declare `locale` and silently drops it.
+        const resolved = { ...interpolateDeep(rest, variables), locale }
         // .safeParse, not .parse: one malformed row (stale sync, hand-edited
         // DB row, a field shape that changed since the row was written) must
         // not take the whole page down with a 500 — skip just that block,

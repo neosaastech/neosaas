@@ -1,3 +1,9 @@
+## [1.12.1](https://github.com/neosaastech/Neosaas-app/compare/v1.12.0...v1.12.1) (2026-08-09)
+
+### Bug Fixes
+
+* **categories:** resolve category listing pages, fix locale-less links ([6985f96](https://github.com/neosaastech/Neosaas-app/commit/6985f96721177c193d831f4313ea07a814e95afc))
+
 ## [1.12.0](https://github.com/neosaastech/Neosaas-app/compare/v1.11.0...v1.12.0) (2026-07-27)
 
 ### Features
