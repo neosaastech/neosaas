@@ -1,3 +1,9 @@
+## [1.13.3](https://github.com/neosaastech/Neosaas-app/compare/v1.13.2...v1.13.3) (2026-08-09)
+
+### Bug Fixes
+
+* **docs:** footer rendered at the top instead of the bottom ([7b06543](https://github.com/neosaastech/Neosaas-app/commit/7b065438d930f2c446f071e0c016024f274759a0))
+
 ## [1.13.2](https://github.com/neosaastech/Neosaas-app/compare/v1.13.1...v1.13.2) (2026-08-09)
 
 ### Bug Fixes

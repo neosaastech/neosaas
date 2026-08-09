@@ -82,17 +82,30 @@ export default async function DocumentationLayout({
 
   return (
     <RootProvider theme={{ enabled: false }} search={{ enabled: false }}>
-      <DocsLayout
-        tree={source.pageTree}
-        nav={{ title: navTitle, url: `/${locale}/documentation` }}
-        links={[{ type: "main", url: `/${locale}`, text: "Retour au site", icon: <ArrowLeft className="h-4 w-4" /> }]}
-        searchToggle={{ enabled: false }}
-        themeSwitch={{ enabled: false }}
-        sidebar={{ footer: <ThemeToggle /> }}
-      >
-        {children}
+      {/* DocsLayout owns its own internal (sidebar + content) layout — a
+          sibling placed after {children} inside it does NOT reliably land
+          at the bottom of the page (confirmed live 2026-08-09: the Footer
+          rendered at the TOP, inside the header/sidebar region, not below
+          the doc content). Wrapping the whole thing in the same
+          `flex min-h-screen flex-col` shell app/[locale]/(public)/layout.tsx
+          uses — DocsLayout in a flex-1 slot, Footer as the next sibling —
+          guarantees normal document flow instead of depending on
+          DocsLayout's own internal CSS. */}
+      <div className="flex min-h-screen flex-col">
+        <div className="flex-1">
+          <DocsLayout
+            tree={source.pageTree}
+            nav={{ title: navTitle, url: `/${locale}/documentation` }}
+            links={[{ type: "main", url: `/${locale}`, text: "Retour au site", icon: <ArrowLeft className="h-4 w-4" /> }]}
+            searchToggle={{ enabled: false }}
+            themeSwitch={{ enabled: false }}
+            sidebar={{ footer: <ThemeToggle /> }}
+          >
+            {children}
+          </DocsLayout>
+        </div>
         <SiteFooter footerConfig={footerConfig} />
-      </DocsLayout>
+      </div>
     </RootProvider>
   )
 }
