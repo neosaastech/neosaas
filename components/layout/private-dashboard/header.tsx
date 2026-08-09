@@ -1,6 +1,6 @@
 "use client"
 
-import { LogOut, User, CreditCard, Search, ShoppingCart, Menu, PanelLeftClose, PanelLeft } from "lucide-react"
+import { LogOut, User, CreditCard, Search, ShoppingCart, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -37,15 +37,7 @@ interface UserData {
   isAdmin?: boolean
 }
 
-export function PrivateHeader({
-  onMenuClick,
-  isSidebarCollapsed = false,
-  onToggleSidebar,
-}: {
-  onMenuClick?: () => void
-  isSidebarCollapsed?: boolean
-  onToggleSidebar?: () => void
-}) {
+export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const router = useRouter()
   const { logo, siteName } = usePlatformConfig()
   const { itemCount } = useCart()
@@ -204,17 +196,6 @@ export function PrivateHeader({
 
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background/90 px-4 backdrop-blur-md sm:px-6">
-
-      {/* Desktop sidebar collapse — left of header, common app-shell pattern */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="hidden md:inline-flex text-muted-foreground hover:text-foreground"
-        onClick={onToggleSidebar}
-        aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        {isSidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-      </Button>
 
       {/* Mobile menu trigger — opens PrivateSidebar's own mobile drawer (isOpen/onClose),
           which already had all the transform/backdrop logic but nothing to open it. */}

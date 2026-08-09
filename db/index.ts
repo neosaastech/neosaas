@@ -29,7 +29,7 @@ function getConnectionString(): string {
     .replace('?channel_binding=require', '');
 }
 
-function useNodePostgres(url: string): boolean {
+function wantsNodePostgres(url: string): boolean {
   // Neon HTTP driver only works with Neon cloud endpoints (*.neon.tech).
   // Self-hosted Postgres (Supabase, local, Dokploy) must use node-postgres.
   if (/localhost|127\.0\.0\.1/.test(url)) return true;
@@ -40,7 +40,7 @@ function useNodePostgres(url: string): boolean {
 function initDb() {
   if (_db) return _db;
   const connectionString = getConnectionString();
-  if (useNodePostgres(connectionString)) {
+  if (wantsNodePostgres(connectionString)) {
     _pool = new Pool({ connectionString });
     _db = drizzlePg(_pool, { schema });
   } else {

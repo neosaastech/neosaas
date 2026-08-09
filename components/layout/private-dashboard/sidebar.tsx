@@ -10,6 +10,8 @@ import {
   Key,
   Mail,
   X,
+  PanelLeftClose,
+  PanelLeft,
   ArrowLeft,
   Users,
   FileText,
@@ -104,7 +106,6 @@ interface NavItem {
 interface PrivateSidebarProps {
   isOpen?: boolean
   onClose?: () => void
-  isCollapsed?: boolean
 }
 
 function NavLink({
@@ -173,7 +174,7 @@ function SubNavLink({
   )
 }
 
-export function PrivateSidebar({ isOpen = false, onClose, isCollapsed = false }: PrivateSidebarProps) {
+export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { isAdmin, isSuperAdmin, isLoading } = useUser()
@@ -197,6 +198,7 @@ export function PrivateSidebar({ isOpen = false, onClose, isCollapsed = false }:
   const [isAccountOpen, setIsAccountOpen] = useState(isAnyPathActive(pathname, accountPaths))
   const [isProfileOpen, setIsProfileOpen] = useState(isAnyPathActive(pathname, profilePaths))
   const [isClientSupportOpen, setIsClientSupportOpen] = useState(isAnyPathActive(pathname, clientSupportPaths))
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   const showLogoInHeader =
     isCollapsed || logoDisplayMode === "logo" || logoDisplayMode === "both"
@@ -558,6 +560,25 @@ export function PrivateSidebar({ isOpen = false, onClose, isCollapsed = false }:
               </CollapsibleContent>
             </Collapsible>
           )}
+
+          <Button
+            variant="ghost"
+            size={isCollapsed ? "icon" : "sm"}
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={cn(
+              "hidden md:flex mt-2 text-muted-foreground hover:text-foreground",
+              isCollapsed ? "w-full justify-center" : "w-full justify-start",
+            )}
+          >
+            {isCollapsed ? (
+              <PanelLeft className="h-5 w-5" />
+            ) : (
+              <>
+                <PanelLeftClose className="h-5 w-5 mr-2" />
+                <span>Collapse</span>
+              </>
+            )}
+          </Button>
 
           {isCollapsed ? (
             <>

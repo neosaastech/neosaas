@@ -39,6 +39,39 @@ async function payloadFetch(path: string, init?: RequestInit): Promise<Response>
   return res
 }
 
+interface PayloadFieldError {
+  label?: string
+  message?: string
+  path?: string
+}
+
+// Payload's own validation error shape (confirmed live):
+// { errors: [{ message, data: { errors: [{ label, message, path }, ...] } }] }
+// — every write error path in this file used to throw the raw JSON body
+// verbatim, which the Content Hub then dumped straight into a toast
+// (Charles, 2026-08-09: "pas super clair comme notification" — a wall of
+// `{"errors":[{"name":"a","data":{...` is not something an editor can act
+// on). Extracts the actual per-field messages Payload already computed
+// (e.g. "Contenu > Layout > Block 2 (Feature grid) > Features 3 > Icon:
+// This field is required.") instead, falling back to the raw body only
+// when the response isn't this shape at all (a real server error, a proxy
+// 502, ...) — those genuinely have no better message to extract.
+function formatPayloadError(operation: string, status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { errors?: Array<{ message?: string; data?: { errors?: PayloadFieldError[] } }> }
+    const fieldErrors = parsed.errors?.flatMap((e) => e.data?.errors ?? []) ?? []
+    if (fieldErrors.length > 0) {
+      const lines = fieldErrors.map((fe) => `- ${fe.label ?? fe.path ?? "Champ"} : ${fe.message ?? "invalide"}`)
+      return `${operation} : champs invalides —\n${lines.join("\n")}`
+    }
+    const topMessage = parsed.errors?.[0]?.message
+    if (topMessage) return `${operation} : ${topMessage}`
+  } catch {
+    // Not JSON (or not this shape) — fall through to the raw-body message below.
+  }
+  return `${operation} failed (${status}): ${body}`
+}
+
 // Pages/BlogPosts' actual Payload field is `meta` — @payloadcms/plugin-seo's
 // own group name (payload.config.ts's seoPlugin, migrated from a hand-rolled
 // `seo` group). Every interface and caller in this file still calls it `seo`
@@ -539,7 +572,7 @@ export async function createPage(input: PageWriteInput, locale: string = "fr"): 
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createPage failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createPage`, res.status, body))
   }
   const data = await res.json()
   return unpackSeoImage(metaToSeo(data.doc) as unknown as PayloadPageDoc)
@@ -565,7 +598,7 @@ export async function updatePage(
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updatePage(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updatePage(${id})`, res.status, body))
   }
   const data = await res.json()
   return unpackSeoImage(metaToSeo(data.doc) as unknown as PayloadPageDoc)
@@ -582,7 +615,7 @@ export async function deletePage(id: string | number): Promise<void> {
   const res = await payloadFetch(`/pages/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deletePage(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deletePage(${id})`, res.status, body))
   }
 }
 
@@ -629,7 +662,7 @@ export async function restorePageVersion(versionId: string, locale: string = "fr
   const res = await payloadFetch(`/pages/versions/${versionId}?locale=${locale}`, { method: "POST" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: restorePageVersion(${versionId}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: restorePageVersion(${versionId})`, res.status, body))
   }
   const data = await res.json()
   return unpackSeoImage(metaToSeo(data.doc) as unknown as PayloadPageDoc)
@@ -695,7 +728,7 @@ export async function createCategory(input: CategoryWriteInput): Promise<Payload
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createCategory failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createCategory`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadCategorySummary), headerImage: unpackImage(data.doc.headerImage) }
@@ -712,7 +745,7 @@ export async function updateCategory(id: string | number, input: CategoryWriteIn
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updateCategory(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updateCategory(${id})`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadCategorySummary), headerImage: unpackImage(data.doc.headerImage) }
@@ -722,7 +755,7 @@ export async function deleteCategory(id: string | number): Promise<void> {
   const res = await payloadFetch(`/categories/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deleteCategory(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deleteCategory(${id})`, res.status, body))
   }
 }
 
@@ -827,7 +860,7 @@ export async function createHeader(input: HeaderWriteInput, locale: string = "fr
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createHeader failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createHeader`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadHeaderDoc), logo: unpackImage(data.doc.logo) }
@@ -845,7 +878,7 @@ export async function updateHeader(id: string | number, input: HeaderWriteInput,
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updateHeader(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updateHeader(${id})`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadHeaderDoc), logo: unpackImage(data.doc.logo) }
@@ -855,7 +888,7 @@ export async function deleteHeader(id: string | number): Promise<void> {
   const res = await payloadFetch(`/header/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deleteHeader(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deleteHeader(${id})`, res.status, body))
   }
 }
 
@@ -920,7 +953,7 @@ export async function createFooter(input: FooterWriteInput, locale: string = "fr
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createFooter failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createFooter`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadFooterDoc), logo: unpackImage(data.doc.logo) }
@@ -937,7 +970,7 @@ export async function updateFooter(id: string | number, input: FooterWriteInput,
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updateFooter(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updateFooter(${id})`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadFooterDoc), logo: unpackImage(data.doc.logo) }
@@ -947,7 +980,7 @@ export async function deleteFooter(id: string | number): Promise<void> {
   const res = await payloadFetch(`/footer/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deleteFooter(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deleteFooter(${id})`, res.status, body))
   }
 }
 
@@ -1008,7 +1041,7 @@ export async function createModule(input: ModuleWriteInput, locale: string = "fr
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createModule failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createModule`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadModuleDoc), content: (data.doc.content ?? []).map(fromPayloadBlock) }
@@ -1024,7 +1057,7 @@ export async function updateModule(id: string | number, input: ModuleWriteInput,
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updateModule(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updateModule(${id})`, res.status, body))
   }
   const data = await res.json()
   return { ...(data.doc as PayloadModuleDoc), content: (data.doc.content ?? []).map(fromPayloadBlock) }
@@ -1034,7 +1067,7 @@ export async function deleteModule(id: string | number): Promise<void> {
   const res = await payloadFetch(`/modules/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deleteModule(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deleteModule(${id})`, res.status, body))
   }
 }
 
@@ -1158,7 +1191,7 @@ export async function createBlogPost(input: BlogPostWriteInput, locale: string =
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createBlogPost failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createBlogPost`, res.status, body))
   }
   const data = await res.json()
   return { ...(metaToSeo(data.doc) as unknown as PayloadBlogPostDoc), coverImage: unpackImage(data.doc.coverImage) }
@@ -1180,7 +1213,7 @@ export async function updateBlogPost(
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updateBlogPost(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updateBlogPost(${id})`, res.status, body))
   }
   const data = await res.json()
   return { ...(metaToSeo(data.doc) as unknown as PayloadBlogPostDoc), coverImage: unpackImage(data.doc.coverImage) }
@@ -1191,7 +1224,7 @@ export async function deleteBlogPost(id: string | number): Promise<void> {
   const res = await payloadFetch(`/blog-posts/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deleteBlogPost(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deleteBlogPost(${id})`, res.status, body))
   }
 }
 
@@ -1306,7 +1339,7 @@ export async function uploadMedia(file: File, alt?: string): Promise<PayloadMedi
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: uploadMedia failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: uploadMedia`, res.status, body))
   }
   const data = await res.json()
   const doc = data.doc as PayloadMediaSummary
@@ -1317,7 +1350,7 @@ export async function deleteMedia(id: string | number): Promise<void> {
   const res = await payloadFetch(`/media/${id}`, { method: "DELETE" })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: deleteMedia(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: deleteMedia(${id})`, res.status, body))
   }
 }
 
@@ -1370,7 +1403,7 @@ export async function replaceMediaFile(id: string | number, file: File): Promise
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: replaceMediaFile(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: replaceMediaFile(${id})`, res.status, body))
   }
   const data = await res.json()
   const doc = data.doc as PayloadMediaSummary
@@ -1400,7 +1433,7 @@ export async function transformMedia(id: string | number, input: MediaTransformI
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: transformMedia(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: transformMedia(${id})`, res.status, body))
   }
   const data = await res.json()
   const doc = (data.doc ?? data) as PayloadMediaSummary
@@ -1425,7 +1458,7 @@ export async function renameMedia(id: string | number, filename: string): Promis
   })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: renameMedia(${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: renameMedia(${id})`, res.status, body))
   }
   const data = await res.json()
   const doc = (data.doc ?? data) as PayloadMediaSummary
@@ -1448,7 +1481,7 @@ export async function createCollectionDoc(
   const res = await payloadFetch(`/${slug}`, { method: "POST", body: JSON.stringify(data) })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: createCollectionDoc(${slug}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: createCollectionDoc(${slug})`, res.status, body))
   }
   const result = await res.json()
   return result.doc
@@ -1462,7 +1495,7 @@ export async function updateCollectionDoc(
   const res = await payloadFetch(`/${slug}/${id}`, { method: "PATCH", body: JSON.stringify(data) })
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Payload bridge: updateCollectionDoc(${slug}, ${id}) failed (${res.status}): ${body}`)
+    throw new Error(formatPayloadError(`Payload bridge: updateCollectionDoc(${slug}, ${id})`, res.status, body))
   }
   const result = await res.json()
   return result.doc

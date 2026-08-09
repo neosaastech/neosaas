@@ -32,24 +32,15 @@ export function PrivateLayoutClient({ children, user, platformConfig, alerts }: 
   // close button) — it was just never given an isOpen state or a way to
   // open it, so it sat permanently off-screen below the md breakpoint.
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   return (
     <PlatformConfigProvider config={platformConfig}>
       <UserProvider initialUser={sessionUserFromAuth(user)}>
         <CartProvider>
           <div className="flex h-screen overflow-hidden bg-muted/30">
-            <PrivateSidebar
-              isOpen={isMobileMenuOpen}
-              onClose={() => setIsMobileMenuOpen(false)}
-              isCollapsed={isSidebarCollapsed}
-            />
+            <PrivateSidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
             <div className="flex min-w-0 flex-1 flex-col">
-              <PrivateHeader
-                onMenuClick={() => setIsMobileMenuOpen(true)}
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={() => setIsSidebarCollapsed((v) => !v)}
-              />
+              <PrivateHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
               <main className="flex flex-1 flex-col overflow-y-auto p-4 sm:p-6 lg:p-8">
                 {alerts}
                 <div className="flex-1">{children}</div>
