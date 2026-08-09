@@ -26,10 +26,27 @@ interface UpdateStatus {
   error?: string
 }
 
+// A real Dokploy build (clone + docker build + swarm rollout) takes 3-5
+// minutes end to end — confirmed live 2026-08-09 (payload-cms/neosaas-app
+// incident day). The deploy endpoint only ever confirms the GitHub
+// workflow_dispatch itself succeeded (a few hundred ms), not that the
+// actual build finished — there is no reliable way to poll real completion
+// from here (Dokploy's own deployment.all endpoint has already proven
+// unreliable to match against elsewhere in this pipeline, see
+// apply-update.yml). Charles, 2026-08-09: kept re-clicking "Apply update"
+// because the toast gave no sense of "still working" vs "done", triggering
+// several redundant concurrent builds. This cooldown is a deliberate
+// UX guess, not a real completion signal — it exists only to stop the
+// double-click, re-checks status once it elapses so the badge/button
+// reflect reality as soon as possible after.
+const DEPLOY_COOLDOWN_MS = 5 * 60 * 1000
+
 export function UpdateSettings() {
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [checking, setChecking] = useState(false)
   const [deploying, setDeploying] = useState(false)
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -41,6 +58,27 @@ export function UpdateSettings() {
       console.error("[UpdateSettings] fetchStatus failed:", error)
     }
   }, [])
+
+  // Ticks the cooldown countdown and re-checks status the moment it elapses
+  // (best-effort — the real build may still be running past the cooldown on
+  // an unusually slow/cold-cache build, "Apply update" just becomes
+  // clickable again rather than claiming certainty either way).
+  useEffect(() => {
+    if (!cooldownUntil) return
+    const tick = () => {
+      const remaining = cooldownUntil - Date.now()
+      if (remaining <= 0) {
+        setCooldownUntil(null)
+        setCooldownRemaining(0)
+        fetchStatus()
+      } else {
+        setCooldownRemaining(remaining)
+      }
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [cooldownUntil, fetchStatus])
 
   useEffect(() => {
     fetchStatus()
@@ -82,7 +120,8 @@ export function UpdateSettings() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Deploy failed (${res.status})`)
       }
-      toast.success("Update triggered — the pod will restart shortly")
+      toast.success("Update triggered — this takes 3-5 minutes to actually build and deploy, not instant. Avoid clicking again in the meantime.", { duration: 8000 })
+      setCooldownUntil(Date.now() + DEPLOY_COOLDOWN_MS)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to trigger update")
     } finally {
@@ -141,19 +180,20 @@ export function UpdateSettings() {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
-                disabled={deploying || status?.upToDate !== false}
+                disabled={deploying || Boolean(cooldownUntil) || status?.upToDate !== false}
                 className="gap-2 bg-brand hover:bg-brand/90"
               >
-                {deploying && <Loader2 className="h-4 w-4 animate-spin" />}
-                Apply update
+                {(deploying || cooldownUntil) && <Loader2 className="h-4 w-4 animate-spin" />}
+                {cooldownUntil ? `Deploying… ${Math.ceil(cooldownRemaining / 1000)}s` : "Apply update"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Apply update {status?.latestVersion}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will trigger a rollout restart of this instance's pod on the Core image. The
-                  application will be briefly unavailable during the restart. This action cannot be undone.
+                  This will pull the latest Core release and redeploy this instance. Takes 3-5 minutes to
+                  actually build and go live — this dialog closing does not mean it is done. This action
+                  cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

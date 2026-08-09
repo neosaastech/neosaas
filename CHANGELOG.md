@@ -1,3 +1,9 @@
+## [1.13.1](https://github.com/neosaastech/Neosaas-app/compare/v1.13.0...v1.13.1) (2026-08-09)
+
+### Bug Fixes
+
+* **updates:** honest deploy feedback, prevent double-clicking Apply update ([6ef7c09](https://github.com/neosaastech/Neosaas-app/commit/6ef7c09a6457ac82d8536d7a43c30daf9d3d128c))
+
 ## [1.13.0](https://github.com/neosaastech/Neosaas-app/compare/v1.12.9...v1.13.0) (2026-08-09)
 
 ### Features
