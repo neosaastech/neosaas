@@ -1042,6 +1042,21 @@ export type NewFormSubmission = typeof formSubmissions.$inferInsert
 export const blogPosts = pgTable("blog_posts", {
   id: uuid("id").defaultRandom().primaryKey(),
   slug: text("slug").notNull().unique(),
+  // Found 2026-08-10: the sync adapter (payload-cms) upserted by `slug`
+  // alone — any slug change (title edit, or the slugAuto regeneration bug
+  // already fixed elsewhere) left the OLD slug's row behind untouched,
+  // active, duplicated on the site. A "delete the previous slug's row"
+  // cleanup was tried first but Payload's own `previousDoc` hook argument
+  // turned out unreliable across back-to-back saves of the same doc
+  // (confirmed live: correct on the first rename, stale/wrong on the
+  // second) — no amount of app-side diffing can fix that reliably. This
+  // column gives the sync adapter a stable identifier that never depends on
+  // diffing anything: upsert by `payload_post_id`, and a slug change is
+  // just a plain UPDATE of the same row, never a second INSERT. Nullable +
+  // partial unique (not `.unique()`) so existing rows can be backfilled
+  // without a NOT NULL migration failure — see drizzle/<this-migration>.sql
+  // for the partial index and the one-off backfill script.
+  payloadPostId: integer("payload_post_id"),
   locale: text("locale").notNull().default("fr"),
   title: text("title").notNull(),
   excerpt: text("excerpt"),
@@ -1065,7 +1080,9 @@ export const blogPosts = pgTable("blog_posts", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-})
+}, (table) => ({
+  payloadPostIdUnique: uniqueIndex("blog_posts_payload_post_id_unique").on(table.payloadPostId).where(sql`payload_post_id IS NOT NULL`),
+}))
 
 export type BlogPost = typeof blogPosts.$inferSelect
 export type NewBlogPost = typeof blogPosts.$inferInsert
@@ -1083,6 +1100,10 @@ export type NewBlogPost = typeof blogPosts.$inferInsert
 export const categories = pgTable("categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   slug: text("slug").notNull(),
+  // Same gap/fix as blogPosts.payloadPostId above — the sync adapter
+  // upserted by (path, locale), a path/slug change left the old row behind.
+  // Nullable + partial unique for the same backfill reason.
+  payloadCategoryId: integer("payload_category_id"),
   path: text("path").notNull(),
   locale: text("locale").notNull().default("fr"),
   name: text("name").notNull(),
@@ -1093,6 +1114,12 @@ export const categories = pgTable("categories", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   pathLocaleUnique: uniqueIndex("categories_path_locale_unique").on(table.path, table.locale),
+  // Composite, not a plain unique on payload_category_id alone — unlike
+  // blogPosts (one row total per post), a Category has one row PER LOCALE
+  // for the same Payload doc (confirmed live: 4 of 5 categories carry both
+  // an fr and an en row sharing the same payload_category_id) — a bare
+  // unique here would make the fr and en rows fight over the same slot.
+  payloadCategoryIdLocaleUnique: uniqueIndex("categories_payload_category_id_locale_unique").on(table.payloadCategoryId, table.locale).where(sql`payload_category_id IS NOT NULL`),
 }))
 
 export type Category = typeof categories.$inferSelect

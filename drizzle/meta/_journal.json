@@ -169,6 +169,13 @@
       "when": 1786272582473,
       "tag": "0023_jittery_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786344475086,
+      "tag": "0024_bright_ares",
+      "breakpoints": true
     }
   ]
 }

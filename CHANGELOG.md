@@ -1,3 +1,9 @@
+## [1.13.5](https://github.com/neosaastech/Neosaas-app/compare/v1.13.4...v1.13.5) (2026-08-10)
+
+### Bug Fixes
+
+* **db:** add payload_post_id/payload_category_id for stable sync upsert ([89d8388](https://github.com/neosaastech/Neosaas-app/commit/89d83884434ee0026f75d4a56530a95c7f1074d0))
+
 ## [1.13.4](https://github.com/neosaastech/Neosaas-app/compare/v1.13.3...v1.13.4) (2026-08-10)
 
 ### Bug Fixes
