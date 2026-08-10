@@ -173,7 +173,18 @@ export function NotificationBell() {
       // Pages/BlogPosts list has no [id] route, editing happens in an
       // overlay) — the notification's own description already carries the
       // failing path, land the editor on the right list to search it there.
-      router.push('/admin/pages')
+      // Header/Footer/Categories (2026-08-10 extension) have no equivalent
+      // list in THIS admin at all — they're only ever edited in Payload's
+      // own admin (cms.neokube.fr) — so route there directly instead of the
+      // wrong /admin/pages destination.
+      const source = meta?.source as string | undefined
+      if (source === 'header' || source === 'footer') {
+        window.open(`https://cms.neokube.fr/admin/collections/${source}`, '_blank', 'noopener,noreferrer')
+      } else if (source === 'category') {
+        window.open('https://cms.neokube.fr/admin/collections/categories', '_blank', 'noopener,noreferrer')
+      } else {
+        router.push('/admin/pages')
+      }
     } else {
       router.push('/admin/chat')
     }

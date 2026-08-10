@@ -1,3 +1,9 @@
+## [1.13.4](https://github.com/neosaastech/Neosaas-app/compare/v1.13.3...v1.13.4) (2026-08-10)
+
+### Bug Fixes
+
+* **notifications:** route Header/Footer/Category sync failures to Payload admin ([46e058c](https://github.com/neosaastech/Neosaas-app/commit/46e058c2a99adc293d160142b4ce628955df24a1))
+
 ## [1.13.3](https://github.com/neosaastech/Neosaas-app/compare/v1.13.2...v1.13.3) (2026-08-09)
 
 ### Bug Fixes
