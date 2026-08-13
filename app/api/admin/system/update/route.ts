@@ -198,6 +198,17 @@ async function deployViaGithubActions(
     }
   }
 
+  // Confirmed live 2026-08-13: hardcoded to 'main' regardless of which
+  // environment's admin actually clicked the button — the dev instance's
+  // "Appliquer le correctif" silently dispatched apply-update.yml against
+  // main every time, meaning dev's own admin could never trigger a real
+  // update of itself (and had no way to know that's what happened — this
+  // call always returned 204/ok). DEPLOY_BRANCH already exists in this
+  // env per Dokploy application config (main for prod, the feature branch
+  // for dev — see apply-update.yml's own "Determine Dokploy target" step
+  // using the same variable server-side) but was never read here.
+  const ref = process.env.DEPLOY_BRANCH || 'main'
+
   const res = await fetch(
     `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/dispatches`,
     {
@@ -207,7 +218,7 @@ async function deployViaGithubActions(
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ref: 'main' }),
+      body: JSON.stringify({ ref }),
     },
   )
 

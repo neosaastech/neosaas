@@ -1,3 +1,9 @@
+## [1.26.1](https://github.com/neosaastech/Neosaas-app/compare/v1.26.0...v1.26.1) (2026-08-13)
+
+### Bug Fixes
+
+* **admin:** apply-update always dispatched against main, never the actual environment ([bbd2bfb](https://github.com/neosaastech/Neosaas-app/commit/bbd2bfb47882f39558cb6c8dba977a959d3e9867))
+
 ## [1.26.0](https://github.com/neosaastech/Neosaas-app/compare/v1.25.0...v1.26.0) (2026-08-13)
 
 ### Features
