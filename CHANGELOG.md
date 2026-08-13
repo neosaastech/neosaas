@@ -1,3 +1,9 @@
+## [1.14.1](https://github.com/neosaastech/Neosaas-app/compare/v1.14.0...v1.14.1) (2026-08-13)
+
+### Bug Fixes
+
+* decode HTML entities in table-of-contents heading text ([2ce789f](https://github.com/neosaastech/Neosaas-app/commit/2ce789fba3f2415feb860ffceb5b1c6e840f0193)), closes [#39](https://github.com/neosaastech/Neosaas-app/issues/39)
+
 ## [1.14.0](https://github.com/neosaastech/Neosaas-app/compare/v1.13.6...v1.14.0) (2026-08-13)
 
 ### Features

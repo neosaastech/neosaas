@@ -4,8 +4,29 @@ export interface TocHeading {
   level: 2 | 3 | 4
 }
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+}
+
+/** Payload's HTML output entity-escapes heading text (French apostrophes/quotes) — undo that for display; slugify() below strips the rest anyway. */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, code) => {
+      if (code[0] === "#") {
+        const codePoint = code[1] === "x" || code[1] === "X" ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10)
+        return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint)
+      }
+      return NAMED_ENTITIES[code] ?? match
+    })
+}
+
 function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, "").trim()
+  return decodeEntities(html.replace(/<[^>]+>/g, "")).trim()
 }
 
 const COMBINING_MARKS_RE = new RegExp("[\\u0300-\\u036f]", "g")
