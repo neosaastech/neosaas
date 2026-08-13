@@ -1,10 +1,37 @@
 import { eq } from "drizzle-orm"
 import { db } from "@/db"
 import { authors } from "@/db/schema"
-import { AuthorBox } from "@/components/blog/author-box"
+import { AuthorBox, type AuthorSocialLink } from "@/components/blog/author-box"
 
 export interface AuthorCardLayerProps {
   authorId?: string
+}
+
+/**
+ * Resolves a single `authors` row into exactly what AuthorBox should
+ * render, applying its per-field visibility toggles — Charles (2026-08-13):
+ * "on doit retrouver l'admin et sa description dans sa fiche" but only the
+ * fields he's chosen to make public. Phone always comes from the linked
+ * site admin (never a separate column on `authors`) — "le plus automatique
+ * possible", no independent phone to keep in sync by hand. Shared by
+ * AuthorCardLayer here and the upcoming author-list-layer (grid variant),
+ * so the visibility rule is enforced in exactly one place.
+ */
+export async function resolveAuthorProfile(authorId: string) {
+  const author = await db.query.authors.findFirst({
+    where: eq(authors.id, authorId),
+    with: { siteUser: true },
+  })
+  if (!author || !author.isActive) return null
+
+  return {
+    name: author.name,
+    bio: author.showBioPublicly ? author.bio : null,
+    avatarUrl: author.avatarUrl,
+    email: author.showEmailPublicly ? author.siteUser?.email ?? author.email : null,
+    phone: author.showPhonePublicly ? author.siteUser?.phone ?? null : null,
+    socialLinks: author.showSocialLinksPublicly ? (author.socialLinks as AuthorSocialLink[] | null) : null,
+  }
 }
 
 /**
@@ -20,7 +47,7 @@ export interface AuthorCardLayerProps {
  */
 export async function AuthorCardLayer({ authorId }: AuthorCardLayerProps) {
   if (!authorId) return null
-  const author = await db.query.authors.findFirst({ where: eq(authors.id, authorId) })
-  if (!author || !author.isActive) return null
-  return <AuthorBox name={author.name} bio={author.bio} avatarUrl={author.avatarUrl} />
+  const profile = await resolveAuthorProfile(authorId)
+  if (!profile) return null
+  return <AuthorBox {...profile} />
 }

@@ -1,3 +1,9 @@
+## [1.22.0](https://github.com/neosaastech/Neosaas-app/compare/v1.21.0...v1.22.0) (2026-08-13)
+
+### Features
+
+* respect per-author visibility toggles, phone from linked admin ([764965e](https://github.com/neosaastech/Neosaas-app/commit/764965ec3f1b9ecc26da4c73d30654fd69f7efa3)), closes [#93](https://github.com/neosaastech/Neosaas-app/issues/93)
+
 ## [1.21.0](https://github.com/neosaastech/Neosaas-app/compare/v1.20.0...v1.21.0) (2026-08-13)
 
 ### Features
