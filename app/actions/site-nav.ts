@@ -23,7 +23,12 @@ async function resolvePathClassification(
       .from(blogPosts)
       .where(eq(blogPosts.slug, slug))
       .limit(1)
-    return { categoryPath: result[0]?.categoryPath ?? undefined }
+    // Every blog post is implicitly pageType "article" — Pages has a real
+    // pageType column (landing/article/documentation, see ScopePicker's
+    // PAGE_TYPE_OPTIONS), BlogPosts never did, so a Module scoped to
+    // page_type=article could never match here. Hardcoded, not a lookup:
+    // there's no other pageType a blog post could ever be.
+    return { categoryPath: result[0]?.categoryPath ?? undefined, pageType: "article" }
   }
 
   const result = await db

@@ -115,6 +115,22 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
           <BlockRenderer layers={afterBodyLayers} pagePath={`/blog/${slug}`} locale={locale} />
         </div>
       )}
+      {/*
+        Fixed anchor, always present — NOT an editor-placed block. Lets an
+        admin control what appears at the bottom of every article from one
+        place (Modules, scoped page_type=article + locale), rather than
+        either hardcoding a block here (can't turn it off/vary by locale) or
+        adding it to every article's own layout one by one (doesn't scale,
+        each edit only touches one post). Renders nothing if no Module
+        targets this anchorKey yet.
+      */}
+      <div className="mt-12">
+        <BlockRenderer
+          layers={[{ id: "article-footer-anchor", layerType: "module-anchor", props: { anchorKey: "article-footer" } }]}
+          pagePath={`/blog/${slug}`}
+          locale={locale}
+        />
+      </div>
     </article>
   )
 }

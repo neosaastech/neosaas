@@ -1,3 +1,9 @@
+## [1.17.0](https://github.com/neosaastech/Neosaas-app/compare/v1.16.1...v1.17.0) (2026-08-13)
+
+### Features
+
+* fixed module-anchor at the bottom of every article ([37cc1e2](https://github.com/neosaastech/Neosaas-app/commit/37cc1e20848cf1a96da6c668dbdbe3a30235d0c6))
+
 ## [1.16.1](https://github.com/neosaastech/Neosaas-app/compare/v1.16.0...v1.16.1) (2026-08-13)
 
 ### Bug Fixes
