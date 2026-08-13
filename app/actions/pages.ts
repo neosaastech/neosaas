@@ -25,6 +25,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  listUsers,
   listMedia,
   uploadMedia,
   deleteMedia,
@@ -308,6 +309,19 @@ export async function getContentCategories(locale: string = "fr"): Promise<
   } catch (error) {
     console.error("Failed to fetch categories from Payload:", error)
     return { success: false, error: "Failed to fetch categories" }
+  }
+}
+
+/** Backs AuthorPickerField's search — same "always fresh, straight from Payload" posture as getContentCategories. */
+export async function getContentAuthors(): Promise<
+  { success: true; data: { id: string; name: string; email: string }[] } | { success: false; error: string }
+> {
+  try {
+    const users = await listUsers()
+    return { success: true, data: users.map((u) => ({ id: String(u.id), name: u.name, email: u.email })) }
+  } catch (error) {
+    console.error("Failed to fetch authors from Payload:", error)
+    return { success: false, error: "Failed to fetch authors" }
   }
 }
 

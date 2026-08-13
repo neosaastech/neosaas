@@ -690,6 +690,29 @@ export interface PayloadCategorySummary {
   headerImage?: string
 }
 
+export interface PayloadUserSummary {
+  id: string | number
+  name: string
+  email: string
+}
+
+/**
+ * Backs AuthorPickerField — Charles (2026-08-13): an author picker must
+ * resolve to a real Payload admin, never free text. Users has no `tenant`
+ * field (global pool, unlike Categories/Pages — see multiTenantPlugin's
+ * `collections` list, Users isn't in it), so no tenant filter here, unlike
+ * listCategories/listPages. Falls back to email when `name` is unset, same
+ * rule Payload's own admin UI and the sync hooks already use.
+ */
+export async function listUsers(): Promise<PayloadUserSummary[]> {
+  const res = await payloadFetch(`/users?limit=200&sort=email`)
+  if (!res.ok) {
+    throw new Error(`Payload bridge: listUsers failed (${res.status})`)
+  }
+  const data = (await res.json()) as PaginatedResult<{ id: string | number; name?: string | null; email: string }>
+  return data.docs.map((doc) => ({ id: doc.id, name: doc.name || doc.email, email: doc.email }))
+}
+
 /** Categories are typically few (tens, not hundreds) — no pagination needed for a filter dropdown. */
 export async function listCategories(locale: string = "fr"): Promise<PayloadCategorySummary[]> {
   const res = await payloadFetch(

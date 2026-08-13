@@ -1,3 +1,9 @@
+## [1.19.0](https://github.com/neosaastech/Neosaas-app/compare/v1.18.0...v1.19.0) (2026-08-13)
+
+### Features
+
+* real Author module backed by Payload Users, not free text ([8da4626](https://github.com/neosaastech/Neosaas-app/commit/8da46263405a3d8bb290acba9bee64ba69de0bfc))
+
 ## [1.18.0](https://github.com/neosaastech/Neosaas-app/compare/v1.17.0...v1.18.0) (2026-08-13)
 
 ### Features

@@ -19,6 +19,7 @@ import { GrapesJsDesignLayer, type GrapesJsDesignLayerProps } from "@/components
 import { CodeShowcaseLayer, type CodeShowcaseLayerProps } from "@/components/layers/code-showcase-layer"
 import { FeaturesListLayer, type FeaturesListLayerProps } from "@/components/layers/features-list-layer"
 import { LogoCloudLayer, type LogoCloudLayerProps } from "@/components/layers/logo-cloud-layer"
+import { AuthorCardLayer, type AuthorCardLayerProps } from "@/components/layers/author-card-layer"
 
 /**
  * Single source of truth for page layer types (Pilier G — Normes de nommage & design tokens).
@@ -255,6 +256,13 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       authorName: z.string().optional(),
       publishedAt: z.string().optional(),
     }) satisfies z.ZodType<ArticleHeaderLayerProps>,
+    source: "global",
+  },
+  "author-card": {
+    component: AuthorCardLayer,
+    propsSchema: z.object({
+      authorId: z.string().optional(),
+    }) satisfies z.ZodType<AuthorCardLayerProps>,
     source: "global",
   },
   "grapesjs-design": {

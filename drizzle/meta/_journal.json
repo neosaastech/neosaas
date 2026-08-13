@@ -183,6 +183,13 @@
       "when": 1786611905135,
       "tag": "0025_add_author_bio_avatar",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786620360594,
+      "tag": "0026_add_authors_table",
+      "breakpoints": true
     }
   ]
 }

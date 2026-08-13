@@ -1132,6 +1132,32 @@ export type Category = typeof categories.$inferSelect
 export type NewCategory = typeof categories.$inferInsert
 
 /**
+ * Mirror of Payload's Users collection, pushed here by the sync adapter
+ * (syncUserToNeosaasApp) on every save — backs the `author-card` block so an
+ * Author module resolves to a real Payload admin at render time instead of
+ * free text (Charles, 2026-08-13: "le module en front ne correspond à
+ * aucune personne dans les admin du projet. c'est frauduleux"). One row
+ * total per Payload user (unlike categories, Users has no localized
+ * fields), upserted by payload_user_id.
+ */
+export const authors = pgTable("authors", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  payloadUserId: integer("payload_user_id").notNull(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  payloadUserIdUnique: uniqueIndex("authors_payload_user_id_unique").on(table.payloadUserId),
+}))
+
+export type Author = typeof authors.$inferSelect
+export type NewAuthor = typeof authors.$inferInsert
+
+/**
  * Content sync failures — written directly by payload-cms's sync adapter
  * (src/sync/targets/neosaas-app.ts's notifyConsumerSyncFailure) whenever a
  * Page/BlogPost publish fails to push to this site's own DB. Previously the

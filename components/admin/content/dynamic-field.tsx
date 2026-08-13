@@ -14,6 +14,7 @@ import { MediaPickerField } from "./media-picker-field"
 import { IconPickerField } from "./icon-picker-field"
 import { RichTextEditor } from "./rich-text-editor"
 import { CategorySlugField } from "./category-slug-field"
+import { AuthorPickerField } from "./author-picker-field"
 
 /**
  * Generic form field renderer driven directly by a block's Zod propsSchema
@@ -183,6 +184,13 @@ function DynamicField({
   // replaced by a searchable combobox over real categories.
   if (name === "categorySlug") {
     return <CategorySlugField name={name} value={(value as string) ?? ""} onChange={onChange} />
+  }
+
+  // Charles (2026-08-13): "on doit aussi avoir un module auteur pret à
+  // l'emploi" — backs the new `author-card` block's authorId field with a
+  // real Payload user picker, same convention as categorySlug above.
+  if (name === "authorId") {
+    return <AuthorPickerField name={name} value={(value as string) ?? ""} onChange={onChange} />
   }
 
   if (name === "subtitle") {
