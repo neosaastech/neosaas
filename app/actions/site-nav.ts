@@ -181,6 +181,14 @@ export async function getFooterConfig(pagePath: string, locale: string = "fr"): 
  * fallback Joomla's own language switcher module uses.
  */
 export async function getAlternatePagePaths(pagePath: string, locale: string): Promise<Record<string, string> | null> {
+  // Blog posts live in `blog_posts`, keyed by slug, not in `page_seo` —
+  // same routing split resolvePathClassification already makes above. A
+  // blind lookup here always missed for `/blog/...` paths, which is why the
+  // language switcher fell back to its blind prefix-swap on every article.
+  if (pagePath.startsWith("/blog/")) {
+    return getAlternateBlogPostPaths(pagePath.slice("/blog/".length), locale)
+  }
+
   try {
     const current = await db
       .select({ payloadPageId: pageSeo.payloadPageId })
@@ -203,6 +211,42 @@ export async function getAlternatePagePaths(pagePath: string, locale: string): P
     return map
   } catch (error) {
     console.error("Failed to get alternate page paths:", error)
+    return null
+  }
+}
+
+/**
+ * Same shape as getAlternatePagePaths, keyed by `translation_group_id`
+ * instead of `payload_page_id` — a blog post's fr/en versions are two
+ * separate Payload documents (BlogPosts.slug isn't localized), so there's
+ * no shared doc id to group by. See db/schema.ts's blogPosts.translationGroupId
+ * and payload-cms's BlogPosts.translationOf field for how the group gets set.
+ * Returns paths without the /blog/ prefix — callers (locale-switcher.tsx via
+ * getAlternatePagePaths) already own that.
+ */
+async function getAlternateBlogPostPaths(slug: string, locale: string): Promise<Record<string, string> | null> {
+  try {
+    const current = await db
+      .select({ translationGroupId: blogPosts.translationGroupId })
+      .from(blogPosts)
+      .where(and(eq(blogPosts.slug, slug), eq(blogPosts.locale, locale)))
+      .limit(1)
+
+    const translationGroupId = current[0]?.translationGroupId
+    if (!translationGroupId) return null
+
+    const rows = await db
+      .select({ slug: blogPosts.slug, locale: blogPosts.locale })
+      .from(blogPosts)
+      .where(eq(blogPosts.translationGroupId, translationGroupId))
+
+    if (rows.length === 0) return null
+
+    const map: Record<string, string> = {}
+    for (const row of rows) map[row.locale] = `/blog/${row.slug}`
+    return map
+  } catch (error) {
+    console.error("Failed to get alternate blog post paths:", error)
     return null
   }
 }

@@ -1,3 +1,9 @@
+## [1.25.0](https://github.com/neosaastech/Neosaas-app/compare/v1.24.0...v1.25.0) (2026-08-13)
+
+### Features
+
+* **blog:** resolve real translated article on language switch ([a5f8ee8](https://github.com/neosaastech/Neosaas-app/commit/a5f8ee86a119fcfc927a3ee05e0777838e1bbccb))
+
 ## [1.24.0](https://github.com/neosaastech/Neosaas-app/compare/v1.23.0...v1.24.0) (2026-08-13)
 
 ### Features

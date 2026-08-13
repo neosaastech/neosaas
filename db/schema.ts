@@ -1083,11 +1083,25 @@ export const blogPosts = pgTable("blog_posts", {
   // Same gap/fix as pageSeo.noIndex/noFollow above.
   noIndex: boolean("no_index").default(false).notNull(),
   noFollow: boolean("no_follow").default(false).notNull(),
+  // Charles (2026-08-13): a multilingual site selling itself as multilingual
+  // that can't switch an article's language properly is a real embarrassment
+  // to ship. Unlike pageSeo.payloadPageId, a blog post's fr/en versions are
+  // TWO separate Payload documents (slug isn't localized — see BlogPosts.ts)
+  // so there's no shared doc id to group by. This is that group key instead:
+  // set by the sync hook (payload-cms's targets/neosaas-app.ts) whenever
+  // either side of a pair has its new `translationOf` field filled in —
+  // whichever row syncs second does the actual linking. Nullable: existing
+  // rows (synced before this field existed, or never explicitly paired by an
+  // editor) have no group yet, same "not yet linked" posture pageSeo takes —
+  // getAlternateBlogPostPaths (site-nav.ts) falls back to the old blind
+  // prefix-swap when null.
+  translationGroupId: uuid("translation_group_id"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   payloadPostIdUnique: uniqueIndex("blog_posts_payload_post_id_unique").on(table.payloadPostId).where(sql`payload_post_id IS NOT NULL`),
+  translationGroupIdIdx: index("blog_posts_translation_group_id_idx").on(table.translationGroupId),
 }))
 
 export type BlogPost = typeof blogPosts.$inferSelect
