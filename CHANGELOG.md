@@ -1,3 +1,9 @@
+## [1.20.0](https://github.com/neosaastech/Neosaas-app/compare/v1.19.0...v1.20.0) (2026-08-13)
+
+### Features
+
+* search box in the block picker dialog ([5980d14](https://github.com/neosaastech/Neosaas-app/commit/5980d14e73af9b0f6750f181b04d3fa4507afb4b))
+
 ## [1.19.0](https://github.com/neosaastech/Neosaas-app/compare/v1.18.0...v1.19.0) (2026-08-13)
 
 ### Features
