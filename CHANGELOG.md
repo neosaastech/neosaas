@@ -1,3 +1,9 @@
+## [1.23.0](https://github.com/neosaastech/Neosaas-app/compare/v1.22.0...v1.23.0) (2026-08-13)
+
+### Features
+
+* Authors admin panel ([13ab616](https://github.com/neosaastech/Neosaas-app/commit/13ab616c55b5e3acb0c66cc8023567cf674f886b)), closes [#93](https://github.com/neosaastech/Neosaas-app/issues/93) [#24](https://github.com/neosaastech/Neosaas-app/issues/24)
+
 ## [1.22.0](https://github.com/neosaastech/Neosaas-app/compare/v1.21.0...v1.22.0) (2026-08-13)
 
 ### Features

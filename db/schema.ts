@@ -1140,6 +1140,15 @@ export type NewCategory = typeof categories.$inferInsert
  * total per Payload user (unlike categories, Users has no localized
  * fields), upserted by payload_user_id.
  */
+
+// Shape of one entry in authors.socialLinks (jsonb array) — flexible list
+// over fixed per-platform columns, Charles's explicit call: a new platform
+// never needs a migration.
+export interface AuthorSocialLinkInput {
+  platform: string
+  url: string
+}
+
 export const authors = pgTable("authors", {
   id: uuid("id").defaultRandom().primaryKey(),
   payloadUserId: integer("payload_user_id").notNull(),

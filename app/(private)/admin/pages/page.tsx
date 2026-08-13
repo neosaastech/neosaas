@@ -6,6 +6,7 @@ import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
 import { ContentHub } from "@/components/admin/pages-settings"
 import { HeaderFooterPanel } from "@/components/admin/content/header-footer-panel"
 import { ModulesPanel } from "@/components/admin/content/modules-panel"
+import { AuthorsPanel } from "@/components/admin/content/authors-panel"
 import { MediaGallery } from "@/components/admin/content/media-gallery"
 import { ThemeSettings } from "@/components/admin/theme-settings"
 
@@ -45,6 +46,8 @@ export default function AdminPagesPage() {
         <HeaderFooterPanel type={type} />
       ) : type === "modules" ? (
         <ModulesPanel />
+      ) : type === "authors" ? (
+        <AuthorsPanel />
       ) : type === "media" ? (
         <MediaGallery />
       ) : type === "style" ? (

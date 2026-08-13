@@ -93,6 +93,7 @@ const contentSubItems = [
   { name: "Header", href: "/admin/pages?type=header" },
   { name: "Footer", href: "/admin/pages?type=footer" },
   { name: "Modules", href: "/admin/pages?type=modules" },
+  { name: "Authors", href: "/admin/pages?type=authors" },
   { name: "Media", href: "/admin/pages?type=media" },
   { name: "Style", href: "/admin/pages?type=style" },
 ]
