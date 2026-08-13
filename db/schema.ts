@@ -1147,11 +1147,42 @@ export const authors = pgTable("authors", {
   email: text("email").notNull(),
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
+  // Charles (2026-08-13): "ma base utilisateur et admin/rédacteur est la
+  // même... on doit retrouver l'admin et sa description dans sa fiche ainsi
+  // que son avatar et ses données tel que phone". Nullable — an author only
+  // ever synced from Payload (no matching site admin) has no linked profile.
+  // Resolved automatically by payload-cms's syncUserAfterChange matching
+  // Payload's user email against this site's own `users.email` ("le plus
+  // automatique possible") — never overwritten once set, so a manual fix
+  // from the admin UI (Thread B2) always sticks.
+  siteUserId: uuid("site_user_id").references(() => users.id),
+  // Flexible list ({platform, url}[]) rather than fixed columns per network
+  // — Charles explicitly chose this over one column per platform, so a new
+  // network never needs a migration.
+  socialLinks: jsonb("social_links"),
+  // No `phone` column here on purpose — Charles: "le plus automatique
+  // possible" — an author's phone is only ever shown when siteUserId is
+  // linked, read live from users.phone (Thread A3), never duplicated here.
+  showBioPublicly: boolean("show_bio_publicly").default(true).notNull(),
+  showEmailPublicly: boolean("show_email_publicly").default(false).notNull(),
+  showPhonePublicly: boolean("show_phone_publicly").default(false).notNull(),
+  showSocialLinksPublicly: boolean("show_social_links_publicly").default(true).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   payloadUserIdUnique: uniqueIndex("authors_payload_user_id_unique").on(table.payloadUserId),
+  // Partial unique — NULL siteUserId (Payload-only authors) must never be
+  // constrained, only actual links need to stay one-to-one. Same pattern as
+  // categories.payloadCategoryIdLocaleUnique's `WHERE ... IS NOT NULL`.
+  siteUserIdUnique: uniqueIndex("authors_site_user_id_unique").on(table.siteUserId).where(sql`site_user_id IS NOT NULL`),
+}))
+
+export const authorsRelations = relations(authors, ({ one }) => ({
+  siteUser: one(users, {
+    fields: [authors.siteUserId],
+    references: [users.id],
+  }),
 }))
 
 export type Author = typeof authors.$inferSelect

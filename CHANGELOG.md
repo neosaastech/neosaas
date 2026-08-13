@@ -1,3 +1,9 @@
+## [1.21.0](https://github.com/neosaastech/Neosaas-app/compare/v1.20.0...v1.21.0) (2026-08-13)
+
+### Features
+
+* link authors to real site admin accounts ([92b3476](https://github.com/neosaastech/Neosaas-app/commit/92b34764c9345b8bd0c35bb1f8ad678c5afb126f))
+
 ## [1.20.0](https://github.com/neosaastech/Neosaas-app/compare/v1.19.0...v1.20.0) (2026-08-13)
 
 ### Features
