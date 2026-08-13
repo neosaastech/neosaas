@@ -75,7 +75,18 @@ export async function BlockRenderer({
         // route exists outside app/[locale]/...). Injected generically here
         // rather than per-layer plumbing; harmless for every other schema,
         // whose propsSchema doesn't declare `locale` and silently drops it.
-        const resolved = { ...interpolateDeep(rest, variables), locale }
+        // Same generic-injection rationale as `locale` above: a "blog-list"
+        // block added (via the Content Hub's extra-blocks mechanism, same
+        // one article-header already uses) onto a specific article's own
+        // `/blog/{slug}` page shouldn't list that article among its own
+        // "latest articles" — harmless everywhere else, since pagePath only
+        // matches this pattern on an actual article page.
+        const blogSlugMatch = layer.layerType === "blog-list" ? pagePath?.match(/^\/blog\/(.+)$/) : null
+        const resolved = {
+          ...interpolateDeep(rest, variables),
+          locale,
+          ...(blogSlugMatch ? { excludeSlug: blogSlugMatch[1] } : {}),
+        }
         // .safeParse, not .parse: one malformed row (stale sync, hand-edited
         // DB row, a field shape that changed since the row was written) must
         // not take the whole page down with a 500 — skip just that block,

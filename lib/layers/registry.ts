@@ -223,6 +223,9 @@ export const layerRegistry: Record<string, LayerDefinition> = {
       limit: z.number().optional(),
       categorySlug: z.string().optional(),
       locale: z.string().optional(),
+      // Generically injected by block-renderer.tsx when this block sits on
+      // its own article's `/blog/{slug}` page — never authored in Payload.
+      excludeSlug: z.string().optional(),
     }) satisfies z.ZodType<BlogListLayerProps>,
     source: "global",
   },

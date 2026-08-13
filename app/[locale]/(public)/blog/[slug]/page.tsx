@@ -11,7 +11,6 @@ import { injectHeadingIds, extractHeadings, splitAfterFirstParagraph } from "@/l
 import { TableOfContents } from "@/components/blog/table-of-contents"
 import { ShareButtons } from "@/components/blog/share-buttons"
 import { AuthorBox } from "@/components/blog/author-box"
-import { BlogListLayer } from "@/components/layers/blog-list-layer"
 
 // Never had any metadata at all before this — every article showed the
 // site-wide title/description. Uses blog_posts' own meta_title/
@@ -116,13 +115,6 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
           <BlockRenderer layers={afterBodyLayers} pagePath={`/blog/${slug}`} />
         </div>
       )}
-      <BlogListLayer
-        eyebrow={locale === "en" ? "Keep reading" : "À lire aussi"}
-        title={locale === "en" ? "Latest articles" : "Derniers articles"}
-        limit={3}
-        locale={locale}
-        excludeSlug={slug}
-      />
     </article>
   )
 }

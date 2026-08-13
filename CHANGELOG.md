@@ -1,3 +1,9 @@
+## [1.16.0](https://github.com/neosaastech/Neosaas-app/compare/v1.15.0...v1.16.0) (2026-08-13)
+
+### Features
+
+* make "related articles" a pilotable block, not a fixed section ([b5b439d](https://github.com/neosaastech/Neosaas-app/commit/b5b439de14b474038458fb8c9b5c0ab23fd23ae9))
+
 ## [1.15.0](https://github.com/neosaastech/Neosaas-app/compare/v1.14.1...v1.15.0) (2026-08-13)
 
 ### Features
