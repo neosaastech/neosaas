@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/neosaastech/Neosaas-app/compare/v1.14.1...v1.15.0) (2026-08-13)
+
+### Features
+
+* real author card, related articles, and article layout fixes ([357a731](https://github.com/neosaastech/Neosaas-app/commit/357a731022c3e49a32a8a9cd69b80b5412b9fd99))
+
 ## [1.14.1](https://github.com/neosaastech/Neosaas-app/compare/v1.14.0...v1.14.1) (2026-08-13)
 
 ### Bug Fixes

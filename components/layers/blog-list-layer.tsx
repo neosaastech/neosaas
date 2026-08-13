@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, ne } from "drizzle-orm"
 import { db } from "@/db"
 import { blogPosts } from "@/db/schema"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -12,6 +12,8 @@ export interface BlogListLayerProps {
   limit?: number
   categorySlug?: string
   locale?: string
+  /** Omits the current article from its own "latest articles" list. */
+  excludeSlug?: string
 }
 
 /**
@@ -22,12 +24,13 @@ export interface BlogListLayerProps {
  * a snapshot frozen when the block was authored in Payload. Props only
  * configure how many posts and which category, not the post data itself.
  */
-export async function BlogListLayer({ eyebrow, title, subtitle, limit, categorySlug, locale = "fr" }: BlogListLayerProps) {
+export async function BlogListLayer({ eyebrow, title, subtitle, limit, categorySlug, locale = "fr", excludeSlug }: BlogListLayerProps) {
   const posts = await db.query.blogPosts.findMany({
     where: and(
       eq(blogPosts.isActive, true),
       eq(blogPosts.locale, locale),
       categorySlug ? eq(blogPosts.categorySlug, categorySlug) : undefined,
+      excludeSlug ? ne(blogPosts.slug, excludeSlug) : undefined,
     ),
     orderBy: [desc(blogPosts.publishedAt)],
     limit: limit ?? 6,

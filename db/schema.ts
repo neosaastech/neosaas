@@ -1062,6 +1062,12 @@ export const blogPosts = pgTable("blog_posts", {
   excerpt: text("excerpt"),
   coverImageUrl: text("cover_image_url"),
   authorName: text("author_name"),
+  // Synced from Payload's Users.bio/avatar (added alongside Users.name) —
+  // powers a real author card instead of a plain "By {name}" line. Both
+  // nullable: most authors won't have either set, same fallback posture as
+  // authorName itself.
+  authorBio: text("author_bio"),
+  authorAvatarUrl: text("author_avatar_url"),
   bodyHtml: text("body_html").notNull().default(""),
   categorySlug: text("category_slug"),
   categoryPath: text("category_path"),

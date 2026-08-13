@@ -176,6 +176,13 @@
       "when": 1786344475086,
       "tag": "0024_bright_ares",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786611905135,
+      "tag": "0025_add_author_bio_avatar",
+      "breakpoints": true
     }
   ]
 }

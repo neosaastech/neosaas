@@ -10,6 +10,8 @@ import { LOCALES } from "@/app/[locale]/layout"
 import { injectHeadingIds, extractHeadings, splitAfterFirstParagraph } from "@/lib/blog/toc"
 import { TableOfContents } from "@/components/blog/table-of-contents"
 import { ShareButtons } from "@/components/blog/share-buttons"
+import { AuthorBox } from "@/components/blog/author-box"
+import { BlogListLayer } from "@/components/layers/blog-list-layer"
 
 // Never had any metadata at all before this — every article showed the
 // site-wide title/description. Uses blog_posts' own meta_title/
@@ -96,17 +98,14 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
         <BlockRenderer layers={[headerLayer]} pagePath={`/blog/${slug}`} />
       ) : (
         <>
+          {/* h1 first — the SEO-correct first element of the article, not preceded by the cover image. */}
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{post.title}</h1>
           {post.coverImageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.coverImageUrl} alt="" className="mb-4 aspect-video w-full rounded-xl object-cover" />
+            <img src={post.coverImageUrl} alt="" className="mt-4 mb-4 aspect-video w-full rounded-xl object-cover" />
           )}
-          <ShareButtons url={canonicalUrl} title={post.title} locale={locale} />
-          <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{post.title}</h1>
-          {post.authorName && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {locale === "en" ? "By" : "Par"} {post.authorName}
-            </p>
-          )}
+          <ShareButtons url={canonicalUrl} title={post.title} />
+          {post.authorName && <AuthorBox name={post.authorName} bio={post.authorBio} avatarUrl={post.authorAvatarUrl} />}
         </>
       )}
       <div className={`mt-8 space-y-4 ${bodyProseClass}`} dangerouslySetInnerHTML={{ __html: firstParagraphHtml }} />
@@ -117,6 +116,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
           <BlockRenderer layers={afterBodyLayers} pagePath={`/blog/${slug}`} />
         </div>
       )}
+      <BlogListLayer
+        eyebrow={locale === "en" ? "Keep reading" : "À lire aussi"}
+        title={locale === "en" ? "Latest articles" : "Derniers articles"}
+        limit={3}
+        locale={locale}
+        excludeSlug={slug}
+      />
     </article>
   )
 }
