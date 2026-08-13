@@ -13,6 +13,7 @@ import { LinkFieldInput } from "./link-field-input"
 import { MediaPickerField } from "./media-picker-field"
 import { IconPickerField } from "./icon-picker-field"
 import { RichTextEditor } from "./rich-text-editor"
+import { CategorySlugField } from "./category-slug-field"
 
 /**
  * Generic form field renderer driven directly by a block's Zod propsSchema
@@ -174,6 +175,14 @@ function DynamicField({
   // replaced by a searchable combobox over every lucide-react icon.
   if (name === "icon") {
     return <IconPickerField name={name} value={(value as string) ?? ""} onChange={onChange} />
+  }
+
+  // Charles (2026-08-13): "pourquoi ne pas avoir un sélecteur avec moteur
+  // de recherche intégré pour retrouver les catégories actives" — same
+  // complaint as `icon` above, same fix: a raw slug typed from memory
+  // replaced by a searchable combobox over real categories.
+  if (name === "categorySlug") {
+    return <CategorySlugField name={name} value={(value as string) ?? ""} onChange={onChange} />
   }
 
   if (name === "subtitle") {

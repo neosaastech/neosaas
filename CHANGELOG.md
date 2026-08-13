@@ -1,3 +1,9 @@
+## [1.18.0](https://github.com/neosaastech/Neosaas-app/compare/v1.17.0...v1.18.0) (2026-08-13)
+
+### Features
+
+* searchable category picker for the categorySlug field ([a783a21](https://github.com/neosaastech/Neosaas-app/commit/a783a216b708feba91536955fe35e9dd3b194e4a))
+
 ## [1.17.0](https://github.com/neosaastech/Neosaas-app/compare/v1.16.1...v1.17.0) (2026-08-13)
 
 ### Features
