@@ -94,7 +94,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
   return (
     <article className="container max-w-3xl py-12 md:py-24">
       {headerLayer ? (
-        <BlockRenderer layers={[headerLayer]} pagePath={`/blog/${slug}`} />
+        <BlockRenderer layers={[headerLayer]} pagePath={`/blog/${slug}`} locale={locale} />
       ) : (
         <>
           {/* h1 first — the SEO-correct first element of the article, not preceded by the cover image. */}
@@ -112,7 +112,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
       <div className={`space-y-4 ${bodyProseClass}`} dangerouslySetInnerHTML={{ __html: restOfBodyHtml }} />
       {afterBodyLayers.length > 0 && (
         <div className="mt-12">
-          <BlockRenderer layers={afterBodyLayers} pagePath={`/blog/${slug}`} />
+          <BlockRenderer layers={afterBodyLayers} pagePath={`/blog/${slug}`} locale={locale} />
         </div>
       )}
     </article>

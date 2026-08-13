@@ -1,3 +1,9 @@
+## [1.16.1](https://github.com/neosaastech/Neosaas-app/compare/v1.16.0...v1.16.1) (2026-08-13)
+
+### Bug Fixes
+
+* pass locale to BlockRenderer on blog article extra blocks ([dfed0a9](https://github.com/neosaastech/Neosaas-app/commit/dfed0a9cbe30c6fa022864c080e76e51e8e15a1e)), closes [#87](https://github.com/neosaastech/Neosaas-app/issues/87)
+
 ## [1.16.0](https://github.com/neosaastech/Neosaas-app/compare/v1.15.0...v1.16.0) (2026-08-13)
 
 ### Features
