@@ -1,3 +1,13 @@
+## [1.14.0](https://github.com/neosaastech/Neosaas-app/compare/v1.13.6...v1.14.0) (2026-08-13)
+
+### Features
+
+* add table of contents and share buttons to blog articles ([ab18b86](https://github.com/neosaastech/Neosaas-app/commit/ab18b868bb80febc7a081e4354d969c7e741fd69))
+
+### Bug Fixes
+
+* localize hardcoded "Par" author byline label on blog posts ([6efd8f1](https://github.com/neosaastech/Neosaas-app/commit/6efd8f1082d298f85f4dbd078872342c643e181a))
+
 ## [1.13.6](https://github.com/neosaastech/Neosaas-app/compare/v1.13.5...v1.13.6) (2026-08-13)
 
 ### Bug Fixes

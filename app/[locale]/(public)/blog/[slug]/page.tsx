@@ -7,6 +7,9 @@ import { BlockRenderer } from "@/components/layers/block-renderer"
 import { buildPageTemplateContext, interpolateTemplateString } from "@/lib/pages/template-variables"
 import { getPlatformConfig } from "@/lib/config"
 import { LOCALES } from "@/app/[locale]/layout"
+import { injectHeadingIds, extractHeadings, splitAfterFirstParagraph } from "@/lib/blog/toc"
+import { TableOfContents } from "@/components/blog/table-of-contents"
+import { ShareButtons } from "@/components/blog/share-buttons"
 
 // Never had any metadata at all before this — every article showed the
 // site-wide title/description. Uses blog_posts' own meta_title/
@@ -79,7 +82,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
   const afterBodyLayers = extraLayers.filter((layer) => layer.layerType !== "article-header")
 
   const templateContext = await buildPageTemplateContext(locale)
-  const bodyHtml = interpolateTemplateString(post.bodyHtml, templateContext)
+  const interpolatedBodyHtml = interpolateTemplateString(post.bodyHtml, templateContext)
+  const bodyHtml = injectHeadingIds(interpolatedBodyHtml)
+  const headings = extractHeadings(bodyHtml)
+  const { before: firstParagraphHtml, after: restOfBodyHtml } = splitAfterFirstParagraph(bodyHtml)
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${locale}/blog/${slug}`
+  const bodyProseClass =
+    "[&_a]:text-primary [&_a]:underline [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-6 [&_ul]:list-disc [&_ol]:list-decimal"
 
   return (
     <article className="container max-w-3xl py-12 md:py-24">
@@ -89,16 +98,20 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
         <>
           {post.coverImageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.coverImageUrl} alt="" className="mb-8 aspect-video w-full rounded-xl object-cover" />
+            <img src={post.coverImageUrl} alt="" className="mb-4 aspect-video w-full rounded-xl object-cover" />
           )}
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{post.title}</h1>
-          {post.authorName && <p className="mt-2 text-sm text-muted-foreground">Par {post.authorName}</p>}
+          <ShareButtons url={canonicalUrl} title={post.title} locale={locale} />
+          <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{post.title}</h1>
+          {post.authorName && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {locale === "en" ? "By" : "Par"} {post.authorName}
+            </p>
+          )}
         </>
       )}
-      <div
-        className="mt-8 space-y-4 [&_a]:text-primary [&_a]:underline [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-6 [&_ul]:list-disc [&_ol]:list-decimal"
-        dangerouslySetInnerHTML={{ __html: bodyHtml }}
-      />
+      <div className={`mt-8 space-y-4 ${bodyProseClass}`} dangerouslySetInnerHTML={{ __html: firstParagraphHtml }} />
+      <TableOfContents headings={headings} locale={locale} />
+      <div className={`space-y-4 ${bodyProseClass}`} dangerouslySetInnerHTML={{ __html: restOfBodyHtml }} />
       {afterBodyLayers.length > 0 && (
         <div className="mt-12">
           <BlockRenderer layers={afterBodyLayers} pagePath={`/blog/${slug}`} />
