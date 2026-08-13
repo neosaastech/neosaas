@@ -45,11 +45,17 @@ export function linkValueToForm(link?: PayloadLinkValue | null): LinkFormValue {
   if (!link) return emptyLink()
   if (link.type === "reference") {
     const relationTo = typeof link.reference === "object" && link.reference ? link.reference.relationTo : "pages"
+    // reference.value is a bare id at depth=0 but a populated {id, ...} doc
+    // at depth=1 (the header edit form always fetches at depth=1) — String()
+    // on the populated object silently produced "[object Object]", which
+    // never matched any option and left the Page/Category picker stuck on
+    // its placeholder even though the link was saved correctly.
+    const rawValue = typeof link.reference === "object" && link.reference ? link.reference.value : link.reference
     const referenceId =
-      typeof link.reference === "object" && link.reference
-        ? String(link.reference.value)
-        : link.reference != null
-          ? String(link.reference)
+      rawValue && typeof rawValue === "object"
+        ? String((rawValue as { id: string | number }).id)
+        : rawValue != null
+          ? String(rawValue)
           : ""
     return {
       kind: relationTo === "categories" ? "category" : "page",

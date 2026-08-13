@@ -1,3 +1,9 @@
+## [1.13.6](https://github.com/neosaastech/Neosaas-app/compare/v1.13.5...v1.13.6) (2026-08-13)
+
+### Bug Fixes
+
+* unwrap populated reference.value in PayloadLinkEditor ([23d898b](https://github.com/neosaastech/Neosaas-app/commit/23d898ba36f9110fc0568abbc1a7f3e6c9350746))
+
 ## [1.13.5](https://github.com/neosaastech/Neosaas-app/compare/v1.13.4...v1.13.5) (2026-08-10)
 
 ### Bug Fixes
