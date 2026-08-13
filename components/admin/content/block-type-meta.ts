@@ -12,6 +12,7 @@ import {
   Newspaper,
   FileText,
   UserRound,
+  Users,
   type LucideIcon,
 } from "lucide-react"
 
@@ -39,6 +40,7 @@ export const BLOCK_TYPE_ICONS: Record<string, LucideIcon> = {
   content: FileText,
   columns: Columns3,
   "author-card": UserRound,
+  "author-list": Users,
 }
 
 export const BLOCK_TYPE_LABELS: Record<string, string> = {
@@ -55,6 +57,7 @@ export const BLOCK_TYPE_LABELS: Record<string, string> = {
   content: "Content",
   columns: "Columns",
   "author-card": "Author card",
+  "author-list": "Author list",
 }
 
 export function getBlockTypeIcon(blockType: string): LucideIcon {
@@ -86,6 +89,7 @@ export const BLOCK_TYPE_DESCRIPTIONS: Record<string, string> = {
   content: "Freeform rich-text block — for content that does not fit any structured block.",
   columns: "Layout container — splits content into 2-3 side-by-side columns, each holding its own set of blocks.",
   "author-card": "Picks a real Payload user and renders their name, avatar and bio — never free text.",
+  "author-list": "Directory of all active authors — same real-user-only rule as author card, rendered as a grid.",
 }
 
 export function getBlockTypeDescription(blockType: string): string | undefined {
@@ -102,7 +106,7 @@ export function getBlockTypeDescription(blockType: string): string | undefined {
 // back to the icon-only card.
 const THUMBNAIL_OVERRIDES: Record<string, string> = { hero: "hero-classic" }
 const THUMBNAIL_BASE_URL = "https://cms.neokube.fr/block-thumbnails"
-const NO_THUMBNAIL = new Set(["welcome-banner", "icon-showcase", "author-card"])
+const NO_THUMBNAIL = new Set(["welcome-banner", "icon-showcase", "author-card", "author-list"])
 
 export function getBlockTypeThumbnail(blockType: string): string | undefined {
   if (NO_THUMBNAIL.has(blockType)) return undefined

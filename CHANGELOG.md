@@ -1,3 +1,9 @@
+## [1.24.0](https://github.com/neosaastech/Neosaas-app/compare/v1.23.0...v1.24.0) (2026-08-13)
+
+### Features
+
+* author-list block (directory grid of active authors) ([8b80456](https://github.com/neosaastech/Neosaas-app/commit/8b8045602e9c2c85e6d98796418593d7335c1c06)), closes [94/#95](https://github.com/94/Neosaas-app/issues/95)
+
 ## [1.23.0](https://github.com/neosaastech/Neosaas-app/compare/v1.22.0...v1.23.0) (2026-08-13)
 
 ### Features
