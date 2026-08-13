@@ -15,6 +15,8 @@ import { getPlatformConfig } from "@/lib/config"
 import { getThemeConfig } from "@/app/actions/theme-config"
 import { generateThemeCSS } from "@/lib/theme/generate-css"
 import { getGoogleFontsLinkHref } from "@/lib/theme/font-source"
+import { JsonLd } from "@/components/seo/json-ld"
+import { buildOrganizationJsonLd, buildWebSiteJsonLd } from "@/lib/seo/structured-data"
 
 export async function generateMetadata() {
   try {
@@ -70,12 +72,23 @@ export default async function RootLayout({
   // Set by proxy.ts from the actual /fr or /en URL segment — this layout
   // sits above the [locale] route so it can't read params.locale directly.
   const locale = (await headers()).get("x-locale") || "fr"
+  const seo = config.seoSettings || {}
+  const identity = { siteName: config.siteName, baseUrl: seo.baseUrl || "", logo: config.logo }
 
   return (
     <html lang={locale} suppressHydrationWarning className={`${GeistSans.variable} ${themeFontVariables}`}>
       <head>
         {googleFontsHref && <link rel="stylesheet" href={googleFontsHref} />}
         <style dangerouslySetInnerHTML={{ __html: generateThemeCSS(themeConfig) }} />
+        {/* Sitewide identity — one Organization + WebSite block, present on
+            every page. Per-page schema (BlogPosting/Article/Product) is
+            added by the pages that render that content, not here. */}
+        {identity.baseUrl && (
+          <>
+            <JsonLd data={buildOrganizationJsonLd(identity)} />
+            <JsonLd data={buildWebSiteJsonLd(identity)} />
+          </>
+        )}
       </head>
       <body className="font-sans">
         {config.customHeaderCode && (

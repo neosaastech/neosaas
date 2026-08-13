@@ -11,6 +11,8 @@ import { loadPreviewLayers } from "@/lib/pages/preview-layers"
 import { buildPageMetadata } from "@/lib/seo/page-metadata"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import type { Locale } from "@/app/[locale]/layout"
+import { JsonLd } from "@/components/seo/json-ld"
+import { buildWebPageJsonLd } from "@/lib/seo/structured-data"
 
 export async function generateMetadata({
   params,
@@ -39,6 +41,7 @@ export default async function DynamicPage({
   let layers: PageLayerRow[] = []
   let headerImageUrl: string | null = null
   let isHomepage = false
+  let seoRowForJsonLd: typeof pageSeo.$inferSelect | undefined
 
   if (isPreview) {
     layers = await loadPreviewLayers(pagePath, locale)
@@ -58,6 +61,7 @@ export default async function DynamicPage({
       layers = layerRows
       headerImageUrl = seoRow?.headerImageUrl ?? null
       isHomepage = seoRow?.isHomepage ?? false
+      seoRowForJsonLd = seoRow
     } catch (error) {
       console.error(`Failed to load page layers for ${pagePath}:`, error)
     }
@@ -131,8 +135,22 @@ export default async function DynamicPage({
     notFound()
   }
 
+  const canonicalUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${locale}${pagePath}`
+
   return (
     <>
+      {!isPreview && seoRowForJsonLd && (
+        <JsonLd
+          data={buildWebPageJsonLd({
+            url: canonicalUrl,
+            name: seoRowForJsonLd.metaTitle || seoRowForJsonLd.title || pagePath,
+            description: seoRowForJsonLd.metaDescription,
+            isArticle: seoRowForJsonLd.pageType === "article",
+            datePublished: seoRowForJsonLd.createdAt,
+            dateModified: seoRowForJsonLd.updatedAt,
+          })}
+        />
+      )}
       {/* Charles (2026-07-15): NOT a `container` wrapper around BlockRenderer
           — every block is already wrapped in a full-bleed `<section
           className="w-full ...">` (components/layers/block-wrapper.tsx) so a

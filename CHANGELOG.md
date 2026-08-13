@@ -1,3 +1,9 @@
+## [1.26.0](https://github.com/neosaastech/Neosaas-app/compare/v1.25.0...v1.26.0) (2026-08-13)
+
+### Features
+
+* **seo:** add schema.org structured data (JSON-LD) ([8023fa6](https://github.com/neosaastech/Neosaas-app/commit/8023fa699be10936e4c08c4120cf83eb3677e5c1))
+
 ## [1.25.0](https://github.com/neosaastech/Neosaas-app/compare/v1.24.0...v1.25.0) (2026-08-13)
 
 ### Features

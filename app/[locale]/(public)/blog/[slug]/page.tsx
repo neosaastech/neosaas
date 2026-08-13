@@ -11,6 +11,8 @@ import { injectHeadingIds, extractHeadings, splitAfterFirstParagraph } from "@/l
 import { TableOfContents } from "@/components/blog/table-of-contents"
 import { ShareButtons } from "@/components/blog/share-buttons"
 import { AuthorBox } from "@/components/blog/author-box"
+import { JsonLd } from "@/components/seo/json-ld"
+import { buildBlogPostingJsonLd } from "@/lib/seo/structured-data"
 
 // Never had any metadata at all before this — every article showed the
 // site-wide title/description. Uses blog_posts' own meta_title/
@@ -91,8 +93,24 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
   const bodyProseClass =
     "[&_a]:text-primary [&_a]:underline [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:text-xl [&_h3]:font-semibold [&_li]:ml-6 [&_ul]:list-disc [&_ol]:list-decimal"
 
+  const config = await getPlatformConfig()
+  const seo = config.seoSettings || {}
+  const baseUrl = seo.baseUrl || process.env.NEXT_PUBLIC_APP_URL || ""
+
   return (
     <article className="container max-w-3xl py-12 md:py-24">
+      <JsonLd
+        data={buildBlogPostingJsonLd({
+          url: canonicalUrl,
+          headline: post.title,
+          description: post.metaDescription || post.excerpt,
+          image: post.coverImageUrl,
+          datePublished: post.publishedAt,
+          dateModified: post.updatedAt,
+          authorName: post.authorName,
+          publisher: { siteName: config.siteName, baseUrl, logo: config.logo },
+        })}
+      />
       {headerLayer ? (
         <BlockRenderer layers={[headerLayer]} pagePath={`/blog/${slug}`} locale={locale} />
       ) : (
