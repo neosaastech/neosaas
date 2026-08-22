@@ -344,13 +344,13 @@ export default function AdminApiPage() {
 
       switch (selectedService) {
         case "scaleway":
-          // Pour TEM, seuls Secret Key et Project ID sont requis
-          // Access Key est optionnel (non utilisé par l'API TEM)
+          // For TEM, only Secret Key and Project ID are required
+          // Access Key is optional (not used by the TEM API)
           if (!scalewayConfig.secretKey || !scalewayConfig.projectId) {
-            throw new Error("Secret Key et Project ID sont requis")
+            throw new Error("Secret Key and Project ID are required")
           }
           config = {
-            accessKey: scalewayConfig.accessKey || "", // Optionnel pour TEM
+            accessKey: scalewayConfig.accessKey || "", // Optional for TEM
             secretKey: scalewayConfig.secretKey,
             projectId: scalewayConfig.projectId,
           }
@@ -358,20 +358,20 @@ export default function AdminApiPage() {
           break
         case "resend":
           if (!resendConfig.apiKey) {
-            throw new Error("Veuillez remplir la clé API")
+            throw new Error("Please fill in the API key")
           }
           config = { apiKey: resendConfig.apiKey }
           metadata = { domain: resendConfig.domain }
           break
         case "aws":
           if (!awsConfig.accessKeyId || !awsConfig.secretAccessKey) {
-            throw new Error("Veuillez remplir tous les champs requis")
+            throw new Error("Please fill in all required fields")
           }
           config = awsConfig
           break
         case "stripe":
           if (!stripeConfig.secretKey || !stripeConfig.publicKey) {
-            throw new Error("Veuillez remplir les clés API")
+            throw new Error("Please fill in the API keys")
           }
           // Validate key/environment consistency
           {
@@ -379,47 +379,47 @@ export default function AdminApiPage() {
             const isTestPk = stripeConfig.publicKey.startsWith('pk_test_')
             const isProd = environment === "production"
             if (isProd && (isTestSk || isTestPk)) {
-              throw new Error("Vous êtes en mode Production mais les clés sont des clés test (sk_test_ / pk_test_). Utilisez vos clés live depuis le dashboard Stripe.")
+              throw new Error("You are in Production mode but the keys are test keys (sk_test_ / pk_test_). Use your live keys from the Stripe dashboard.")
             }
             if (!isProd && (!isTestSk || !isTestPk)) {
-              throw new Error("Vous êtes en mode Test mais les clés sont des clés live (sk_live_ / pk_live_). Utilisez vos clés test depuis le dashboard Stripe.")
+              throw new Error("You are in Test mode but the keys are live keys (sk_live_ / pk_live_). Use your test keys from the Stripe dashboard.")
             }
           }
           config = stripeConfig
           break
         case "paypal":
           if (!paypalConfig.clientId || !paypalConfig.clientSecret) {
-            throw new Error("Veuillez remplir les identifiants")
+            throw new Error("Please fill in the credentials")
           }
           config = paypalConfig
           break
         case "github":
           if (!githubConfig.clientId) {
-            throw new Error("GitHub Personal Access Token est requis")
+            throw new Error("GitHub Personal Access Token is required")
           }
-          // Pour GitHub, on teste juste si le token est valide via l'API GitHub
+          // For GitHub, we just test whether the token is valid via the GitHub API
           const githubTestResponse = await fetch('https://api.github.com/user', {
             headers: {
               'Authorization': `Bearer ${githubConfig.clientId}`,
               'Accept': 'application/vnd.github+json',
             }
           })
-          
+
           if (!githubTestResponse.ok) {
-            throw new Error("Token GitHub invalide ou permissions insuffisantes")
+            throw new Error("Invalid GitHub token or insufficient permissions")
           }
-          
+
           const githubUser = await githubTestResponse.json()
-          setModalTestResult({ 
-            success: true, 
-            message: `Token valide pour l'utilisateur ${githubUser.login}` 
+          setModalTestResult({
+            success: true,
+            message: `Valid token for user ${githubUser.login}`
           })
           toast({
-            title: "✅ Token GitHub valide",
-            description: `Connecté en tant que ${githubUser.login}`,
+            title: "✅ Valid GitHub token",
+            description: `Connected as ${githubUser.login}`,
           })
           setTestingInModal(false)
-          return // Sortir car on a déjà géré le test
+          return // Exit here, the test has already been handled
       }
 
       const response = await fetch(`/api/services/${selectedService}/test`, {
@@ -443,13 +443,13 @@ export default function AdminApiPage() {
       } else {
         setModalTestResult({ success: false, message: data.message || data.error })
         toast({
-          title: "❌ Clé invalide",
+          title: "❌ Invalid key",
           description: data.message || data.error,
           variant: "destructive",
         })
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Impossible de vérifier la clé"
+      const message = error instanceof Error ? error.message : "Unable to verify the key"
       setModalTestResult({ success: false, message })
       toast({
         title: "❌ Erreur",
@@ -906,8 +906,8 @@ export default function AdminApiPage() {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {environment === "production"
-                    ? "Paiements réels — clés sk_live_ / pk_live_ requises"
-                    : "Mode test — clés sk_test_ / pk_test_ requises"}
+                    ? "Real payments — sk_live_ / pk_live_ keys required"
+                    : "Test mode — sk_test_ / pk_test_ keys required"}
                 </p>
               </div>
               <Switch
@@ -919,12 +919,12 @@ export default function AdminApiPage() {
             {/* Warning: duplicate env already exists */}
             {!editingConfig && environment === 'production' && !canSaveProd && (
               <div className="p-3 border rounded-lg bg-red-50 border-red-200">
-                <p className="text-sm text-red-700 font-medium">⛔ Une configuration Stripe <strong>Production</strong> existe déjà. Modifiez l'existante au lieu d'en créer une nouvelle.</p>
+                <p className="text-sm text-red-700 font-medium">⛔ A <strong>Production</strong> Stripe configuration already exists. Edit the existing one instead of creating a new one.</p>
               </div>
             )}
             {!editingConfig && environment === 'test' && !canSaveTest && (
               <div className="p-3 border rounded-lg bg-red-50 border-red-200">
-                <p className="text-sm text-red-700 font-medium">⛔ Une configuration Stripe <strong>Test</strong> existe déjà. Modifiez l'existante au lieu d'en créer une nouvelle.</p>
+                <p className="text-sm text-red-700 font-medium">⛔ A <strong>Test</strong> Stripe configuration already exists. Edit the existing one instead of creating a new one.</p>
               </div>
             )}
 
@@ -932,7 +932,7 @@ export default function AdminApiPage() {
             {keyEnvMismatch && (
               <div className="p-3 border rounded-lg bg-yellow-50 border-yellow-300">
                 <p className="text-sm text-yellow-800 font-medium">
-                  ⚠️ Les clés saisies sont des clés <strong>{detectedEnv === 'production' ? 'live (production)' : 'test'}</strong>, mais vous êtes en mode <strong>{environment === 'production' ? 'Production' : 'Test'}</strong>. Basculez le toggle ou corrigez vos clés.
+                  ⚠️ The keys entered are <strong>{detectedEnv === 'production' ? 'live (production)' : 'test'}</strong> keys, but you are in <strong>{environment === 'production' ? 'Production' : 'Test'}</strong> mode. Toggle the switch or fix your keys.
                 </p>
               </div>
             )}
@@ -988,7 +988,7 @@ export default function AdminApiPage() {
             {/* Info: max 2 Stripe configs */}
             <div className="p-3 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
               <p className="text-xs text-blue-700 dark:text-blue-400">
-                <strong>💡 Conseil :</strong> Stripe autorise maximum <strong>2 configurations</strong> — une pour la Production (clés <code>sk_live_</code>) et une pour le Test (clés <code>sk_test_</code>). Le mode actif est piloté depuis <strong>Payment Config</strong> dans l'Overview admin.
+                <strong>💡 Tip:</strong> Stripe allows a maximum of <strong>2 configurations</strong> — one for Production (<code>sk_live_</code> keys) and one for Test (<code>sk_test_</code> keys). The active mode is controlled from <strong>Payment Config</strong> in the admin Overview.
               </p>
             </div>
           </div>
@@ -1286,7 +1286,7 @@ export default function AdminApiPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="github-api-repo">Dépôt cible pour les mises à jour (optionnel)</Label>
+                      <Label htmlFor="github-api-repo">Target repository for updates (optional)</Label>
                       <Input
                         id="github-api-repo"
                         placeholder="neosaastech/neosaas-website"
@@ -1295,7 +1295,7 @@ export default function AdminApiPage() {
                         className="font-mono"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Renseigné, ce token sert aussi au bouton "Appliquer le correctif" (onglet Mises à jour) pour déclencher le déploiement de ce dépôt.
+                        When set, this token is also used by the "Apply update" button (Updates tab) to trigger this repository's deployment.
                       </p>
                     </div>
 
@@ -1630,12 +1630,12 @@ export default function AdminApiPage() {
                         {testingId === config.id ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Vérification...
+                            Verifying...
                           </>
                         ) : (
                           <>
                             <RefreshCw className="h-4 w-4 mr-2" />
-                            Vérifier
+                            Verify
                           </>
                         )}
                       </Button>
@@ -1749,8 +1749,8 @@ export default function AdminApiPage() {
               if (hasProd && hasTest) {
                 return (
                   <div className="p-4 border-2 rounded-lg bg-red-50 border-red-300">
-                    <p className="text-sm text-red-800 font-semibold">⛔ Stripe est déjà entièrement configuré (Production + Test).</p>
-                    <p className="text-xs text-red-700 mt-1">Pour modifier une clé, utilisez le bouton <strong>Edit</strong> sur la configuration existante.</p>
+                    <p className="text-sm text-red-800 font-semibold">⛔ Stripe is already fully configured (Production + Test).</p>
+                    <p className="text-xs text-red-700 mt-1">To change a key, use the <strong>Edit</strong> button on the existing configuration.</p>
                   </div>
                 )
               }
@@ -1759,7 +1759,7 @@ export default function AdminApiPage() {
                 return (
                   <div className="p-3 border rounded-lg bg-blue-50 border-blue-200">
                     <p className="text-xs text-blue-700">
-                      💡 Stripe {hasProd ? 'Production' : 'Test'} existe déjà. Vous pouvez ajouter la configuration <strong>{availableEnv}</strong>.
+                      💡 Stripe {hasProd ? 'Production' : 'Test'} is already configured. You can add the <strong>{availableEnv}</strong> configuration.
                     </p>
                   </div>
                 )

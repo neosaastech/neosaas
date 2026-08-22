@@ -1,3 +1,9 @@
+## [1.26.5](https://github.com/neosaastech/Neosaas-app/compare/v1.26.4...v1.26.5) (2026-08-22)
+
+### Bug Fixes
+
+* **admin-api:** translate remaining French strings to English ([3da8777](https://github.com/neosaastech/Neosaas-app/commit/3da8777c432c64e89fa303280165bf6fe7fc1aba))
+
 ## [1.26.4](https://github.com/neosaastech/Neosaas-app/compare/v1.26.3...v1.26.4) (2026-08-22)
 
 ### Bug Fixes
