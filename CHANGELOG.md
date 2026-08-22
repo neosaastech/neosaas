@@ -1,3 +1,10 @@
+## [1.26.2](https://github.com/neosaastech/Neosaas-app/compare/v1.26.1...v1.26.2) (2026-08-22)
+
+### Bug Fixes
+
+* **admin-api:** load saved GitHub API token on page mount ([12956da](https://github.com/neosaastech/Neosaas-app/commit/12956da2ad32ac960e44671625024f0a7797e532))
+* **admin-api:** load saved GitHub API token on page mount ([ec98a9d](https://github.com/neosaastech/Neosaas-app/commit/ec98a9d29d50728185063910e49748d470ab2fd2))
+
 ## [1.26.1](https://github.com/neosaastech/Neosaas-app/compare/v1.26.0...v1.26.1) (2026-08-13)
 
 ### Bug Fixes

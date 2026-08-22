@@ -240,8 +240,31 @@ export default function AdminApiPage() {
     redirectUri: "",
   })
 
+  // "GitHub API" (Personal Access Token) is saved via its own dedicated
+  // route (/api/admin/configure-github-api, always environment "production")
+  // rather than the generic /api/services/[service] dialog flow used by
+  // Stripe/Google/etc — it never had a matching load call, so the field
+  // rendered empty on every page visit even when a valid token was saved.
+  const loadGithubApiConfig = async () => {
+    try {
+      const response = await fetch('/api/services/github_api?environment=production')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          setGithubApiConfig({
+            personalAccessToken: data.data.config.personalAccessToken || "",
+            repo: data.data.config.repo || "",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error loading GitHub API configuration:", error)
+    }
+  }
+
   useEffect(() => {
     loadAllConfigs()
+    loadGithubApiConfig()
   }, [])
 
   const loadAllConfigs = async () => {
