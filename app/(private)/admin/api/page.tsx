@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Switch } from "@/components/ui/switch"
 import {
   Sheet,
@@ -20,7 +22,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Eye, EyeOff, Save, RefreshCw, Key, CheckCircle, XCircle, Loader2, Trash2, Plus, AlertCircle, Copy, Check, ChevronDown, Rocket, FlaskConical, ShieldAlert } from "lucide-react"
+import { Eye, EyeOff, Save, RefreshCw, Key, CheckCircle, XCircle, Loader2, Trash2, Plus, AlertCircle, Copy, Check, ChevronDown, ChevronsUpDown, Rocket, FlaskConical, ShieldAlert } from "lucide-react"
 import { SiStripe, SiPaypal, SiResend, SiScaleway, SiGithub, SiGoogle, SiFacebook } from "react-icons/si"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
@@ -66,7 +68,13 @@ const services = serviceCategories.flatMap(cat => cat.services)
 
 // SVG Icons for all services
 function ServiceIcon({ service, size = "sm" }: { service: (typeof services)[0]; size?: "sm" | "md" | "lg" }) {
-  const sizeClass = size === "sm" ? "h-5 w-5" : size === "md" ? "h-6 w-6" : "h-8 w-8"
+  // The `!` (important) prefix is required: SelectItem force-resizes any
+  // descendant <svg> lacking a "size-" class to 16px via
+  // `[&_svg:not([class*='size-'])]:size-4`, and CommandItem forces ALL
+  // descendant svgs to size-4 unconditionally via `[&_svg]:size-4` — neither
+  // is beatable by plain h-X/w-X classes. Confirmed live 2026-08-22 (Charles:
+  // icons overflowing/inconsistent in the service picker).
+  const sizeClass = size === "sm" ? "!size-5" : size === "md" ? "!size-6" : "!size-8"
 
 
   // Brands covered by Simple Icons (simpleicons.org via react-icons/si) —
@@ -75,7 +83,7 @@ function ServiceIcon({ service, size = "sm" }: { service: (typeof services)[0]; 
   if (service.id === "stripe") {
     return (
       <div className={`${sizeClass} rounded-md flex items-center justify-center`} style={{ backgroundColor: "#635BFF" }}>
-        <SiStripe className={size === "sm" ? "h-3 w-3" : size === "md" ? "h-3.5 w-3.5" : "h-5 w-5"} color="white" />
+        <SiStripe className={size === "sm" ? "!size-3" : size === "md" ? "!size-3.5" : "!size-5"} color="white" />
       </div>
     )
   }
@@ -152,6 +160,7 @@ export default function AdminApiPage() {
 
   // Form state
   const [selectedService, setSelectedService] = useState(services[0].id)
+  const [serviceComboOpen, setServiceComboOpen] = useState(false)
   const [environment, setEnvironment] = useState("production")
   const [showKey, setShowKey] = useState(false)
   const [showSecretKey, setShowSecretKey] = useState(false)
@@ -1683,62 +1692,93 @@ export default function AdminApiPage() {
           <div className="flex-1 overflow-y-auto space-y-6 px-6 py-6">
             <div className="space-y-2">
               <Label>Select Service</Label>
-              <Select
-                value={selectedService}
-                onValueChange={setSelectedService}
-                disabled={!!editingConfig}
-              >
-                <SelectTrigger className="w-full h-auto py-3 shadow-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-[400px]">
-                  {serviceCategories.map((category) => (
-                    <SelectGroup key={category.id}>
-                      <SelectLabel className="flex items-center gap-2 py-2 px-2 text-sm font-semibold text-foreground bg-muted/50 sticky top-0">
-                        {category.label}
-                      </SelectLabel>
-                      {category.services.map((service) => {
-                        const bgColor = service.type === 'payment'
-                          ? 'bg-purple-100 text-purple-600'
-                          : service.type === 'email'
-                          ? 'bg-blue-100 text-blue-600'
-                          : service.type === 'oauth'
-                          ? 'bg-green-100 text-green-600'
-                          : 'bg-muted'
+              <Popover open={serviceComboOpen} onOpenChange={setServiceComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={serviceComboOpen}
+                    disabled={!!editingConfig}
+                    className="w-full h-auto py-3 justify-between shadow-xs font-normal"
+                  >
+                    {(() => {
+                      const current = services.find((s) => s.id === selectedService)
+                      if (!current) return "Select a service..."
+                      return (
+                        <span className="flex items-center gap-3">
+                          <div className="flex items-center justify-center h-8 w-8 rounded-md shrink-0 bg-muted">
+                            <ServiceIcon service={current} size="sm" />
+                          </div>
+                          <span className="flex flex-col text-left">
+                            <span className="font-medium">{current.name}</span>
+                            <span className="text-xs text-muted-foreground">{current.description}</span>
+                          </span>
+                        </span>
+                      )
+                    })()}
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search a service..." />
+                    <CommandList className="max-h-[400px]">
+                      <CommandEmpty>No service found.</CommandEmpty>
+                      {serviceCategories.map((category) => (
+                        <CommandGroup key={category.id} heading={category.label}>
+                          {category.services.map((service) => {
+                            const bgColor = service.type === 'payment'
+                              ? 'bg-purple-100 text-purple-600'
+                              : service.type === 'email'
+                              ? 'bg-blue-100 text-blue-600'
+                              : service.type === 'oauth'
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-muted'
 
-                        const badgeColor = service.type === 'payment'
-                          ? 'bg-purple-100 text-purple-700'
-                          : service.type === 'email'
-                          ? 'bg-blue-100 text-blue-700'
-                          : service.type === 'oauth'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
+                            const badgeColor = service.type === 'payment'
+                              ? 'bg-purple-100 text-purple-700'
+                              : service.type === 'email'
+                              ? 'bg-blue-100 text-blue-700'
+                              : service.type === 'oauth'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-700'
 
-                        return (
-                          <SelectItem key={service.id} value={service.id} className="py-2 cursor-pointer pl-4">
-                            <div className="flex items-center gap-3">
-                              <div className={`flex items-center justify-center h-10 w-10 rounded-md shrink-0 ${bgColor}`}>
-                                <ServiceIcon service={service} size="md" />
-                              </div>
-                              <div className="flex flex-col text-left">
-                                <span className="font-medium flex items-center gap-2">
-                                  {service.name}
-                                  {'isMain' in service && service.isMain && (
-                                    <Badge variant="secondary" className={`text-[10px] h-4 px-1 ${badgeColor}`}>
-                                      Principal
-                                    </Badge>
-                                  )}
-                                </span>
-                                <span className="text-xs text-muted-foreground">{service.description}</span>
-                              </div>
-                            </div>
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+                            return (
+                              <CommandItem
+                                key={service.id}
+                                value={`${service.name} ${service.description} ${service.id}`}
+                                onSelect={() => {
+                                  setSelectedService(service.id)
+                                  setServiceComboOpen(false)
+                                }}
+                                className="py-2 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-3 w-full">
+                                  <div className={`flex items-center justify-center h-10 w-10 rounded-md shrink-0 ${bgColor}`}>
+                                    <ServiceIcon service={service} size="md" />
+                                  </div>
+                                  <div className="flex flex-col text-left flex-1 min-w-0">
+                                    <span className="font-medium flex items-center gap-2">
+                                      {service.name}
+                                      {'isMain' in service && service.isMain && (
+                                        <Badge variant="secondary" className={`text-[10px] h-4 px-1 ${badgeColor}`}>
+                                          Main
+                                        </Badge>
+                                      )}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground truncate">{service.description}</span>
+                                  </div>
+                                  {service.id === selectedService && <Check className="h-4 w-4 shrink-0" />}
+                                </div>
+                              </CommandItem>
+                            )
+                          })}
+                        </CommandGroup>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Warning if Stripe is fully configured */}

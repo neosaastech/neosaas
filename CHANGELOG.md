@@ -1,3 +1,9 @@
+## [1.26.6](https://github.com/neosaastech/Neosaas-app/compare/v1.26.5...v1.26.6) (2026-08-22)
+
+### Bug Fixes
+
+* **admin-api:** searchable service picker, fix icon sizing ([812c16e](https://github.com/neosaastech/Neosaas-app/commit/812c16e12c893aa3ade91b4d0f1cf2793792b667))
+
 ## [1.26.5](https://github.com/neosaastech/Neosaas-app/compare/v1.26.4...v1.26.5) (2026-08-22)
 
 ### Bug Fixes
