@@ -1,3 +1,9 @@
+## [1.28.0](https://github.com/neosaastech/Neosaas-app/compare/v1.27.0...v1.28.0) (2026-08-22)
+
+### Features
+
+* **system-update:** real completion tracking, header icon, notifications ([ebf1c4c](https://github.com/neosaastech/Neosaas-app/commit/ebf1c4cf25d9dc936dff9e7270930032ba942dca))
+
 ## [1.27.0](https://github.com/neosaastech/Neosaas-app/compare/v1.26.7...v1.27.0) (2026-08-22)
 
 ### Features

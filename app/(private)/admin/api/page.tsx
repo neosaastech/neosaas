@@ -1899,7 +1899,7 @@ export default function AdminApiPage() {
             )}
           </div>
 
-          <SheetFooter className="gap-2 sm:justify-between items-center p-6 border-t shrink-0 bg-background">
+          <SheetFooter className="gap-2 p-6 border-t shrink-0 bg-background">
             <div className="text-xs text-muted-foreground flex items-center gap-1.5 min-h-4">
               {autoSaveState === "saving" && (
                 <>
@@ -1918,10 +1918,9 @@ export default function AdminApiPage() {
               )}
             </div>
             <Button
-              variant="outline"
+              className="bg-brand hover:bg-[#B8691C] w-full"
               onClick={handleTestInModal}
               disabled={saving || testingInModal}
-              className="w-full sm:w-auto"
             >
               {testingInModal ? (
                 <>

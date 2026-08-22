@@ -10,9 +10,55 @@ import { platformConfig } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { logSystemEvent } from '@/app/actions/logs'
 import { initGithub } from '@/lib/services/initializers'
+import { sendAdminNotification } from '@/lib/notifications/admin-notifications'
 import packageJson from '../../../../../package.json'
 
 const CONFIG_KEY = 'system_update_status'
+// Tracks the one in-flight/most-recent deploy job in platformConfig (same
+// key-value pattern as CONFIG_KEY above -- additive, no migration needed).
+// Exists because deployUpdate() below only ever confirms the GitHub
+// workflow_dispatch call itself succeeded; the real build/deploy outcome
+// only becomes known minutes later, when apply-update.yml calls back into
+// /api/admin/system/update/callback. Polled by the header's super-admin-only
+// status icon so "is an update running / did it just fail" survives page
+// navigation instead of living in that one component's local state.
+const JOB_CONFIG_KEY = 'system_update_job'
+
+type UpdateJobStatus = 'pending' | 'succeeded' | 'failed' | 'denied'
+
+interface UpdateJob {
+  status: UpdateJobStatus
+  version: string | null
+  startedAt: string
+  finishedAt: string | null
+  error?: string
+  triggeredBy?: string
+}
+
+async function readJob(): Promise<UpdateJob | null> {
+  const [row] = await db
+    .select()
+    .from(platformConfig)
+    .where(eq(platformConfig.key, JOB_CONFIG_KEY))
+    .limit(1)
+  if (!row?.value) return null
+  try {
+    return JSON.parse(row.value) as UpdateJob
+  } catch {
+    return null
+  }
+}
+
+async function writeJob(job: UpdateJob): Promise<void> {
+  const value = JSON.stringify(job)
+  await db
+    .insert(platformConfig)
+    .values({ key: JOB_CONFIG_KEY, value, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: platformConfig.key,
+      set: { value, updatedAt: new Date() },
+    })
+}
 
 interface UpdateStatus {
   currentVersion: string
@@ -325,7 +371,8 @@ export async function GET(request: NextRequest) {
   }
 
   const status = await readStatus()
-  return NextResponse.json(status)
+  const job = await readJob()
+  return NextResponse.json({ ...status, job })
 }
 
 const ActionBodySchema = z.object({
@@ -355,6 +402,49 @@ export async function POST(request: NextRequest) {
   }
 
   // action === 'deploy'
+  const currentStatus = await readStatus()
   const result = await deployUpdate(authResult.userId)
+  const now = new Date().toISOString()
+
+  if (result.ok) {
+    await writeJob({
+      status: 'pending',
+      version: currentStatus.latestVersion,
+      startedAt: now,
+      finishedAt: null,
+      triggeredBy: authResult.userId,
+    })
+    await sendAdminNotification({
+      subject: `Update triggered${currentStatus.latestVersion ? ` — ${currentStatus.latestVersion}` : ''}`,
+      message: `🚀 **System update started**\n\nDeploying${currentStatus.latestVersion ? ` version ${currentStatus.latestVersion}` : ''}. This takes 3-5 minutes to actually build and go live — you'll get a follow-up message here once it succeeds or fails.`,
+      type: 'system',
+      mode: 'informative',
+      userId: authResult.userId,
+      priority: 'normal',
+      metadata: { notificationType: 'system_update_started', actionRequired: false, version: currentStatus.latestVersion },
+    })
+  } else {
+    // "Denied" case: the dispatch itself never even started (missing
+    // GitHub config, GitHub API error, etc.) -- distinct from a build that
+    // starts and later fails, which the callback endpoint reports instead.
+    await writeJob({
+      status: 'denied',
+      version: currentStatus.latestVersion,
+      startedAt: now,
+      finishedAt: now,
+      error: typeof result.body?.error === 'string' ? result.body.error : 'Update could not be started',
+      triggeredBy: authResult.userId,
+    })
+    await sendAdminNotification({
+      subject: 'Update denied',
+      message: `❌ **System update denied**\n\n${typeof result.body?.error === 'string' ? result.body.error : 'Update could not be started.'}`,
+      type: 'system',
+      mode: 'interactive',
+      userId: authResult.userId,
+      priority: 'high',
+      metadata: { notificationType: 'system_update_denied', actionRequired: true },
+    })
+  }
+
   return NextResponse.json(result.body, { status: result.status })
 }

@@ -13,6 +13,7 @@ import {
 import { UserCompanyAvatar } from "@/components/common/user-company-avatar"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { NotificationBell } from "@/components/admin/notification-bell"
+import { UpdateStatusIcon } from "@/components/admin/update-status-icon"
 import { UserNotificationBell } from "@/components/common/user-notification-bell"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -35,6 +36,7 @@ interface UserData {
   companyLogo?: string | null
   companyName?: string | null
   isAdmin?: boolean
+  isSuperAdmin?: boolean
 }
 
 export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -100,6 +102,7 @@ export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
             companyLogo,
             companyName: data.user.company?.name || null,
             isAdmin: userRoles.includes("admin") || userRoles.includes("super_admin"),
+            isSuperAdmin: userRoles.includes("super_admin"),
           }
           setUser(userData)
           persistUserToStorage(userData)
@@ -272,6 +275,9 @@ export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
 
         <ThemeToggle />
+
+        {/* Update status — super-admin only, next to the bell so it survives navigation instead of only living on the Updates tab */}
+        <UpdateStatusIcon isSuperAdmin={!!user?.isSuperAdmin} />
 
         {/* Notification Bell — admin sees platform-wide events, everyone else sees their own */}
         {user?.isAdmin ? <NotificationBell /> : user && <UserNotificationBell />}
