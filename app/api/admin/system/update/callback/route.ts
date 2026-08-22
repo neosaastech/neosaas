@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
     mode: body.status === 'succeeded' ? 'informative' : 'interactive',
     userId: existingJob?.triggeredBy,
     priority: body.status === 'succeeded' ? 'normal' : 'high',
+    category: body.status === 'succeeded' ? 'action' : 'urgent',
+    superAdminOnly: true,
     metadata: {
       notificationType: body.status === 'succeeded' ? 'system_update_succeeded' : 'system_update_failed',
       actionRequired: body.status === 'failed',

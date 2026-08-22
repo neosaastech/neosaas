@@ -61,6 +61,19 @@ export async function sendAdminNotification(params: {
   userName?: string
   priority?: 'low' | 'normal' | 'high' | 'urgent'
   metadata?: Record<string, any>
+  // Overrides determineCategory()'s subject-pattern guess. Needed because
+  // every 'system'-typed subject gets prefixed "[SYSTEM] ..." below, and
+  // "[system]" itself is one of INFO_PATTERNS in notification-category.ts
+  // -- every system notification silently landed in category='info', which
+  // /api/admin/chat's default query EXCLUDES (confirmed live 2026-08-22:
+  // a real "update succeeded" notification never showed up in /admin/chat,
+  // only visible by querying the DB directly). Callers that genuinely want
+  // an actionable/urgent system notification to be seen must pass this.
+  category?: 'info' | 'action' | 'urgent'
+  // Stored in metadata.superAdminOnly and enforced by /api/admin/chat's and
+  // the notification bell's queries — this notification's chat/chat count
+  // only surfaces for viewers with the super_admin role, not plain admins.
+  superAdminOnly?: boolean
 }) {
   const {
     subject,
@@ -71,12 +84,17 @@ export async function sendAdminNotification(params: {
     userEmail,
     userName,
     priority = 'normal',
-    metadata
+    metadata,
+    category: categoryOverride,
+    superAdminOnly,
   } = params
+
+  const mergedMetadata = superAdminOnly ? { ...(metadata || {}), superAdminOnly: true } : metadata
 
   try {
     // 1. Create or retrieve a conversation for this notification type
     const conversationSubject = `[${type.toUpperCase()}] ${subject}`
+    const category = categoryOverride ?? determineCategory(conversationSubject)
 
     // Look for an existing open conversation for this user and type
     let conversation = await db.query.chatConversations.findFirst({
@@ -87,22 +105,19 @@ export async function sendAdminNotification(params: {
             eq(conversations.status, 'pending')
           )
         ]
-        
+
         if (userId) {
           conditions.push(eq(conversations.userId, userId))
         } else if (userEmail) {
           conditions.push(eq(conversations.guestEmail, userEmail))
         }
-        
+
         return and(...conditions)
       }
     })
 
     // If no existing conversation, create a new one
     if (!conversation) {
-      // Determine category based on subject for proper filtering
-      const category = determineCategory(conversationSubject)
-
       const [newConversation] = await db.insert(chatConversations).values({
         userId: userId || null,
         guestEmail: userEmail || null,
@@ -110,16 +125,18 @@ export async function sendAdminNotification(params: {
         subject: conversationSubject,
         status: 'open',
         priority,
-        category, // Set category based on subject pattern
-        metadata: metadata || null, // Store metadata in conversation for InfoOverlay
+        category,
+        metadata: mergedMetadata || null, // Store metadata in conversation for InfoOverlay
         lastMessageAt: new Date()
       }).returning()
 
       conversation = newConversation
-    } else if (metadata) {
-      // Update existing conversation metadata if new metadata provided
+    } else {
+      // Update existing conversation's metadata/category if a newer message
+      // changes them (e.g. the same update-job thread escalating from
+      // "action" on start to "urgent" once it fails).
       await db.update(chatConversations)
-        .set({ metadata })
+        .set({ metadata: mergedMetadata ?? conversation.metadata, category })
         .where(eq(chatConversations.id, conversation.id))
     }
 

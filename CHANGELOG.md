@@ -1,3 +1,9 @@
+## [1.28.1](https://github.com/neosaastech/Neosaas-app/compare/v1.28.0...v1.28.1) (2026-08-22)
+
+### Bug Fixes
+
+* **notifications:** system-update messages were silently hidden ([6645497](https://github.com/neosaastech/Neosaas-app/commit/6645497075a1d2fe3ead986ad7f3736176e20aef))
+
 ## [1.28.0](https://github.com/neosaastech/Neosaas-app/compare/v1.27.0...v1.28.0) (2026-08-22)
 
 ### Features

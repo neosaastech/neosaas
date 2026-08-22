@@ -421,6 +421,8 @@ export async function POST(request: NextRequest) {
       mode: 'informative',
       userId: authResult.userId,
       priority: 'normal',
+      category: 'action',
+      superAdminOnly: true,
       metadata: { notificationType: 'system_update_started', actionRequired: false, version: currentStatus.latestVersion },
     })
   } else {
@@ -442,6 +444,8 @@ export async function POST(request: NextRequest) {
       mode: 'interactive',
       userId: authResult.userId,
       priority: 'high',
+      category: 'urgent',
+      superAdminOnly: true,
       metadata: { notificationType: 'system_update_denied', actionRequired: true },
     })
   }

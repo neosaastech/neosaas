@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatConversations, chatMessages, users, orders, orderItems, products, contentSyncIssues } from '@/db/schema'
 import { eq, desc, and, or, sql, count, ne, isNull } from 'drizzle-orm'
-import { requireAdmin } from '@/lib/auth/server'
+import { requireAdmin, getUserRoles } from '@/lib/auth/server'
 
 /**
  * Format currency amount for display
@@ -24,7 +24,9 @@ function formatCurrency(amountInCents: number, currency: string = 'EUR'): string
  */
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
+    const currentUserRoles = await getUserRoles(currentUser.userId)
+    const isSuperAdmin = currentUserRoles.includes('super_admin')
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'order' | 'appointment' | 'payment' | 'user' | 'support' | 'system'
@@ -66,6 +68,14 @@ export async function GET(request: NextRequest) {
         )
         .orderBy(desc(chatConversations.lastMessageAt))
         .limit(Math.floor(limit / 2))
+
+      if (!isSuperAdmin) {
+        // System-update notifications (see lib/notifications/admin-notifications.ts
+        // superAdminOnly flag) are reserved for super_admin — a plain admin
+        // shares this same inbox otherwise, so filter them out here rather
+        // than at write time.
+        openConversations = openConversations.filter((conv) => !(conv.metadata as any)?.superAdminOnly)
+      }
 
       console.log(`[Notifications] Found ${openConversations.length} conversations`)
     } catch (convError) {

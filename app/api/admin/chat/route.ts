@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatConversations, chatMessages, users } from '@/db/schema'
 import { eq, desc, and, or, count, sql, isNull, isNotNull, inArray, ne } from 'drizzle-orm'
-import { requireAdmin } from '@/lib/auth/server'
+import { requireAdmin, getUserRoles } from '@/lib/auth/server'
 
 // GET /api/admin/chat - Get all conversations (admin only)
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
+    const currentUserRoles = await getUserRoles(currentUser.userId)
+    const isSuperAdmin = currentUserRoles.includes('super_admin')
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -65,6 +67,13 @@ export async function GET(request: NextRequest) {
           sql`${chatConversations.guestName} ILIKE ${`%${search}%`}`
         )
       )
+    }
+
+    if (!isSuperAdmin) {
+      // Reserved for super_admin (system-update notifications flagged via
+      // lib/notifications/admin-notifications.ts superAdminOnly) — plain
+      // admins share this same inbox otherwise.
+      conditions.push(sql`(${chatConversations.metadata}->>'superAdminOnly') IS DISTINCT FROM 'true'`)
     }
 
     const conversations = await db.query.chatConversations.findMany({
