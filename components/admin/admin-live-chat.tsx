@@ -382,7 +382,12 @@ export function AdminLiveChat() {
             <Button
               onClick={() => setIsOpen(true)}
               className={cn(
-                "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg",
+                // components/common/back-to-top.tsx renders from the root
+                // layout on every page including /admin/* (bottom-8 right-8,
+                // same z-50) -- at the same offset as this button they sat
+                // directly on top of each other. Shifted further from the
+                // corner so both stay visible side by side.
+                "fixed bottom-6 right-24 z-50 h-14 w-14 rounded-full shadow-lg",
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
                 "transition-all hover:scale-105",
                 isOpen && "hidden"

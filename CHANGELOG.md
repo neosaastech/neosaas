@@ -1,3 +1,9 @@
+## [1.28.2](https://github.com/neosaastech/Neosaas-app/compare/v1.28.1...v1.28.2) (2026-08-22)
+
+### Bug Fixes
+
+* **ui:** chat widget button no longer overlaps back-to-top ([66057b7](https://github.com/neosaastech/Neosaas-app/commit/66057b744b67b521ab12700ff6194b70e09d6557))
+
 ## [1.28.1](https://github.com/neosaastech/Neosaas-app/compare/v1.28.0...v1.28.1) (2026-08-22)
 
 ### Bug Fixes

@@ -265,14 +265,18 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Chat Button */}
+      {/* Chat Button — offset further from the right edge than
+          components/common/back-to-top.tsx (bottom-8 right-8): both are
+          fixed, same z-index, same corner, so at the same offset one always
+          sat visually on top of the other whenever both were visible.
+          Sitting further out keeps them side by side instead of stacked. */}
       <button
         onClick={() => {
           setIsOpen(true)
           setIsMinimized(false)
         }}
         className={cn(
-          "fixed bottom-6 right-6 z-50 p-4 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform",
+          "fixed bottom-6 right-24 z-50 p-4 rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform",
           isOpen && "hidden"
         )}
       >
