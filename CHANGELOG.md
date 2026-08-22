@@ -1,3 +1,9 @@
+## [1.26.3](https://github.com/neosaastech/Neosaas-app/compare/v1.26.2...v1.26.3) (2026-08-22)
+
+### Bug Fixes
+
+* **admin-api:** sticky sheet footer, full-width selector, Simple Icons ([#100](https://github.com/neosaastech/Neosaas-app/issues/100)) ([a231a3f](https://github.com/neosaastech/Neosaas-app/commit/a231a3f2a8101174b4a2d7ae3be288212dad30cb))
+
 ## [1.26.2](https://github.com/neosaastech/Neosaas-app/compare/v1.26.1...v1.26.2) (2026-08-22)
 
 ### Bug Fixes

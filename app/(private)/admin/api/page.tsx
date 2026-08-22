@@ -21,6 +21,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Eye, EyeOff, Save, RefreshCw, Key, CheckCircle, XCircle, Loader2, Trash2, Plus, AlertCircle, Copy, Check, ChevronDown, Rocket, FlaskConical, ShieldAlert } from "lucide-react"
+import { SiStripe, SiPaypal, SiResend, SiScaleway, SiGithub, SiGoogle, SiFacebook } from "react-icons/si"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { McpTokensCard } from "@/components/admin/mcp-tokens-card"
@@ -68,37 +69,23 @@ function ServiceIcon({ service, size = "sm" }: { service: (typeof services)[0]; 
   const sizeClass = size === "sm" ? "h-5 w-5" : size === "md" ? "h-6 w-6" : "h-8 w-8"
 
 
-  // Stripe - Official logo
+  // Brands covered by Simple Icons (simpleicons.org via react-icons/si) —
+  // official logo + official brand color, one line each instead of a
+  // hand-maintained SVG path per service.
   if (service.id === "stripe") {
     return (
-      <svg className={sizeClass} viewBox="0 0 32 32" fill="none">
-        <rect width="32" height="32" rx="6" fill="#635BFF"/>
-        <path fillRule="evenodd" clipRule="evenodd" d="M14.5 12.6c0-.9.7-1.3 1.9-1.3 1.7 0 3.8.5 5.5 1.4V8.2c-1.8-.7-3.6-1-5.5-1-4.5 0-7.5 2.3-7.5 6.2 0 6.1 8.4 5.1 8.4 7.7 0 1.1-.9 1.4-2.2 1.4-1.9 0-4.3-.8-6.2-1.9v4.6c2.1.9 4.2 1.3 6.2 1.3 4.6 0 7.8-2.3 7.8-6.2 0-6.6-8.4-5.4-8.4-7.7z" fill="white"/>
-      </svg>
+      <div className={`${sizeClass} rounded-md flex items-center justify-center`} style={{ backgroundColor: "#635BFF" }}>
+        <SiStripe className={size === "sm" ? "h-3 w-3" : size === "md" ? "h-3.5 w-3.5" : "h-5 w-5"} color="white" />
+      </div>
     )
   }
 
-  // PayPal - Official colors
   if (service.id === "paypal") {
-    return (
-      <svg className={sizeClass} viewBox="0 0 32 32" fill="none">
-        <rect width="32" height="32" rx="6" fill="#003087"/>
-        <path d="M23.2 10.8c-.5 3.3-2.9 4.4-5.8 4.4h-1.5c-.4 0-.7.3-.8.6l-.8 4.8-.2 1.4c0 .2.2.4.4.4h3c.3 0 .6-.2.7-.5l.6-3.8c.1-.3.4-.5.7-.5h.4c2.8 0 5-1.1 5.6-4.4.3-1.4.1-2.5-.5-3.3-.2-.4-.5-.7-.8-1.1z" fill="#009CDE"/>
-        <path d="M22.4 10.4c-.2-.1-.4-.1-.6-.2-.2 0-.5-.1-.7-.1h-4.2c-.3 0-.6.2-.7.5l-.9 5.7v.2c.1-.4.4-.6.8-.6h1.5c2.9 0 5.3-1.2 5.8-4.4v-.3c-.2-.4-.5-.6-1-.8z" fill="#012169"/>
-        <path d="M11.4 7h5.5c.6 0 1.2 0 1.7.1.2 0 .3 0 .5.1.4.1.8.2 1.1.4.4-2.3 0-3.9-1.3-5.3C17.4.7 15.3 0 12.6 0H6.1c-.4 0-.8.3-.9.7L2.5 18.2c0 .3.2.5.5.5h3.7l.9-5.9 1-6.2c.1-.4.4-.6.8-.6z" fill="#003087"/>
-      </svg>
-    )
+    return <SiPaypal className={sizeClass} color="#003087" />
   }
 
-  // Resend - Email service
   if (service.id === "resend") {
-    return (
-      <svg className={sizeClass} viewBox="0 0 32 32" fill="none">
-        <rect width="32" height="32" rx="6" fill="#000000"/>
-        <path d="M8 8h16v16H8V8z" fill="none" stroke="white" strokeWidth="2"/>
-        <path d="M8 8l8 8 8-8" fill="none" stroke="white" strokeWidth="2"/>
-      </svg>
-    )
+    return <SiResend className={sizeClass} color="#000000" />
   }
 
   // AWS SES - Amazon orange
@@ -112,46 +99,20 @@ function ServiceIcon({ service, size = "sm" }: { service: (typeof services)[0]; 
     )
   }
 
-  // Scaleway - Purple logo (based on provided image)
   if (service.id === "scaleway" || service.icon === "scaleway") {
-    return (
-      <svg className={sizeClass} viewBox="0 0 32 32" fill="none">
-        <rect width="32" height="32" rx="6" fill="#4F0599"/>
-        <path d="M22 8H10c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z" fill="none" stroke="white" strokeWidth="2"/>
-        <path d="M13 12h6v2h-6v-2zm0 4h6v2h-6v-2z" fill="white"/>
-        <circle cx="22" cy="22" r="4" fill="#CBD5E1"/>
-      </svg>
-    )
+    return <SiScaleway className={sizeClass} color="#4F0599" />
   }
 
-  // GitHub - Official
   if (service.id === "github") {
-    return (
-      <svg className={sizeClass} fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-      </svg>
-    )
+    return <SiGithub className={sizeClass} color="currentColor" />
   }
 
-  // Google - Official colors
   if (service.id === "google") {
-    return (
-      <svg className={sizeClass} viewBox="0 0 24 24">
-        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-      </svg>
-    )
+    return <SiGoogle className={sizeClass} color="#4285F4" />
   }
 
-  // Facebook - Official blue
   if (service.id === "facebook") {
-    return (
-      <svg className={sizeClass} fill="#1877F2" viewBox="0 0 24 24">
-        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-      </svg>
-    )
+    return <SiFacebook className={sizeClass} color="#1877F2" />
   }
 
   // Microsoft - Official colors
@@ -1706,8 +1667,8 @@ export default function AdminApiPage() {
 
       {/* Add/Edit Sheet */}
       <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
-        <SheetContent className="max-w-xl overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="max-w-xl p-0 flex flex-col">
+          <SheetHeader className="p-6 pb-4 border-b shrink-0">
             <SheetTitle className="flex items-center gap-2">
               <Key className="h-5 w-5 text-brand" />
               {editingConfig ? "Edit API Configuration" : "Add New API Configuration"}
@@ -1719,7 +1680,7 @@ export default function AdminApiPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-6 py-6">
+          <div className="flex-1 overflow-y-auto space-y-6 px-6 py-6">
             <div className="space-y-2">
               <Label>Select Service</Label>
               <Select
@@ -1727,7 +1688,7 @@ export default function AdminApiPage() {
                 onValueChange={setSelectedService}
                 disabled={!!editingConfig}
               >
-                <SelectTrigger className="h-auto py-3 shadow-xs">
+                <SelectTrigger className="w-full h-auto py-3 shadow-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-[400px]">
@@ -1824,7 +1785,7 @@ export default function AdminApiPage() {
             )}
           </div>
 
-          <SheetFooter className="gap-2 flex-col sm:flex-row mt-6">
+          <SheetFooter className="gap-2 flex-col sm:flex-row p-6 border-t shrink-0 bg-background">
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
