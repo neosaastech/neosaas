@@ -1,3 +1,9 @@
+## [1.27.0](https://github.com/neosaastech/Neosaas-app/compare/v1.26.7...v1.27.0) (2026-08-22)
+
+### Features
+
+* **admin-api:** autosave service config, fix Google OAuth save ([fd26b0d](https://github.com/neosaastech/Neosaas-app/commit/fd26b0d96eee5939e0ca36ef65db907c2c4a2b5b))
+
 ## [1.26.7](https://github.com/neosaastech/Neosaas-app/compare/v1.26.6...v1.26.7) (2026-08-22)
 
 ### Bug Fixes

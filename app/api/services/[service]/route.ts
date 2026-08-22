@@ -66,7 +66,11 @@ export async function POST(
     const body = await request.json();
 
     // Validate service name
-    const validServices = ['stripe', 'paypal', 'scaleway', 'resend', 'aws', 'lago'];
+    // Must match every service.id the admin/api picker actually offers
+    // (app/(private)/admin/api/page.tsx serviceCategories) -- "google" was
+    // missing here, silently failing every save attempt with "Invalid
+    // service name" even though the picker happily let you fill the form.
+    const validServices = ['stripe', 'paypal', 'scaleway', 'resend', 'aws', 'lago', 'github', 'google'];
     if (!validServices.includes(service)) {
       return NextResponse.json(
         { success: false, error: 'Invalid service name' },

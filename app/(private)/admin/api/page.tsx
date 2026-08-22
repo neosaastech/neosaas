@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -170,6 +170,9 @@ export default function AdminApiPage() {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [githubOAuthOpen, setGithubOAuthOpen] = useState(true)
   const [githubApiOpen, setGithubApiOpen] = useState(false)
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastAutoSavedSignatureRef = useRef<string>("")
 
   // Service-specific configs
   const [scalewayConfig, setScalewayConfig] = useState({
@@ -341,6 +344,8 @@ export default function AdminApiPage() {
     setShowKey(false)
     setShowSecretKey(false)
     setModalTestResult(null)
+    setAutoSaveState("idle")
+    lastAutoSavedSignatureRef.current = ""
   }
 
   const handleTestInModal = async () => {
@@ -470,8 +475,35 @@ export default function AdminApiPage() {
     }
   }
 
-  const handleSave = async () => {
+  // Required fields per service, mirrored from the validation inside
+  // handleSave -- used to decide when the autosave effect is allowed to fire
+  // (never attempt a save while the user is still mid-way through filling
+  // a form, only once every required field for that service is present).
+  const isCurrentServiceComplete = () => {
+    switch (selectedService) {
+      case "scaleway":
+        return !!(scalewayConfig.secretKey && scalewayConfig.projectId)
+      case "resend":
+        return !!resendConfig.apiKey
+      case "aws":
+        return !!(awsConfig.accessKeyId && awsConfig.secretAccessKey)
+      case "stripe":
+        return !!(stripeConfig.secretKey && stripeConfig.publicKey)
+      case "paypal":
+        return !!(paypalConfig.clientId && paypalConfig.clientSecret)
+      case "github":
+        return !!(githubConfig.clientId && githubConfig.clientSecret)
+      case "google":
+        return !!(googleConfig.clientId && googleConfig.clientSecret)
+      default:
+        return false
+    }
+  }
+
+  const handleSave = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false
     setSaving(true)
+    if (silent) setAutoSaveState("saving")
 
     try {
       let config: any
@@ -568,24 +600,24 @@ export default function AdminApiPage() {
             throw new Error(githubData.error || "Failed to save GitHub OAuth configuration")
           }
 
-          console.log("✅ [Frontend] Configuration successful, closing dialog...")
-          
-          // If successful, close dialog and show message
-          setDialogOpen(false)
+          console.log("✅ [Frontend] Configuration successful")
           setSaving(false)
-          
-          toast({
-            title: "✅ GitHub OAuth Saved",
-            description: githubData.message || "GitHub OAuth credentials have been saved successfully.",
-            duration: 3000,
-          })
-          
+
+          if (silent) {
+            setAutoSaveState("saved")
+          } else {
+            setDialogOpen(false)
+            resetForm()
+            toast({
+              title: "✅ GitHub OAuth Saved",
+              description: githubData.message || "GitHub OAuth credentials have been saved successfully.",
+              duration: 3000,
+            })
+          }
+
           console.log("🔄 [Frontend] Reloading configurations...")
-          
-          // Reload configs
           await loadAllConfigs()
-          resetForm()
-          
+
           return // Exit function as we already handled the save
         case "google":
           if (!googleConfig.clientId || !googleConfig.clientSecret) {
@@ -618,18 +650,23 @@ export default function AdminApiPage() {
       console.log("Response data:", data)
 
       if (data.success) {
-        toast({
-          title: "Configuration Saved",
-          description: `${currentService?.name} configuration has been saved and encrypted.`,
-        })
-        setDialogOpen(false)
-        resetForm()
+        if (silent) {
+          setAutoSaveState("saved")
+        } else {
+          toast({
+            title: "Configuration Saved",
+            description: `${currentService?.name} configuration has been saved and encrypted.`,
+          })
+          setDialogOpen(false)
+          resetForm()
+        }
         await loadAllConfigs()
 
       } else {
         throw new Error(data.error || "Failed to save configuration")
       }
     } catch (error) {
+      if (silent) setAutoSaveState("error")
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save configuration",
@@ -639,6 +676,43 @@ export default function AdminApiPage() {
       setSaving(false)
     }
   }
+
+  // Autosave: once every required field for the selected service is filled,
+  // debounce and persist in the background instead of requiring an explicit
+  // Save click. `lastAutoSavedSignatureRef` skips redundant saves when the
+  // effect re-fires with unchanged values (e.g. a sibling field re-rendering).
+  useEffect(() => {
+    if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
+
+    if (!dialogOpen || !isCurrentServiceComplete()) {
+      return
+    }
+
+    const signature = JSON.stringify({
+      selectedService,
+      environment,
+      scalewayConfig,
+      resendConfig,
+      awsConfig,
+      stripeConfig,
+      paypalConfig,
+      githubConfig,
+      googleConfig,
+    })
+    if (signature === lastAutoSavedSignatureRef.current) {
+      return
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      lastAutoSavedSignatureRef.current = signature
+      handleSave({ silent: true })
+    }, 800)
+
+    return () => {
+      if (autoSaveTimeoutRef.current) clearTimeout(autoSaveTimeoutRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogOpen, selectedService, environment, scalewayConfig, resendConfig, awsConfig, stripeConfig, paypalConfig, githubConfig, googleConfig])
 
   const handleTest = async (config: ApiConfig) => {
     setTestingId(config.id)
@@ -1825,15 +1899,24 @@ export default function AdminApiPage() {
             )}
           </div>
 
-          <SheetFooter className="gap-2 flex-col sm:flex-row p-6 border-t shrink-0 bg-background">
-            <Button
-              variant="outline"
-              onClick={() => setDialogOpen(false)}
-              disabled={saving || testingInModal}
-              className="w-full sm:w-auto"
-            >
-              Cancel
-            </Button>
+          <SheetFooter className="gap-2 sm:justify-between items-center p-6 border-t shrink-0 bg-background">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5 min-h-4">
+              {autoSaveState === "saving" && (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Saving...
+                </>
+              )}
+              {autoSaveState === "saved" && (
+                <>
+                  <Save className="h-3.5 w-3.5 text-green-600" />
+                  All changes saved
+                </>
+              )}
+              {autoSaveState === "error" && (
+                <span className="text-destructive">Auto-save failed — see error above</span>
+              )}
+            </div>
             <Button
               variant="outline"
               onClick={handleTestInModal}
@@ -1849,23 +1932,6 @@ export default function AdminApiPage() {
                 <>
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Verify Key
-                </>
-              )}
-            </Button>
-            <Button
-              className="bg-brand hover:bg-[#B8691C] w-full sm:w-auto"
-              onClick={handleSave}
-              disabled={saving || testingInModal}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingConfig ? "Update" : "Save"} Configuration
                 </>
               )}
             </Button>
