@@ -33,8 +33,8 @@ import { McpTokensCard } from "@/components/admin/mcp-tokens-card"
 const serviceCategories = [
   {
     id: "payment",
-    label: "💳 Paiement",
-    description: "Services de facturation et paiement",
+    label: "💳 Payment",
+    description: "Billing and payment services",
     services: [
       { id: "stripe", name: "Stripe", icon: "stripe", type: "payment", description: "Payment Processing", isMain: true },
       { id: "paypal", name: "PayPal", icon: "paypal", type: "payment", description: "Online Payments" },
@@ -43,7 +43,7 @@ const serviceCategories = [
   {
     id: "email",
     label: "📧 Email",
-    description: "Services d'envoi d'emails transactionnels",
+    description: "Transactional email sending services",
     services: [
       { id: "resend", name: "Resend", icon: "📧", type: "email", description: "Transactional email service" },
       { id: "aws", name: "AWS SES", icon: "☁️", type: "email", description: "Amazon Simple Email Service" },
@@ -52,8 +52,8 @@ const serviceCategories = [
   },
   {
     id: "oauth",
-    label: "🔐 Authentification OAuth",
-    description: "Providers d'authentification sociale",
+    label: "🔐 OAuth Authentication",
+    description: "Social authentication providers",
     services: [
       { id: "github", name: "GitHub", icon: "github", type: "oauth", description: "OAuth Authentication Provider" },
       { id: "google", name: "Google", icon: "google", type: "oauth", description: "OAuth Authentication Provider" },

@@ -1,3 +1,10 @@
+## [1.26.7](https://github.com/neosaastech/Neosaas-app/compare/v1.26.6...v1.26.7) (2026-08-22)
+
+### Bug Fixes
+
+* **admin-api:** translate remaining French category labels ([fe7d396](https://github.com/neosaastech/Neosaas-app/commit/fe7d396464cbf7fc5ebb3ed3f6ea89a0d773788f))
+* **db:** widen user_api_keys.key_prefix to varchar(20) ([c95df20](https://github.com/neosaastech/Neosaas-app/commit/c95df207de498052e32885d741993351c4dc6552))
+
 ## [1.26.6](https://github.com/neosaastech/Neosaas-app/compare/v1.26.5...v1.26.6) (2026-08-22)
 
 ### Bug Fixes

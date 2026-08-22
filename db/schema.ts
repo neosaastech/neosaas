@@ -585,7 +585,7 @@ export const userApiKeys = pgTable("user_api_keys", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   keyHash: varchar("key_hash", { length: 255 }).notNull().unique(), // SHA-256 hash
-  keyPrefix: varchar("key_prefix", { length: 10 }).notNull(), // Display prefix (e.g., "sk_live_abc")
+  keyPrefix: varchar("key_prefix", { length: 20 }).notNull(), // Display prefix (e.g., "sk_live_abc123456d"); getApiKeyPrefix() in lib/apiKeys.ts takes the first 12 chars, length:10 was always too short
   permissions: jsonb("permissions").$type<string[]>().default([]).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   expiresAt: timestamp("expires_at"),
