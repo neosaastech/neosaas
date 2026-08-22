@@ -1,3 +1,9 @@
+## [1.26.4](https://github.com/neosaastech/Neosaas-app/compare/v1.26.3...v1.26.4) (2026-08-22)
+
+### Bug Fixes
+
+* **auth:** never widen session cookie to shared platform domain ([48bc9d1](https://github.com/neosaastech/Neosaas-app/commit/48bc9d1c478b47ba80ac4ce55628173beab4c716))
+
 ## [1.26.3](https://github.com/neosaastech/Neosaas-app/compare/v1.26.2...v1.26.3) (2026-08-22)
 
 ### Bug Fixes

@@ -93,6 +93,23 @@ export async function getCookieDomain(): Promise<string | undefined> {
     const { hostname: configuredHost } = new URL(appUrl);
     const rootDomain = configuredHost.split('.').slice(-2).join('.');
 
+    // Shared multi-tenant platform domains (e.g. neokube.fr hosts dozens of
+    // unrelated apps/subdomains) must never get a widened cookie domain —
+    // slice(-2) on a host like "dev.neosaas.neokube.fr" yields "neokube.fr",
+    // which would make this app's session cookie valid on every other
+    // neokube.fr subdomain (other NeoSaaS deployments, other products
+    // entirely). Confirmed live 2026-08-22: a session cookie set on
+    // app.neosaas.neokube.fr (prod) was replayed on dev.neosaas.neokube.fr
+    // (separate DB, separate user rows) — same JWT_SECRET verified the
+    // token, but the embedded user id didn't exist in dev's database, so
+    // every admin-role check failed and the user got redirected to
+    // /dashboard in a loop. Only widen for a genuine standalone client
+    // domain (not this platform's own shared domain).
+    const SHARED_PLATFORM_DOMAINS = ['neokube.fr'];
+    if (SHARED_PLATFORM_DOMAINS.includes(rootDomain)) {
+      return undefined;
+    }
+
     if (
       requestHost === configuredHost ||
       requestHost === rootDomain ||
