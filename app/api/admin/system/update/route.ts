@@ -362,6 +362,44 @@ async function deployUpdate(userId?: string): Promise<{ ok: boolean; status: num
   }
 }
 
+// Charles (2026-08-25): merging PR #19 himself left the header icon stuck
+// pulsing "review PR open" — the callback only ever fires from inside the
+// GitHub Actions run, never on a manual merge/close done outside it, so a
+// pr_opened job has no other way to learn its own outcome. Reconciles on
+// every GET instead of waiting for a callback that isn't coming: if the PR
+// referenced by job.prUrl has since been merged or closed, update the job
+// to reflect that before returning it.
+async function reconcilePrOpenedJob(job: UpdateJob): Promise<UpdateJob> {
+  if (job.status !== 'pr_opened' || !job.prUrl) return job
+
+  const match = job.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
+  if (!match) return job
+  const [, owner, repo, number] = match
+
+  try {
+    const gh = await initGithub()
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${number}`, {
+      headers: { Authorization: `Bearer ${gh.token}`, Accept: 'application/vnd.github+json' },
+    })
+    if (!res.ok) return job
+    const pr = await res.json()
+
+    let updated: UpdateJob | null = null
+    if (pr.merged_at) {
+      updated = { ...job, status: 'succeeded', finishedAt: pr.merged_at }
+    } else if (pr.state === 'closed') {
+      updated = { ...job, status: 'failed', error: 'Review PR was closed without merging', finishedAt: pr.closed_at ?? job.finishedAt }
+    }
+    if (updated) {
+      await writeJob(updated)
+      return updated
+    }
+  } catch (error) {
+    console.error('[system/update] PR reconciliation failed:', error)
+  }
+  return job
+}
+
 export async function GET(request: NextRequest) {
   const authResult = await verifyAdminAuth(request)
   if (!authResult.isAuthenticated || !authResult.isAdmin) {
@@ -372,7 +410,8 @@ export async function GET(request: NextRequest) {
   }
 
   const status = await readStatus()
-  const job = await readJob()
+  let job = await readJob()
+  if (job) job = await reconcilePrOpenedJob(job)
   return NextResponse.json({ ...status, job })
 }
 

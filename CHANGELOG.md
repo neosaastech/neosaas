@@ -1,3 +1,9 @@
+## [1.29.2](https://github.com/neosaastech/Neosaas-app/compare/v1.29.1...v1.29.2) (2026-08-25)
+
+### Bug Fixes
+
+* **update:** reconcile pr_opened jobs with real PR state on every GET ([6b2d87e](https://github.com/neosaastech/Neosaas-app/commit/6b2d87e670edf9c9ad91a17304e5930151ee2f19))
+
 ## [1.29.1](https://github.com/neosaastech/Neosaas-app/compare/v1.29.0...v1.29.1) (2026-08-25)
 
 ### Bug Fixes
