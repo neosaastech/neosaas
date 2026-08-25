@@ -1,16 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { RefreshCw, CheckCircle2, XCircle, ShieldAlert } from "lucide-react"
+import { RefreshCw, CheckCircle2, GitPullRequest, XCircle, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import Link from "next/link"
 
-type JobStatus = "pending" | "succeeded" | "failed" | "denied"
+type JobStatus = "pending" | "succeeded" | "pr_opened" | "up_to_date" | "failed" | "denied"
 
 interface UpdateJob {
   status: JobStatus
   version: string | null
+  prUrl?: string | null
   startedAt: string
   finishedAt: string | null
   error?: string
@@ -62,9 +63,14 @@ export function UpdateStatusIcon({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   if (!isSuperAdmin || !job) return null
 
   const finishedAgo = job.finishedAt ? Date.now() - new Date(job.finishedAt).getTime() : 0
-  if (job.status === "succeeded" && finishedAgo > SUCCEEDED_VISIBLE_MS) return null
-  if ((job.status === "failed" || job.status === "denied") && finishedAgo > FAILED_VISIBLE_MS) return null
+  if ((job.status === "succeeded" || job.status === "up_to_date") && finishedAgo > SUCCEEDED_VISIBLE_MS) return null
+  if ((job.status === "failed" || job.status === "denied" || job.status === "pr_opened") && finishedAgo > FAILED_VISIBLE_MS) return null
 
+  // pr_opened deliberately does NOT reuse the green checkmark: this repo's
+  // apply-update is PR-gated (see .github/workflows/apply-update.yml), so
+  // "the workflow finished" only ever means "a review PR is open", never
+  // "deployed" -- v1.29.0 test (Charles, 2026-08-25) showed a green check +
+  // "now running" message while PR #17 sat unmerged and nothing changed.
   const config: Record<JobStatus, { icon: React.ReactNode; label: string; className: string }> = {
     pending: {
       icon: <RefreshCw className="h-5 w-5 animate-spin" />,
@@ -73,8 +79,24 @@ export function UpdateStatusIcon({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     },
     succeeded: {
       icon: <CheckCircle2 className="h-5 w-5" />,
-      label: `Update succeeded${job.version ? ` — ${job.version}` : ""}`,
+      label: `Already up to date${job.version ? ` — ${job.version}` : ""}`,
       className: "text-green-600",
+    },
+    up_to_date: {
+      icon: <CheckCircle2 className="h-5 w-5" />,
+      label: `Already up to date${job.version ? ` — ${job.version}` : ""}`,
+      className: "text-green-600",
+    },
+    pr_opened: {
+      // animate-pulse, not animate-spin: this isn't "in progress" like
+      // `pending` above, it's "stalled, waiting on you" — a spin would
+      // imply the automation is still doing something, which is exactly
+      // the false impression this fix exists to remove (Charles,
+      // 2026-08-25: "le détail qui tuerait" — wants the PR icon to visibly
+      // demand attention, not just sit there in a different color).
+      icon: <GitPullRequest className="h-5 w-5 animate-pulse" />,
+      label: `Review PR open — not deployed yet${job.version ? ` (${job.version})` : ""}`,
+      className: "text-amber-600",
     },
     failed: {
       icon: <XCircle className="h-5 w-5" />,

@@ -24,11 +24,12 @@ const CONFIG_KEY = 'system_update_status'
 // navigation instead of living in that one component's local state.
 const JOB_CONFIG_KEY = 'system_update_job'
 
-type UpdateJobStatus = 'pending' | 'succeeded' | 'failed' | 'denied'
+type UpdateJobStatus = 'pending' | 'succeeded' | 'pr_opened' | 'up_to_date' | 'failed' | 'denied'
 
 interface UpdateJob {
   status: UpdateJobStatus
   version: string | null
+  prUrl?: string | null
   startedAt: string
   finishedAt: string | null
   error?: string
@@ -415,8 +416,8 @@ export async function POST(request: NextRequest) {
       triggeredBy: authResult.userId,
     })
     await sendAdminNotification({
-      subject: `Update triggered${currentStatus.latestVersion ? ` — ${currentStatus.latestVersion}` : ''}`,
-      message: `🚀 **System update started**\n\nDeploying${currentStatus.latestVersion ? ` version ${currentStatus.latestVersion}` : ''}. This takes 3-5 minutes to actually build and go live — you'll get a follow-up message here once it succeeds or fails.`,
+      subject: `Update sync started${currentStatus.latestVersion ? ` — ${currentStatus.latestVersion}` : ''}`,
+      message: `🚀 **System update sync started**\n\nSyncing${currentStatus.latestVersion ? ` version ${currentStatus.latestVersion}` : ''} and opening a review PR — this does not deploy by itself, you still need to merge that PR. You'll get a follow-up message here once the PR is ready (or if the sync fails).`,
       type: 'system',
       mode: 'informative',
       userId: authResult.userId,

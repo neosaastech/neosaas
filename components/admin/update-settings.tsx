@@ -15,8 +15,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { RefreshCw, ShieldCheck, ShieldAlert, Loader2, GitCommitHorizontal } from "lucide-react"
+import { RefreshCw, ShieldCheck, ShieldAlert, Loader2, GitCommitHorizontal, GitPullRequest } from "lucide-react"
 import { toast } from "sonner"
+
+interface UpdateJob {
+  status: "pending" | "succeeded" | "pr_opened" | "up_to_date" | "failed" | "denied"
+  version: string | null
+  prUrl?: string | null
+  finishedAt: string | null
+  error?: string
+}
 
 interface UpdateStatus {
   currentVersion: string
@@ -24,6 +32,7 @@ interface UpdateStatus {
   upToDate: boolean | null
   checkedAt: string | null
   error?: string
+  job?: UpdateJob | null
 }
 
 // A real Dokploy build (clone + docker build + swarm rollout) takes 3-5
@@ -120,7 +129,7 @@ export function UpdateSettings() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Deploy failed (${res.status})`)
       }
-      toast.success("Update triggered — this takes 3-5 minutes to actually build and deploy, not instant. Avoid clicking again in the meantime.", { duration: 8000 })
+      toast.success("Sync triggered — it opens a review PR, it does not deploy by itself. You'll get a notification with the PR link once it's ready. Avoid clicking again in the meantime.", { duration: 8000 })
       setCooldownUntil(Date.now() + DEPLOY_COOLDOWN_MS)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to trigger update")
@@ -171,6 +180,24 @@ export function UpdateSettings() {
         )}
         {status?.error && <p className="text-sm text-destructive">{status.error}</p>}
 
+        {status?.job?.status === "pr_opened" && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-600/30 bg-amber-600/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+            <GitPullRequest className="h-4 w-4 shrink-0 animate-pulse" />
+            <span>
+              Automated sync finished but nothing is deployed yet — a review PR is open
+              {status.job.version ? ` for ${status.job.version}` : ""}, merge it to actually ship it.
+              {status.job.prUrl && (
+                <>
+                  {" "}
+                  <a href={status.job.prUrl} target="_blank" rel="noreferrer" className="underline">
+                    Open the PR
+                  </a>
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3 pt-2">
           <Button variant="outline" onClick={handleCheck} disabled={checking} className="gap-2">
             {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -191,9 +218,10 @@ export function UpdateSettings() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Apply update {status?.latestVersion}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will pull the latest Core release and redeploy this instance. Takes 3-5 minutes to
-                  actually build and go live — this dialog closing does not mean it is done. This action
-                  cannot be undone.
+                  This syncs the latest Core release and opens a pull request for review — it does NOT deploy
+                  by itself. Nothing goes live until you (or another admin) review the diff and merge that PR.
+                  Takes a couple of minutes for the sync to finish; this dialog closing does not mean the PR
+                  exists yet.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

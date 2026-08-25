@@ -1,3 +1,9 @@
+## [1.29.1](https://github.com/neosaastech/Neosaas-app/compare/v1.29.0...v1.29.1) (2026-08-25)
+
+### Bug Fixes
+
+* **update:** stop reporting deploy success when only a review PR opened ([1488dbc](https://github.com/neosaastech/Neosaas-app/commit/1488dbcab3845e28083aedc4d53a0af2d5a51107))
+
 ## [1.29.0](https://github.com/neosaastech/Neosaas-app/compare/v1.28.2...v1.29.0) (2026-08-25)
 
 ### Features

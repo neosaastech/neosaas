@@ -18,15 +18,26 @@ import { sendAdminNotification } from '@/lib/notifications/admin-notifications'
 
 const JOB_CONFIG_KEY = 'system_update_job'
 
+// Charles (2026-08-25, v1.29.0 test): apply-update.yml is PR-gated on this
+// repo (see the workflow's own header) -- it never deploys by itself. The
+// old two-outcome model reported "succeeded" the instant the sync branch
+// was pushed and a PR opened, which is a real false positive: the header
+// icon went green and the admin notification said "Now running v1.29.0"
+// while PR #17 sat unmerged and the live version never moved. "succeeded"
+// is now reserved for "genuinely nothing to do" (the sync found no diff);
+// "pr_opened" is the honest outcome for "automation finished, a human still
+// has to review and merge" -- distinct icon/message, carries the PR link.
 const CallbackBodySchema = z.object({
-  status: z.enum(['succeeded', 'failed']),
+  status: z.enum(['succeeded', 'pr_opened', 'up_to_date', 'failed']),
   version: z.string().nullish(),
+  prUrl: z.string().nullish(),
   error: z.string().nullish(),
 })
 
 interface UpdateJob {
-  status: 'pending' | 'succeeded' | 'failed' | 'denied'
+  status: 'pending' | 'succeeded' | 'pr_opened' | 'up_to_date' | 'failed' | 'denied'
   version: string | null
+  prUrl?: string | null
   startedAt: string
   finishedAt: string | null
   error?: string
@@ -82,11 +93,13 @@ export async function POST(request: NextRequest) {
 
   const existingJob = await readJob()
   const version = body.version ?? existingJob?.version ?? null
+  const prUrl = body.prUrl ?? null
   const now = new Date().toISOString()
 
   await writeJob({
     status: body.status,
     version,
+    prUrl,
     startedAt: existingJob?.startedAt ?? now,
     finishedAt: now,
     error: body.error ?? undefined,
@@ -95,27 +108,44 @@ export async function POST(request: NextRequest) {
 
   await logSystemEvent({
     category: 'system_update',
-    level: body.status === 'succeeded' ? 'info' : 'error',
-    message: `Update ${body.status}${version ? ` (${version})` : ''}${body.error ? `: ${body.error}` : ''}`,
+    level: body.status === 'failed' ? 'error' : 'info',
+    message: `Update ${body.status}${version ? ` (${version})` : ''}${prUrl ? ` — ${prUrl}` : ''}${body.error ? `: ${body.error}` : ''}`,
     userId: existingJob?.triggeredBy,
   })
 
+  const subject =
+    body.status === 'pr_opened'
+      ? `Update ready for review${version ? ` — ${version}` : ''}`
+      : body.status === 'up_to_date' || body.status === 'succeeded'
+        ? `Already up to date${version ? ` — ${version}` : ''}`
+        : 'Update failed'
+
+  const message =
+    body.status === 'pr_opened'
+      ? `🔍 **Update ready for review**\n\nThe automated sync for ${version ?? 'the latest release'} finished and opened a pull request — nothing is deployed yet, it only ships once you review and merge it.${prUrl ? `\n\n${prUrl}` : ''}`
+      : body.status === 'up_to_date' || body.status === 'succeeded'
+        ? `✅ **Already up to date**\n\n${version ? `${version} is already applied — nothing to sync.` : 'The instance is up to date.'}`
+        : `❌ **System update failed**\n\n${body.error || 'The build or deployment failed — check the GitHub Actions run for details.'}`
+
   await sendAdminNotification({
-    subject: body.status === 'succeeded' ? `Update succeeded${version ? ` — ${version}` : ''}` : 'Update failed',
-    message:
-      body.status === 'succeeded'
-        ? `✅ **System update succeeded**\n\n${version ? `Now running ${version}.` : 'The instance is up to date.'}`
-        : `❌ **System update failed**\n\n${body.error || 'The build or deployment failed — check the GitHub Actions run for details.'}`,
+    subject,
+    message,
     type: 'system',
-    mode: body.status === 'succeeded' ? 'informative' : 'interactive',
+    mode: body.status === 'failed' || body.status === 'pr_opened' ? 'interactive' : 'informative',
     userId: existingJob?.triggeredBy,
-    priority: body.status === 'succeeded' ? 'normal' : 'high',
-    category: body.status === 'succeeded' ? 'action' : 'urgent',
+    priority: body.status === 'failed' ? 'high' : 'normal',
+    category: body.status === 'failed' ? 'urgent' : 'action',
     superAdminOnly: true,
     metadata: {
-      notificationType: body.status === 'succeeded' ? 'system_update_succeeded' : 'system_update_failed',
-      actionRequired: body.status === 'failed',
+      notificationType:
+        body.status === 'pr_opened'
+          ? 'system_update_pr_opened'
+          : body.status === 'failed'
+            ? 'system_update_failed'
+            : 'system_update_succeeded',
+      actionRequired: body.status === 'failed' || body.status === 'pr_opened',
       version,
+      prUrl,
     },
   })
 
