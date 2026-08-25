@@ -9,6 +9,7 @@ import { MobileMenu } from "@/components/layout/mobile-menu"
 import { AuthNavButtons } from "@/components/layout/auth-nav-buttons"
 import Image from "next/image"
 import { Icon } from "@/components/ui/icon"
+import { SiteNameText } from "@/components/common/site-name-text"
 import { type JWTPayload } from "@/lib/auth"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
 import { useLocale } from "@/lib/i18n/use-locale"
@@ -26,7 +27,7 @@ interface SiteHeaderProps {
 
 export function SiteHeader({ user, headerConfig, alternatePaths }: SiteHeaderProps) {
   const platformConfig = usePlatformConfig()
-  const { siteName, logo, logoDisplayMode, socialLinks: platformSocialLinks } = platformConfig
+  const { siteName, siteNameStyle, siteNameHtml, logo, logoDisplayMode, socialLinks: platformSocialLinks } = platformConfig
   const locale = useLocale()
 
   // Charles (2026-07-15): "le preview ne prend pas en compte le tag merge" —
@@ -77,10 +78,7 @@ export function SiteHeader({ user, headerConfig, alternatePaths }: SiteHeaderPro
               <Image src={logoSrc} alt={siteName} width={32} height={32} className="rounded" />
             )}
             {showSiteName && (
-              <span className="font-bold text-lg">
-                <span className="text-foreground">{siteName.substring(0, 3)}</span>
-                <span className="text-brand">{siteName.substring(3)}</span>
-              </span>
+              <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} className="font-bold text-lg" />
             )}
           </Link>
         </div>

@@ -20,6 +20,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { SiteNameText } from "@/components/common/site-name-text"
 import { useCart } from "@/contexts/cart-context"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { getUserRoleConfig } from "@/lib/status-configs"
@@ -41,7 +42,7 @@ interface UserData {
 
 export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const router = useRouter()
-  const { logo, siteName } = usePlatformConfig()
+  const { logo, siteName, siteNameStyle, siteNameHtml } = usePlatformConfig()
   const { itemCount } = useCart()
   const [user, setUser] = useState<UserData | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -211,10 +212,7 @@ export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
          {logo ? (
             <img src={logo} alt={siteName} className="h-8 w-auto object-contain" />
          ) : (
-            <span className="font-bold text-lg">
-              <span className="text-foreground">{siteName.substring(0, 3)}</span>
-              <span className="text-brand">{siteName.substring(3)}</span>
-            </span>
+            <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} className="font-bold text-lg" />
          )}
       </div>
 

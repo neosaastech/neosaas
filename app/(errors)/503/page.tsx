@@ -1,8 +1,13 @@
 import { ErrorPageLayout } from '@/components/common/error-page-layout'
+import { getPlatformConfig } from '@/lib/config'
 
-export default function Error503Page() {
+export default async function Error503Page() {
+  const { siteName, siteNameStyle, siteNameHtml } = await getPlatformConfig()
   return (
     <ErrorPageLayout
+      siteName={siteName}
+      siteNameStyle={siteNameStyle}
+      siteNameHtml={siteNameHtml}
       errorCode="503"
       title="Service Unavailable"
       description="The service is temporarily unavailable. We're working to restore it as quickly as possible."

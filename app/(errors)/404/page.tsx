@@ -1,8 +1,13 @@
 import { ErrorPageLayout } from '@/components/common/error-page-layout'
+import { getPlatformConfig } from '@/lib/config'
 
-export default function NotFoundPage() {
+export default async function NotFoundPage() {
+  const { siteName, siteNameStyle, siteNameHtml } = await getPlatformConfig()
   return (
     <ErrorPageLayout
+      siteName={siteName}
+      siteNameStyle={siteNameStyle}
+      siteNameHtml={siteNameHtml}
       errorCode="404"
       title="Sorry, the page can't be found"
       description="The page you were looking for appears to have been moved, deleted or does not exist."

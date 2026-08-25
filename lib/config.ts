@@ -5,6 +5,18 @@ import { OFFLINE_PLATFORM_CONFIG } from "@/lib/dev/mock-data"
 
 export interface PlatformConfigData {
   siteName: string
+  // Charles (2026-08-25): the bicolor "first 3 chars / rest" split
+  // (see components/common/brand-mark.tsx) was hardcoded for "NeoSaaS" and
+  // silently breaks for any other siteName. "plain" (new default) drops the
+  // split entirely; "legacy-bicolor" keeps the old substring behavior for
+  // sites that already rely on the current look (e.g. this one); "custom"
+  // renders siteNameHtml verbatim so an admin can style it however they
+  // want (own <span> colors, not tied to any fixed split point).
+  siteNameStyle?: "plain" | "legacy-bicolor" | "custom"
+  // Admin-authored markup, only used when siteNameStyle === "custom" —
+  // trusted content (same trust level as customHeaderCode/customFooterCode
+  // below, both already rendered via dangerouslySetInnerHTML).
+  siteNameHtml?: string | null
   logo: string | null
   logoDisplayMode?: "logo" | "text" | "both" | "none"
   authEnabled: boolean
@@ -52,6 +64,8 @@ export async function getPlatformConfig(): Promise<PlatformConfigData> {
 
     return {
       siteName: configMap['site_name'] || 'NeoSaaS',
+      siteNameStyle: configMap['site_name_style'] || 'plain',
+      siteNameHtml: configMap['site_name_html'] || null,
       logo: configMap['logo'] || null,
       logoDisplayMode: configMap['logo_display_mode'] || 'both',
       authEnabled: configMap['auth_enabled'] === 'true',
@@ -82,6 +96,8 @@ export async function getPlatformConfig(): Promise<PlatformConfigData> {
     console.error("Failed to fetch platform config:", error)
     return {
       siteName: 'NeoSaaS',
+      siteNameStyle: 'plain',
+      siteNameHtml: null,
       logo: null,
       authEnabled: true,
       maintenanceMode: false,

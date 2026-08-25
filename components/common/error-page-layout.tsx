@@ -3,15 +3,29 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Home } from 'lucide-react'
+import { usePlatformConfig } from '@/contexts/platform-config-context'
+import { SiteNameText } from '@/components/common/site-name-text'
 
 interface ErrorPageLayoutProps {
   errorCode: string
   title: string
   description: string
   icon: React.ReactNode
+  // Optional overrides -- Server-Component callers (404/500/503 pages)
+  // fetch the real config directly and pass it explicitly. error.tsx (a
+  // required Client Component, no way to await server data) relies on
+  // usePlatformConfig() alone, which now gets real data too (root layout
+  // wraps the whole app in a PlatformConfigProvider).
+  siteName?: string
+  siteNameStyle?: "plain" | "legacy-bicolor" | "custom"
+  siteNameHtml?: string | null
 }
 
-export function ErrorPageLayout({ errorCode, title, description, icon }: ErrorPageLayoutProps) {
+export function ErrorPageLayout({ errorCode, title, description, icon, siteName: siteNameProp, siteNameStyle: siteNameStyleProp, siteNameHtml: siteNameHtmlProp }: ErrorPageLayoutProps) {
+  const context = usePlatformConfig()
+  const siteName = siteNameProp ?? context.siteName
+  const siteNameStyle = siteNameStyleProp ?? context.siteNameStyle
+  const siteNameHtml = siteNameHtmlProp ?? context.siteNameHtml
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background p-6">
       {/* Decorative Background Circles */}
@@ -60,8 +74,7 @@ export function ErrorPageLayout({ errorCode, title, description, icon }: ErrorPa
       {/* Footer */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
         <p className="text-sm text-muted-foreground">
-          © 2025 - <span className="text-foreground">Neo</span>
-          <span className="text-brand">SaaS</span>
+          © {new Date().getFullYear()} - <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} />
         </p>
       </div>
     </div>

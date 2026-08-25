@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 import { type JWTPayload } from "@/lib/auth"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { SiteNameText } from "@/components/common/site-name-text"
 import { useLocale } from "@/lib/i18n/use-locale"
 import { AuthNavButtons } from "@/components/layout/auth-nav-buttons"
 import type { NavLink } from "@/types/site-nav"
@@ -28,7 +29,7 @@ interface MobileMenuProps {
 }
 
 export function MobileMenu({ user, showAuthButtons = true, items }: MobileMenuProps) {
-  const { siteName } = usePlatformConfig()
+  const { siteName, siteNameStyle, siteNameHtml } = usePlatformConfig()
   const locale = useLocale()
   const [open, setOpen] = useState(false)
   const navItems = items && items.length > 0 ? items : DEFAULT_ITEMS
@@ -43,10 +44,7 @@ export function MobileMenu({ user, showAuthButtons = true, items }: MobileMenuPr
       </SheetTrigger>
       <SheetContent side="right" className="w-[75vw] sm:max-w-sm">
         <div className="flex items-center mb-8 mt-2">
-          <div className="font-bold text-2xl tracking-tight">
-            <span className="text-foreground">{siteName.substring(0, 3)}</span>
-            <span className="text-brand">{siteName.substring(3)}</span>
-          </div>
+          <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} className="font-bold text-2xl tracking-tight" />
         </div>
         <div className="flex flex-col gap-6 px-2 py-6">
           <nav className="flex flex-col space-y-4">

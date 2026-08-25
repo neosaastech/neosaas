@@ -65,12 +65,14 @@ export default async function DocumentationLayout({
     getPlatformConfig(),
     getFooterConfig(pagePath, locale),
   ])
-  const { siteName, logo, logoDisplayMode } = platformConfig
+  const { siteName, siteNameStyle, siteNameHtml, logo, logoDisplayMode } = platformConfig
 
   const navTitle = (
     <span className="inline-flex items-center gap-2">
       <BrandMark
         siteName={siteName}
+        siteNameStyle={siteNameStyle}
+        siteNameHtml={siteNameHtml}
         logo={logo}
         showLogo={shouldShowLogoInHeader(logoDisplayMode)}
         showSiteName={shouldShowSiteNameInHeader(logoDisplayMode)}

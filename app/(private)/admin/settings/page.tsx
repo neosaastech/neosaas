@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { ImageCropper } from "@/components/ui/image-cropper"
@@ -58,6 +59,8 @@ export default function AdminSettingsPage() {
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const [siteName, setSiteName] = useState("NeoSaaS")
+  const [siteNameStyle, setSiteNameStyle] = useState<"plain" | "legacy-bicolor" | "custom">("plain")
+  const [siteNameHtml, setSiteNameHtml] = useState("")
   const [siteUrl, setSiteUrl] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [gdprContactName, setGdprContactName] = useState("")
@@ -115,6 +118,8 @@ export default function AdminSettingsPage() {
     try {
       const formData = new FormData()
       formData.append('siteName', siteName)
+        formData.append('siteNameStyle', siteNameStyle)
+        formData.append('siteNameHtml', siteNameHtml)
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
@@ -156,7 +161,7 @@ export default function AdminSettingsPage() {
       setSaveStatus('error')
       toast.error(error instanceof Error ? error.message : 'Failed to save')
     }
-  }, [siteName, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
+  }, [siteName, siteNameStyle, siteNameHtml, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
 
   // Debounced auto-save
   const triggerAutoSave = useCallback(() => {
@@ -183,6 +188,8 @@ export default function AdminSettingsPage() {
           const data = await res.json()
           console.log('[AdminSettings] fetchConfig - Config loaded successfully')
           if (data.site_name) setSiteName(data.site_name)
+          if (data.site_name_style) setSiteNameStyle(data.site_name_style)
+          if (data.site_name_html) setSiteNameHtml(data.site_name_html)
           if (data.site_url) setSiteUrl(data.site_url)
           if (data.default_sender_email) setContactEmail(data.default_sender_email)
           if (data.gdpr_contact_name) setGdprContactName(data.gdpr_contact_name)
@@ -251,7 +258,7 @@ export default function AdminSettingsPage() {
   // Trigger auto-save on changes
   useEffect(() => {
     triggerAutoSave()
-  }, [siteName, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
+  }, [siteName, siteNameStyle, siteNameHtml, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
 
   // Handle logo change - open cropper
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,6 +291,8 @@ export default function AdminSettingsPage() {
     try {
       const formData = new FormData()
       formData.append('siteName', siteName)
+        formData.append('siteNameStyle', siteNameStyle)
+        formData.append('siteNameHtml', siteNameHtml)
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
@@ -329,6 +338,8 @@ export default function AdminSettingsPage() {
     try {
       const formData = new FormData()
       formData.append('siteName', siteName)
+        formData.append('siteNameStyle', siteNameStyle)
+        formData.append('siteNameHtml', siteNameHtml)
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
@@ -381,6 +392,8 @@ export default function AdminSettingsPage() {
       try {
         const formData = new FormData()
         formData.append('siteName', siteName)
+        formData.append('siteNameStyle', siteNameStyle)
+        formData.append('siteNameHtml', siteNameHtml)
         formData.append('siteUrl', siteUrl)
         formData.append('defaultSenderEmail', contactEmail)
         formData.append('gdprContactName', gdprContactName)
@@ -431,6 +444,8 @@ export default function AdminSettingsPage() {
 
       const formData = new FormData()
       formData.append('siteName', siteName)
+        formData.append('siteNameStyle', siteNameStyle)
+        formData.append('siteNameHtml', siteNameHtml)
       formData.append('siteUrl', siteUrl)
       formData.append('defaultSenderEmail', contactEmail)
       formData.append('gdprContactName', gdprContactName)
@@ -645,6 +660,42 @@ export default function AdminSettingsPage() {
                   />
                   <p className="text-xs text-muted-foreground">Displayed on the platform and in communications</p>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="siteNameStyle">Site Name Style</Label>
+                  <Select value={siteNameStyle} onValueChange={(v) => setSiteNameStyle(v as typeof siteNameStyle)}>
+                    <SelectTrigger id="siteNameStyle">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="plain">Plain — single color</SelectItem>
+                      <SelectItem value="legacy-bicolor">Two-tone — first 3 characters, then accent color</SelectItem>
+                      <SelectItem value="custom">Custom HTML — style it yourself</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    How the site name renders in the header, footer, and error pages. Two-tone assumes a name
+                    like &quot;NeoSaaS&quot; (first 3 chars vs rest) — pick Plain or Custom for anything else.
+                  </p>
+                </div>
+
+                {siteNameStyle === "custom" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="siteNameHtml">Custom Site Name HTML</Label>
+                    <Textarea
+                      id="siteNameHtml"
+                      value={siteNameHtml}
+                      onChange={(e) => setSiteNameHtml(e.target.value)}
+                      placeholder='<span class="text-foreground">Neo</span><span class="text-brand">kube</span>'
+                      rows={3}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Rendered as-is wherever the site name appears. Same trust level as the custom header/footer
+                      code below — only paste markup you trust.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="siteUrl">Site URL</Label>

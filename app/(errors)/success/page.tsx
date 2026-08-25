@@ -1,8 +1,11 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { CheckCircle2 } from 'lucide-react'
+import { getPlatformConfig } from '@/lib/config'
+import { SiteNameText } from '@/components/common/site-name-text'
 
-export default function SuccessPage() {
+export default async function SuccessPage() {
+  const { siteName, siteNameStyle, siteNameHtml } = await getPlatformConfig()
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md text-center space-y-8">
@@ -29,7 +32,7 @@ export default function SuccessPage() {
         </Button>
 
         <footer className="pt-8 text-sm text-muted-foreground">
-          © 2025 - <span className="text-foreground">Neo</span><span className="text-brand">SaaS</span>
+          © {new Date().getFullYear()} - <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} />
         </footer>
       </div>
     </div>

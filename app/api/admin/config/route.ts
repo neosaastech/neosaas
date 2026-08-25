@@ -98,6 +98,12 @@ export async function POST(request: NextRequest) {
     const siteName = formData.get('siteName') as string;
     if (siteName) updates['site_name'] = siteName;
 
+    const siteNameStyle = formData.get('siteNameStyle') as string;
+    if (siteNameStyle) updates['site_name_style'] = siteNameStyle;
+
+    const siteNameHtml = formData.get('siteNameHtml');
+    if (siteNameHtml !== null) updates['site_name_html'] = siteNameHtml.toString();
+
     const siteUrl = formData.get('siteUrl') as string;
     if (siteUrl) updates['site_url'] = siteUrl;
 

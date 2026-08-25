@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { SiteNameText } from "@/components/common/site-name-text"
 import { useLocale } from "@/lib/i18n/use-locale"
 import { FormLayer } from "@/components/layers/form-layer"
 import { BlockWrapper } from "@/components/layers/block-wrapper"
@@ -87,6 +88,8 @@ function FooterBody({
   showSiteName,
   logoSrc,
   siteName,
+  siteNameStyle,
+  siteNameHtml,
   locale,
 }: {
   modules: FooterModule[]
@@ -97,6 +100,8 @@ function FooterBody({
   showSiteName: boolean
   logoSrc: string
   siteName: string
+  siteNameStyle?: "plain" | "legacy-bicolor" | "custom"
+  siteNameHtml?: string | null
   locale: string
 }) {
   return (
@@ -108,10 +113,14 @@ function FooterBody({
             <img src={logoSrc} alt={siteName} className="h-8 w-auto" />
           )}
           {showSiteName && (
-            <div className="font-bold text-xl tracking-tight">
-              <span className="text-white">{siteName.substring(0, 3)}</span>
-              <span className="text-brand">{siteName.substring(3)}</span>
-            </div>
+            <SiteNameText
+              siteName={siteName}
+              siteNameStyle={siteNameStyle}
+              siteNameHtml={siteNameHtml}
+              className="font-bold text-xl tracking-tight"
+              prefixClassName="text-white"
+              accentClassName="text-brand"
+            />
           )}
         </div>
         {!hideTagline && (
@@ -159,7 +168,7 @@ function FooterBody({
 
 export function SiteFooter({ footerConfig }: { footerConfig?: FooterConfig | null }) {
   const platformConfig = usePlatformConfig()
-  const { siteName, logo, logoDisplayMode } = platformConfig
+  const { siteName, siteNameStyle, siteNameHtml, logo, logoDisplayMode } = platformConfig
   const locale = useLocale()
 
   // Charles (2026-07-15): "j'ai juste date dans le Copyright... merge moi
@@ -207,6 +216,8 @@ export function SiteFooter({ footerConfig }: { footerConfig?: FooterConfig | nul
           showSiteName={showSiteName}
           logoSrc={logoSrc}
           siteName={siteName}
+          siteNameStyle={siteNameStyle}
+          siteNameHtml={siteNameHtml}
           locale={locale}
         />
 

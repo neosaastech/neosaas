@@ -1,10 +1,16 @@
-'use client'
-
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Wrench, LogIn } from 'lucide-react'
+import { getPlatformConfig } from '@/lib/config'
+import { SiteNameText } from '@/components/common/site-name-text'
 
-export default function MaintenancePage() {
+// No client-side state/effects here -- was 'use client' with no reason to
+// be, which also meant usePlatformConfig() would only ever see the
+// context's hardcoded default (nothing wraps this route group in a
+// PlatformConfigProvider), not the real site name. Server Component +
+// direct getPlatformConfig() sidesteps that entirely.
+export default async function MaintenancePage() {
+  const { siteName, siteNameStyle, siteNameHtml } = await getPlatformConfig()
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
       <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
@@ -25,8 +31,7 @@ export default function MaintenancePage() {
       </Button>
       <div className="mt-12 text-sm text-muted-foreground">
         <p>
-          © 2025 - <span className="text-foreground">Neo</span>
-          <span className="text-primary">SaaS</span>
+          © {new Date().getFullYear()} - <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} accentClassName="text-primary" />
         </p>
       </div>
     </div>

@@ -1,8 +1,13 @@
 import { ErrorPageLayout } from '@/components/common/error-page-layout'
+import { getPlatformConfig } from '@/lib/config'
 
-export default function Error500Page() {
+export default async function Error500Page() {
+  const { siteName, siteNameStyle, siteNameHtml } = await getPlatformConfig()
   return (
     <ErrorPageLayout
+      siteName={siteName}
+      siteNameStyle={siteNameStyle}
+      siteNameHtml={siteNameHtml}
       errorCode="500"
       title="Internal Server Error"
       description="We apologize for the inconvenience. Our server encountered an unexpected error. Please try again later."

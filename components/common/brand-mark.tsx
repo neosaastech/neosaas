@@ -6,15 +6,19 @@
  * dynamique"). Pure/presentational — no hooks — so it works from both a
  * server component (documentation/layout.tsx) and a client one (sidebar.tsx).
  */
+import { SiteNameText } from "./site-name-text"
+
 interface BrandMarkProps {
   siteName: string
+  siteNameStyle?: "plain" | "legacy-bicolor" | "custom"
+  siteNameHtml?: string | null
   logo?: string | null
   showLogo?: boolean
   showSiteName?: boolean
   size?: "sm" | "md"
 }
 
-export function BrandMark({ siteName, logo, showLogo = true, showSiteName = true, size = "md" }: BrandMarkProps) {
+export function BrandMark({ siteName, siteNameStyle, siteNameHtml, logo, showLogo = true, showSiteName = true, size = "md" }: BrandMarkProps) {
   const logoInitials = siteName.substring(0, 2).toUpperCase()
   const dim = size === "sm" ? "h-6 w-6" : "h-8 w-8"
   const textSize = size === "sm" ? "text-lg" : "text-xl"
@@ -30,10 +34,12 @@ export function BrandMark({ siteName, logo, showLogo = true, showSiteName = true
           </span>
         ))}
       {showSiteName && (
-        <span className={`font-bold ${textSize}`}>
-          <span className="text-foreground">{siteName.substring(0, 3)}</span>
-          <span className="text-brand">{siteName.substring(3)}</span>
-        </span>
+        <SiteNameText
+          siteName={siteName}
+          siteNameStyle={siteNameStyle}
+          siteNameHtml={siteNameHtml}
+          className={`font-bold ${textSize}`}
+        />
       )}
     </span>
   )

@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useUser } from "@/lib/contexts/user-context"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
+import { SiteNameText } from "@/components/common/site-name-text"
 import {
   adminNavItems,
   dashboardNavItems,
@@ -75,7 +76,7 @@ function isPathActive(pathname: string, href: string) {
 export function PrelineAdminSidebar({ onClose }: PrelineAdminSidebarProps) {
   const pathname = usePathname()
   const { isAdmin, isSuperAdmin, isLoading } = useUser()
-  const { siteName, logo, logoDisplayMode } = usePlatformConfig()
+  const { siteName, siteNameStyle, siteNameHtml, logo, logoDisplayMode } = usePlatformConfig()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isSupportOpen, setIsSupportOpen] = useState(
     pathname.startsWith("/admin/support") || pathname.startsWith("/admin/chat"),
@@ -126,10 +127,7 @@ export function PrelineAdminSidebar({ onClose }: PrelineAdminSidebarProps) {
               </span>
             ))}
           {showLabels && (logoDisplayMode === "text" || logoDisplayMode === "both") && (
-            <span className="hidden text-lg font-bold md:inline">
-              <span className="text-foreground">{siteName.substring(0, 3)}</span>
-              <span className="text-brand">{siteName.substring(3)}</span>
-            </span>
+            <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} className="hidden text-lg font-bold md:inline" />
           )}
         </Link>
       </div>

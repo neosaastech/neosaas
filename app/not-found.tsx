@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Home } from 'lucide-react'
+import { getPlatformConfig } from '@/lib/config'
+import { SiteNameText } from '@/components/common/site-name-text'
 
-export default function NotFound() {
+export default async function NotFound() {
+  const { siteName, siteNameStyle, siteNameHtml } = await getPlatformConfig()
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background p-6">
       <div className="absolute left-0 top-0 -z-10 opacity-5">
@@ -54,8 +57,7 @@ export default function NotFound() {
 
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
         <p className="text-sm text-muted-foreground">
-          © 2025 - <span className="text-foreground">Neo</span>
-          <span className="text-brand">SaaS</span>
+          © {new Date().getFullYear()} - <SiteNameText siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} />
         </p>
       </div>
     </div>

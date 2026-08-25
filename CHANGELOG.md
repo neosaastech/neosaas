@@ -1,3 +1,13 @@
+## [1.29.0](https://github.com/neosaastech/Neosaas-app/compare/v1.28.2...v1.29.0) (2026-08-25)
+
+### Features
+
+* admin-configurable site name style (plain / two-tone / custom HTML) ([aaaeff1](https://github.com/neosaastech/Neosaas-app/commit/aaaeff1ec77dcbcb3a4714ddf450eebf17300e4b))
+
+### Bug Fixes
+
+* error pages hardcoded site name/year, close error.tsx context gap ([f67edf3](https://github.com/neosaastech/Neosaas-app/commit/f67edf34674b8b7c19e1f36a7e01b33def00a0db))
+
 ## [1.28.2](https://github.com/neosaastech/Neosaas-app/compare/v1.28.1...v1.28.2) (2026-08-22)
 
 ### Bug Fixes

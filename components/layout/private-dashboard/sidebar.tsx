@@ -179,7 +179,7 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { isAdmin, isSuperAdmin, isLoading } = useUser()
-  const { siteName, logo, logoDisplayMode } = usePlatformConfig()
+  const { siteName, siteNameStyle, siteNameHtml, logo, logoDisplayMode } = usePlatformConfig()
   const [isAdminOpen, setIsAdminOpen] = useState(
     pathname.startsWith("/admin") || pathname.startsWith("/dashboard/admin"),
   )
@@ -238,7 +238,7 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
       >
         <div className={cn("flex h-16 items-center border-b", isCollapsed ? "px-3 justify-center" : "px-6")}>
           <Link href="/dashboard" className="flex items-center gap-2" onClick={handleLinkClick}>
-            <BrandMark siteName={siteName} logo={logo} showLogo={showLogoInHeader} showSiteName={showSiteNameInHeader} />
+            <BrandMark siteName={siteName} siteNameStyle={siteNameStyle} siteNameHtml={siteNameHtml} logo={logo} showLogo={showLogoInHeader} showSiteName={showSiteNameInHeader} />
           </Link>
           <div className={cn("ml-auto flex items-center", isCollapsed && "hidden")}>
             {isOpen && !isCollapsed && (

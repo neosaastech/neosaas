@@ -17,6 +17,7 @@ import { generateThemeCSS } from "@/lib/theme/generate-css"
 import { getGoogleFontsLinkHref } from "@/lib/theme/font-source"
 import { JsonLd } from "@/components/seo/json-ld"
 import { buildOrganizationJsonLd, buildWebSiteJsonLd } from "@/lib/seo/structured-data"
+import { PlatformConfigProvider } from "@/contexts/platform-config-context"
 
 export async function generateMetadata() {
   try {
@@ -107,10 +108,12 @@ export default async function RootLayout({
         
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <DynamicThemeProvider theme={themeConfig}>
-            <RouteOverlayCleanup />
-            {children}
-            <BackToTop />
-            <Toaster />
+            <PlatformConfigProvider config={config}>
+              <RouteOverlayCleanup />
+              {children}
+              <BackToTop />
+              <Toaster />
+            </PlatformConfigProvider>
           </DynamicThemeProvider>
         </ThemeProvider>
 

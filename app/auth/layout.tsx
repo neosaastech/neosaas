@@ -6,6 +6,7 @@ import { MinimalFooter } from "@/components/layout/minimal-footer"
 import { isAuthenticated } from "@/lib/auth/server"
 import { getPlatformConfig } from "@/lib/config"
 import { PlatformConfigProvider } from "@/contexts/platform-config-context"
+import { SiteNameText } from "@/components/common/site-name-text"
 
 // Force dynamic rendering for auth checks
 export const dynamic = 'force-dynamic'
@@ -45,10 +46,12 @@ export default async function AuthLayout({
       <div className="min-h-screen flex flex-col">
         <div className="p-4">
           <Link href="/" className="flex items-center">
-            <div className="font-bold text-2xl tracking-tight">
-              <span className="text-foreground">{platformConfig.siteName.substring(0, 3)}</span>
-              <span className="text-brand">{platformConfig.siteName.substring(3)}</span>
-            </div>
+            <SiteNameText
+              siteName={platformConfig.siteName}
+              siteNameStyle={platformConfig.siteNameStyle}
+              siteNameHtml={platformConfig.siteNameHtml}
+              className="font-bold text-2xl tracking-tight"
+            />
           </Link>
         </div>
         <div className="flex-1">{children}</div>

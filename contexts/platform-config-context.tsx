@@ -12,6 +12,10 @@ export interface PlatformSocialLinks {
 
 export interface PlatformConfig {
   siteName: string
+  // See lib/config.ts PlatformConfigData for the full rationale — kept in
+  // sync field-for-field since this object is passed through unchanged.
+  siteNameStyle?: "plain" | "legacy-bicolor" | "custom"
+  siteNameHtml?: string | null
   logo: string | null
   logoDisplayMode?: "logo" | "text" | "both" | "none"
   authEnabled?: boolean
@@ -37,6 +41,8 @@ export interface PlatformConfig {
 
 const defaultConfig: PlatformConfig = {
   siteName: 'NeoSaaS',
+  siteNameStyle: 'plain',
+  siteNameHtml: null,
   logo: null,
   logoDisplayMode: 'both',
   authEnabled: true,
