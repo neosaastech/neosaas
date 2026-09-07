@@ -51,9 +51,18 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Générer le manifeste de synchronisation
+        # NEOKUBE-548 (07/09/2026) -- liste chaque chemin que ce repo possede reellement,
+        # a cette version. Les forks downstream (neo-invoice et suivants) l'utilisent
+        # comme allowlist opt-in pour leur sync (rsync --files-from), au lieu de
+        # maintenir a la main une exclude-list qui derive a chaque nouvelle feature
+        # business ajoutee par un fork. git ls-files respecte deja .gitignore --
+        # aucune liste separee a maintenir ici au-dela du .gitignore existant.
+        run: git ls-files > sync-manifest.txt
+
       - name: Commit version bump
         run: |
-          git add package.json
+          git add package.json sync-manifest.txt
           if [ -f pnpm-lock.yaml ]; then
             git add pnpm-lock.yaml
           fi
