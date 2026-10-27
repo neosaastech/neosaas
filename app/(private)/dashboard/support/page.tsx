@@ -208,7 +208,7 @@ export default function SupportPage() {
             <div className="space-y-4">
               <Alert>
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Didn't find your answer?</AlertTitle>
+                <AlertTitle>Didn&apos;t find your answer?</AlertTitle>
                 <AlertDescription>
                   Start a conversation with our support team for personalized assistance.
                 </AlertDescription>

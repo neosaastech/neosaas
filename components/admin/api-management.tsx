@@ -88,7 +88,7 @@ export function APIManagement() {
             <CardTitle>Configuration GitHub OAuth</CardTitle>
           </div>
           <CardDescription>
-            Configurez automatiquement l'authentification GitHub via une clé API
+            Configurez automatiquement l&apos;authentification GitHub via une clé API
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -117,7 +117,7 @@ export function APIManagement() {
             <Alert>
               <Server className="h-4 w-4" />
               <AlertDescription>
-                <strong>Prérequis :</strong> Assurez-vous que les variables d'environnement{" "}
+                <strong>Prérequis :</strong> Assurez-vous que les variables d&apos;environnement{" "}
                 <code className="bg-muted px-1 py-0.5 rounded">VERCEL_PROJECT_ID</code> et{" "}
                 <code className="bg-muted px-1 py-0.5 rounded">VERCEL_API_TOKEN</code> sont configurées.
               </AlertDescription>
@@ -204,10 +204,10 @@ export function APIManagement() {
         <CardContent className="space-y-2 text-sm">
           <ol className="list-decimal list-inside space-y-2">
             <li>Allez sur <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener noreferrer" className="text-primary underline">GitHub Settings → Tokens</a></li>
-            <li>Cliquez sur "Generate new token (classic)"</li>
-            <li>Donnez un nom descriptif (ex: "NeoSAS OAuth Configuration")</li>
+            <li>Cliquez sur &quot;Generate new token (classic)&quot;</li>
+            <li>Donnez un nom descriptif (ex: &quot;NeoSAS OAuth Configuration&quot;)</li>
             <li>Sélectionnez les permissions : <code className="bg-muted px-1 py-0.5 rounded">admin:org</code> et <code className="bg-muted px-1 py-0.5 rounded">write:org</code></li>
-            <li>Cliquez sur "Generate token"</li>
+            <li>Cliquez sur &quot;Generate token&quot;</li>
             <li>Copiez le token (vous ne pourrez plus le voir ensuite)</li>
           </ol>
         </CardContent>

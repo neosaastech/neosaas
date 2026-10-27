@@ -277,7 +277,7 @@ export function CheckoutConfirmationContent({
                     <div>
                       <p className="text-purple-800 dark:text-purple-200 font-medium">Order Being Prepared!</p>
                       <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
-                        Your order will be prepared within 24-48 hours. You'll receive a tracking number by email once shipped.
+                        Your order will be prepared within 24-48 hours. You&apos;ll receive a tracking number by email once shipped.
                       </p>
                     </div>
                   </div>

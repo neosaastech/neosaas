@@ -32,7 +32,7 @@ export default async function PaymentMethodsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Payment Methods</h1>
         <p className="mt-2 text-gray-600">
-          Manage your company's payment methods for billing and subscriptions
+          Manage your company&apos;s payment methods for billing and subscriptions
         </p>
       </div>
 

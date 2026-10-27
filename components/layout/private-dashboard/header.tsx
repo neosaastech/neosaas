@@ -264,7 +264,7 @@ export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
                   <Search className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                   <p className="text-sm font-medium text-muted-foreground">No results found</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Essayez "users", "products", "admin", "settings"...
+                    Essayez &quot;users&quot;, &quot;products&quot;, &quot;admin&quot;, &quot;settings&quot;...
                   </p>
                 </div>
               )}

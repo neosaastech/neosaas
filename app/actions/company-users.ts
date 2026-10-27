@@ -2,9 +2,10 @@
 
 import { db } from "@/db"
 import { users, userInvitations, userRoles, roles } from "@/db/schema"
-import { eq, and, inArray } from "drizzle-orm"
+import { eq, and, inArray, ne } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { getCurrentUser } from "@/lib/auth"
+import { logSystemEvent } from "@/app/actions/logs"
 
 export async function cancelInvitation(invitationId: string) {
   try {
@@ -68,6 +69,32 @@ export async function removeUserFromCompany(userId: string) {
         // Also check if current user has 'manage_users' permission (omitted for brevity, assuming writer/admin role implies it or UI handles it)
     }
 
+    // Incident NeoStudio du 25/10/2026 : un super admin s'est retiré lui-même de son entreprise (la corbeille était
+    // affichée sur sa propre ligne) et a perdu rôle d'entreprise, droits et entreprise, sans trace. Ni soi-même, ni le
+    // dernier membre d'une entreprise.
+    let refusal: string | null = null
+    if (targetUser.id === currentUser.userId) {
+      refusal = "You cannot remove yourself from your company"
+    } else if (targetUser.companyId) {
+      const others = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.companyId, targetUser.companyId), ne(users.id, targetUser.id)))
+        .limit(1)
+      if (!others.length) refusal = "A company cannot lose its last member"
+    }
+    if (refusal) {
+      await logSystemEvent({
+        category: 'auth',
+        level: 'warning',
+        message: `Removal from company refused: ${targetUser.email} — ${refusal}`,
+        metadata: { targetUserId: targetUser.id, companyId: targetUser.companyId },
+        userId: currentUser.userId,
+        resourceId: targetUser.id,
+      }).catch(() => {})
+      return { success: false, error: refusal }
+    }
+
     // 1. Remove company-scoped roles
     const companyRoles = await db.select({ id: roles.id }).from(roles).where(eq(roles.scope, 'company'));
     const companyRoleIds = companyRoles.map(r => r.id);
@@ -84,6 +111,15 @@ export async function removeUserFromCompany(userId: string) {
     await db.update(users)
       .set({ companyId: null })
       .where(eq(users.id, userId))
+
+    await logSystemEvent({
+      category: 'auth',
+      level: 'warning',
+      message: `User removed from company: ${targetUser.email}`,
+      metadata: { targetUserId: targetUser.id, companyId: targetUser.companyId },
+      userId: currentUser.userId,
+      resourceId: targetUser.id,
+    }).catch(() => {})
 
     revalidatePath("/dashboard/company-management")
     return { success: true, message: "User removed from company successfully" }

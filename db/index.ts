@@ -2,7 +2,12 @@ import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { Pool } from 'pg';
-import * as schema from './schema';
+import * as vendorSchema from './schema';
+import * as customSchema from './schema.custom';
+
+// NEOKUBE-578 -- point d'extension : un derive ajoute ses propres tables dans
+// schema.custom.ts (vide par defaut) plutot que d'editer ce fichier vendor partage.
+const schema = { ...vendorSchema, ...customSchema };
 
 let _sql: NeonQueryFunction<false, false> | null = null;
 let _pool: Pool | null = null;
@@ -54,7 +59,7 @@ function initDb() {
 export const db = new Proxy({} as ReturnType<typeof drizzleNeon<typeof schema>>, {
   get(_, prop) {
     const instance = initDb();
-    return (instance as Record<string | symbol, unknown>)[prop];
+    return (instance as unknown as Record<string | symbol, unknown>)[prop];
   }
 });
 

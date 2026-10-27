@@ -182,9 +182,9 @@ export async function saveContentModule(
   if (unauthorized) return unauthorized
 
   try {
-    const module = id ? await updateModule(id, input, locale) : await createModule(input, locale)
+    const savedModule = id ? await updateModule(id, input, locale) : await createModule(input, locale)
     revalidatePath("/admin/pages")
-    return { success: true, data: module }
+    return { success: true, data: savedModule }
   } catch (error) {
     console.error("Failed to save module to Payload:", error)
     const message = error instanceof Error ? error.message : "Failed to save module"

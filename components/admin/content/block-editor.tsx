@@ -47,7 +47,11 @@ export function BlockEditor(props: BlockEditorProps) {
   if (props.block.blockType === "columns") {
     return <ColumnsBlockEditor {...props} />
   }
+  return <GenericBlockEditor {...props} />
+}
 
+// Séparé de BlockEditor pour que ses hooks ne soient jamais appelés après le retour anticipé des colonnes.
+function GenericBlockEditor(props: BlockEditorProps) {
   const { block, onChange, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown, defaultExpanded = true } = props
   const def = clientLayerRegistry[block.blockType]
   const [expanded, setExpanded] = useState(defaultExpanded)

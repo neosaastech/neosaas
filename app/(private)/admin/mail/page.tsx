@@ -438,7 +438,7 @@ export default function MailPage() {
                 <div className="border rounded-lg p-4 bg-muted/30">
                   <div className="text-sm text-muted-foreground mb-2">Subject: {subject}</div>
                   <div className="prose max-w-none text-sm">
-                    <p>Template preview hidden. Click "Edit Template" to modify.</p>
+                    <p>Template preview hidden. Click &quot;Edit Template&quot; to modify.</p>
                   </div>
                 </div>
               )}

@@ -114,7 +114,7 @@ export function ImageCropper({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Recadrer l'image</DialogTitle>
+          <DialogTitle>Recadrer l&apos;image</DialogTitle>
         </DialogHeader>
         <div className="relative h-[400px] w-full">
           {imageSrc && (

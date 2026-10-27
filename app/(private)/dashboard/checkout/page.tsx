@@ -866,7 +866,7 @@ export default function CheckoutPage() {
                 </Button>
 
                 <p className="text-xs text-center text-muted-foreground">
-                  By clicking "Pay", you accept our terms and conditions of sale
+                  By clicking &quot;Pay&quot;, you accept our terms and conditions of sale
                 </p>
               </form>
             </CardContent>

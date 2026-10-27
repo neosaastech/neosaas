@@ -70,7 +70,14 @@ export async function POST(
     // (app/(private)/admin/api/page.tsx serviceCategories) -- "google" was
     // missing here, silently failing every save attempt with "Invalid
     // service name" even though the picker happily let you fill the form.
-    const validServices = ['stripe', 'paypal', 'scaleway', 'resend', 'aws', 'lago', 'github', 'google'];
+    // 2026-08-30: found 'microsoft'/'facebook' had the exact same bug (never
+    // exercised until now) -- added, plus the 3 new storage connectors
+    // (google-drive/dropbox/microsoft-sharepoint).
+    const validServices = [
+      'stripe', 'paypal', 'scaleway', 'resend', 'aws', 'lago',
+      'github', 'google', 'facebook', 'microsoft',
+      'google-drive', 'dropbox', 'microsoft-sharepoint',
+    ];
     if (!validServices.includes(service)) {
       return NextResponse.json(
         { success: false, error: 'Invalid service name' },

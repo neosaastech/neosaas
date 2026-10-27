@@ -492,7 +492,7 @@ export default function AppointmentDetailPage() {
             {appointment.status === "pending" && (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <AlertCircle className="h-4 w-4" />
-                <span>En attente de confirmation par l'administrateur</span>
+                <span>En attente de confirmation par l&apos;administrateur</span>
               </div>
             )}
             {appointment.status === "confirmed" && (
@@ -512,7 +512,7 @@ export default function AppointmentDetailPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Annuler le rendez-vous ?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Le participant sera notifié de l'annulation. Cette action ne peut pas être annulée.
+                    Le participant sera notifié de l&apos;annulation. Cette action ne peut pas être annulée.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

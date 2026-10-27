@@ -207,7 +207,7 @@ export default function AppointmentsListPage() {
               Rendez-vous en attente de confirmation
             </CardTitle>
             <CardDescription>
-              Ces rendez-vous ont été demandés par l'équipe et nécessitent votre confirmation
+              Ces rendez-vous ont été demandés par l&apos;équipe et nécessitent votre confirmation
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -346,7 +346,7 @@ export default function AppointmentsListPage() {
                 <h3 className={`text-sm font-medium mb-3 flex items-center gap-2 ${isPast ? "text-muted-foreground" : ""}`}>
                   <CalendarIcon className="h-4 w-4" />
                   {isToday ? "Aujourd'hui" : format(date, "EEEE d MMMM yyyy", { locale: fr })}
-                  {isToday && <Badge variant="outline" className="ml-2">Aujourd'hui</Badge>}
+                  {isToday && <Badge variant="outline" className="ml-2">Aujourd&apos;hui</Badge>}
                 </h3>
                 <div className="space-y-2">
                   {groupedAppointments[dateKey].map(apt => {

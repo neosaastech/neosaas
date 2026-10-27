@@ -7,13 +7,15 @@ import { eq, count, sum, desc } from "drizzle-orm"
 // GET /api/admin/users/[userId] - Get a single user by ID (admin only)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Verify admin access
     await requireAdmin()
 
-    const { userId } = params
+    // Next 16 : params est une promesse -- sans await, userId valait undefined et la fiche renvoyait à la liste
+
+    const { userId } = await params
 
     if (!userId) {
       return NextResponse.json(
@@ -129,12 +131,14 @@ export async function GET(
 // PATCH /api/admin/users/[userId] - Update a user (admin only)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     await requireAdmin()
 
-    const { userId } = params
+    // Next 16 : params est une promesse -- sans await, userId valait undefined et la fiche renvoyait à la liste
+
+    const { userId } = await params
     const body = await request.json()
 
     if (!userId) {

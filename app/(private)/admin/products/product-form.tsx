@@ -615,7 +615,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="deliverables">You'll Receive (One per line)</Label>
+          <Label htmlFor="deliverables">You&apos;ll Receive (One per line)</Label>
           <Textarea
             id="deliverables"
             value={formData.deliverables}

@@ -451,7 +451,7 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
       const newRole = formData.get("role") as string
       const currentRole = editingUser.userRoles[0]?.role.name
       
-      if (newRole && newRole !== currentRole) {
+      if (newRole && newRole !== currentRole && editingUser.id !== currentUserId) {
          const roleResult = await updateUserRole(editingUser.id, newRole)
          if (!roleResult.success) {
             toast.error(roleResult.error || "Failed to update role")
@@ -1143,7 +1143,10 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
                         className="h-8 w-8"
                         onClick={() => setEditingUser(user)}
                         title="Edit user"
-                        disabled={user.id === currentUserId}
+                        // 27/10/2026 (NeoKube NEO-2363) : un super admin peut ouvrir sa propre fiche pour changer son
+                        // entreprise -- sans cela, un super admin sans entreprise n'avait aucun chemin de retour. Son
+                        // rôle reste verrouillé (lockRole) ; updateUserRole refuse de toute façon de changer le sien.
+                        disabled={user.id === currentUserId && !isSuperAdmin}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -1327,6 +1330,7 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
         onSave={handleEditUser}
         companies={companies}
         isLoading={isLoading}
+        lockRole={editingUser?.id === currentUserId}
       />
 
       {/* Edit Company Dialog */}
@@ -1443,6 +1447,7 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
         onSave={handleEditUser}
         companies={companies}
         isLoading={isLoading}
+        lockRole={editingUser?.id === currentUserId}
       />
     </div>
   )

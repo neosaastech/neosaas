@@ -6,13 +6,15 @@ import { eq, desc } from "drizzle-orm"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Vérifier que l'utilisateur est admin
     await requireAdmin()
 
-    const { userId } = params
+    // Next 16 : params est une promesse -- sans await, userId valait undefined et la fiche renvoyait à la liste
+
+    const { userId } = await params
 
     if (!userId) {
       return NextResponse.json(

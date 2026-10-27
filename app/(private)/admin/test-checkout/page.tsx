@@ -159,9 +159,9 @@ export default function CheckoutTestPage() {
   return (
     <div className="container max-w-4xl py-10">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Test du Tunnel d'Achat</h1>
+        <h1 className="text-3xl font-bold mb-2">Test du Tunnel d&apos;Achat</h1>
         <p className="text-muted-foreground">
-          Testez l'intégration complète du processus de checkout avec Stripe
+          Testez l&apos;intégration complète du processus de checkout avec Stripe
         </p>
       </div>
 
@@ -264,7 +264,7 @@ export default function CheckoutTestPage() {
         <ul className="text-sm space-y-1">
           <li>
             📖 <a href="/docs/CHECKOUT_FLOW.md" className="text-blue-500 hover:underline">
-              Documentation complète du tunnel d'achat
+              Documentation complète du tunnel d&apos;achat
             </a>
           </li>
           <li>

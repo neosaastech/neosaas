@@ -7,6 +7,10 @@
 
 import { githubOAuthProvider } from "./providers/github";
 import { googleOAuthProvider } from "./providers/google";
+import { microsoftOAuthProvider } from "./providers/microsoft";
+import { googleDriveOAuthProvider } from "./providers/google-drive";
+import { dropboxOAuthProvider } from "./providers/dropbox";
+import { microsoftSharepointOAuthProvider } from "./providers/microsoft-sharepoint";
 import type { OAuthProvider } from "./types";
 import type { BaseOAuthProvider } from "./base-provider";
 
@@ -16,10 +20,15 @@ import type { BaseOAuthProvider } from "./base-provider";
 export const oauthProviders: Record<OAuthProvider, BaseOAuthProvider> = {
   github: githubOAuthProvider,
   google: googleOAuthProvider,
-  // Ajouter ici les futurs providers
+  // 2026-08-30: MicrosoftOAuthProvider existait deja (classe complete, exchangeCodeForToken
+  // inclus) mais n'avait jamais ete enregistree ici -- null as any, jamais appelable via
+  // getOAuthProvider("microsoft"). Facebook n'a toujours pas d'implementation reelle.
+  microsoft: microsoftOAuthProvider,
   facebook: null as any, // À implémenter
-  microsoft: null as any, // À implémenter
   linkedin: null as any, // À implémenter
+  "google-drive": googleDriveOAuthProvider,
+  dropbox: dropboxOAuthProvider,
+  "microsoft-sharepoint": microsoftSharepointOAuthProvider,
 };
 
 /**

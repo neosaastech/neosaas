@@ -73,9 +73,11 @@ interface UserEditSheetProps {
   onSave: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
   companies: Company[]
   isLoading: boolean
+  /** Sa propre fiche : le rôle ne se change pas ici (27/10/2026, NeoKube NEO-2363). */
+  lockRole?: boolean
 }
 
-export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isLoading }: UserEditSheetProps) {
+export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isLoading, lockRole = false }: UserEditSheetProps) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState("")
   const [selectedCompany, setSelectedCompany] = useState(user?.companyId || "none")
@@ -334,7 +336,7 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
           {/* Role Selection */}
           <div className="space-y-2">
             <Label htmlFor="edit-role">Role</Label>
-            <Select name="role" defaultValue={user.userRoles[0]?.role.name || "reader"}>
+            <Select name="role" defaultValue={user.userRoles[0]?.role.name || "reader"} disabled={lockRole}>
               <SelectTrigger>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>

@@ -286,7 +286,7 @@ export default function AdminApiPage() {
               <h3 className="font-semibold text-blue-900">New Hierarchical API System</h3>
               <p className="text-sm text-blue-800 mt-1">
                 Services are now organized by <strong>Brand → API Type</strong>. 
-                For example, GitHub has both "OAuth Authentication" and "REST API" as separate services.
+                For example, GitHub has both &quot;OAuth Authentication&quot; and &quot;REST API&quot; as separate services.
                 This makes it easier to manage multiple APIs from the same provider.
               </p>
               <ul className="text-sm text-blue-700 mt-2 ml-4 list-disc space-y-1">

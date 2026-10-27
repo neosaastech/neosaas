@@ -164,20 +164,20 @@ export function NeoSaasArchitectureDiagram() {
             y1="50%"
             x2="40%"
             y2="50%"
-            stroke="currentColor" className="text-brand"
+            stroke="currentColor"
             strokeWidth="2"
             markerEnd="url(#arrowhead)"
-            className="hidden md:block"
+            className="text-brand hidden md:block"
           />
           <line
             x1="60%"
             y1="50%"
             x2="67%"
             y2="50%"
-            stroke="currentColor" className="text-brand"
+            stroke="currentColor"
             strokeWidth="2"
             markerEnd="url(#arrowhead)"
-            className="hidden md:block"
+            className="text-brand hidden md:block"
           />
         </svg>
       </div>

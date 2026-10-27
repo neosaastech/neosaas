@@ -36,6 +36,8 @@ const FAILED_VISIBLE_MS = 24 * 60 * 60 * 1000
  */
 export function UpdateStatusIcon({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [job, setJob] = useState<UpdateJob | null>(null)
+  // Horloge relevée à chaque sondage (Date.now() pendant le rendu est impur)
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     if (!isSuperAdmin) return
@@ -46,7 +48,10 @@ export function UpdateStatusIcon({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         const res = await fetch("/api/admin/system/update", { cache: "no-store" })
         if (!res.ok) return
         const data = await res.json()
-        if (mounted) setJob(data.job ?? null)
+        if (mounted) {
+          setJob(data.job ?? null)
+          setNow(Date.now())
+        }
       } catch {
         // best-effort — a failed poll just means the icon doesn't update this tick
       }
@@ -62,7 +67,7 @@ export function UpdateStatusIcon({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   if (!isSuperAdmin || !job) return null
 
-  const finishedAgo = job.finishedAt ? Date.now() - new Date(job.finishedAt).getTime() : 0
+  const finishedAgo = job.finishedAt ? now - new Date(job.finishedAt).getTime() : 0
   if ((job.status === "succeeded" || job.status === "up_to_date") && finishedAgo > SUCCEEDED_VISIBLE_MS) return null
   if ((job.status === "failed" || job.status === "denied" || job.status === "pr_opened") && finishedAgo > FAILED_VISIBLE_MS) return null
 

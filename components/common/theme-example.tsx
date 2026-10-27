@@ -101,7 +101,7 @@ export function ThemeExampleComponent() {
               État secondaire (secondary)
             </div>
             <div className="p-3 rounded-md bg-destructive text-destructive-foreground">
-              État d'erreur (destructive)
+              État d&apos;erreur (destructive)
             </div>
           </div>
         </CardContent>

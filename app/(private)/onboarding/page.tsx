@@ -84,7 +84,7 @@ export default function OnboardingPage() {
         <CardHeader>
           <CardTitle>Welcome to NeoSaaS</CardTitle>
           <CardDescription>
-            Let's set up your profile and workspace to get started.
+            Let&apos;s set up your profile and workspace to get started.
           </CardDescription>
         </CardHeader>
         <CardContent>

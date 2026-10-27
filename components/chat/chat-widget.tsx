@@ -331,7 +331,7 @@ export function ChatWidget() {
                   </div>
                   <h3 className="text-lg font-semibold mb-2">Welcome!</h3>
                   <p className="text-muted-foreground text-sm mb-6">
-                    We're here to help. Start a conversation with our team.
+                    We&apos;re here to help. Start a conversation with our team.
                   </p>
                   <Button onClick={handleStartChat} className="w-full">
                     Start a conversation

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { db, validateDatabaseUrl } from "@/db"
 import { users, userRoles, roles, userInvitations } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 
 /**
  * GET /api/users/team
@@ -54,6 +54,9 @@ export async function GET() {
           ...user,
           roles: userRolesData.map((r) => r.roleName),
           status: "active", // Active users
+          // Incident NeoStudio du 25/10/2026 : isOwner n'était jamais renseigné, donc chaque ligne -- la sienne comprise --
+          // avait la corbeille de retrait. Sa propre ligne n'en a plus (le serveur refuse aussi, removeUserFromCompany).
+          isOwner: user.id === currentUser.userId,
         }
       }),
     )
@@ -68,7 +71,9 @@ export async function GET() {
         roleId: userInvitations.roleId,
       })
       .from(userInvitations)
-      .where(eq(userInvitations.companyId, companyId))
+      // 27/10/2026 (NeoKube NEO-2363) : seules les invitations en attente -- une invitation acceptée s'affichait en
+      // doublon du compte créé (« Pending Invitation », rôle de l'invitation, « Inactive »).
+      .where(and(eq(userInvitations.companyId, companyId), eq(userInvitations.status, "pending")))
 
     const invitationsWithRoles = await Promise.all(
       pendingInvitations.map(async (inv) => {

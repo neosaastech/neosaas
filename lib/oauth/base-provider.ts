@@ -27,7 +27,10 @@ export abstract class BaseOAuthProvider {
       console.log(`🔍 [OAuth ${this.provider}] Récupération de la configuration cryptée (env: ${environment})`);
 
       // Récupérer la config depuis la DB (décryptage automatique)
-      const config = await serviceApiRepository.getConfig(this.provider, environment as any);
+      // OAuthProvider includes 'linkedin', never added to ServiceName (no implementation
+      // exists) -- `as any` here matches the same tradeoff already made throughout this file
+      // for `environment`, not a new one introduced now.
+      const config = await serviceApiRepository.getConfig(this.provider as any, environment as any);
 
       if (!config) {
         console.warn(`⚠️ [OAuth ${this.provider}] Aucune configuration trouvée pour l'environnement: ${environment}`);
@@ -62,6 +65,12 @@ export abstract class BaseOAuthProvider {
         baseUrl,
         isActive: config.isActive,
         provider: this.provider,
+        // Microsoft/microsoft-sharepoint only -- was read via `(config as any).tenant`
+        // in MicrosoftOAuthProvider.getAuthorizationUrl/exchangeCodeForToken but never
+        // actually threaded through here, so it silently fell back to "common" even
+        // when a real tenant was configured. Found 2026-08-30, fixed alongside the new
+        // storage connectors.
+        ...(((credentials as any).tenant) ? { tenant: (credentials as any).tenant } : {}),
       };
 
       console.log(`✅ [OAuth ${this.provider}] Configuration chargée avec succès`);

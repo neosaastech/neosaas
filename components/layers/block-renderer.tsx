@@ -29,9 +29,9 @@ async function ModuleAnchorSlot({
   locale: string
 }) {
   if (!anchorKey || !pagePath) return null
-  const module = await getModuleForAnchor(anchorKey, pagePath, locale)
-  if (!module?.blocks?.length) return null
-  const layers: PageLayerRow[] = module.blocks.map((block, index) => ({
+  const anchorModule = await getModuleForAnchor(anchorKey, pagePath, locale)
+  if (!anchorModule?.blocks?.length) return null
+  const layers: PageLayerRow[] = anchorModule.blocks.map((block, index) => ({
     id: `${anchorKey}-${index}`,
     layerType: block.layerType,
     props: block.props,

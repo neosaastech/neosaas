@@ -220,11 +220,29 @@ function getTools() {
   ] as const
 }
 
+// 2026-08-29 — NEO-610 : distinct de WRITE_TOOLS ci-dessus (qui ne veut dire que "nécessite une
+// auth", tools/list le laisse passer sans credential). Ici : les seuls outils qui persistent
+// réellement une donnée (Payload, DB) sont publish_change_set et apply_pilot_actions --
+// validate_change_set ne fait que stocker en mémoire un brouillon (voir changeset.ts), les
+// propose_*/validate_* ne font que générer/valider sans rien écrire. `auth.roles` était résolu
+// (voir auth.ts) mais jamais vérifié ici avant ce commit -- n'importe quel credential valide, y
+// compris via le token legacy partagé, pouvait écrire.
+// publish_change_set toujours réel (pas de mode dry-run) ; apply_pilot_actions a un vrai mode
+// dryRun (true par défaut, voir plus bas) qui ne persiste rien -- laissé accessible aux readers,
+// seul un dryRun:false explicite est bloqué.
+const PERSISTING_TOOLS = new Set(["publish_change_set"])
+const WRITER_ROLES = ["writer", "admin", "super_admin"]
+
 async function callTool(
   name: string,
   argumentsPayload: Record<string, unknown> | undefined,
   auth: McpAuthContext,
 ): Promise<unknown> {
+  const isRealPilotApply = name === "apply_pilot_actions" && argumentsPayload?.dryRun === false
+  if ((PERSISTING_TOOLS.has(name) || isRealPilotApply) && !auth.roles.some((r) => WRITER_ROLES.includes(r))) {
+    throw new Error(`Forbidden: tool '${name}' requires writer role (actor has: ${auth.roles.join(", ") || "none"})`)
+  }
+
   if (name === "list_features") {
     return {
       features: Object.entries(featureRegistry).map(([slug, config]) => ({

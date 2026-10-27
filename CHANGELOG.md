@@ -1,3 +1,20 @@
+## [1.30.0](https://github.com/neosaastech/Neosaas-app/compare/v1.29.2...v1.30.0) (2026-10-27)
+
+### Features
+
+* **db:** point d'extension schema.custom.ts pour les derives ([#104](https://github.com/neosaastech/Neosaas-app/issues/104)) ([123de68](https://github.com/neosaastech/Neosaas-app/commit/123de685e90b94855425504ab53e1f30abb67cc3))
+* **oauth:** document storage connectors (Google Drive, Dropbox, SharePoint) ([b256f7d](https://github.com/neosaastech/Neosaas-app/commit/b256f7ded8fe48da71c1d2cc8f2833d67017acea))
+
+### Bug Fixes
+
+* **admin:** un super admin peut ouvrir sa propre fiche pour changer son entreprise (role verrouille) ([1160ca7](https://github.com/neosaastech/Neosaas-app/commit/1160ca71de8e99b673f80d86005f3a583132bb49))
+* **comptes:** un membre ne peut plus se retirer lui-meme ni retirer le dernier membre ; retraits journalises ; fiche admin rouverte ([f75b7cb](https://github.com/neosaastech/Neosaas-app/commit/f75b7cbc72d37cc2ed018352abc83735f22cb306))
+* **equipe:** la liste des membres n'affiche plus les invitations deja acceptees en doublon du compte ([7767c5f](https://github.com/neosaastech/Neosaas-app/commit/7767c5fa33068adf4fc77195894eaaa2553cb553))
+* **lint:** CI de nouveau verte -- 67 guillemets JSX echappes, hook conditionnel, props en double, variable module, setState dans useMemo, fonctions impures au rendu ; regles du React Compiler (non active) en avertissement ([1c221a3](https://github.com/neosaastech/Neosaas-app/commit/1c221a3de939c36b90438caf29fd281e84c63cbf))
+* **mcp:** rôle writer requis pour publish_change_set/apply_pilot_actions ([56f8d85](https://github.com/neosaastech/Neosaas-app/commit/56f8d853b8f76ade327f4f6f71d33d571b6ec953))
+* **oauth:** SharePoint tenant fallback should be organizations, not common ([4838963](https://github.com/neosaastech/Neosaas-app/commit/483896382b83d3339f13e00d7257aa190c44a94e))
+* **security:** next 16.0.7 -> 16.3.6 (CVE-2026-75604, NEO-954) ([b26f66c](https://github.com/neosaastech/Neosaas-app/commit/b26f66cbb34a0e3b1f9aea591e20bd24aad13d56))
+
 ## [1.29.2](https://github.com/neosaastech/Neosaas-app/compare/v1.29.1...v1.29.2) (2026-08-25)
 
 ### Bug Fixes

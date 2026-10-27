@@ -492,7 +492,7 @@ export default function BookAppointmentPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">Calendrier</p>
                     <p className="text-sm text-gray-600">
-                      Retrouvez tous vos rendez-vous dans votre espace client, rubrique "Calendrier".
+                      Retrouvez tous vos rendez-vous dans votre espace client, rubrique &quot;Calendrier&quot;.
                     </p>
                   </div>
                 </div>

@@ -23,7 +23,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Eye, EyeOff, Save, RefreshCw, Key, CheckCircle, XCircle, Loader2, Trash2, Plus, AlertCircle, Copy, Check, ChevronDown, ChevronsUpDown, Rocket, FlaskConical, ShieldAlert } from "lucide-react"
-import { SiStripe, SiPaypal, SiResend, SiScaleway, SiGithub, SiGoogle, SiFacebook } from "react-icons/si"
+import { SiStripe, SiPaypal, SiResend, SiScaleway, SiGithub, SiGoogle, SiFacebook, SiDropbox } from "react-icons/si"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { McpTokensCard } from "@/components/admin/mcp-tokens-card"
@@ -59,6 +59,16 @@ const serviceCategories = [
       { id: "google", name: "Google", icon: "google", type: "oauth", description: "OAuth Authentication Provider" },
       { id: "facebook", name: "Facebook", icon: "facebook", type: "oauth", description: "OAuth Authentication Provider" },
       { id: "microsoft", name: "Microsoft", icon: "microsoft", type: "oauth", description: "OAuth Authentication Provider" },
+    ]
+  },
+  {
+    id: "storage",
+    label: "🗂️ Document Storage",
+    description: "Let users connect their own cloud storage for file access -- not a login method",
+    services: [
+      { id: "google-drive", name: "Google Drive", icon: "google", type: "storage", description: "Document Storage Connector" },
+      { id: "dropbox", name: "Dropbox", icon: "dropbox", type: "storage", description: "Document Storage Connector" },
+      { id: "microsoft-sharepoint", name: "Microsoft SharePoint", icon: "microsoft", type: "storage", description: "Document Storage Connector" },
     ]
   },
 ]
@@ -115,7 +125,7 @@ function ServiceIcon({ service, size = "sm" }: { service: (typeof services)[0]; 
     return <SiGithub className={sizeClass} color="currentColor" />
   }
 
-  if (service.id === "google") {
+  if (service.id === "google" || service.id === "google-drive") {
     return <SiGoogle className={sizeClass} color="#4285F4" />
   }
 
@@ -123,8 +133,14 @@ function ServiceIcon({ service, size = "sm" }: { service: (typeof services)[0]; 
     return <SiFacebook className={sizeClass} color="#1877F2" />
   }
 
-  // Microsoft - Official colors
-  if (service.id === "microsoft") {
+  if (service.id === "dropbox") {
+    return <SiDropbox className={sizeClass} color="#0061FF" />
+  }
+
+  // Microsoft - Official colors (also used for the microsoft-sharepoint
+  // storage connector -- same brand, different scope/purpose, not a
+  // different visual identity)
+  if (service.id === "microsoft" || service.id === "microsoft-sharepoint") {
     return (
       <svg className={sizeClass} viewBox="0 0 24 24">
         <path fill="#f25022" d="M1 1h10v10H1z"/>
@@ -210,6 +226,40 @@ export default function AdminApiPage() {
   const [googleConfig, setGoogleConfig] = useState({
     clientId: "",
     clientSecret: "",
+    redirectUri: "",
+  })
+
+  // "microsoft" (login) never had a state/form block despite being listed in
+  // serviceCategories -- saving it was impossible from the UI. Added
+  // 2026-08-30 alongside the 3 new document storage connectors below, same
+  // shape (Microsoft/microsoft-sharepoint need a tenant, the rest don't).
+  const [microsoftConfig, setMicrosoftConfig] = useState({
+    clientId: "",
+    clientSecret: "",
+    tenant: "common",
+    redirectUri: "",
+  })
+
+  // Document storage connectors (2026-08-30) -- distinct from the login
+  // providers above: a user connects THEIR OWN Drive/SharePoint/Dropbox for
+  // file access, not to sign into NeoStudio. Same OAuth client
+  // (clientId/clientSecret) CAN be reused across both purposes for
+  // Google/Microsoft (same app registration, different requested scope) --
+  // see lib/oauth/providers/google-drive.ts and microsoft-sharepoint.ts.
+  const [googleDriveConfig, setGoogleDriveConfig] = useState({
+    clientId: "",
+    clientSecret: "",
+    redirectUri: "",
+  })
+  const [dropboxConfig, setDropboxConfig] = useState({
+    clientId: "",
+    clientSecret: "",
+    redirectUri: "",
+  })
+  const [microsoftSharepointConfig, setMicrosoftSharepointConfig] = useState({
+    clientId: "",
+    clientSecret: "",
+    tenant: "common",
     redirectUri: "",
   })
 
@@ -321,6 +371,36 @@ export default function AdminApiPage() {
                 redirectUri: data.data.metadata?.redirectUri || "",
               })
               break
+            case "microsoft":
+              setMicrosoftConfig({
+                clientId: data.data.config.clientId || "",
+                clientSecret: data.data.config.clientSecret || "",
+                tenant: data.data.config.tenant || "common",
+                redirectUri: data.data.metadata?.redirectUri || "",
+              })
+              break
+            case "google-drive":
+              setGoogleDriveConfig({
+                clientId: data.data.config.clientId || "",
+                clientSecret: data.data.config.clientSecret || "",
+                redirectUri: data.data.metadata?.redirectUri || "",
+              })
+              break
+            case "dropbox":
+              setDropboxConfig({
+                clientId: data.data.config.clientId || "",
+                clientSecret: data.data.config.clientSecret || "",
+                redirectUri: data.data.metadata?.redirectUri || "",
+              })
+              break
+            case "microsoft-sharepoint":
+              setMicrosoftSharepointConfig({
+                clientId: data.data.config.clientId || "",
+                clientSecret: data.data.config.clientSecret || "",
+                tenant: data.data.config.tenant || "common",
+                redirectUri: data.data.metadata?.redirectUri || "",
+              })
+              break
           }
         }
       }
@@ -341,6 +421,10 @@ export default function AdminApiPage() {
     setPaypalConfig({ clientId: "", clientSecret: "", webhookId: "" })
     setGithubConfig({ clientId: "", clientSecret: "", redirectUri: "" })
     setGoogleConfig({ clientId: "", clientSecret: "", redirectUri: "" })
+    setMicrosoftConfig({ clientId: "", clientSecret: "", tenant: "common", redirectUri: "" })
+    setGoogleDriveConfig({ clientId: "", clientSecret: "", redirectUri: "" })
+    setDropboxConfig({ clientId: "", clientSecret: "", redirectUri: "" })
+    setMicrosoftSharepointConfig({ clientId: "", clientSecret: "", tenant: "common", redirectUri: "" })
     setShowKey(false)
     setShowSecretKey(false)
     setModalTestResult(null)
@@ -625,6 +709,34 @@ export default function AdminApiPage() {
           }
           config = googleConfig
           metadata = { redirectUri: googleConfig.redirectUri }
+          break
+        case "microsoft":
+          if (!microsoftConfig.clientId || !microsoftConfig.clientSecret) {
+            throw new Error("Client ID and Client Secret are required")
+          }
+          config = { clientId: microsoftConfig.clientId, clientSecret: microsoftConfig.clientSecret, tenant: microsoftConfig.tenant || "common" }
+          metadata = { redirectUri: microsoftConfig.redirectUri }
+          break
+        case "google-drive":
+          if (!googleDriveConfig.clientId || !googleDriveConfig.clientSecret) {
+            throw new Error("Client ID and Client Secret are required")
+          }
+          config = googleDriveConfig
+          metadata = { redirectUri: googleDriveConfig.redirectUri }
+          break
+        case "dropbox":
+          if (!dropboxConfig.clientId || !dropboxConfig.clientSecret) {
+            throw new Error("Client ID and Client Secret are required")
+          }
+          config = dropboxConfig
+          metadata = { redirectUri: dropboxConfig.redirectUri }
+          break
+        case "microsoft-sharepoint":
+          if (!microsoftSharepointConfig.clientId || !microsoftSharepointConfig.clientSecret) {
+            throw new Error("Client ID and Client Secret are required")
+          }
+          config = { clientId: microsoftSharepointConfig.clientId, clientSecret: microsoftSharepointConfig.clientSecret, tenant: microsoftSharepointConfig.tenant || "common" }
+          metadata = { redirectUri: microsoftSharepointConfig.redirectUri }
           break
       }
 
@@ -1378,7 +1490,7 @@ export default function AdminApiPage() {
                         className="font-mono"
                       />
                       <p className="text-xs text-muted-foreground">
-                        When set, this token is also used by the "Apply update" button (Updates tab) to trigger this repository's deployment.
+                        When set, this token is also used by the &quot;Apply update&quot; button (Updates tab) to trigger this repository&apos;s deployment.
                       </p>
                     </div>
 
@@ -1503,7 +1615,7 @@ export default function AdminApiPage() {
                       </p>
                       <ol className="text-xs text-gray-700 space-y-1 ml-4 list-decimal">
                         <li>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">GitHub Settings → Developer settings → Personal access tokens</a></li>
-                        <li>Click "Generate new token (classic)"</li>
+                        <li>Click &quot;Generate new token (classic)&quot;</li>
                         <li>Select scopes: <code>repo</code>, <code>read:org</code>, <code>read:user</code></li>
                         <li>Copy the token and paste it above</li>
                         <li>Test and save</li>
@@ -1521,7 +1633,7 @@ export default function AdminApiPage() {
               <ol className="text-xs text-green-700 dark:text-green-300 space-y-1 ml-4 list-decimal">
                 <li>Click the link to create an OAuth App on GitHub</li>
                 <li>Copy the callback URL above (copy button)</li>
-                <li>Paste it in the "Authorization callback URL" field on GitHub</li>
+                <li>Paste it in the &quot;Authorization callback URL&quot; field on GitHub</li>
                 <li>Copy the Client ID and Client Secret here</li>
                 <li>Test the configuration</li>
                 <li>Enable and save</li>
@@ -1592,6 +1704,130 @@ export default function AdminApiPage() {
           </div>
         )
 
+      // "microsoft" (login) had a serviceCategories entry but no form case at
+      // all -- fell through to `default: return null`, rendering a blank
+      // dialog. Fixed 2026-08-30 alongside the 3 new storage connectors,
+      // which share the same simple clientId/clientSecret(/tenant) shape.
+      case "microsoft":
+      case "microsoft-sharepoint": {
+        const isSharepoint = selectedService === "microsoft-sharepoint"
+        const msConfig = isSharepoint ? microsoftSharepointConfig : microsoftConfig
+        const setMsConfig = isSharepoint ? setMicrosoftSharepointConfig : setMicrosoftConfig
+        return (
+          <div className="space-y-4">
+            {isSharepoint && (
+              <div className="p-3 border rounded-lg bg-amber-50 dark:bg-amber-950/20">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Same Azure AD app registration as the &quot;Microsoft&quot; login provider can be reused --
+                  just add the Files.Read.All / Sites.Read.All / offline_access delegated permissions
+                  to it. One app, two purposes, no need for a second registration.
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Client ID *</Label>
+              <Input
+                type="text"
+                placeholder="00000000-0000-0000-0000-000000000000"
+                value={msConfig.clientId}
+                onChange={(e) => setMsConfig({ ...msConfig, clientId: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">Azure Portal → App registrations → your app → Overview</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Client Secret *</Label>
+              <div className="relative">
+                <Input
+                  type={showSecretKey ? "text" : "password"}
+                  placeholder="ey~..."
+                  value={msConfig.clientSecret}
+                  onChange={(e) => setMsConfig({ ...msConfig, clientSecret: e.target.value })}
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setShowSecretKey(!showSecretKey)} className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700">
+                  {showSecretKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">Azure Portal → Certificates & secrets → New client secret (value shown once)</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Tenant</Label>
+              <Input
+                type="text"
+                placeholder="common"
+                value={msConfig.tenant}
+                onChange={(e) => setMsConfig({ ...msConfig, tenant: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">&quot;common&quot; for any Microsoft account, or your Azure AD tenant ID for single-tenant</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Redirect URI</Label>
+              <Input
+                type="text"
+                placeholder={`https://yourdomain.com/api/auth/oauth/${selectedService}/callback`}
+                value={msConfig.redirectUri}
+                onChange={(e) => setMsConfig({ ...msConfig, redirectUri: e.target.value })}
+              />
+            </div>
+          </div>
+        )
+      }
+
+      case "google-drive":
+      case "dropbox": {
+        const isDropbox = selectedService === "dropbox"
+        const stConfig = isDropbox ? dropboxConfig : googleDriveConfig
+        const setStConfig = isDropbox ? setDropboxConfig : setGoogleDriveConfig
+        return (
+          <div className="space-y-4">
+            {!isDropbox && (
+              <div className="p-3 border rounded-lg bg-amber-50 dark:bg-amber-950/20">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Same Google Cloud OAuth client as the &quot;Google&quot; login provider can be reused -- just
+                  add the drive.readonly scope to the consent screen. One client, two purposes.
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Client ID *</Label>
+              <Input
+                type="text"
+                placeholder={isDropbox ? "your-app-key" : "123456789012-abc...apps.googleusercontent.com"}
+                value={stConfig.clientId}
+                onChange={(e) => setStConfig({ ...stConfig, clientId: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                {isDropbox ? "Dropbox App Console → your app → Settings" : "Google Cloud Console → Credentials"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Client Secret *</Label>
+              <div className="relative">
+                <Input
+                  type={showSecretKey ? "text" : "password"}
+                  placeholder={isDropbox ? "app secret" : "GOCSPX-..."}
+                  value={stConfig.clientSecret}
+                  onChange={(e) => setStConfig({ ...stConfig, clientSecret: e.target.value })}
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setShowSecretKey(!showSecretKey)} className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700">
+                  {showSecretKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Redirect URI</Label>
+              <Input
+                type="text"
+                placeholder={`https://yourdomain.com/api/auth/oauth/${selectedService}/callback`}
+                value={stConfig.redirectUri}
+                onChange={(e) => setStConfig({ ...stConfig, redirectUri: e.target.value })}
+              />
+            </div>
+          </div>
+        )
+      }
+
       default:
         return null
     }
@@ -1634,7 +1870,7 @@ export default function AdminApiPage() {
           ) : allConfigs.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No API configurations yet. Click "Add API" to get started.</p>
+              <p className="text-muted-foreground">No API configurations yet. Click &quot;Add API&quot; to get started.</p>
             </div>
           ) : (
             <div className="space-y-3">

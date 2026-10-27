@@ -4,7 +4,18 @@
  */
 
 // Service names supported by the platform
-export type ServiceName = 'stripe' | 'paypal' | 'scaleway' | 'resend' | 'aws' | 'lago';
+// github/google/facebook/microsoft (social login) and google-drive/dropbox/
+// microsoft-sharepoint (document storage connectors) were wired into the
+// admin/api picker (app/(private)/admin/api/page.tsx) without ever being
+// added here -- serviceName was cast `as any` at every call site instead.
+// Found live 2026-08-30: 'microsoft'/'facebook' were also missing from
+// app/api/services/[service]/route.ts's validServices allowlist, so saving
+// either would have silently failed with "Invalid service name" despite the
+// picker letting you fill the form.
+export type ServiceName =
+  | 'stripe' | 'paypal' | 'scaleway' | 'resend' | 'aws' | 'lago'
+  | 'github' | 'github_api' | 'google' | 'facebook' | 'microsoft'
+  | 'google-drive' | 'dropbox' | 'microsoft-sharepoint';
 
 // Service types categorization
 export type ServiceType = 'payment' | 'email' | 'storage' | 'compute' | 'other';
@@ -106,6 +117,22 @@ export interface LagoConfig extends BaseServiceConfig {
   };
 }
 
+// Shared shape for simple OAuth-style services (social login providers and
+// document storage connectors alike) -- clientId/clientSecret is the whole
+// story for all of them except Microsoft, which additionally needs a tenant.
+export interface OAuthServiceConfig extends BaseServiceConfig {
+  serviceName: 'github' | 'google' | 'facebook' | 'microsoft' | 'google-drive' | 'dropbox' | 'microsoft-sharepoint';
+  serviceType: 'other';
+  config: {
+    clientId: string;
+    clientSecret: string;
+    tenant?: string; // microsoft/microsoft-sharepoint only, defaults to 'common'
+  };
+  metadata?: {
+    redirectUri?: string;
+  };
+}
+
 // Union type for all service configurations
 export type ServiceConfig =
   | StripeConfig
@@ -113,7 +140,8 @@ export type ServiceConfig =
   | ScalewayConfig
   | ResendConfig
   | AWSConfig
-  | LagoConfig;
+  | LagoConfig
+  | OAuthServiceConfig;
 
 // API Usage tracking
 export interface ServiceApiUsageRecord {

@@ -20,7 +20,10 @@ export interface OAuthConfig {
 /**
  * Providers OAuth supportés
  */
-export type OAuthProvider = 'github' | 'google' | 'facebook' | 'microsoft' | 'linkedin';
+export type OAuthProvider = 'github' | 'google' | 'facebook' | 'microsoft' | 'linkedin'
+  // Document storage connectors (2026-08-30) -- same OAuth mechanics, different purpose:
+  // a user grants file access, this never creates/authenticates a NeoSaaS session.
+  | 'google-drive' | 'dropbox' | 'microsoft-sharepoint';
 
 /**
  * Structure des credentials OAuth stockés en DB (cryptés)

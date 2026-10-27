@@ -342,7 +342,7 @@ export function DashboardStats() {
         <Card>
           <CardHeader>
             <CardTitle>New Writers</CardTitle>
-            <CardDescription>Individual registrations with 'writer' role</CardDescription>
+            <CardDescription>Individual registrations with &apos;writer&apos; role</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             <div className="h-[250px] sm:h-[300px]">

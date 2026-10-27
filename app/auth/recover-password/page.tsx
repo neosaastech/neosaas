@@ -47,7 +47,7 @@ export default function RecoverPasswordPage() {
               <h1 className="text-3xl font-bold">Reset your password</h1>
             </div>
             <p className="text-balance text-muted-foreground">
-              Enter your email address and we'll send you a link to reset your password
+              Enter your email address and we&apos;ll send you a link to reset your password
             </p>
           </div>
           <div className="grid gap-4">
@@ -127,7 +127,7 @@ export default function RecoverPasswordPage() {
               <div className="text-center space-y-4">
                 <h2 className="text-2xl font-bold">Password Recovery</h2>
                 <p className="text-muted-foreground max-w-sm">
-                  We'll send you a secure link to reset your password and regain access to your account.
+                  We&apos;ll send you a secure link to reset your password and regain access to your account.
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-4 w-full pt-4">

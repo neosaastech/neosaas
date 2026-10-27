@@ -188,7 +188,7 @@ export default function UserProfilePage() {
         <div className="text-center">
           <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h2 className="text-xl font-semibold mb-2">User not found</h2>
-          <p className="text-muted-foreground mb-6">The user you're looking for doesn't exist or has been deleted.</p>
+          <p className="text-muted-foreground mb-6">The user you&apos;re looking for doesn&apos;t exist or has been deleted.</p>
           <Button asChild>
             <Link href="/admin/users">
               <ArrowLeft className="h-4 w-4 mr-2" />

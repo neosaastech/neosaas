@@ -245,7 +245,7 @@ export function ServiceApiTable({
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-muted-foreground text-center">
             No API configurations found.<br />
-            Click "Add API" to create your first configuration.
+            Click &quot;Add API&quot; to create your first configuration.
           </p>
         </CardContent>
       </Card>

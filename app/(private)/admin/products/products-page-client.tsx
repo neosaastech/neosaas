@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Search, Percent, Package, Calendar, Download, FileUp, Edit, Trash, Settings, X, Rocket, Ticket } from "lucide-react"
@@ -193,7 +193,7 @@ export function ProductsPageClient({ products, vatRates, coupons }: ProductsPage
   }, [filteredProducts, currentPage, itemsPerPage])
 
   // Reset to page 1 when filters change
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery, idFilter, typeFilter, statusFilter, startDateFilter, endDateFilter, itemsPerPage])
 

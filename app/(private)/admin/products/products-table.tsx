@@ -2377,7 +2377,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
                         </div>
                         
                         <div className="space-y-2">
-                          <Label className="text-xs">You'll Receive (Deliverables)</Label>
+                          <Label className="text-xs">You&apos;ll Receive (Deliverables)</Label>
                           <Textarea
                             value={editValues.deliverables}
                             onChange={(e) => setEditValues({...editValues, deliverables: e.target.value})}

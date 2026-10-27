@@ -48,7 +48,7 @@ export function AuthorsPanel() {
         <CardTitle>Authors</CardTitle>
         <CardDescription>
           Real Payload users, synced automatically. Auto-linked to a matching site admin account by email — edit bio,
-          avatar, social links, and what's shown publicly.
+          avatar, social links, and what&apos;s shown publicly.
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -301,7 +301,7 @@ export function ThemeSettings() {
             Theme Configuration
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Customize your site's colors and styles (auto-saved)
+            Customize your site&apos;s colors and styles (auto-saved)
           </p>
         </div>
         <div className="flex items-center gap-4">
