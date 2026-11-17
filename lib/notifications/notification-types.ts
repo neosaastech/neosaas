@@ -11,6 +11,7 @@
  */
 import type { LucideIcon } from "lucide-react"
 import { AlertTriangle, Calendar, CreditCard, MessageSquare, Package, Settings, User } from "lucide-react"
+import { registerProductNotificationTypes } from "@/lib/notifications/product-types"
 
 export interface BellNotification {
   id: string
@@ -65,3 +66,6 @@ registerNotificationType("support", { icon: MessageSquare, color: "text-pink-600
 registerNotificationType("system", { icon: Settings, color: "text-gray-600", bg: "bg-gray-100 dark:bg-gray-900/30", label: "Système" })
 // Content sync failures (Payload → site, CLAUDE-content-manager.md § 8): red, they need fixing.
 registerNotificationType("content", { icon: AlertTriangle, color: "text-red-600", bg: "bg-red-100 dark:bg-red-900/30", label: "Contenu" })
+
+// ── Product types (extension point, see lib/notifications/product-types.ts) ────────
+registerProductNotificationTypes(registerNotificationType)

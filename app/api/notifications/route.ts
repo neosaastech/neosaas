@@ -1,3 +1,4 @@
+import { listProductNotifications } from "@/lib/notifications/product-notifications"
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatConversations, chatMessages, orders, orderItems } from '@/db/schema'
@@ -192,6 +193,9 @@ export async function GET(request: NextRequest) {
         metadata: { conversationId: msg.conversationId },
       })
     }
+
+    // 4. Product sources (extension point, lib/notifications/product-sources.ts) — the user's own.
+    notifications.push(...(await listProductNotifications({ userId: user.userId, email: user.email }, limit)))
 
     notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 

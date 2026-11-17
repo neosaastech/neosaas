@@ -1,3 +1,4 @@
+import { markProductNotificationRead } from "@/lib/notifications/product-notifications"
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatMessages, chatConversations } from '@/db/schema'
@@ -12,6 +13,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const user = await requireAuth()
     const { id } = await params
+
+    if (await markProductNotificationRead({ userId: user.userId, email: user.email }, id)) {
+      return NextResponse.json({ success: true })
+    }
 
     const [message] = await db
       .select({ conversationId: chatMessages.conversationId })

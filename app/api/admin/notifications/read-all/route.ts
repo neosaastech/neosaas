@@ -1,3 +1,4 @@
+import { markAllProductNotificationsRead } from "@/lib/notifications/product-notifications"
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatMessages, contentSyncIssues } from '@/db/schema'
@@ -10,7 +11,8 @@ import { requireAdmin } from '@/lib/auth/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
+    await markAllProductNotificationsRead({ userId: admin.userId, email: admin.email })
 
     await db
       .update(chatMessages)

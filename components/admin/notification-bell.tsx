@@ -135,6 +135,13 @@ export function NotificationBell() {
 
     const meta = notification.metadata
 
+    // A notification that carries its own in-app link (product sources, e.g. an agent operation
+    // → its conversation) opens it directly — internal paths only.
+    if (typeof meta?.viewLink === 'string' && meta.viewLink.startsWith('/') && !meta.viewLink.startsWith('//')) {
+      router.push(meta.viewLink)
+      return
+    }
+
     // Navigate based on notification type
     if (notification.type === 'support' && meta?.conversationId) {
       // Navigate to Support Reply page with the conversation ID

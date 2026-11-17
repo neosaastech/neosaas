@@ -1,3 +1,4 @@
+import { markAllProductNotificationsRead } from "@/lib/notifications/product-notifications"
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatMessages, chatConversations } from '@/db/schema'
@@ -11,6 +12,7 @@ import { requireAuth } from '@/lib/auth/server'
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth()
+    await markAllProductNotificationsRead({ userId: user.userId, email: user.email })
 
     const ownConversations = await db
       .select({ id: chatConversations.id })

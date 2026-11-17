@@ -1,3 +1,9 @@
+## [1.32.0](https://github.com/neosaastech/Neosaas-app/compare/v1.31.1...v1.32.0) (2026-11-17)
+
+### Features
+
+* **notifications:** point d'extension des sources de notification du produit ([dd691a4](https://github.com/neosaastech/Neosaas-app/commit/dd691a407cbdc7b177e17df5d8eca5d5719013d3))
+
 ## [1.31.1](https://github.com/neosaastech/Neosaas-app/compare/v1.31.0...v1.31.1) (2026-11-17)
 
 ### Bug Fixes

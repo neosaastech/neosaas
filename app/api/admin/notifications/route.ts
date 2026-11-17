@@ -1,3 +1,4 @@
+import { listProductNotifications } from "@/lib/notifications/product-notifications"
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { chatConversations, chatMessages, users, orders, orderItems, products, contentSyncIssues } from '@/db/schema'
@@ -488,6 +489,10 @@ export async function GET(request: NextRequest) {
     } catch (syncIssuesError) {
       console.error('Error fetching content sync issues:', syncIssuesError)
     }
+
+    // Product sources (extension point, lib/notifications/product-sources.ts) — the admin's OWN
+    // notifications (an admin sees the admin bell instead of the user bell, so they must be here too).
+    notifications.push(...(await listProductNotifications({ userId: currentUser.userId, email: currentUser.email }, 50)))
 
     // Sort all notifications by timestamp (most recent first)
     notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
