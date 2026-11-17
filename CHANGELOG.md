@@ -1,3 +1,9 @@
+## [1.31.1](https://github.com/neosaastech/Neosaas-app/compare/v1.31.0...v1.31.1) (2026-11-17)
+
+### Bug Fixes
+
+* **notifications:** ne plus annoncer en toast une notification ancienne qui entre dans la liste ([3a3c9da](https://github.com/neosaastech/Neosaas-app/commit/3a3c9dafe2c3c99ddd8ddb102cccfe43a3f09cbf))
+
 ## [1.31.0](https://github.com/neosaastech/Neosaas-app/compare/v1.30.0...v1.31.0) (2026-11-17)
 
 ### Features

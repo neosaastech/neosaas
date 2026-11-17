@@ -17,6 +17,8 @@ export interface BellNotification {
   type: string
   title: string
   description?: string
+  /** ISO date of the event. A toast is only shown for events newer than the page load. */
+  timestamp?: string
   isRead: boolean
   metadata?: Record<string, unknown>
 }

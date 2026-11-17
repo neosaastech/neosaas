@@ -6,7 +6,8 @@
  * unread in the bell until opened: the toast is a signal, the bell is the record.
  *
  * - The first successful load only memorises what is already there: no toast on page load.
- * - Only new, unread notifications whose type allows it (registry, current path) are shown.
+ * - Only unread notifications never seen AND dated after the page load, whose type allows it
+ *   (registry, current path), are shown.
  * - More than MAX_TOASTS at once → one summary toast instead of a burst.
  */
 import { useEffect, useRef } from "react"
@@ -15,6 +16,15 @@ import { notify } from "@/lib/notify"
 import { shouldToastNotification, type BellNotification } from "@/lib/notifications/notification-types"
 
 const MAX_TOASTS = 3
+/** Tolerance between server and browser clocks. */
+const CLOCK_SKEW_MS = 2 * 60 * 1000
+
+/** No date → not announced: an undated item cannot be proven recent. */
+function isAfter(timestamp: string | undefined, since: number): boolean {
+  if (!timestamp) return false
+  const t = new Date(timestamp).getTime()
+  return Number.isFinite(t) && t >= since
+}
 
 export function useNotificationToasts<N extends BellNotification>(
   notifications: N[],
@@ -22,6 +32,7 @@ export function useNotificationToasts<N extends BellNotification>(
 ): void {
   const pathname = usePathname() ?? ""
   const seen = useRef<Set<string> | null>(null)
+  const loadedAt = useRef(0)
   // The array the bell started with (its useState initial value) is not a load. Compared by
   // reference, so React strict mode re-running effects on mount does not count as one.
   const initial = useRef(notifications)
@@ -35,10 +46,19 @@ export function useNotificationToasts<N extends BellNotification>(
     if (notifications === initial.current) return
     if (seen.current === null) {
       seen.current = new Set(notifications.map((n) => n.id))
+      loadedAt.current = Date.now()
       return
     }
+    // « Never seen » is not « new »: the bell reads a window of the latest items, and an OLD
+    // unread item slides into it when others are read or leave (17/11, dev: 1 037 old « Mission
+    // complétée » resurfaced as toasts). Only events dated after the page load are announced.
+    const since = loadedAt.current - CLOCK_SKEW_MS
     const fresh = notifications.filter(
-      (n) => !n.isRead && !seen.current!.has(n.id) && shouldToastNotification(n, latest.current.pathname),
+      (n) =>
+        !n.isRead &&
+        !seen.current!.has(n.id) &&
+        isAfter(n.timestamp, since) &&
+        shouldToastNotification(n, latest.current.pathname),
     )
     notifications.forEach((n) => seen.current!.add(n.id))
     if (fresh.length === 0) return
