@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, CreditCard, Lock, Mail, ArrowLeft, Calendar, ShoppingBag, ShoppingCart, ArrowRight, Loader2, Tag, X } from "lucide-react"
 import Link from "next/link"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { getProductById, getCart, processCheckout, addToCart } from "@/app/actions/ecommerce"
 import { validateCoupon } from "@/app/actions/coupons"
 import { getStripePaymentMethods } from "@/app/actions/payments"
@@ -123,7 +123,7 @@ export default function CheckoutPage() {
         if (moduleId) {
           const addResult = await addToCart(moduleId)
           if (!addResult.success) {
-            toast.error("Failed to add item to cart")
+            notify.error("Failed to add item to cart")
           }
           // Continue to load cart...
         }
@@ -192,7 +192,7 @@ export default function CheckoutPage() {
         }
       } catch (error) {
         console.error("Failed to load checkout data", error)
-        toast.error("Failed to load checkout details")
+        notify.error("Failed to load checkout details")
       } finally {
         setLoading(false)
       }
@@ -290,7 +290,7 @@ export default function CheckoutPage() {
         console.log('[Checkout] Opening modal for:', missingAppointments[0])
         setCurrentAppointmentProduct(missingAppointments[0])
         setAppointmentModalOpen(true)
-        toast.info("Please select a time slot for your appointment")
+        notify.info("Please select a time slot for your appointment")
         return
       }
     }
@@ -310,12 +310,12 @@ export default function CheckoutPage() {
     } else if (hasPhysical) {
       processingMsg = "Processing your order and preparing shipment..."
     }
-    toast.loading(processingMsg, { id: 'checkout-processing' })
+    notify.loading(processingMsg, { id: 'checkout-processing' })
 
     try {
       if (!cartId) {
-        toast.dismiss('checkout-processing')
-        toast.warning("No active cart. Redirecting to cart...")
+        notify.dismiss('checkout-processing')
+        notify.warning("No active cart. Redirecting to cart...")
         router.push("/dashboard/cart")
         setIsProcessing(false)
         return
@@ -334,7 +334,7 @@ export default function CheckoutPage() {
       const result = await processCheckout(cartId, appointmentsObj, appliedCoupon?.code || undefined)
 
       if (result.success) {
-        toast.dismiss('checkout-processing')
+        notify.dismiss('checkout-processing')
         console.log('[Checkout] ✅ Order completed successfully', { orderId: result.orderId })
 
         // Clear cart in context to update header
@@ -345,23 +345,23 @@ export default function CheckoutPage() {
         setConfirmedOrderId(result.orderId)
         setShowConfirmation(true)
       } else {
-        toast.dismiss('checkout-processing')
+        notify.dismiss('checkout-processing')
         console.error('[Checkout] ❌ Checkout failed:', result.error)
         
         // Specific error message if cart no longer exists
         if (result.error?.includes('Cart not found')) {
-          toast.error("Your cart no longer exists. Please add your products to the cart again.")
+          notify.error("Your cart no longer exists. Please add your products to the cart again.")
           setTimeout(() => {
             router.push('/dashboard/cart')
           }, 2000)
         } else {
-          toast.error(result.error || "Checkout error")
+          notify.error(result.error || "Checkout error")
         }
       }
     } catch (error) {
-      toast.dismiss('checkout-processing')
+      notify.dismiss('checkout-processing')
       console.error("Checkout error:", error)
-      toast.error("An error occurred. Please try again.")
+      notify.error("An error occurred. Please try again.")
     } finally {
       setIsProcessing(false)
     }
@@ -391,7 +391,7 @@ export default function CheckoutPage() {
 
     if (missingAppointments.length > 0) {
       // Open modal for next appointment product
-      toast.success("Time slot selected! Please select another time slot.")
+      notify.success("Time slot selected! Please select another time slot.")
       setTimeout(() => {
         setCurrentAppointmentProduct(missingAppointments[0])
         setAppointmentModalOpen(true)
@@ -400,36 +400,36 @@ export default function CheckoutPage() {
     }
 
     // All appointments are booked - auto-submit checkout
-    toast.success("Time slot confirmed! Processing your order...")
+    notify.success("Time slot confirmed! Processing your order...")
 
     // Auto-submit the checkout
     setTimeout(async () => {
       if (!cartId) {
-        toast.error("No active cart")
+        notify.error("No active cart")
         return
       }
 
       setIsProcessing(true)
-      toast.loading("Finalizing your order...", { id: 'checkout-processing' })
+      notify.loading("Finalizing your order...", { id: 'checkout-processing' })
 
       try {
         const appointmentsObj = Object.fromEntries(newAppointmentsMap)
         const result = await processCheckout(cartId, appointmentsObj, appliedCoupon?.code || undefined)
 
         if (result.success) {
-          toast.dismiss('checkout-processing')
+          notify.dismiss('checkout-processing')
           console.log('[Checkout] ✅ Order completed successfully', { orderId: result.orderId })
           clearCart()
           setConfirmedOrderId(result.orderId)
           setShowConfirmation(true)
         } else {
-          toast.dismiss('checkout-processing')
-          toast.error(result.error || "Checkout error")
+          notify.dismiss('checkout-processing')
+          notify.error(result.error || "Checkout error")
         }
       } catch (error) {
-        toast.dismiss('checkout-processing')
+        notify.dismiss('checkout-processing')
         console.error("Checkout error:", error)
-        toast.error("An error occurred. Please try again.")
+        notify.error("An error occurred. Please try again.")
       } finally {
         setIsProcessing(false)
       }
@@ -442,14 +442,14 @@ export default function CheckoutPage() {
     try {
       const result = await addToCart(upsellProduct.id)
       if (result.success) {
-        toast.success("Upsell added to cart")
+        notify.success("Upsell added to cart")
         // Reload page to refresh cart
         window.location.reload()
       } else {
-        toast.error("Failed to add upsell")
+        notify.error("Failed to add upsell")
       }
     } catch (error) {
-      toast.error("Failed to add upsell")
+      notify.error("Failed to add upsell")
     }
   }
 
@@ -474,7 +474,7 @@ export default function CheckoutPage() {
           discountAmount: result.data.discountAmount / 100 // Convert cents to currency
         })
         setCouponCode("")
-        toast.success(`Coupon "${result.data.coupon.code}" applied!`)
+        notify.success(`Coupon "${result.data.coupon.code}" applied!`)
       } else {
         setCouponError(result.error || "Invalid coupon")
       }

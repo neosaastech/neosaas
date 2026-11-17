@@ -58,7 +58,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 
 interface ChatMessage {
@@ -239,7 +239,7 @@ export function AdminLiveChat() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success("Conversation créée avec succès")
+        notify.success("Conversation créée avec succès")
         setShowNewDialog(false)
         setSelectedUser(null)
         setNewSubject("")
@@ -255,11 +255,11 @@ export function AdminLiveChat() {
           setView('chat')
         }
       } else {
-        toast.error(data.error || "Échec de la création de la conversation")
+        notify.error(data.error || "Échec de la création de la conversation")
       }
     } catch (error) {
       console.error("Failed to create conversation:", error)
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setCreatingConversation(false)
     }
@@ -284,11 +284,11 @@ export function AdminLiveChat() {
         setNewMessage("")
         messageInputRef.current?.focus()
       } else {
-        toast.error("Échec de l'envoi du message")
+        notify.error("Échec de l'envoi du message")
       }
     } catch (error) {
       console.error("Failed to send message:", error)
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setSending(false)
     }
@@ -304,7 +304,7 @@ export function AdminLiveChat() {
       })
 
       if (response.ok) {
-        toast.success("Conversation fermée")
+        notify.success("Conversation fermée")
         if (selectedConversation?.id === conversationId) {
           setSelectedConversation(null)
           setView('list')
@@ -312,7 +312,7 @@ export function AdminLiveChat() {
         fetchConversations()
       }
     } catch (error) {
-      toast.error("Échec de la fermeture")
+      notify.error("Échec de la fermeture")
     }
   }
 

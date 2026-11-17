@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { Building2, User } from "lucide-react"
 
 export default function OnboardingPage() {
@@ -65,14 +65,14 @@ export default function OnboardingPage() {
             localStorage.setItem("user", JSON.stringify(user))
         }
 
-        toast.success("Setup complete! Welcome to NeoSaaS.")
+        notify.success("Setup complete! Welcome to NeoSaaS.")
         router.push("/dashboard")
       } else {
         const error = await response.json()
-        toast.error(error.error || "Failed to complete setup")
+        notify.error(error.error || "Failed to complete setup")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setIsLoading(false)
     }

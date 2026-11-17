@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Check, Loader2, Calendar, ShoppingBag, Package, FileDown } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { getProducts, addToCart } from "@/app/actions/ecommerce"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import * as Icons from "lucide-react"
 
 export default function PricingPage() {
@@ -35,14 +35,14 @@ export default function PricingPage() {
     try {
       const result = await addToCart(productId)
       if (result.success) {
-        toast.success("Product added to cart")
+        notify.success("Product added to cart")
         router.push("/dashboard/checkout")
       } else {
-        toast.error(result.error || "Error adding to cart")
+        notify.error(result.error || "Error adding to cart")
       }
     } catch (error) {
       console.error("Purchase error:", error)
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setIsLoading(null)
     }

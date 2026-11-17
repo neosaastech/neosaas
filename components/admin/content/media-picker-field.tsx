@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Check, ChevronsUpDown, ImageOff, Loader2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { getContentMedia, uploadContentMedia } from "@/app/actions/pages"
 import type { PayloadMediaSummary } from "@/lib/payload-bridge"
 
@@ -72,7 +72,7 @@ export function MediaPickerField({
       formData.set("file", file)
       const result = await uploadContentMedia(formData)
       if (!result.success) {
-        toast.error(result.error)
+        notify.error(result.error)
         return
       }
       cachedMedia = [result.data, ...(cachedMedia ?? [])]
@@ -81,9 +81,9 @@ export function MediaPickerField({
       }
       onChange(result.data.url)
       setOpen(false)
-      toast.success("Media uploaded")
+      notify.success("Media uploaded")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload media")
+      notify.error(error instanceof Error ? error.message : "Failed to upload media")
     } finally {
       setUploading(false)
     }

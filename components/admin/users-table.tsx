@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useRef } from "react"
 import {
   Table,
@@ -55,7 +56,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   createUser,
   deleteUser,
@@ -238,12 +239,12 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
     try {
       const result = await resendInvitation(invitationId)
       if (result.success) {
-        toast.success("Invitation resent successfully")
+        notify.success("Invitation resent successfully")
       } else {
-        toast.error(result.error || "Failed to resend invitation")
+        notify.error(result.error || "Failed to resend invitation")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setIsLoading(false)
     }
@@ -255,12 +256,12 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
       const result = await cancelInvitation(invitationId)
       if (result.success) {
         setInvitations(invitations.filter(i => i.id !== invitationId))
-        toast.success("Invitation cancelled successfully")
+        notify.success("Invitation cancelled successfully")
       } else {
-        toast.error(result.error || "Failed to cancel invitation")
+        notify.error(result.error || "Failed to cancel invitation")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setIsLoading(false)
     }
@@ -300,81 +301,83 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
         if (profileImageFile && profileImageFile.size > 0) {
           await uploadUserProfileImage(result.data.id, profileImageFile)
         }
-        toast.success("User created successfully")
+        notify.success("User created successfully")
         setIsCreateOpen(false)
         window.location.reload()
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "User created but profile image upload failed")
+        notify.error(error instanceof Error ? error.message : "User created but profile image upload failed")
         window.location.reload()
       }
     } else {
-      toast.error(result.error || "Failed to create user")
+      notify.error(result.error || "Failed to create user")
     }
     setIsLoading(false)
   }
 
+  const confirm = useConfirm()
+
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return
+    if (!await confirm({ title: "Supprimer cet utilisateur ?", description: "Cette action est irréversible.", destructive: true })) return
 
     const result = await deleteUser(userId)
     if (result.success) {
-      toast.success("User deleted successfully")
+      notify.success("User deleted successfully")
       setUsers(users.filter(u => u.id !== userId))
       setSelectedUsers(selectedUsers.filter(id => id !== userId))
     } else {
-      toast.error(result.error || "Failed to delete user")
+      notify.error(result.error || "Failed to delete user")
     }
   }
 
   const handleRoleUpdate = async (userId: string, roleName: string) => {
     const result = await updateUserRole(userId, roleName)
     if (result.success) {
-      toast.success("Role updated successfully")
+      notify.success("Role updated successfully")
       window.location.reload()
     } else {
-      toast.error(result.error || "Failed to update role")
+      notify.error(result.error || "Failed to update role")
     }
   }
 
   const handleStatusUpdate = async (userId: string, isActive: boolean) => {
     const result = await updateUserStatus(userId, isActive)
     if (result.success) {
-      toast.success(result.message)
+      notify.success(result.message)
       setUsers(users.map(u => u.id === userId ? { ...u, isActive } : u))
     } else {
-      toast.error(result.error || "Failed to update status")
+      notify.error(result.error || "Failed to update status")
     }
   }
 
   const handleBulkStatusUpdate = async (isActive: boolean) => {
     if (selectedUsers.length === 0) {
-      toast.error("No users selected")
+      notify.error("No users selected")
       return
     }
 
     const action = isActive ? "activate" : "deactivate"
-    if (!confirm(`Are you sure you want to ${action} ${selectedUsers.length} user(s)?`)) return
+    if (!await confirm({ title: `${isActive ? "Activer" : "Désactiver"} ${selectedUsers.length} utilisateur(s) ?`, confirmLabel: isActive ? "Activer" : "Désactiver", destructive: !isActive })) return
 
     setIsLoading(true)
     const result = await bulkUpdateUserStatus(selectedUsers, isActive)
     if (result.success) {
-      toast.success(result.message)
+      notify.success(result.message)
       setUsers(users.map(u =>
         selectedUsers.includes(u.id) ? { ...u, isActive } : u
       ))
       setSelectedUsers([])
     } else {
-      toast.error(result.error || `Failed to ${action} users`)
+      notify.error(result.error || `Failed to ${action} users`)
     }
     setIsLoading(false)
   }
 
   const handleBulkDelete = async () => {
     if (selectedUsers.length === 0) {
-      toast.error("No users selected")
+      notify.error("No users selected")
       return
     }
-    if (!confirm(`Are you sure you want to permanently delete ${selectedUsers.length} user(s)? This action cannot be undone.`)) return
+    if (!await confirm({ title: `Supprimer définitivement ${selectedUsers.length} utilisateur(s) ?`, description: "Cette action est irréversible.", destructive: true })) return
 
     setIsLoading(true)
     let deleted = 0
@@ -391,9 +394,9 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
     if (deleted > 0) {
       setUsers(users.filter(u => !selectedUsers.includes(u.id)))
       setSelectedUsers([])
-      toast.success(`${deleted} user(s) deleted${failed > 0 ? `, ${failed} failed` : ""}`)
+      notify.success(`${deleted} user(s) deleted${failed > 0 ? `, ${failed} failed` : ""}`)
     } else {
-      toast.error(`Failed to delete users (${failed} error(s))`)
+      notify.error(`Failed to delete users (${failed} error(s))`)
     }
     setIsLoading(false)
   }
@@ -402,10 +405,10 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
     setIsLoading(true)
     const result = await setDpo(userId)
     if (result.success) {
-      toast.success("DPO updated successfully")
+      notify.success("DPO updated successfully")
       setUsers(users.map(u => ({ ...u, isDpo: u.id === userId })))
     } else {
-      toast.error(result.error || "Failed to set DPO")
+      notify.error(result.error || "Failed to set DPO")
     }
     setIsLoading(false)
   }
@@ -414,10 +417,10 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
     setIsLoading(true)
     const result = await setSiteManager(userId)
     if (result.success) {
-      toast.success("Legal representative updated successfully")
+      notify.success("Legal representative updated successfully")
       setUsers(users.map(u => ({ ...u, isSiteManager: u.id === userId })))
     } else {
-      toast.error(result.error || "Failed to set legal representative")
+      notify.error(result.error || "Failed to set legal representative")
     }
     setIsLoading(false)
   }
@@ -454,15 +457,15 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
       if (newRole && newRole !== currentRole && editingUser.id !== currentUserId) {
          const roleResult = await updateUserRole(editingUser.id, newRole)
          if (!roleResult.success) {
-            toast.error(roleResult.error || "Failed to update role")
+            notify.error(roleResult.error || "Failed to update role")
          }
       }
 
-      toast.success("User updated successfully")
+      notify.success("User updated successfully")
       setEditingUser(null)
       window.location.reload()
     } else {
-      toast.error(result.error || "Failed to update user")
+      notify.error(result.error || "Failed to update user")
     }
     setIsLoading(false)
   }
@@ -488,11 +491,11 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
     const result = await updateCompany(editingCompany.id, data)
 
     if (result.success) {
-      toast.success("Company updated successfully")
+      notify.success("Company updated successfully")
       setEditingCompany(null)
       window.location.reload()
     } else {
-      toast.error(result.error || "Failed to update company")
+      notify.error(result.error || "Failed to update company")
     }
     setIsLoading(false)
   }
@@ -648,7 +651,7 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
       const lines = text.split('\n')
       
       if (lines.length < 2) {
-        toast.error("CSV file is empty or invalid")
+        notify.error("CSV file is empty or invalid")
         return
       }
 
@@ -688,14 +691,14 @@ export function UsersTable({ initialUsers, initialInvitations = [], companies = 
       }
 
       if (imported > 0) {
-        toast.success(`${imported} user(s) imported successfully${errors > 0 ? `, ${errors} error(s)` : ''}`)
+        notify.success(`${imported} user(s) imported successfully${errors > 0 ? `, ${errors} error(s)` : ''}`)
         window.location.reload()
       } else {
-        toast.error(`Import failed: ${errors} error(s)`)
+        notify.error(`Import failed: ${errors} error(s)`)
       }
     } catch (error) {
       console.error('[UsersTable] Import error:', error)
-      toast.error("Failed to import CSV file")
+      notify.error("Failed to import CSV file")
     }
 
     // Reset input

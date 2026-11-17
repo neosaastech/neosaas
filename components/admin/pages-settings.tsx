@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -56,7 +57,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   getContentPages,
   getContentPage,
@@ -743,14 +744,14 @@ function ContentPanel() {
       const result = await getContentPage(row.id, openLocale)
       if (result.success) setEditingPageDoc(result.data)
       else {
-        toast.error(result.error)
+        notify.error(result.error)
         setSheetOpen(false)
       }
     } else {
       const result = await getContentArticle(row.id, openLocale)
       if (result.success) setEditingArticleDoc(result.data)
       else {
-        toast.error(result.error)
+        notify.error(result.error)
         setSheetOpen(false)
       }
     }
@@ -768,11 +769,11 @@ function ContentPanel() {
     })
     setIsSavingCategory(false)
     if (result.success) {
-      toast.success(editingCategory ? "Category updated" : "Category created")
+      notify.success(editingCategory ? "Category updated" : "Category created")
       setSheetOpen(false)
       load()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -784,12 +785,12 @@ function ContentPanel() {
           ? await removeContentArticle(row.id)
           : await removeCategory(row.id)
     if (result.success) {
-      toast.success(row.kind === "page" ? "Page deleted" : row.kind === "article" ? "Article deleted" : "Category deleted")
+      notify.success(row.kind === "page" ? "Page deleted" : row.kind === "article" ? "Article deleted" : "Category deleted")
       if (row.kind === "page") setAllPages((prev) => prev.filter((p) => p.id !== row.id))
       else if (row.kind === "article") setAllArticles((prev) => prev.filter((a) => a.id !== row.id))
       else setCategories((prev) => prev.filter((c) => c.id !== row.id))
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -811,11 +812,11 @@ function ContentPanel() {
           ? await saveContentArticle(row.id, { title: title.trim() }, saveLocale)
           : await saveCategory(row.id, { name: title.trim(), slug: categories.find((c) => c.id === row.id)?.slug ?? "" })
     if (result.success) {
-      toast.success("Title updated")
+      notify.success("Title updated")
       setEditingTitleId(null)
       load()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -834,7 +835,7 @@ function ContentPanel() {
       return next
     })
     if (result.success) {
-      toast.success(next === "published" ? "Published" : "Unpublished")
+      notify.success(next === "published" ? "Published" : "Unpublished")
       // Patch just this row in place instead of load() (a full refetch of
       // every page/article) — that used to flip the whole table back to
       // its "Loading content..." state for a single toggle.
@@ -845,7 +846,7 @@ function ContentPanel() {
         setAllArticles((prev) => prev.map((a) => (a.id === row.id ? { ...a, ...patch } : a)))
       }
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -867,10 +868,10 @@ function ContentPanel() {
       return nextSet
     })
     if (result.success) {
-      toast.success(next ? `Set as home page (${saveLocale})` : "Removed as home page")
+      notify.success(next ? `Set as home page (${saveLocale})` : "Removed as home page")
       setAllPages((prev) => prev.map((p) => (p.id === row.id ? { ...p, homeForLocale: result.data.homeForLocale } : p)))
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -888,16 +889,18 @@ function ContentPanel() {
       if (result.success) ok++
       else fail++
     }
-    toast[fail > 0 ? "warning" : "success"](
+    notify[fail > 0 ? "warning" : "success"](
       `${ok} item(s) ${status === "published" ? "published" : "unpublished"}${fail > 0 ? `, ${fail} failed` : ""}`,
     )
     setSelectedIds(new Set())
     load()
   }
 
+  const confirm = useConfirm()
+
   async function handleBulkDelete() {
     const rows = filtered.filter((r) => selectedIds.has(rowKey(r.kind, r.id)))
-    if (!confirm(`Delete ${rows.length} item(s)? This action cannot be undone.`)) return
+    if (!await confirm({ title: `Supprimer ${rows.length} élément(s) ?`, description: "Cette action est irréversible.", destructive: true })) return
     let ok = 0
     let fail = 0
     for (const row of rows) {
@@ -910,14 +913,14 @@ function ContentPanel() {
       if (result.success) ok++
       else fail++
     }
-    toast[fail > 0 ? "warning" : "success"](`${ok} item(s) deleted${fail > 0 ? `, ${fail} failed` : ""}`)
+    notify[fail > 0 ? "warning" : "success"](`${ok} item(s) deleted${fail > 0 ? `, ${fail} failed` : ""}`)
     setSelectedIds(new Set())
     load()
   }
 
   function handleExportCSV() {
     if (filtered.length === 0) {
-      toast.error("No content to export")
+      notify.error("No content to export")
       return
     }
     const headers = ["ID", "Title", "Kind", "Type", "Path", "Category", "Parent", "Status", "Created At", "Updated At"]
@@ -939,7 +942,7 @@ function ContentPanel() {
     link.href = URL.createObjectURL(blob)
     link.download = `content_export_${new Date().toISOString().split("T")[0]}.csv`
     link.click()
-    toast.success(`${filtered.length} item(s) exported`)
+    notify.success(`${filtered.length} item(s) exported`)
   }
 
   // Full-fidelity backup/restore/migration — one {kind, doc} entry per row,
@@ -948,7 +951,7 @@ function ContentPanel() {
   async function handleExportJson() {
     const targetRows = selectedIds.size > 0 ? filtered.filter((r) => selectedIds.has(rowKey(r.kind, r.id))) : filtered
     if (targetRows.length === 0) {
-      toast.error("No content to export")
+      notify.error("No content to export")
       return
     }
     const entries = await Promise.all(
@@ -968,7 +971,7 @@ function ContentPanel() {
     const valid = entries.filter((e): e is NonNullable<typeof e> => e !== null)
     const failed = entries.length - valid.length
     downloadJson("content_export", valid)
-    toast[failed > 0 ? "warning" : "success"](`${valid.length} item(s) exported${failed > 0 ? `, ${failed} failed` : ""}`)
+    notify[failed > 0 ? "warning" : "success"](`${valid.length} item(s) exported${failed > 0 ? `, ${failed} failed` : ""}`)
   }
 
   async function importJsonEntries(entries: { kind: string; doc: Record<string, unknown> }[]) {
@@ -1064,10 +1067,10 @@ function ContentPanel() {
     const isJson = file.name.toLowerCase().endsWith(".json")
     try {
       const { ok, fail } = isJson ? await importJsonEntries(JSON.parse(await file.text())) : await importCsvRows(await file.text())
-      toast[fail > 0 ? "warning" : "success"](`${ok} item(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
+      notify[fail > 0 ? "warning" : "success"](`${ok} item(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
       load()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Import failed")
+      notify.error(error instanceof Error ? error.message : "Import failed")
     }
   }
 

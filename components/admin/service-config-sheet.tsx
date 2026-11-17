@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 import { 
   Eye, 
   EyeOff, 
@@ -72,7 +72,6 @@ export function ServiceConfigSheet({
   onSave,
   onTest,
 }: ServiceConfigSheetProps) {
-  const { toast } = useToast()
 
   // Selection state
   const [selectedBrandId, setSelectedBrandId] = useState<string | undefined>(initialBrandId)
@@ -133,22 +132,14 @@ export function ServiceConfigSheet({
 
   const validateForm = (): boolean => {
     if (!selectedApi) {
-      toast({
-        title: "❌ Validation Error",
-        description: "Please select a service and API",
-        variant: "destructive",
-      })
+      notify.error("❌ Validation Error", { description: "Please select a service and API" })
       return false
     }
 
     // Check required fields
     for (const field of selectedApi.requiredFields) {
       if (field.required && !formValues[field.name]) {
-        toast({
-          title: "❌ Validation Error",
-          description: `${field.label} is required`,
-          variant: "destructive",
-        })
+        notify.error("❌ Validation Error", { description: `${field.label} is required` })
         return false
       }
     }
@@ -173,25 +164,14 @@ export function ServiceConfigSheet({
       setTestResult(result)
 
       if (result.success) {
-        toast({
-          title: "✅ Test Successful",
-          description: result.message,
-        })
+        notify.success("✅ Test Successful", { description: result.message })
       } else {
-        toast({
-          title: "❌ Test Failed",
-          description: result.message,
-          variant: "destructive",
-        })
+        notify.error("❌ Test Failed", { description: result.message })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Test failed"
       setTestResult({ success: false, message })
-      toast({
-        title: "❌ Test Error",
-        description: message,
-        variant: "destructive",
-      })
+      notify.error("❌ Test Error", { description: message })
     } finally {
       setTesting(false)
     }
@@ -213,18 +193,11 @@ export function ServiceConfigSheet({
         isDefault: false,
       })
 
-      toast({
-        title: "✅ Configuration Saved",
-        description: `${selectedBrand?.name} ${selectedApi?.name} has been ${mode === 'create' ? 'created' : 'updated'} successfully`,
-      })
+      notify.success("✅ Configuration Saved", { description: `${selectedBrand?.name} ${selectedApi?.name} has been ${mode === 'create' ? 'created' : 'updated'} successfully` })
 
       onOpenChange(false)
     } catch (error) {
-      toast({
-        title: "❌ Save Error",
-        description: error instanceof Error ? error.message : "Failed to save configuration",
-        variant: "destructive",
-      })
+      notify.error("❌ Save Error", { description: error instanceof Error ? error.message : "Failed to save configuration" })
     } finally {
       setSaving(false)
     }

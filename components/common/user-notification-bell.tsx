@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Package, MessageSquare, Settings, CheckCircle, Clock, Download } from "lucide-react"
+import { Bell, CheckCircle, Clock, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
+import { getNotificationType } from "@/lib/notifications/notification-types"
+import { useNotificationToasts } from "@/hooks/use-notification-toasts"
 
 interface Notification {
   id: string
@@ -38,12 +40,6 @@ interface NotificationStats {
   unread: number
   actionRequired: number
   byType: Record<string, number>
-}
-
-const typeConfig = {
-  order: { icon: Package, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', label: 'Commandes' },
-  support: { icon: MessageSquare, color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/30', label: 'Support' },
-  system: { icon: Settings, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-900/30', label: 'Système' },
 }
 
 /**
@@ -116,6 +112,9 @@ export function UserNotificationBell() {
     }
   }
 
+  // SAAS-179 : une notification qui arrive pendant la navigation s'affiche aussi en toast.
+  useNotificationToasts(notifications, handleNotificationClick)
+
   const filteredNotifications = activeTab === 'all'
     ? notifications
     : activeTab === 'action'
@@ -123,7 +122,7 @@ export function UserNotificationBell() {
       : notifications.filter((n) => n.type === activeTab)
 
   const getTypeIcon = (type: string) => {
-    const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.system
+    const config = getNotificationType(type)
     const Icon = config.icon
     return <Icon className={`h-4 w-4 ${config.color}`} />
   }
@@ -186,7 +185,7 @@ export function UserNotificationBell() {
               ) : (
                 <div className="divide-y">
                   {filteredNotifications.map((notification) => {
-                    const config = typeConfig[notification.type as keyof typeof typeConfig] || typeConfig.system
+                    const config = getNotificationType(notification.type)
                     const meta = notification.metadata || {}
 
                     return (

@@ -7,12 +7,11 @@ import { Label } from "@/components/ui/label"
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { recoverPassword } from "@/app/actions/auth"
 import { useState, useTransition } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 
 export default function RecoverPasswordPage() {
   const [isPending, startTransition] = useTransition()
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const { toast } = useToast()
 
   async function handleSubmit(formData: FormData) {
     setSuccessMessage(null)
@@ -20,17 +19,10 @@ export default function RecoverPasswordPage() {
       const result = await recoverPassword(formData)
       
       if (result.error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.error,
-        })
+        notify.error("Error", { description: result.error })
       } else if (result.success && result.message) {
         setSuccessMessage(result.message)
-        toast({
-          title: "Email sent",
-          description: result.message,
-        })
+        notify.success("Email sent", { description: result.message })
       }
     })
   }

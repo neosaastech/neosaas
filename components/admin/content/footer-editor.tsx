@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, ChevronUp, ChevronDown, Link2, Globe, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { saveContentFooter, getContentFooter } from "@/app/actions/header-footer"
 import { getContentPages, getContentCategories } from "@/app/actions/pages"
 import { MediaPickerField } from "./media-picker-field"
@@ -175,7 +175,7 @@ export function FooterEditor({
       applyDoc(result.data)
       setActiveLocale(nextLocale)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to switch language")
+      notify.error(error instanceof Error ? error.message : "Failed to switch language")
     } finally {
       setIsSwitchingLocale(false)
     }
@@ -210,10 +210,10 @@ export function FooterEditor({
     setSaving(true)
     try {
       await persist()
-      toast.success("Footer saved")
+      notify.success("Footer saved")
       onSaved()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save footer")
+      notify.error(error instanceof Error ? error.message : "Failed to save footer")
     } finally {
       setSaving(false)
     }

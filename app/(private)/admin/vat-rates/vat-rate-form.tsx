@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 
@@ -107,16 +107,16 @@ export function VatRateForm({ initialData }: VatRateFormProps) {
       })
 
       if (response.ok) {
-        toast.success(initialData ? "VAT rate updated" : "VAT rate created")
+        notify.success(initialData ? "VAT rate updated" : "VAT rate created")
         router.push("/admin/vat-rates")
         router.refresh()
       } else {
         const error = await response.json()
-        toast.error(error.error || "Failed to save VAT rate")
+        notify.error(error.error || "Failed to save VAT rate")
       }
     } catch (error) {
       console.error(error)
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setLoading(false)
     }

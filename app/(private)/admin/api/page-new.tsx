@@ -19,10 +19,11 @@
  * - ✅ Dynamic form fields based on API definition
  */
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 import { Plus, Key } from "lucide-react"
 
 // Import new hierarchical components
@@ -31,7 +32,6 @@ import { ServiceApiTable, ServiceApiConfigRow } from "@/components/admin/service
 import { ServiceConfigSheet } from "@/components/admin/service-config-sheet"
 
 export default function AdminApiPage() {
-  const { toast } = useToast()
 
   // State
   const [configs, setConfigs] = useState<ServiceApiConfigRow[]>([])
@@ -101,11 +101,7 @@ export default function AdminApiPage() {
       setConfigs(mockData)
     } catch (error) {
       console.error("Error loading configurations:", error)
-      toast({
-        title: "❌ Error",
-        description: "Failed to load API configurations",
-        variant: "destructive",
-      })
+      notify.error("❌ Error", { description: "Failed to load API configurations" })
     } finally {
       setLoading(false)
     }
@@ -138,10 +134,7 @@ export default function AdminApiPage() {
       // Mock success for now
       await new Promise(resolve => setTimeout(resolve, 1500))
       
-      toast({
-        title: "✅ Test Successful",
-        description: `${config.brandName} ${config.apiName} is working correctly`,
-      })
+      notify.success("✅ Test Successful", { description: `${config.brandName} ${config.apiName} is working correctly` })
 
       // Update the config's last test info
       setConfigs(prev => prev.map(c => 
@@ -150,18 +143,16 @@ export default function AdminApiPage() {
           : c
       ))
     } catch (error) {
-      toast({
-        title: "❌ Test Failed",
-        description: error instanceof Error ? error.message : "Connection test failed",
-        variant: "destructive",
-      })
+      notify.error("❌ Test Failed", { description: error instanceof Error ? error.message : "Connection test failed" })
     } finally {
       setTestingId(null)
     }
   }
 
+  const confirm = useConfirm()
+
   const handleDelete = async (config: ServiceApiConfigRow) => {
-    if (!confirm(`Are you sure you want to delete ${config.brandName} ${config.apiName} configuration?`)) {
+    if (!await confirm({ title: `Supprimer la configuration ${config.brandName} ${config.apiName} ?`, description: "Les identifiants enregistrés pour ce service seront effacés.", destructive: true })) {
       return
     }
 
@@ -169,19 +160,12 @@ export default function AdminApiPage() {
       // TODO: Replace with actual API call
       // await fetch(`/api/admin/services/configs/${config.id}`, { method: 'DELETE' })
 
-      toast({
-        title: "✅ Deleted",
-        description: `${config.brandName} ${config.apiName} configuration has been deleted`,
-      })
+      notify.success("✅ Deleted", { description: `${config.brandName} ${config.apiName} configuration has been deleted` })
 
       // Remove from local state
       setConfigs(prev => prev.filter(c => c.id !== config.id))
     } catch (error) {
-      toast({
-        title: "❌ Error",
-        description: "Failed to delete configuration",
-        variant: "destructive",
-      })
+      notify.error("❌ Error", { description: "Failed to delete configuration" })
     }
   }
 
@@ -222,10 +206,7 @@ export default function AdminApiPage() {
         ))
       }
 
-      toast({
-        title: "✅ Saved",
-        description: `Configuration has been ${sheetMode === 'create' ? 'created' : 'updated'} successfully`,
-      })
+      notify.success("✅ Saved", { description: `Configuration has been ${sheetMode === 'create' ? 'created' : 'updated'} successfully` })
 
       setSheetOpen(false)
     } catch (error) {

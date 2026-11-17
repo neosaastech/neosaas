@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Building2, Upload, X, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
 
 interface CompanyLogoUploadProps {
@@ -47,9 +47,9 @@ export function CompanyLogoUpload({
       setLogoPreview(nextLogo)
       onLogoChange?.(nextLogo)
       window.dispatchEvent(new CustomEvent("companyLogoUpdated", { detail: { logo: nextLogo } }))
-      toast.success("Company logo updated")
+      notify.success("Company logo updated")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload logo")
+      notify.error(error instanceof Error ? error.message : "Failed to upload logo")
     } finally {
       setIsUploading(false)
     }
@@ -72,9 +72,9 @@ export function CompanyLogoUpload({
       onLogoChange?.(null)
       window.dispatchEvent(new CustomEvent("companyLogoUpdated", { detail: { logo: null } }))
       fileInputRef.current?.clear()
-      toast.success("Logo removed")
+      notify.success("Logo removed")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to remove logo")
+      notify.error(error instanceof Error ? error.message : "Failed to remove logo")
     } finally {
       setIsUploading(false)
     }

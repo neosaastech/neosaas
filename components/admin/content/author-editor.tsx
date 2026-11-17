@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -46,10 +46,10 @@ export function AuthorEditor({ author, onSaved, onCancel }: { author: AuthorProf
     })
     setSaving(false)
     if (result.success) {
-      toast.success("Author profile saved")
+      notify.success("Author profile saved")
       onSaved()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 

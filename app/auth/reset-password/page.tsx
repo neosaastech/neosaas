@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react'
 import { resetPassword } from "@/app/actions/auth"
 import { useState, useTransition } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams()
@@ -38,7 +38,7 @@ export default function ResetPasswordPage() {
     const confirmPassword = formData.get("confirmPassword") as string
 
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match")
+      notify.error("Passwords do not match")
       return
     }
 
@@ -46,10 +46,10 @@ export default function ResetPasswordPage() {
       const result = await resetPassword(token, password)
       
       if (result.success) {
-        toast.success("Password reset successfully")
+        notify.success("Password reset successfully")
         router.push("/auth/login?reset=true")
       } else {
-        toast.error(result.error || "Failed to reset password")
+        notify.error(result.error || "Failed to reset password")
       }
     })
   }

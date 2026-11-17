@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Pencil, Trash2, LayoutTemplate, Search } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { getContentModules, getContentModule, removeContentModule, saveContentModule } from "@/app/actions/header-footer"
 import type { PayloadModuleSummary, PayloadModuleDoc, ModuleWriteInput } from "@/lib/payload-bridge"
 import { ContentSheet } from "./content-sheet"
@@ -62,7 +62,7 @@ export function ModulesPanel() {
     setLoading(true)
     const result = await getContentModules(locale)
     if (result.success) setModules(result.data)
-    else toast.error(result.error)
+    else notify.error(result.error)
     setLoading(false)
   }, [locale])
 
@@ -70,7 +70,7 @@ export function ModulesPanel() {
     setLoading(true)
     getContentModules(locale).then((result) => {
       if (result.success) setModules(result.data)
-      else toast.error(result.error)
+      else notify.error(result.error)
       setLoading(false)
     })
   }, [locale])
@@ -82,7 +82,7 @@ export function ModulesPanel() {
 
   async function openEdit(id: string | number) {
     const result = await getContentModule(id, locale)
-    if (!result.success) return toast.error(result.error)
+    if (!result.success) return notify.error(result.error)
     setEditingModule(result.data)
     setSheetOpen(true)
   }
@@ -91,10 +91,10 @@ export function ModulesPanel() {
     if (!deleteTarget) return
     const result = await removeContentModule(deleteTarget.id)
     if (result.success) {
-      toast.success("Module deleted")
+      notify.success("Module deleted")
       reload()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
     setDeleteTarget(null)
   }
@@ -111,21 +111,21 @@ export function ModulesPanel() {
   }, [modules, search])
 
   async function handleExportJson() {
-    if (filteredRows.length === 0) { toast.error("No module to export"); return }
+    if (filteredRows.length === 0) { notify.error("No module to export"); return }
     const docs = await Promise.all(filteredRows.map((row) => getContentModule(row.id, locale)))
     const failed = docs.filter((d) => !d.success).length
     downloadJson("modules_export", docs.filter((d) => d.success).map((d) => (d as { data: PayloadModuleDoc }).data))
-    toast[failed > 0 ? "warning" : "success"](`${docs.length - failed} module(s) exported${failed > 0 ? `, ${failed} failed` : ""}`)
+    notify[failed > 0 ? "warning" : "success"](`${docs.length - failed} module(s) exported${failed > 0 ? `, ${failed} failed` : ""}`)
   }
 
   function handleExportCsv() {
-    if (filteredRows.length === 0) return toast.error("No module to export")
+    if (filteredRows.length === 0) return notify.error("No module to export")
     downloadCsv(
       "modules_export",
       ["ID", "Anchor Key", "Scope", "Updated At"],
       filteredRows.map((row) => [row.id, row.anchorKey, scopeLabel(row), row.updatedAt]),
     )
-    toast.success(`${filteredRows.length} module(s) exported`)
+    notify.success(`${filteredRows.length} module(s) exported`)
   }
 
   // JSON only — a module's real content (anchorKey, content blocks) isn't
@@ -137,7 +137,7 @@ export function ModulesPanel() {
       docs = JSON.parse(await file.text())
       if (!Array.isArray(docs)) throw new Error("Expected a JSON array")
     } catch (error) {
-      toast.error(error instanceof Error ? `Invalid JSON: ${error.message}` : "Invalid JSON")
+      notify.error(error instanceof Error ? `Invalid JSON: ${error.message}` : "Invalid JSON")
       return
     }
 
@@ -156,7 +156,7 @@ export function ModulesPanel() {
       if (result.success) ok++
       else fail++
     }
-    toast[fail > 0 ? "warning" : "success"](`${ok} module(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
+    notify[fail > 0 ? "warning" : "success"](`${ok} module(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
     reload()
   }
 

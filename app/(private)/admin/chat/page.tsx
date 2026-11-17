@@ -38,7 +38,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 import { UserProfileOverlay } from "@/components/admin/user-profile-overlay"
 
@@ -256,7 +256,7 @@ export default function ChatPage() {
         fetchContacts()
       }
     } catch (error) {
-      toast.error("Failed to send message")
+      notify.error("Failed to send message")
     } finally {
       setSending(false)
     }
@@ -279,7 +279,7 @@ export default function ChatPage() {
 
       const data = await response.json()
       if (data.success) {
-        toast.success("Conversation started")
+        notify.success("Conversation started")
         setShowNewDialog(false)
         setSelectedUser(null)
         setNewMessage("")
@@ -290,10 +290,10 @@ export default function ChatPage() {
           router.push(`/admin/chat?id=${data.data.conversation.id}`)
         }
       } else {
-        toast.error(data.error || "Failed to start conversation")
+        notify.error(data.error || "Failed to start conversation")
       }
     } catch (error) {
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setCreatingConversation(false)
     }
@@ -319,12 +319,12 @@ export default function ChatPage() {
 
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("File too large. Maximum size is 10MB.")
+      notify.error("File too large. Maximum size is 10MB.")
       return
     }
 
     // For now, show a toast - file upload to be implemented with proper storage
-    toast.info(`File "${file.name}" selected. File upload feature coming soon!`)
+    notify.info(`File "${file.name}" selected. File upload feature coming soon!`)
 
     // Reset input
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -341,18 +341,18 @@ export default function ChatPage() {
 
     // Check if it's an image
     if (!file.type.startsWith('image/')) {
-      toast.error("Please select an image file.")
+      notify.error("Please select an image file.")
       return
     }
 
     // Check file size (max 5MB for images)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image too large. Maximum size is 5MB.")
+      notify.error("Image too large. Maximum size is 5MB.")
       return
     }
 
     // For now, show a toast - image upload to be implemented with proper storage
-    toast.info(`Image "${file.name}" selected. Image upload feature coming soon!`)
+    notify.info(`Image "${file.name}" selected. Image upload feature coming soon!`)
 
     // Reset input
     if (imageInputRef.current) imageInputRef.current.value = ''

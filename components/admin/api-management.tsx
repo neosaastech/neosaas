@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify"
 import { Loader2, CheckCircle2, AlertCircle, Github, Key, Server, RefreshCw } from "lucide-react";
 import type { GitHubConfigResponse } from "@/types/github-config";
 
@@ -14,17 +14,12 @@ export function APIManagement() {
   const [githubPat, setGithubPat] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<GitHubConfigResponse | null>(null);
-  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!githubPat.trim()) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez saisir une clé API GitHub",
-        variant: "destructive",
-      });
+      notify.error("Erreur", { description: "Veuillez saisir une clé API GitHub" });
       return;
     }
 
@@ -48,10 +43,7 @@ export function APIManagement() {
 
       setResponse(data);
 
-      toast({
-        title: "✅ Configuration réussie",
-        description: data.message || "GitHub OAuth a été configuré avec succès",
-      });
+      notify.message("✅ Configuration réussie", { description: data.message || "GitHub OAuth a été configuré avec succès" });
 
       // Nettoyer le champ après succès
       setGithubPat("");
@@ -69,11 +61,7 @@ export function APIManagement() {
         error: errorMessage,
       });
 
-      toast({
-        title: "❌ Erreur",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      notify.error("❌ Erreur", { description: errorMessage });
     } finally {
       setIsLoading(false);
     }

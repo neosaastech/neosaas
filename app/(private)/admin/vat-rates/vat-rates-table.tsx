@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import Link from "next/link"
 
 interface VatRate {
@@ -63,13 +63,13 @@ export function VatRatesTable({ rates }: VatRatesTableProps) {
       })
 
       if (response.ok) {
-        toast.success("VAT rate deleted")
+        notify.success("VAT rate deleted")
         router.refresh()
       } else {
-        toast.error("Failed to delete VAT rate")
+        notify.error("Failed to delete VAT rate")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setIsDeleting(false)
       setDeleteId(null)
@@ -85,13 +85,13 @@ export function VatRatesTable({ rates }: VatRatesTableProps) {
       })
 
       if (response.ok) {
-        toast.success("Default rate updated")
+        notify.success("Default rate updated")
         router.refresh()
       } else {
-        toast.error("Failed to update default rate")
+        notify.error("Failed to update default rate")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     }
   }
 
@@ -104,13 +104,13 @@ export function VatRatesTable({ rates }: VatRatesTableProps) {
       })
 
       if (response.ok) {
-        toast.success(`VAT rate ${!currentStatus ? "activated" : "deactivated"}`)
+        notify.success(`VAT rate ${!currentStatus ? "activated" : "deactivated"}`)
         router.refresh()
       } else {
-        toast.error("Failed to update VAT rate")
+        notify.error("Failed to update VAT rate")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     }
   }
 

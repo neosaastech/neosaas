@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { notify } from "@/lib/notify"
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { usePlatformConfig } from "@/contexts/platform-config-context"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -93,7 +93,7 @@ export default function LoginPage() {
         description: details || 'An unknown error occurred. Please try again.',
       };
 
-      toast.error(errorInfo.title, {
+      notify.error(errorInfo.title, {
         description: errorInfo.description,
         duration: 6000,
       });
@@ -124,7 +124,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || 'Login failed');
+        notify.error(data.error || 'Login failed');
         return;
       }
 
@@ -135,7 +135,7 @@ export default function LoginPage() {
       // Save user data to localStorage for client-side usage
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      toast.success(`Welcome back, ${userName}!`, {
+      notify.success(`Welcome back, ${userName}!`, {
         description: userRoles.length > 0 ? `Role: ${userRoles.join(', ')}` : 'Loading your dashboard...'
       });
 
@@ -147,7 +147,7 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
     } catch (error) {
-      toast.error('An error occurred during login');
+      notify.error('An error occurred during login');
       console.error('Login error:', error);
     } finally {
       setIsLoading(false);
@@ -205,7 +205,7 @@ export default function LoginPage() {
                       disabled={isGithubLoading || isGoogleLoading}
                       onClick={() => {
                         setIsGithubLoading(true);
-                        toast.loading('Redirecting to GitHub...', { id: 'github-redirect' });
+                        notify.loading('Redirecting to GitHub...', { id: 'github-redirect' });
                         window.location.href = '/api/auth/oauth/github';
                       }}
                     >
@@ -255,7 +255,7 @@ export default function LoginPage() {
                       disabled={isGithubLoading || isGoogleLoading}
                       onClick={() => {
                         setIsGoogleLoading(true);
-                        toast.loading('Redirecting to Google...', { id: 'google-redirect' });
+                        notify.loading('Redirecting to Google...', { id: 'google-redirect' });
                         window.location.href = '/api/auth/oauth/google';
                       }}
                     >

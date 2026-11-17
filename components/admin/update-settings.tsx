@@ -16,7 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { RefreshCw, ShieldCheck, ShieldAlert, Loader2, GitCommitHorizontal, GitPullRequest } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 interface UpdateJob {
   status: "pending" | "succeeded" | "pr_opened" | "up_to_date" | "failed" | "denied"
@@ -104,14 +104,14 @@ export function UpdateSettings() {
       const data: UpdateStatus = await res.json()
       setStatus(data)
       if (data.error) {
-        toast.error(`Update check failed: ${data.error}`)
+        notify.error(`Update check failed: ${data.error}`)
       } else if (data.upToDate) {
-        toast.success("You're on the latest version")
+        notify.success("You're on the latest version")
       } else {
-        toast.info(`New version available: ${data.latestVersion}`)
+        notify.info(`New version available: ${data.latestVersion}`)
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Update check failed")
+      notify.error(error instanceof Error ? error.message : "Update check failed")
     } finally {
       setChecking(false)
     }
@@ -129,10 +129,10 @@ export function UpdateSettings() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Deploy failed (${res.status})`)
       }
-      toast.success("Sync triggered — it opens a review PR, it does not deploy by itself. You'll get a notification with the PR link once it's ready. Avoid clicking again in the meantime.", { duration: 8000 })
+      notify.success("Sync triggered — it opens a review PR, it does not deploy by itself. You'll get a notification with the PR link once it's ready. Avoid clicking again in the meantime.", { duration: 8000 })
       setCooldownUntil(Date.now() + DEPLOY_COOLDOWN_MS)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to trigger update")
+      notify.error(error instanceof Error ? error.message : "Failed to trigger update")
     } finally {
       setDeploying(false)
     }

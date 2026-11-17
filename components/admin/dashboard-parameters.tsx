@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ImageCropper } from "@/components/ui/image-cropper"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   Upload,
   Settings,
@@ -105,12 +105,12 @@ export function DashboardParameters() {
 
       setSaveStatus('saved')
       if (immediate) {
-        toast.success('Configuration saved')
+        notify.success('Configuration saved')
       }
     } catch (error) {
       console.error('[ADMIN] Save error:', error)
       setSaveStatus('error')
-      toast.error(error instanceof Error ? error.message : 'Failed to save')
+      notify.error(error instanceof Error ? error.message : 'Failed to save')
     }
   }, [siteName, showLogoInHeader, showSiteNameInHeader, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, seoSettings, socialLinks, logoFile])
 
@@ -160,7 +160,7 @@ export function DashboardParameters() {
         }
       } catch (error) {
         console.error('[ADMIN] Failed to fetch config', error)
-        toast.error('Failed to load configuration')
+        notify.error('Failed to load configuration')
       } finally {
         setIsInitialLoad(false)
       }
@@ -232,11 +232,11 @@ export function DashboardParameters() {
       if (!res.ok) throw new Error('Failed to update maintenance mode')
 
       setSaveStatus('saved')
-      toast.success(newMode ? 'Maintenance mode enabled' : 'Site is now live')
+      notify.success(newMode ? 'Maintenance mode enabled' : 'Site is now live')
     } catch (error) {
       setMaintenanceMode(!newMode) // Revert
       setSaveStatus('error')
-      toast.error('Failed to update maintenance mode')
+      notify.error('Failed to update maintenance mode')
     }
   }
 

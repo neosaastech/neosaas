@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useRouter } from "next/navigation"
 import { saveContentArticle, getContentCategories } from "@/app/actions/pages"
 import type { PayloadBlogPostDoc, PayloadCategorySummary } from "@/lib/payload-bridge"
@@ -171,7 +171,7 @@ export function ArticleEditor({
     setIsPublishing(true)
     try {
       await persist("published", formValues)
-      toast.success("Article published")
+      notify.success("Article published")
       if (onSaved) {
         onSaved()
       } else {
@@ -180,7 +180,7 @@ export function ArticleEditor({
       }
     } catch (error) {
       console.error("handlePublish threw before reaching the server:", error)
-      toast.error(error instanceof Error ? error.message : "An unexpected error occurred")
+      notify.error(error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsPublishing(false)
     }

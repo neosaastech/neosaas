@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useEffect, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Globe, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useRouter } from "next/navigation"
 import {
   saveContentPage,
@@ -188,7 +189,7 @@ export function PageEditor({
       applyDoc(result.data)
       setActiveLocale(nextLocale)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to switch language")
+      notify.error(error instanceof Error ? error.message : "Failed to switch language")
     } finally {
       setIsSwitchingLocale(false)
     }
@@ -207,7 +208,7 @@ export function PageEditor({
     try {
       const result = await getContentPageVersions(docIdRef.current, activeLocale)
       if (result.success) setVersions(result.data)
-      else toast.error(result.error)
+      else notify.error(result.error)
     } finally {
       setIsLoadingVersions(false)
     }
@@ -216,17 +217,19 @@ export function PageEditor({
   // Rewrites the live doc back to a past version, then reloads the form
   // the same way switching locale already does (applyDoc) — no separate
   // "preview before restoring" step, matching Payload's own admin behavior.
+  const confirm = useConfirm()
+
   async function handleRestoreVersion(version: PayloadPageVersion) {
-    if (!confirm(`Restore this page to its version from ${new Date(version.updatedAt).toLocaleString()}? This replaces the current content.`)) return
+    if (!await confirm({ title: `Restaurer la version du ${new Date(version.updatedAt).toLocaleString("fr-FR")} ?`, description: "Le contenu actuel de la page sera remplacé.", confirmLabel: "Restaurer" })) return
     setRestoringVersionId(version.id)
     try {
       const result = await restoreContentPageVersion(version.id, activeLocale)
       if (!result.success) throw new Error(result.error)
       applyDoc(result.data)
-      toast.success("Version restored")
+      notify.success("Version restored")
       await loadVersions()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to restore version")
+      notify.error(error instanceof Error ? error.message : "Failed to restore version")
     } finally {
       setRestoringVersionId(null)
     }
@@ -318,13 +321,13 @@ export function PageEditor({
     // a 500). Catching it here, before the request, beats a confusing
     // silent no-op after.
     if (layout.length === 0) {
-      toast.error("Add at least one block before publishing — a published page with no blocks shows nothing on the site.")
+      notify.error("Add at least one block before publishing — a published page with no blocks shows nothing on the site.")
       return
     }
     setIsPublishing(true)
     try {
       await persist("published", formValues)
-      toast.success("Page published")
+      notify.success("Page published")
       if (onSaved) {
         onSaved()
       } else {
@@ -343,9 +346,9 @@ export function PageEditor({
       const message = error instanceof Error ? error.message : "An unexpected error occurred"
       const [title, ...rest] = message.split("\n")
       if (rest.length > 0) {
-        toast.error(title, { description: rest.join("\n"), duration: 15000 })
+        notify.error(title, { description: rest.join("\n"), duration: 15000 })
       } else {
-        toast.error(title)
+        notify.error(title)
       }
     } finally {
       setIsPublishing(false)

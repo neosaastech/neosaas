@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 export default function NewAppointmentPage() {
   const router = useRouter()
@@ -63,7 +63,7 @@ export default function NewAppointmentPage() {
       const endTime = new Date(`${formData.startDate}T${formData.endTime}`)
 
       if (startTime >= endTime) {
-        toast.error("L'heure de fin doit être après l'heure de début")
+        notify.error("L'heure de fin doit être après l'heure de début")
         setLoading(false)
         return
       }
@@ -94,14 +94,14 @@ export default function NewAppointmentPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success("Demande de rendez-vous envoyée ! Vous serez notifié après confirmation.")
+        notify.success("Demande de rendez-vous envoyée ! Vous serez notifié après confirmation.")
         router.push("/dashboard/appointments")
       } else {
-        toast.error(data.error || "Erreur lors de l'envoi de la demande")
+        notify.error(data.error || "Erreur lors de l'envoi de la demande")
       }
     } catch (error) {
       console.error("Failed to create appointment:", error)
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setLoading(false)
     }

@@ -23,7 +23,7 @@ import { Check, ChevronsUpDown, Upload, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 interface Company {
   id: string
@@ -109,9 +109,9 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
         throw new Error(data.error || "Failed to upload profile image")
       }
       setProfileImagePreview(data.profileImage)
-      toast.success("Profile image updated")
+      notify.success("Profile image updated")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload profile image")
+      notify.error(error instanceof Error ? error.message : "Failed to upload profile image")
     } finally {
       setIsUploadingImage(false)
     }
@@ -127,9 +127,9 @@ export function UserEditSheet({ user, open, onOpenChange, onSave, companies, isL
       }
       setProfileImagePreview(null)
       fileInputRef.current?.clear()
-      toast.success("Profile image removed")
+      notify.success("Profile image removed")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to remove profile image")
+      notify.error(error instanceof Error ? error.message : "Failed to remove profile image")
     } finally {
       setIsUploadingImage(false)
     }

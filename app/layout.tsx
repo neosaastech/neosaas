@@ -7,6 +7,7 @@ import { DynamicThemeProvider } from "@/components/common/dynamic-theme-provider
 import { BackToTop } from "@/components/common/back-to-top"
 import { RouteOverlayCleanup } from "@/components/common/route-overlay-cleanup"
 import { Toaster } from "@/components/ui/sonner"
+import { ConfirmProvider } from "@/hooks/use-confirm"
 import "@/styles/globals.css"
 
 import { GeistSans } from 'geist/font/sans'
@@ -109,10 +110,12 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <DynamicThemeProvider theme={themeConfig}>
             <PlatformConfigProvider config={config}>
-              <RouteOverlayCleanup />
-              {children}
-              <BackToTop />
-              <Toaster />
+              <ConfirmProvider>
+                <RouteOverlayCleanup />
+                {children}
+                <BackToTop />
+                <Toaster />
+              </ConfirmProvider>
             </PlatformConfigProvider>
           </DynamicThemeProvider>
         </ThemeProvider>

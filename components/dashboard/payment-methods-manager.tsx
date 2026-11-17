@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { useToast } from '@/hooks/use-toast'
+import { notify } from "@/lib/notify"
 import {
   getCompanyCards,
   removePaymentMethod,
@@ -47,7 +47,6 @@ export function PaymentMethodsManager() {
   const [syncing, setSyncing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
-  const { toast } = useToast()
   const { hasRole } = useUser()
   const canManage = hasRole(WRITER_ROLES)
 
@@ -58,11 +57,7 @@ export function PaymentMethodsManager() {
     if (result.success && result.data) {
       setPaymentMethods(result.data as PaymentMethod[])
     } else {
-      toast({
-        title: 'Error',
-        description: result.error || 'Failed to load payment methods',
-        variant: 'destructive',
-      })
+      notify.error('Error', { description: result.error || 'Failed to load payment methods' })
     }
     setLoading(false)
   }
@@ -72,17 +67,10 @@ export function PaymentMethodsManager() {
     const result = await syncPaymentMethods()
 
     if (result.success) {
-      toast({
-        title: 'Sync Successful',
-        description: `Updated ${result.data?.cardsAdded || 0} cards`,
-      })
+      notify.success('Sync Successful', { description: `Updated ${result.data?.cardsAdded || 0} cards` })
       await loadPaymentMethods()
     } else {
-      toast({
-        title: 'Sync Failed',
-        description: result.error || 'Failed to sync payment methods',
-        variant: 'destructive',
-      })
+      notify.error('Sync Failed', { description: result.error || 'Failed to sync payment methods' })
     }
     setSyncing(false)
   }
@@ -91,17 +79,10 @@ export function PaymentMethodsManager() {
     const result = await setDefaultCard(paymentMethodId)
 
     if (result.success) {
-      toast({
-        title: 'Success',
-        description: 'Default payment method updated',
-      })
+      notify.success('Success', { description: 'Default payment method updated' })
       await loadPaymentMethods()
     } else {
-      toast({
-        title: 'Error',
-        description: result.error || 'Failed to set default card',
-        variant: 'destructive',
-      })
+      notify.error('Error', { description: result.error || 'Failed to set default card' })
     }
   }
 
@@ -111,17 +92,10 @@ export function PaymentMethodsManager() {
     const result = await removePaymentMethod(selectedMethod)
 
     if (result.success) {
-      toast({
-        title: 'Success',
-        description: 'Payment method removed',
-      })
+      notify.success('Success', { description: 'Payment method removed' })
       await loadPaymentMethods()
     } else {
-      toast({
-        title: 'Error',
-        description: result.error || 'Failed to remove payment method',
-        variant: 'destructive',
-      })
+      notify.error('Error', { description: result.error || 'Failed to remove payment method' })
     }
 
     setDeleteDialogOpen(false)

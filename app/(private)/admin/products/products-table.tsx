@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react"
 import { useRouter } from "next/navigation"
 import { deleteProduct, upsertProduct } from "@/app/actions/ecommerce"
@@ -68,7 +69,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import Link from "next/link"
 import * as Icons from "lucide-react"
 import Image from "next/image"
@@ -376,7 +377,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
   // Fonction de modification groupée
   const handleBulkUpdateField = async (field: string, value: any) => {
     if (selectedProductIds.size === 0) {
-      toast.error("No products selected")
+      notify.error("No products selected")
       return
     }
 
@@ -405,22 +406,24 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
     }
 
     if (successCount > 0) {
-      toast.success(`${successCount} product(s) updated successfully${errorCount > 0 ? `, ${errorCount} error(s)` : ''}`)
+      notify.success(`${successCount} product(s) updated successfully${errorCount > 0 ? `, ${errorCount} error(s)` : ''}`)
       setSelectedProductIds(new Set())
       router.refresh()
     } else {
-      toast.error(`Failed to update products: ${errorCount} error(s)`)
+      notify.error(`Failed to update products: ${errorCount} error(s)`)
     }
   }
 
   // Fonction de suppression groupée
+  const confirm = useConfirm()
+
   const handleBulkDelete = async () => {
     if (selectedProductIds.size === 0) {
-      toast.error("No products selected")
+      notify.error("No products selected")
       return
     }
 
-    if (!confirm(`Are you sure you want to delete ${selectedProductIds.size} product(s)? This action cannot be undone.`)) {
+    if (!await confirm({ title: `Supprimer ${selectedProductIds.size} produit(s) ?`, description: "Cette action est irréversible.", destructive: true })) {
       return
     }
 
@@ -446,11 +449,11 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
     }
 
     if (successCount > 0) {
-      toast.success(`${successCount} product(s) deleted successfully${errorCount > 0 ? `, ${errorCount} error(s)` : ''}`)
+      notify.success(`${successCount} product(s) deleted successfully${errorCount > 0 ? `, ${errorCount} error(s)` : ''}`)
       setSelectedProductIds(new Set())
       router.refresh()
     } else {
-      toast.error(`Failed to delete products: ${errorCount} error(s)`)
+      notify.error(`Failed to delete products: ${errorCount} error(s)`)
     }
   }
 
@@ -485,7 +488,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       : products
 
     if (productsToExport.length === 0) {
-      toast.error("No products to export")
+      notify.error("No products to export")
       return
     }
 
@@ -515,7 +518,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
     link.download = `products_export_${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     
-    toast.success(`${productsToExport.length} product(s) exported`)
+    notify.success(`${productsToExport.length} product(s) exported`)
   }
 
   // Import CSV
@@ -528,7 +531,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       const lines = text.split('\n')
       
       if (lines.length < 2) {
-        toast.error("CSV file is empty")
+        notify.error("CSV file is empty")
         return
       }
 
@@ -570,14 +573,14 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       }
 
       if (imported > 0) {
-        toast.success(`${imported} product(s) imported successfully${errors > 0 ? `, ${errors} error(s)` : ''}`)
+        notify.success(`${imported} product(s) imported successfully${errors > 0 ? `, ${errors} error(s)` : ''}`)
         router.refresh()
       } else {
-        toast.error(`Import failed: ${errors} error(s)`)
+        notify.error(`Import failed: ${errors} error(s)`)
       }
     } catch (error) {
       console.error('[ProductsTable] Import error:', error)
-      toast.error("Failed to import CSV file")
+      notify.error("Failed to import CSV file")
     }
 
     // Reset l'input
@@ -708,16 +711,16 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       const result = await deleteProduct(deleteId)
       console.log('[ProductsTable] handleDelete - Result:', result)
       if (result.success) {
-        toast.success("Product deleted successfully")
+        notify.success("Product deleted successfully")
         console.log('[ProductsTable] handleDelete - Product deleted, refreshing...')
         router.refresh()
       } else {
         console.error('[ProductsTable] handleDelete - Failed:', result.error)
-        toast.error(result.error || "Failed to delete product")
+        notify.error(result.error || "Failed to delete product")
       }
     } catch (error) {
       console.error('[ProductsTable] handleDelete - Exception:', error)
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setIsDeleting(false)
       setDeleteId(null)
@@ -734,17 +737,17 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       console.log('[ProductsTable] updateField - Result:', result)
       
       if (result.success) {
-        toast.success(`${field} updated`)
+        notify.success(`${field} updated`)
         setEditingCell(null)
         console.log('[ProductsTable] updateField - Refreshing router...')
         router.refresh()
       } else {
         console.error('[ProductsTable] updateField - Failed:', result.error)
-        toast.error(result.error || "Failed to update")
+        notify.error(result.error || "Failed to update")
       }
     } catch (error) {
       console.error('[ProductsTable] updateField - Exception:', error)
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     }
   }
 
@@ -764,16 +767,16 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       if (response.ok) {
         const data = await response.json()
         console.log('[ProductsTable] handleImageUpload - Success:', data)
-        toast.success("Image uploaded")
+        notify.success("Image uploaded")
         router.refresh()
       } else {
         const errorText = await response.text()
         console.error('[ProductsTable] handleImageUpload - Failed:', errorText)
-        toast.error("Failed to upload image")
+        notify.error("Failed to upload image")
       }
     } catch (error) {
       console.error('[ProductsTable] handleImageUpload - Exception:', error)
-      toast.error("Upload error")
+      notify.error("Upload error")
     }
   }
 
@@ -792,7 +795,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
         setImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
-      toast.success("Image ready for upload (will be saved with product)")
+      notify.success("Image ready for upload (will be saved with product)")
       return
     }
 
@@ -813,16 +816,16 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
           const data = await response.json()
           console.log('[ProductsTable] handleImageUploadInPanel - Success:', data)
           setImagePreview(data.imageUrl)
-          toast.success("Image uploaded")
+          notify.success("Image uploaded")
           router.refresh()
         } else {
           const errorText = await response.text()
           console.error('[ProductsTable] handleImageUploadInPanel - Failed:', errorText)
-          toast.error("Failed to upload image")
+          notify.error("Failed to upload image")
         }
       } catch (error) {
         console.error('[ProductsTable] handleImageUploadInPanel - Exception:', error)
-        toast.error("Upload error")
+        notify.error("Upload error")
       }
     }
   }
@@ -834,7 +837,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
       // Pour les nouveaux produits, juste effacer la preview
       setImagePreview(null)
       setPendingImageFile(null)
-      toast.success("Image removed")
+      notify.success("Image removed")
       return
     }
 
@@ -849,14 +852,14 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
         if (result.success) {
           setImagePreview(null)
           setPendingImageFile(null)
-          toast.success("Image removed")
+          notify.success("Image removed")
           router.refresh()
         } else {
-          toast.error("Failed to remove image")
+          notify.error("Failed to remove image")
         }
       } catch (error) {
         console.error('[ProductsTable] removeImageInPanel - Exception:', error)
-        toast.error("Failed to remove image")
+        notify.error("Failed to remove image")
       }
     }
   }
@@ -867,7 +870,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
     // Validation
     if (!editValues.title.trim()) {
       console.warn('[ProductsTable] handleSaveFromPanel - Validation failed: Title is empty')
-      toast.error("Title is required")
+      notify.error("Title is required")
       return
     }
     
@@ -877,19 +880,19 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
     
     if (!hasBasePrice && !hasHourlyRate) {
       console.warn('[ProductsTable] handleSaveFromPanel - Validation failed: No pricing defined')
-      toast.error("At least one pricing option (base price or hourly rate) is required")
+      notify.error("At least one pricing option (base price or hourly rate) is required")
       return
     }
     
     if (editValues.price && parseFloat(editValues.price) < 0) {
       console.warn('[ProductsTable] handleSaveFromPanel - Validation failed: Invalid price:', editValues.price)
-      toast.error("Price must be 0 or greater")
+      notify.error("Price must be 0 or greater")
       return
     }
 
     if (editValues.paymentType === 'subscription' && !editValues.recurrenceType) {
       console.warn('[ProductsTable] handleSaveFromPanel - Validation failed: Recurrence type is missing')
-      toast.error("Please select a recurrence period for subscriptions")
+      notify.error("Please select a recurrence period for subscriptions")
       return
     }
     
@@ -958,17 +961,17 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
             
             if (!imgResponse.ok) {
               console.error('[ProductsTable] handleSaveFromPanel - Image upload failed')
-              toast.warning("Product created but image upload failed")
+              notify.warning("Product created but image upload failed")
             } else {
               console.log('[ProductsTable] handleSaveFromPanel - Image uploaded successfully')
             }
           } catch (error) {
             console.error('[ProductsTable] handleSaveFromPanel - Image upload exception:', error)
-            toast.warning("Product created but image upload failed")
+            notify.warning("Product created but image upload failed")
           }
         }
         
-        toast.success(isNewProduct ? "Product created successfully" : "Product updated successfully")
+        notify.success(isNewProduct ? "Product created successfully" : "Product updated successfully")
         console.log('[ProductsTable] handleSaveFromPanel - Success, closing panel and refreshing')
         setIsEditingInPanel(false)
         setDetailsProductId(null)
@@ -978,11 +981,11 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
         router.refresh()
       } else {
         console.error('[ProductsTable] handleSaveFromPanel - Failed:', result.error)
-        toast.error(result.error || (isNewProduct ? "Failed to create product" : "Failed to update product"))
+        notify.error(result.error || (isNewProduct ? "Failed to create product" : "Failed to update product"))
       }
     } catch (error) {
       console.error('[ProductsTable] handleSaveFromPanel - Exception:', error)
-      toast.error("An error occurred while saving")
+      notify.error("An error occurred while saving")
     }
   }
 
@@ -1201,7 +1204,7 @@ export const ProductsTable = forwardRef<ProductsTableHandle, ProductsTableProps>
                       className="font-mono text-xs text-muted-foreground cursor-pointer hover:text-foreground truncate"
                       onClick={() => {
                         navigator.clipboard.writeText(product.id)
-                        toast.success("ID copied to clipboard")
+                        notify.success("ID copied to clipboard")
                       }}
                       title={product.id}
                     >

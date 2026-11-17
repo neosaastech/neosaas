@@ -35,7 +35,7 @@ import {
   Copy,
   X,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   getContentMedia,
   uploadContentMedia,
@@ -169,7 +169,7 @@ export function MediaGallery() {
     setIsLoading(true)
     const result = await getContentMedia({ limit: 200, search: search || undefined })
     if (result.success) setItems(result.data)
-    else toast.error(result.error)
+    else notify.error(result.error)
     setIsLoading(false)
   }
 
@@ -246,7 +246,7 @@ export function MediaGallery() {
       }
     }
     setIsUploading(false)
-    toast[fail > 0 ? "warning" : "success"](`${ok} file(s) uploaded${fail > 0 ? `, ${fail} failed` : ""}`)
+    notify[fail > 0 ? "warning" : "success"](`${ok} file(s) uploaded${fail > 0 ? `, ${fail} failed` : ""}`)
     load()
   }
 
@@ -273,10 +273,10 @@ export function MediaGallery() {
     setIsUploading(true)
     try {
       await upload(file)
-      toast.success("Uploaded")
+      notify.success("Uploaded")
       load()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Upload failed")
+      notify.error(error instanceof Error ? error.message : "Upload failed")
     } finally {
       setIsUploading(false)
     }
@@ -290,7 +290,7 @@ export function MediaGallery() {
   async function handleDelete(item: PayloadMediaSummary) {
     const result = await removeContentMedia(item.id)
     if (result.success) {
-      toast.success("Deleted")
+      notify.success("Deleted")
       setItems((prev) => prev.filter((m) => m.id !== item.id))
       setSelected((prev) => {
         const next = new Set(prev)
@@ -298,7 +298,7 @@ export function MediaGallery() {
         return next
       })
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -320,13 +320,13 @@ export function MediaGallery() {
     }
     setBulkProgress(null)
     clearSelection()
-    if (fail > 0) toast.warning(`${ok} deleted, ${fail} failed`)
-    else toast.success(`${ok} file(s) deleted`)
+    if (fail > 0) notify.warning(`${ok} deleted, ${fail} failed`)
+    else notify.success(`${ok} file(s) deleted`)
   }
 
   function copyUrl(url: string) {
     navigator.clipboard.writeText(url)
-    toast.success("URL copied")
+    notify.success("URL copied")
   }
 
   // Charles (2026-07-11): "la sélection multiple doit permettre de modifier
@@ -336,7 +336,7 @@ export function MediaGallery() {
   async function handleBulkRotate() {
     const targets = selectedItems.filter((m) => (m.mimeType ?? "").startsWith("image/"))
     if (targets.length === 0) {
-      toast.warning("No images in the selection")
+      notify.warning("No images in the selection")
       return
     }
     setBulkProgress({ label: "Rotating", done: 0, total: targets.length })
@@ -353,8 +353,8 @@ export function MediaGallery() {
       setBulkProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev))
     }
     setBulkProgress(null)
-    if (fail > 0) toast.warning(`${ok} rotated, ${fail} failed`)
-    else toast.success(`${ok} image(s) rotated`)
+    if (fail > 0) notify.warning(`${ok} rotated, ${fail} failed`)
+    else notify.success(`${ok} image(s) rotated`)
   }
 
   // Charles: "on doit être capable de vérifier leur poids et la
@@ -364,7 +364,7 @@ export function MediaGallery() {
   async function handleBulkMinify() {
     const targets = selectedItems.filter((m) => (m.mimeType ?? "").startsWith("image/"))
     if (targets.length === 0) {
-      toast.warning("No images in the selection")
+      notify.warning("No images in the selection")
       return
     }
     setBulkProgress({ label: "Minifying", done: 0, total: targets.length })
@@ -381,8 +381,8 @@ export function MediaGallery() {
       setBulkProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev))
     }
     setBulkProgress(null)
-    if (fail > 0) toast.warning(`${ok} minified, ${fail} failed`)
-    else toast.success(`${ok} image(s) minified`)
+    if (fail > 0) notify.warning(`${ok} minified, ${fail} failed`)
+    else notify.success(`${ok} image(s) minified`)
   }
 
   // Extension kept out of the editable field on purpose (Charles, 2026-07-11:
@@ -460,10 +460,10 @@ export function MediaGallery() {
         setBulkProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev))
       }
       setItems((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
-      toast.success("Saved")
+      notify.success("Saved")
       setOverlayTarget(null)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save changes")
+      notify.error(error instanceof Error ? error.message : "Failed to save changes")
     } finally {
       setBulkProgress(null)
     }
@@ -484,7 +484,7 @@ export function MediaGallery() {
     const result = await getContentMediaDataUrl(overlayTarget.id)
     setIsLoadingCrop(false)
     if (!result.success) {
-      toast.error(result.error)
+      notify.error(result.error)
       return
     }
     setCropSrc(result.dataUrl)
@@ -507,9 +507,9 @@ export function MediaGallery() {
       if (!result.success) throw new Error(result.error)
       setItems((prev) => prev.map((m) => (m.id === result.data.id ? result.data : m)))
       setOverlayTarget(result.data)
-      toast.success("Cropped")
+      notify.success("Cropped")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save crop")
+      notify.error(error instanceof Error ? error.message : "Failed to save crop")
     } finally {
       setBulkProgress(null)
       setCropSrc(null)
@@ -521,7 +521,7 @@ export function MediaGallery() {
   // pages-settings.tsx's handleExportCSV (Content tab).
   function handleExportCSV() {
     if (sorted.length === 0) {
-      toast.error("No media to export")
+      notify.error("No media to export")
       return
     }
     const headers = ["ID", "Filename", "Alt", "MimeType", "Filesize", "URL", "CreatedAt"]
@@ -540,7 +540,7 @@ export function MediaGallery() {
     link.href = URL.createObjectURL(blob)
     link.download = `media_export_${new Date().toISOString().split("T")[0]}.csv`
     link.click()
-    toast.success(`${sorted.length} file(s) exported`)
+    notify.success(`${sorted.length} file(s) exported`)
   }
 
   // Charles: "éditer des balises alt en masse c'est pas génial" was the
@@ -558,7 +558,7 @@ export function MediaGallery() {
       const text = await file.text()
       const lines = text.split("\n")
       if (lines.length < 2) {
-        toast.error("CSV file is empty")
+        notify.error("CSV file is empty")
         return
       }
       const header = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ""))
@@ -566,7 +566,7 @@ export function MediaGallery() {
       const altIdx = header.indexOf("alt")
       const filenameIdx = header.indexOf("filename")
       if (idIdx === -1) {
-        toast.error('CSV must have an "ID" column')
+        notify.error('CSV must have an "ID" column')
         return
       }
       const dataLines = lines.slice(1).filter((line) => line.trim())
@@ -609,11 +609,11 @@ export function MediaGallery() {
         setBulkProgress((prev) => (prev ? { ...prev, done: prev.done + 1 } : prev))
       }
       setBulkProgress(null)
-      if (fail > 0) toast.warning(`${ok} updated, ${fail} failed`)
-      else toast.success(`${ok} file(s) updated from CSV`)
+      if (fail > 0) notify.warning(`${ok} updated, ${fail} failed`)
+      else notify.success(`${ok} file(s) updated from CSV`)
     } catch (error) {
       console.error("CSV import error:", error)
-      toast.error("Failed to import CSV file")
+      notify.error("Failed to import CSV file")
       setBulkProgress(null)
     } finally {
       if (csvImportInputRef.current) csvImportInputRef.current.value = ""

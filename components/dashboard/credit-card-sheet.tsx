@@ -19,7 +19,7 @@ import {
 } from "@/app/actions/payments"
 import { confirmPaymentMethodAdded } from "@/app/actions/stripe-payments"
 import { StripeCardForm } from "@/components/dashboard/stripe-card-form"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 
 const WRITER_ROLES = ['writer', 'admin', 'super_admin']
@@ -148,10 +148,10 @@ export function CreditCardSheet({ open, onOpenChange, cards, onRefresh }: Credit
         })
         setShowCardForm(true)
       } else {
-        toast.error(response.error || "Could not initialize card setup")
+        notify.error(response.error || "Could not initialize card setup")
       }
     } catch {
-      toast.error("Failed to initialize card setup")
+      notify.error("Failed to initialize card setup")
     } finally {
       setIsLoadingSetup(false)
     }
@@ -163,15 +163,15 @@ export function CreditCardSheet({ open, onOpenChange, cards, onRefresh }: Credit
     try {
       const result = await confirmPaymentMethodAdded(paymentMethodId)
       if (!result.success) {
-        toast.error(result.error || "Failed to save card to your company account")
+        notify.error(result.error || "Failed to save card to your company account")
         return
       }
       setShowCardForm(false)
       setSetupData(null)
-      toast.success("Card saved to your company account!")
+      notify.success("Card saved to your company account!")
       onRefresh()
     } catch {
-      toast.error("Failed to save card")
+      notify.error("Failed to save card")
     } finally {
       setIsSavingCard(false)
     }
@@ -187,13 +187,13 @@ export function CreditCardSheet({ open, onOpenChange, cards, onRefresh }: Credit
     try {
       const response = await deleteStripePaymentMethod(cardId)
       if (response.success) {
-        toast.success("Card removed")
+        notify.success("Card removed")
         onRefresh()
       } else {
-        toast.error(response.error || "Failed to remove card")
+        notify.error(response.error || "Failed to remove card")
       }
     } catch {
-      toast.error("Failed to remove card")
+      notify.error("Failed to remove card")
     } finally {
       setDeletingCard(null)
     }
@@ -204,13 +204,13 @@ export function CreditCardSheet({ open, onOpenChange, cards, onRefresh }: Credit
     try {
       const response = await setDefaultPaymentMethod(cardId)
       if (response.success) {
-        toast.success("Default card updated")
+        notify.success("Default card updated")
         onRefresh()
       } else {
-        toast.error(response.error || "Failed to set default card")
+        notify.error(response.error || "Failed to set default card")
       }
     } catch {
-      toast.error("Failed to set default card")
+      notify.error("Failed to set default card")
     } finally {
       setSettingDefault(null)
     }
@@ -369,7 +369,7 @@ export function CreditCardSheet({ open, onOpenChange, cards, onRefresh }: Credit
           {/* Refresh */}
           <Button
             variant="ghost"
-            onClick={() => { onRefresh(); toast.info("Refreshing...") }}
+            onClick={() => { onRefresh(); notify.info("Refreshing...") }}
             className="w-full"
             size="sm"
           >

@@ -44,7 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { Checkbox } from "@/components/ui/checkbox"
 
 interface Coupon {
@@ -109,10 +109,10 @@ export function CouponsTable({ coupons, products }: CouponsTableProps) {
     
     const result = await deleteCoupon(deleteId)
     if (result.success) {
-      toast.success("Coupon deleted")
+      notify.success("Coupon deleted")
       router.refresh()
     } else {
-      toast.error("Failed to delete coupon")
+      notify.error("Failed to delete coupon")
     }
     setDeleteId(null)
   }
@@ -184,15 +184,15 @@ export function CouponsTable({ coupons, products }: CouponsTableProps) {
       })
 
       if (result.success) {
-        toast.success(editingCoupon ? "Coupon updated" : "Coupon created")
+        notify.success(editingCoupon ? "Coupon updated" : "Coupon created")
         setEditingCoupon(null)
         setIsCreating(false)
         router.refresh()
       } else {
-        toast.error(result.error || "Failed to save coupon")
+        notify.error(result.error || "Failed to save coupon")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setLoading(false)
     }
@@ -201,7 +201,7 @@ export function CouponsTable({ coupons, products }: CouponsTableProps) {
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code)
     setCopiedCode(code)
-    toast.success("Code copied to clipboard")
+    notify.success("Code copied to clipboard")
     setTimeout(() => setCopiedCode(null), 2000)
   }
 

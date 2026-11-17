@@ -23,7 +23,7 @@ import {
 import { formatCurrency } from "@/lib/utils"
 import { Search, Filter, X, FileText, Download, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { getInvoicePdfUrl } from "@/app/actions/admin-dashboard"
 
 interface Invoice {
@@ -95,20 +95,20 @@ function InvoiceDownloadButton({
       try {
         const result = await getInvoicePdfUrl(stripeInvoiceId, paymentIntentId, orderId)
         if (!result.success) {
-          toast.error(result.error || "Unable to retrieve invoice")
+          notify.error(result.error || "Unable to retrieve invoice")
           return
         }
         const url = result.invoicePdf || result.hostedInvoiceUrl
         if (!url) {
-          toast.error("Invoice URL not available yet")
+          notify.error("Invoice URL not available yet")
           return
         }
         if (result.isReceipt) {
-          toast.info("Opening Stripe receipt (legacy order — no invoice PDF available)")
+          notify.info("Opening Stripe receipt (legacy order — no invoice PDF available)")
         }
         window.open(url, "_blank", "noopener,noreferrer")
       } catch {
-        toast.error("Error fetching invoice")
+        notify.error("Error fetching invoice")
       } finally {
         setLoading(false)
       }

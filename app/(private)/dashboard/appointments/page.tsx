@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 interface Appointment {
   id: string
@@ -74,11 +74,11 @@ export default function AppointmentsListPage() {
         setAppointments(data.data)
         setFilteredAppointments(data.data)
       } else {
-        toast.error("Erreur lors du chargement des rendez-vous")
+        notify.error("Erreur lors du chargement des rendez-vous")
       }
     } catch (error) {
       console.error("Failed to fetch appointments:", error)
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setLoading(false)
     }
@@ -161,14 +161,14 @@ export default function AppointmentsListPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success("Rendez-vous confirmé !")
+        notify.success("Rendez-vous confirmé !")
         fetchAppointments() // Refresh list
       } else {
-        toast.error(data.error || "Échec de la confirmation")
+        notify.error(data.error || "Échec de la confirmation")
       }
     } catch (error) {
       console.error("Failed to confirm appointment:", error)
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     }
   }
 

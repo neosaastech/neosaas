@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { upsertProduct } from "@/app/actions/ecommerce"
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { ArrowLeft, Upload, X, ImageIcon, Package, Monitor, Calendar, Box, Ticket, Plus, Check, Copy, Trash, Gift, Download, Key, FileText, Repeat, Clock, CreditCard } from "lucide-react"
 import Link from "next/link"
 import * as Icons from "lucide-react"
@@ -180,7 +181,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
         setImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
-      toast.success("Image ready for upload (will be saved with product)")
+      notify.success("Image ready for upload (will be saved with product)")
       return
     }
 
@@ -198,13 +199,13 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
       if (response.ok) {
         const data = await response.json()
         setImagePreview(data.imageUrl)
-        toast.success("Image uploaded")
+        notify.success("Image uploaded")
         router.refresh()
       } else {
-        toast.error("Failed to upload image")
+        notify.error("Failed to upload image")
       }
     } catch (error) {
-      toast.error("Upload error")
+      notify.error("Upload error")
     }
   }
 
@@ -213,7 +214,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
       // For new products, just clear the preview and pending file
       setImagePreview(null)
       setPendingImageFile(null)
-      toast.success("Image removed")
+      notify.success("Image removed")
       return
     }
 
@@ -227,11 +228,11 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
       if (result.success) {
         setImagePreview(null)
         setPendingImageFile(null)
-        toast.success("Image removed")
+        notify.success("Image removed")
         router.refresh()
       }
     } catch (error) {
-      toast.error("Failed to remove image")
+      notify.error("Failed to remove image")
     }
   }
 
@@ -249,7 +250,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
     if (!initialData?.id) {
       setPendingCoupon(true)
       setShowCouponForm(false)
-      toast.success("Coupon will be created after the product is saved")
+      notify.success("Coupon will be created after the product is saved")
       return
     }
     
@@ -272,7 +273,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
       })
 
       if (result.success) {
-        toast.success("Coupon created successfully")
+        notify.success("Coupon created successfully")
         setShowCouponForm(false)
         setCouponFormData({
           code: "",
@@ -294,31 +295,33 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
           setCoupons(productCoupons)
         }
       } else {
-        toast.error(result.error || "Failed to create coupon")
+        notify.error(result.error || "Failed to create coupon")
       }
     } catch (error) {
-      toast.error("An error occurred while creating the coupon")
+      notify.error("An error occurred while creating the coupon")
     } finally {
       setCouponLoading(false)
     }
   }
 
+  const confirm = useConfirm()
+
   const handleDeleteCoupon = async (couponId: string) => {
-    if (!confirm("Are you sure you want to delete this coupon?")) return
+    if (!await confirm({ title: "Supprimer ce coupon ?", description: "Cette action est irréversible.", destructive: true })) return
     
     const result = await deleteCoupon(couponId)
     if (result.success) {
-      toast.success("Coupon deleted")
+      notify.success("Coupon deleted")
       setCoupons(coupons.filter(c => c.id !== couponId))
     } else {
-      toast.error("Failed to delete coupon")
+      notify.error("Failed to delete coupon")
     }
   }
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code)
     setCopiedCode(code)
-    toast.success("Code copied to clipboard")
+    notify.success("Code copied to clipboard")
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
@@ -328,21 +331,21 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
     // Validation: if subscription, at least one recurrence must be enabled
     if (formData.paymentType === 'subscription') {
       if (!enabledRecurrences.weekly && !enabledRecurrences.monthly && !enabledRecurrences.yearly) {
-        toast.error("Veuillez sélectionner au moins une période d'abonnement")
+        notify.error("Veuillez sélectionner au moins une période d'abonnement")
         return
       }
       
       // Check that enabled recurrences have prices
       if (enabledRecurrences.weekly && !formData.subscriptionPriceWeekly) {
-        toast.error("Veuillez définir un prix pour l'abonnement hebdomadaire")
+        notify.error("Veuillez définir un prix pour l'abonnement hebdomadaire")
         return
       }
       if (enabledRecurrences.monthly && !formData.subscriptionPriceMonthly) {
-        toast.error("Veuillez définir un prix pour l'abonnement mensuel")
+        notify.error("Veuillez définir un prix pour l'abonnement mensuel")
         return
       }
       if (enabledRecurrences.yearly && !formData.subscriptionPriceYearly) {
-        toast.error("Veuillez définir un prix pour l'abonnement annuel")
+        notify.error("Veuillez définir un prix pour l'abonnement annuel")
         return
       }
     }
@@ -424,11 +427,11 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
             })
           } catch (error) {
             console.error("Image upload error:", error)
-            toast.error("Product created but image upload failed")
+            notify.error("Product created but image upload failed")
           }
         }
 
-        toast.success(initialData ? "Product updated" : "Product created")
+        notify.success(initialData ? "Product updated" : "Product created")
 
         if (pendingCoupon && result.data?.id) {
           const discountValue = couponFormData.discountType === 'percentage'
@@ -448,7 +451,7 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
           })
 
           if (couponResult.success) {
-            toast.success("Coupon created")
+            notify.success("Coupon created")
             setPendingCoupon(false)
             setCouponFormData({
               code: "",
@@ -460,18 +463,18 @@ export function ProductForm({ initialData, products = [], vatRates }: ProductFor
               usageLimit: "",
             })
           } else {
-            toast.error(couponResult.error || "Failed to create coupon")
+            notify.error(couponResult.error || "Failed to create coupon")
           }
         }
 
         router.push("/admin/products")
         router.refresh()
       } else {
-        toast.error("Failed to save product")
+        notify.error("Failed to save product")
       }
     } catch (error) {
       console.error(error)
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     } finally {
       setLoading(false)
     }

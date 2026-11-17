@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Pencil, Trash2, PanelTop, PanelBottom, Search } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   getContentHeaders,
   getContentHeader,
@@ -95,11 +95,11 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
     if (type === "header") {
       const result = await getContentHeaders(locale)
       if (result.success) setHeaders(result.data)
-      else toast.error(result.error)
+      else notify.error(result.error)
     } else {
       const result = await getContentFooters(locale)
       if (result.success) setFooters(result.data)
-      else toast.error(result.error)
+      else notify.error(result.error)
     }
     setLoading(false)
   }, [type, locale])
@@ -109,13 +109,13 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
     if (type === "header") {
       getContentHeaders(locale).then((result) => {
         if (result.success) setHeaders(result.data)
-        else toast.error(result.error)
+        else notify.error(result.error)
         setLoading(false)
       })
     } else {
       getContentFooters(locale).then((result) => {
         if (result.success) setFooters(result.data)
-        else toast.error(result.error)
+        else notify.error(result.error)
         setLoading(false)
       })
     }
@@ -130,11 +130,11 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
   async function openEdit(id: string | number) {
     if (type === "header") {
       const result = await getContentHeader(id, locale)
-      if (!result.success) return toast.error(result.error)
+      if (!result.success) return notify.error(result.error)
       setEditingHeader(result.data)
     } else {
       const result = await getContentFooter(id, locale)
-      if (!result.success) return toast.error(result.error)
+      if (!result.success) return notify.error(result.error)
       setEditingFooter(result.data)
     }
     setSheetOpen(true)
@@ -144,10 +144,10 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
     if (!deleteTarget) return
     const result = type === "header" ? await removeContentHeader(deleteTarget.id) : await removeContentFooter(deleteTarget.id)
     if (result.success) {
-      toast.success(type === "header" ? "Header deleted" : "Footer deleted")
+      notify.success(type === "header" ? "Header deleted" : "Footer deleted")
       reload()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
     setDeleteTarget(null)
   }
@@ -171,7 +171,7 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
   const columnCount = showStatusColumn ? 4 : 3
 
   async function handleExportJson() {
-    if (filteredRows.length === 0) { toast.error(`No ${label.toLowerCase()} to export`); return }
+    if (filteredRows.length === 0) { notify.error(`No ${label.toLowerCase()} to export`); return }
     const docs = await Promise.all(
       filteredRows.map((row) => (type === "header" ? getContentHeader(row.id, locale) : getContentFooter(row.id, locale))),
     )
@@ -180,13 +180,13 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
       `${type}s_export`,
       docs.filter((d) => d.success).map((d) => (d as { data: PayloadHeaderDoc | PayloadFooterDoc }).data),
     )
-    toast[failed > 0 ? "warning" : "success"](
+    notify[failed > 0 ? "warning" : "success"](
       `${docs.length - failed} ${label.toLowerCase()}(s) exported${failed > 0 ? `, ${failed} failed` : ""}`,
     )
   }
 
   function handleExportCsv() {
-    if (filteredRows.length === 0) return toast.error(`No ${label.toLowerCase()} to export`)
+    if (filteredRows.length === 0) return notify.error(`No ${label.toLowerCase()} to export`)
     const headers = showStatusColumn ? ["ID", "Scope", "Status", "Updated At"] : ["ID", "Scope", "Updated At"]
     const rows = filteredRows.map((row) =>
       showStatusColumn
@@ -194,7 +194,7 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
         : [row.id, scopeLabel(row), row.updatedAt],
     )
     downloadCsv(`${type}s_export`, headers, rows)
-    toast.success(`${filteredRows.length} ${label.toLowerCase()}(s) exported`)
+    notify.success(`${filteredRows.length} ${label.toLowerCase()}(s) exported`)
   }
 
   // JSON only — navItems/cta (header) and modules blocks (footer) aren't
@@ -205,7 +205,7 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
       docs = JSON.parse(await file.text())
       if (!Array.isArray(docs)) throw new Error("Expected a JSON array")
     } catch (error) {
-      toast.error(error instanceof Error ? `Invalid JSON: ${error.message}` : "Invalid JSON")
+      notify.error(error instanceof Error ? `Invalid JSON: ${error.message}` : "Invalid JSON")
       return
     }
 
@@ -252,7 +252,7 @@ export function HeaderFooterPanel({ type }: { type: "header" | "footer" }) {
       if (result.success) ok++
       else fail++
     }
-    toast[fail > 0 ? "warning" : "success"](`${ok} ${label.toLowerCase()}(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
+    notify[fail > 0 ? "warning" : "success"](`${ok} ${label.toLowerCase()}(s) imported${fail > 0 ? `, ${fail} failed` : ""}`)
     reload()
   }
 

@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/contexts/user-context"
 import { usePageTitle } from "@/hooks/use-page-title"
@@ -139,7 +139,7 @@ export default function UserChatPage() {
 
       const data = await response.json()
       if (data.success) {
-        toast.success("Conversation created")
+        notify.success("Conversation created")
         setNewChatOpen(false)
         setNewSubject("")
         setNewContent("")
@@ -147,11 +147,11 @@ export default function UserChatPage() {
         setSelectedConversation(data.data.conversation)
         setMessages([data.data.message])
       } else {
-        toast.error("Failed to create")
+        notify.error("Failed to create")
       }
     } catch (error) {
       console.error("Failed to create conversation:", error)
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setCreating(false)
     }
@@ -179,11 +179,11 @@ export default function UserChatPage() {
             : c
         ))
       } else {
-        toast.error("Failed to send message")
+        notify.error("Failed to send message")
       }
     } catch (error) {
       console.error("Failed to send message:", error)
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setSending(false)
     }

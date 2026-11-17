@@ -5,6 +5,7 @@
 
 'use client'
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
@@ -15,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from 'sonner'
+import { notify } from "@/lib/notify"
 import { Loader2, Palette, RefreshCw, Sun, Moon, Type, Cloud } from 'lucide-react'
 import type { ThemeConfig, ColorPalette } from '@/types/theme-config'
 import { defaultTheme } from '@/types/theme-config'
@@ -133,7 +134,7 @@ export function ThemeSettings() {
       const config = await getThemeConfig()
       setTheme(config)
     } catch (error) {
-      toast.error('Error loading theme')
+      notify.error('Error loading theme')
     } finally {
       setLoading(false)
     }
@@ -153,11 +154,11 @@ export function ThemeSettings() {
         router.refresh()
       } else {
         setSaveStatus('error')
-        toast.error(result.error || 'Error saving theme')
+        notify.error(result.error || 'Error saving theme')
       }
     } catch (error) {
       setSaveStatus('error')
-      toast.error('Error saving theme')
+      notify.error('Error saving theme')
     }
   }, [theme, router])
 
@@ -189,8 +190,10 @@ export function ThemeSettings() {
     triggerAutoSave()
   }, [theme, resolvedTheme, loading, triggerAutoSave])
 
+  const confirm = useConfirm()
+
   const handleReset = async () => {
-    if (!confirm('Are you sure you want to reset to the default theme?')) {
+    if (!await confirm({ title: "Revenir au thème par défaut ?", description: "Vos réglages de couleurs, de polices et d'affichage seront remplacés.", confirmLabel: "Réinitialiser", destructive: true })) {
       return
     }
 
@@ -198,18 +201,18 @@ export function ThemeSettings() {
     try {
       const result = await resetThemeConfig()
       if (result.success) {
-        toast.success('Theme reset successfully')
+        notify.success('Theme reset successfully')
         setSaveStatus('saved')
         hasHydrated.current = false
         await loadTheme()
         router.refresh()
       } else {
         setSaveStatus('error')
-        toast.error(result.error || 'Error resetting theme')
+        notify.error(result.error || 'Error resetting theme')
       }
     } catch (error) {
       setSaveStatus('error')
-      toast.error('Error resetting theme')
+      notify.error('Error resetting theme')
     }
   }
 

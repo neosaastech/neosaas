@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Globe, Loader2, Plus, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { saveContentHeader, getContentHeader } from "@/app/actions/header-footer"
 import { getContentPages, getContentCategories } from "@/app/actions/pages"
 import { MediaPickerField } from "./media-picker-field"
@@ -160,7 +160,7 @@ export function HeaderEditor({
       applyDoc(result.data)
       setActiveLocale(nextLocale)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to switch language")
+      notify.error(error instanceof Error ? error.message : "Failed to switch language")
     } finally {
       setIsSwitchingLocale(false)
     }
@@ -239,10 +239,10 @@ export function HeaderEditor({
     setIsPublishing(true)
     try {
       await persist("published", formValues)
-      toast.success("Header published")
+      notify.success("Header published")
       onSaved()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "An unexpected error occurred")
+      notify.error(error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsPublishing(false)
     }

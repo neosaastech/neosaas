@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 import { updateCookieSettings, updateHostingSettings } from "@/app/actions/platform-config"
 import { deleteCookieConsent, deleteCookieConsents } from "@/app/actions/cookie-consent"
 import { Badge } from "@/components/ui/badge"
@@ -77,7 +77,6 @@ export function LegalManagement({
   const [isSavingHosting, setIsSavingHosting] = useState(false)
 
   const [isDeleting, setIsDeleting] = useState(false)
-  const { toast } = useToast()
 
   // Debounce timers for autosave
   const cookieSettingsTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -97,10 +96,7 @@ export function LegalManagement({
       })
       
       if (result.success) {
-        toast({
-          title: "Auto-saved",
-          description: "Cookie settings saved",
-        })
+        notify.success("Auto-saved", { description: "Cookie settings saved" })
       }
     } catch (error) {
       // Silent fail for autosave to avoid disrupting user
@@ -108,7 +104,7 @@ export function LegalManagement({
     } finally {
       setIsSavingCookie(false)
     }
-  }, [showCookieLogo, cookieEnabled, cookieMessage, cookieMessageEn, cookiePosition, toast])
+  }, [showCookieLogo, cookieEnabled, cookieMessage, cookieMessageEn, cookiePosition])
 
   // Auto-save hosting settings with debounce
   const autoSaveHostingSettings = useCallback(async () => {
@@ -121,17 +117,14 @@ export function LegalManagement({
       })
       
       if (result.success) {
-        toast({
-          title: "Auto-saved",
-          description: "Hosting settings saved",
-        })
+        notify.success("Auto-saved", { description: "Hosting settings saved" })
       }
     } catch (error) {
       console.error("Autosave failed:", error)
     } finally {
       setIsSavingHosting(false)
     }
-  }, [hostingName, hostingAddress, hostingContact, toast])
+  }, [hostingName, hostingAddress, hostingContact])
 
   // Effect for auto-saving cookie settings
   useEffect(() => {
@@ -209,26 +202,15 @@ export function LegalManagement({
       const result = await deleteCookieConsents(Array.from(selectedConsents))
       
       if (result.success) {
-        toast({
-          title: "Deleted",
-          description: result.message || `${selectedConsents.size} consent(s) deleted`,
-        })
+        notify.success("Deleted", { description: result.message || `${selectedConsents.size} consent(s) deleted` })
         setConsents(consents.filter(c => !selectedConsents.has(c.id)))
         setSelectedConsents(new Set())
         router.refresh()
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.error || "Failed to delete consents",
-        })
+        notify.error("Error", { description: result.error || "Failed to delete consents" })
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Something went wrong",
-      })
+      notify.error("Error", { description: "Something went wrong" })
     } finally {
       setIsDeleting(false)
     }
@@ -240,27 +222,16 @@ export function LegalManagement({
       const result = await deleteCookieConsent(id)
       
       if (result.success) {
-        toast({
-          title: "Deleted",
-          description: "Consent deleted successfully",
-        })
+        notify.success("Deleted", { description: "Consent deleted successfully" })
         setConsents(consents.filter(c => c.id !== id))
         selectedConsents.delete(id)
         setSelectedConsents(new Set(selectedConsents))
         router.refresh()
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.error || "Failed to delete consent",
-        })
+        notify.error("Error", { description: result.error || "Failed to delete consent" })
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Something went wrong",
-      })
+      notify.error("Error", { description: "Something went wrong" })
     } finally {
       setIsDeleting(false)
     }

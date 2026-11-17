@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import Link from "next/link"
 import { Loader2, Terminal, History, Shield, LayoutGrid } from "lucide-react"
 import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
@@ -78,7 +78,7 @@ export default function PilotagePage() {
     try {
       body = JSON.parse(payload)
     } catch {
-      toast.error("JSON invalide")
+      notify.error("JSON invalide")
       return
     }
 
@@ -92,14 +92,14 @@ export default function PilotagePage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        toast.error(data.error || "Échec de la requête")
+        notify.error(data.error || "Échec de la requête")
         return
       }
       setResults(data.results)
-      toast.success(dryRun ? "Validation terminée" : "Actions appliquées")
+      notify.success(dryRun ? "Validation terminée" : "Actions appliquées")
       if (!dryRun) loadLogs()
     } catch {
-      toast.error("Erreur réseau")
+      notify.error("Erreur réseau")
     } finally {
       setSubmitting(false)
     }

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import { getCart, addToCart as addToCartAction, clearActiveCart } from "@/app/actions/ecommerce"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { usePathname } from "next/navigation"
 
 interface CartContextType {
@@ -66,13 +66,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const result = await addToCartAction(productId)
       if (result.success) {
         await refreshCart()
-        toast.success("Ajouté au panier")
+        notify.success("Ajouté au panier")
       } else {
-        toast.error(result.error || "Erreur lors de l'ajout au panier")
+        notify.error(result.error || "Erreur lors de l'ajout au panier")
       }
     } catch (error) {
       console.error("[CartContext] Add to cart error", error)
-      toast.error("Erreur lors de l'ajout au panier")
+      notify.error("Erreur lors de l'ajout au panier")
     }
   }
 

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Globe, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { saveContentModule, getContentModule } from "@/app/actions/header-footer"
 import { getContentPages, getContentCategories } from "@/app/actions/pages"
 import { BlockEditor } from "./block-editor"
@@ -98,7 +98,7 @@ export function ModuleEditor({
       return
     }
     if (!anchorKey.trim()) {
-      toast.error("Anchor key is required before switching language")
+      notify.error("Anchor key is required before switching language")
       return
     }
     setIsSwitchingLocale(true)
@@ -109,7 +109,7 @@ export function ModuleEditor({
       applyDoc(result.data)
       setActiveLocale(nextLocale)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to switch language")
+      notify.error(error instanceof Error ? error.message : "Failed to switch language")
     } finally {
       setIsSwitchingLocale(false)
     }
@@ -134,16 +134,16 @@ export function ModuleEditor({
 
   async function handleSave() {
     if (!anchorKey.trim()) {
-      toast.error("Anchor key is required")
+      notify.error("Anchor key is required")
       return
     }
     setSaving(true)
     try {
       await persist()
-      toast.success("Module saved")
+      notify.success("Module saved")
       onSaved()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save module")
+      notify.error(error instanceof Error ? error.message : "Failed to save module")
     } finally {
       setSaving(false)
     }

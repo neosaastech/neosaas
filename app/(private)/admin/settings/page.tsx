@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { ImageCropper } from "@/components/ui/image-cropper"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   Upload,
   Settings,
@@ -154,12 +154,12 @@ export default function AdminSettingsPage() {
       window.dispatchEvent(new CustomEvent('refreshAdminAlerts'))
 
       if (immediate) {
-        toast.success('Configuration saved')
+        notify.success('Configuration saved')
       }
     } catch (error) {
       console.error('[AdminSettings] saveConfig - Exception:', error)
       setSaveStatus('error')
-      toast.error(error instanceof Error ? error.message : 'Failed to save')
+      notify.error(error instanceof Error ? error.message : 'Failed to save')
     }
   }, [siteName, siteNameStyle, siteNameHtml, siteUrl, contactEmail, gdprContactName, showLogoInHeader, showSiteNameInHeader, maintenanceMode, gtmCode, customHeaderCode, customFooterCode, customHttpHeaders, adminFooterCopyright, forceHttps, seoSettings, socialLinks, socialAuthEnabled])
 
@@ -247,7 +247,7 @@ export default function AdminSettingsPage() {
         }
       } catch (error) {
         console.error('[AdminSettings] fetchConfig - Exception:', error)
-        toast.error('Failed to load configuration')
+        notify.error('Failed to load configuration')
       } finally {
         setIsInitialLoad(false)
       }
@@ -323,11 +323,11 @@ export default function AdminSettingsPage() {
       console.log('[AdminSettings] handleCropComplete - Logo saved successfully')
       setSaveStatus('saved')
       window.dispatchEvent(new CustomEvent('refreshAdminAlerts'))
-      toast.success('Logo saved successfully')
+      notify.success('Logo saved successfully')
     } catch (error) {
       console.error('[AdminSettings] handleCropComplete - Exception:', error)
       setSaveStatus('error')
-      toast.error(error instanceof Error ? error.message : 'Failed to save logo')
+      notify.error(error instanceof Error ? error.message : 'Failed to save logo')
     }
   }
 
@@ -368,11 +368,11 @@ export default function AdminSettingsPage() {
       console.log('[AdminSettings] handleRemoveLogo - Logo removed successfully')
       setLogoPreview('')
       setSaveStatus('saved')
-      toast.success('Logo removed successfully')
+      notify.success('Logo removed successfully')
     } catch (error) {
       console.error('[AdminSettings] handleRemoveLogo - Exception:', error)
       setSaveStatus('error')
-      toast.error('Failed to remove logo')
+      notify.error('Failed to remove logo')
     }
   }
 
@@ -424,11 +424,11 @@ export default function AdminSettingsPage() {
         console.log('[AdminSettings] handleOgImageChange - OG image saved successfully')
         setSaveStatus('saved')
         window.dispatchEvent(new CustomEvent('refreshAdminAlerts'))
-        toast.success('OG Image saved successfully')
+        notify.success('OG Image saved successfully')
       } catch (error) {
         console.error('[AdminSettings] handleOgImageChange - Exception:', error)
         setSaveStatus('error')
-        toast.error(error instanceof Error ? error.message : 'Failed to save OG image')
+        notify.error(error instanceof Error ? error.message : 'Failed to save OG image')
       }
     }
   }
@@ -472,11 +472,11 @@ export default function AdminSettingsPage() {
 
       console.log('[AdminSettings] handleRemoveOgImage - OG image removed successfully')
       setSaveStatus('saved')
-      toast.success('OG Image removed successfully')
+      notify.success('OG Image removed successfully')
     } catch (error) {
       console.error('[AdminSettings] handleRemoveOgImage - Exception:', error)
       setSaveStatus('error')
-      toast.error('Failed to remove OG image')
+      notify.error('Failed to remove OG image')
     }
   }
 
@@ -503,12 +503,12 @@ export default function AdminSettingsPage() {
 
       console.log('[AdminSettings] handleMaintenanceToggle - Maintenance mode updated successfully')
       setSaveStatus('saved')
-      toast.success(newMode ? 'Maintenance mode enabled' : 'Site is now live')
+      notify.success(newMode ? 'Maintenance mode enabled' : 'Site is now live')
     } catch (error) {
       console.error('[AdminSettings] handleMaintenanceToggle - Exception:', error)
       setMaintenanceMode(!newMode) // Revert
       setSaveStatus('error')
-      toast.error('Failed to update maintenance mode')
+      notify.error('Failed to update maintenance mode')
     }
   }
 
@@ -932,11 +932,11 @@ export default function AdminSettingsPage() {
                           throw new Error(error.error || 'Failed to toggle GitHub OAuth');
                         }
 
-                        toast.success(checked ? 'GitHub OAuth published' : 'GitHub OAuth unpublished');
+                        notify.success(checked ? 'GitHub OAuth published' : 'GitHub OAuth unpublished');
                       } catch (error) {
                         console.error('Toggle GitHub OAuth error:', error);
                         setSocialAuthEnabled(socialAuthEnabled);
-                        toast.error(error instanceof Error ? error.message : 'Failed to toggle GitHub OAuth');
+                        notify.error(error instanceof Error ? error.message : 'Failed to toggle GitHub OAuth');
                       }
                     }}
                   />
@@ -998,11 +998,11 @@ export default function AdminSettingsPage() {
                           throw new Error(error.error || 'Failed to toggle Google OAuth');
                         }
 
-                        toast.success(checked ? 'Google OAuth published' : 'Google OAuth unpublished');
+                        notify.success(checked ? 'Google OAuth published' : 'Google OAuth unpublished');
                       } catch (error) {
                         console.error('Toggle Google OAuth error:', error);
                         setSocialAuthEnabled(socialAuthEnabled);
-                        toast.error(error instanceof Error ? error.message : 'Failed to toggle Google OAuth');
+                        notify.error(error instanceof Error ? error.message : 'Failed to toggle Google OAuth');
                       }
                     }}
                   />
@@ -1052,11 +1052,11 @@ export default function AdminSettingsPage() {
                           throw new Error(error.error || 'Failed to toggle Microsoft OAuth');
                         }
 
-                        toast.success(checked ? 'Microsoft OAuth published' : 'Microsoft OAuth unpublished');
+                        notify.success(checked ? 'Microsoft OAuth published' : 'Microsoft OAuth unpublished');
                       } catch (error) {
                         console.error('Toggle Microsoft OAuth error:', error);
                         setSocialAuthEnabled(socialAuthEnabled);
-                        toast.error(error instanceof Error ? error.message : 'Failed to toggle Microsoft OAuth');
+                        notify.error(error instanceof Error ? error.message : 'Failed to toggle Microsoft OAuth');
                       }
                     }}
                   />
@@ -1104,11 +1104,11 @@ export default function AdminSettingsPage() {
                           throw new Error(error.error || 'Failed to toggle Facebook OAuth');
                         }
 
-                        toast.success(checked ? 'Facebook OAuth published' : 'Facebook OAuth unpublished');
+                        notify.success(checked ? 'Facebook OAuth published' : 'Facebook OAuth unpublished');
                       } catch (error) {
                         console.error('Toggle Facebook OAuth error:', error);
                         setSocialAuthEnabled(socialAuthEnabled);
-                        toast.error(error instanceof Error ? error.message : 'Failed to toggle Facebook OAuth');
+                        notify.error(error instanceof Error ? error.message : 'Failed to toggle Facebook OAuth');
                       }
                     }}
                   />

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Mail, Settings, Edit3, Copy, Check, Cloud, Send, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { AdminPageGuard } from "@/components/admin/admin-page-guard"
 
 function ScalewayIcon({ className }: { className?: string }) {
@@ -155,13 +155,13 @@ export default function MailPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success('Template saved successfully!')
+        notify.success('Template saved successfully!')
         setIsEditing(false)
       } else {
-        toast.error(data.error || 'Failed to save template')
+        notify.error(data.error || 'Failed to save template')
       }
     } catch (error) {
-      toast.error('An error occurred while saving')
+      notify.error('An error occurred while saving')
       console.error(error)
     } finally {
       setIsSaving(false)
@@ -170,7 +170,7 @@ export default function MailPage() {
 
   const handleSendTestEmail = async () => {
     if (!testEmail) {
-      toast.error('Please enter a test email address')
+      notify.error('Please enter a test email address')
       return
     }
 
@@ -196,12 +196,12 @@ export default function MailPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success(`Test email sent successfully! Message ID: ${data.messageId}`)
+        notify.success(`Test email sent successfully! Message ID: ${data.messageId}`)
       } else {
-        toast.error(data.error || 'Failed to send test email')
+        notify.error(data.error || 'Failed to send test email')
       }
     } catch (error) {
-      toast.error('An error occurred while sending')
+      notify.error('An error occurred while sending')
       console.error(error)
     } finally {
       setIsSending(false)

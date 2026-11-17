@@ -15,7 +15,7 @@ import {
   PanelLeft,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
 import { SiteNameText } from "@/components/common/site-name-text"
@@ -98,7 +98,7 @@ export function PrelineAdminSidebar({ onClose }: PrelineAdminSidebarProps) {
     }
     localStorage.removeItem("user")
     localStorage.removeItem("authToken")
-    toast.success("Logged out successfully")
+    notify.success("Logged out successfully")
     window.location.href = "/auth/login"
   }
 

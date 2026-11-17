@@ -40,7 +40,7 @@ import {
 } from "@/app/actions/payments"
 import { CreditCardSheet, CreditCardItem } from "@/components/dashboard/credit-card-sheet"
 import type { PaymentCard } from "@/components/dashboard/credit-card-sheet"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ export default function PaymentsPage() {
       }
     } catch (error) {
       console.error("Error fetching payment data:", error)
-      toast.error("Failed to load payment data")
+      notify.error("Failed to load payment data")
     } finally {
       setLoading(false)
     }
@@ -158,13 +158,13 @@ export default function PaymentsPage() {
     try {
       const res = await setDefaultPaymentMethod(cardId)
       if (res.success) {
-        toast.success("Default card updated")
+        notify.success("Default card updated")
         await fetchData()
       } else {
-        toast.error(res.error || "Failed to set default card")
+        notify.error(res.error || "Failed to set default card")
       }
     } catch {
-      toast.error("Failed to set default card")
+      notify.error("Failed to set default card")
     } finally {
       setSettingDefaultCard(null)
     }
@@ -176,10 +176,10 @@ export default function PaymentsPage() {
     setSubActionLoading(subId)
     const res = await pauseSubscription(subId)
     if (res.success) {
-      toast.success("Subscription paused")
+      notify.success("Subscription paused")
       await fetchData()
     } else {
-      toast.error(res.error || "Failed to pause subscription")
+      notify.error(res.error || "Failed to pause subscription")
     }
     setSubActionLoading(null)
   }
@@ -188,10 +188,10 @@ export default function PaymentsPage() {
     setSubActionLoading(subId)
     const res = await unpauseSubscription(subId)
     if (res.success) {
-      toast.success("Subscription resumed")
+      notify.success("Subscription resumed")
       await fetchData()
     } else {
-      toast.error(res.error || "Failed to resume subscription")
+      notify.error(res.error || "Failed to resume subscription")
     }
     setSubActionLoading(null)
   }
@@ -200,10 +200,10 @@ export default function PaymentsPage() {
     setSubActionLoading(subId)
     const res = await resumeSubscription(subId)
     if (res.success) {
-      toast.success("Cancellation reversed — subscription kept")
+      notify.success("Cancellation reversed — subscription kept")
       await fetchData()
     } else {
-      toast.error(res.error || "Failed to reverse cancellation")
+      notify.error(res.error || "Failed to reverse cancellation")
     }
     setSubActionLoading(null)
   }
@@ -215,10 +215,10 @@ export default function PaymentsPage() {
     setSubActionLoading(subId)
     const res = await cancelSubscription(subId, immediately)
     if (res.success) {
-      toast.success(immediately ? "Subscription canceled immediately" : "Subscription scheduled for cancellation at period end")
+      notify.success(immediately ? "Subscription canceled immediately" : "Subscription scheduled for cancellation at period end")
       await fetchData()
     } else {
-      toast.error(res.error || "Failed to cancel subscription")
+      notify.error(res.error || "Failed to cancel subscription")
     }
     setSubActionLoading(null)
   }

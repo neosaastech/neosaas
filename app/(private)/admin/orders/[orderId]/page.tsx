@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { ArrowLeft, Save, Loader2, Package, User, Building2, Clock, Cog, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
@@ -39,12 +39,12 @@ export default function OrderEditPage() {
         setStatus(data.order.status || "pending")
         setNotes(data.order.notes || "")
       } else {
-        toast.error("Failed to load order")
+        notify.error("Failed to load order")
         router.push("/admin")
       }
     } catch (error) {
       console.error("Error loading order:", error)
-      toast.error("Error loading order")
+      notify.error("Error loading order")
     } finally {
       setLoading(false)
     }
@@ -60,15 +60,15 @@ export default function OrderEditPage() {
       })
 
       if (response.ok) {
-        toast.success("Order updated successfully")
+        notify.success("Order updated successfully")
         router.push("/admin")
       } else {
         const error = await response.json()
-        toast.error(error.error || "Failed to update order")
+        notify.error(error.error || "Failed to update order")
       }
     } catch (error) {
       console.error("Error updating order:", error)
-      toast.error("Error updating order")
+      notify.error("Error updating order")
     } finally {
       setSaving(false)
     }

@@ -12,7 +12,7 @@ const PuckEditor = dynamic(() => import("@/components/puck/puck-editor").then((m
     <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Chargement de l&apos;éditeur…</div>
   ),
 })
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { ArrowLeft, LayoutGrid, ArrowRight } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -96,7 +96,7 @@ function BuilderInner() {
         if (result.success) {
           setInitialData(layerRowsToPuckData(result.data))
         } else {
-          toast.error(result.error)
+          notify.error(result.error)
           setInitialData({ content: [], root: { props: {} } } as Data)
         }
       })
@@ -116,10 +116,10 @@ function BuilderInner() {
     })
     const result = await res.json()
     if (!res.ok || result.results?.[0]?.status === "error") {
-      toast.error(result.results?.[0]?.error || result.error || "Échec de la publication")
+      notify.error(result.results?.[0]?.error || result.error || "Échec de la publication")
       return
     }
-    toast.success(`Page "${pagePath}" publiée`)
+    notify.success(`Page "${pagePath}" publiée`)
     purgeBlockingOverlays()
   }
 

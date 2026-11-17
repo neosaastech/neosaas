@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { checkTosAcceptance, acceptTos } from "@/app/actions/legal"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -16,7 +16,6 @@ export function TosModal() {
   const [position, setPosition] = useState<"center" | "bottom-left" | "bottom-right">("center")
   const [isLoading, setIsLoading] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
-  const { toast } = useToast()
 
   useEffect(() => {
     async function check() {
@@ -45,23 +44,12 @@ export function TosModal() {
       const result = await acceptTos(tosContent.id)
       if (result.success) {
         setIsOpen(false)
-        toast({
-          title: "Terms Accepted",
-          description: "Thank you for accepting the Terms of Service.",
-        })
+        notify.success("Terms Accepted", { description: "Thank you for accepting the Terms of Service." })
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.error,
-        })
+        notify.error("Error", { description: result.error })
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Something went wrong",
-      })
+      notify.error("Error", { description: "Something went wrong" })
     } finally {
       setIsLoading(false)
     }

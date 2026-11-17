@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -64,7 +65,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { InfoOverlay } from "@/components/admin/info-overlay"
 
 // ============================================================================
@@ -263,11 +264,11 @@ export default function SupportListPage() {
         setConversations(data.data || [])
         setStats(data.stats || { total: 0, open: 0, pending: 0, unassigned: 0 })
         setTotalPages(Math.ceil((data.pagination?.total || 0) / itemsPerPage))
-        if (isRefresh) toast.success("Tickets refreshed")
+        if (isRefresh) notify.success("Tickets refreshed")
       }
     } catch (error) {
       console.error("Failed to fetch conversations:", error)
-      toast.error("Failed to load tickets")
+      notify.error("Failed to load tickets")
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -315,8 +316,10 @@ export default function SupportListPage() {
     router.push(`/admin/support/reply?id=${id}`)
   }
 
+  const confirm = useConfirm()
+
   const deleteTicket = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this ticket?")) return
+    if (!await confirm({ title: "Supprimer ce ticket ?", description: "Le ticket et ses messages seront supprimés définitivement.", destructive: true })) return
 
     try {
       const response = await fetch(`/api/admin/chat/${id}`, {
@@ -324,20 +327,20 @@ export default function SupportListPage() {
       })
 
       if (response.ok) {
-        toast.success("Ticket deleted")
+        notify.success("Ticket deleted")
         fetchConversations()
       } else {
-        toast.error("Failed to delete ticket")
+        notify.error("Failed to delete ticket")
       }
     } catch (error) {
-      toast.error("Connection error")
+      notify.error("Connection error")
     }
   }
 
   // Bulk Actions
   const bulkDelete = async () => {
     if (selectedIds.size === 0) return
-    if (!confirm(`Are you sure you want to delete ${selectedIds.size} ticket(s)?`)) return
+    if (!await confirm({ title: `Supprimer ${selectedIds.size} ticket(s) ?`, description: "Les tickets et leurs messages seront supprimés définitivement.", destructive: true })) return
 
     setBulkProcessing(true)
     try {
@@ -345,11 +348,11 @@ export default function SupportListPage() {
         fetch(`/api/admin/chat/${id}`, { method: 'DELETE' })
       )
       await Promise.all(promises)
-      toast.success(`${selectedIds.size} ticket(s) deleted`)
+      notify.success(`${selectedIds.size} ticket(s) deleted`)
       clearSelection()
       fetchConversations()
     } catch (error) {
-      toast.error("Failed to delete some tickets")
+      notify.error("Failed to delete some tickets")
     } finally {
       setBulkProcessing(false)
     }
@@ -368,11 +371,11 @@ export default function SupportListPage() {
         })
       )
       await Promise.all(promises)
-      toast.success(`${selectedIds.size} ticket(s) updated to ${statusConfig[newStatus as keyof typeof statusConfig]?.label || newStatus}`)
+      notify.success(`${selectedIds.size} ticket(s) updated to ${statusConfig[newStatus as keyof typeof statusConfig]?.label || newStatus}`)
       clearSelection()
       fetchConversations()
     } catch (error) {
-      toast.error("Failed to update some tickets")
+      notify.error("Failed to update some tickets")
     } finally {
       setBulkProcessing(false)
     }
@@ -395,7 +398,7 @@ export default function SupportListPage() {
 
       const data = await response.json()
       if (data.success) {
-        toast.success("Ticket created")
+        notify.success("Ticket created")
         setShowNewDialog(false)
         setSelectedUser(null)
         setNewSubject("")
@@ -408,10 +411,10 @@ export default function SupportListPage() {
           router.push(`/admin/support/reply?id=${data.data.conversation.id}`)
         }
       } else {
-        toast.error(data.error || "Failed to create ticket")
+        notify.error(data.error || "Failed to create ticket")
       }
     } catch (error) {
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setCreatingConversation(false)
     }

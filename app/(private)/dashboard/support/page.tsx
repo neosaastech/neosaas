@@ -42,7 +42,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { usePageTitle } from "@/hooks/use-page-title"
 
 const faqItems = [

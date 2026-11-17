@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { CheckCircle, XCircle } from "lucide-react"
 
 interface OAuthConfig {
@@ -46,7 +46,7 @@ export default function RegisterPage() {
     if (error === "account_not_found") {
       // Petit délai pour s'assurer que l'UI est montée et le toast visible
       setTimeout(() => {
-        toast("Account does not exist", {
+        notify.message("Account does not exist", {
           description: "No account found with this login. Please create an account to continue.",
           duration: 6000,
           action: {
@@ -94,14 +94,14 @@ export default function RegisterPage() {
     try {
       // Validate passwords match
       if (formData.password !== formData.confirmPassword) {
-        toast.error("Passwords do not match")
+        notify.error("Passwords do not match")
         setIsLoading(false)
         return
       }
 
       // Validate terms accepted
       if (!formData.termsAccepted) {
-        toast.error("You must accept the terms and conditions")
+        notify.error("You must accept the terms and conditions")
         setIsLoading(false)
         return
       }
@@ -120,12 +120,12 @@ export default function RegisterPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        toast.error(data.error || "Registration failed")
+        notify.error(data.error || "Registration failed")
         return
       }
 
       // Show success message - user needs to verify email before logging in
-      toast.success("Account created successfully!", {
+      notify.success("Account created successfully!", {
         description: "Please check your email to verify your account before logging in.",
         duration: 10000, // Show for 10 seconds
       })
@@ -133,7 +133,7 @@ export default function RegisterPage() {
       // Redirect to login page with success message
       router.push("/auth/login?registered=true")
     } catch (error) {
-      toast.error("An error occurred during registration")
+      notify.error("An error occurred during registration")
       console.error("Registration error:", error)
     } finally {
       setIsLoading(false)
@@ -178,7 +178,7 @@ export default function RegisterPage() {
                       disabled={isGithubLoading || isGoogleLoading}
                       onClick={() => {
                         setIsGithubLoading(true);
-                        toast.loading('Redirecting to GitHub...', { id: 'github-redirect' });
+                        notify.loading('Redirecting to GitHub...', { id: 'github-redirect' });
                         window.location.href = '/api/auth/oauth/github';
                       }}
                     >
@@ -228,7 +228,7 @@ export default function RegisterPage() {
                       disabled={isGithubLoading || isGoogleLoading}
                       onClick={() => {
                         setIsGoogleLoading(true);
-                        toast.loading('Redirecting to Google...', { id: 'google-redirect' });
+                        notify.loading('Redirecting to Google...', { id: 'google-redirect' });
                         window.location.href = '/api/auth/oauth/google';
                       }}
                     >

@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { AppointmentBooking } from '@/components/checkout/appointment-booking'
-import { toast } from 'sonner'
+import { notify } from "@/lib/notify"
 
 interface OrderItem {
   id: string
@@ -210,11 +210,11 @@ export default function BookAppointmentPage() {
         })
         setConfirmationOpen(true)
       } else {
-        toast.error(result.error || 'Erreur lors de la creation du rendez-vous')
+        notify.error(result.error || 'Erreur lors de la creation du rendez-vous')
       }
     } catch (err) {
       console.error('[BookAppointment] Error creating appointment:', err)
-      toast.error('Erreur de connexion')
+      notify.error('Erreur de connexion')
     }
   }
 

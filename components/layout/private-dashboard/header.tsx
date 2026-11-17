@@ -18,7 +18,7 @@ import { UserNotificationBell } from "@/components/common/user-notification-bell
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
 import { SiteNameText } from "@/components/common/site-name-text"
 import { useCart } from "@/contexts/cart-context"
@@ -193,7 +193,7 @@ export function PrivateHeader({ onMenuClick }: { onMenuClick?: () => void }) {
     }
     localStorage.removeItem("user")
     localStorage.removeItem("authToken")
-    toast.success("Logged out successfully")
+    notify.success("Logged out successfully")
     // Force full page reload to ensure cookies are cleared and auth state is reset
     window.location.href = "/auth/login"
   }

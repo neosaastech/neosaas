@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { LogOut, Shield } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useRouter } from "next/navigation"
 
 export function ImpersonationBanner() {
@@ -39,14 +39,14 @@ export function ImpersonationBanner() {
       })
 
       if (response.ok) {
-        toast.success("Retour au compte administrateur")
+        notify.success("Retour au compte administrateur")
         window.location.href = "/admin"
       } else {
-        toast.error("Erreur lors de la déconnexion")
+        notify.error("Erreur lors de la déconnexion")
       }
     } catch (error) {
       console.error("Error stopping impersonation:", error)
-      toast.error("Erreur lors de la déconnexion")
+      notify.error("Erreur lors de la déconnexion")
     }
   }
 

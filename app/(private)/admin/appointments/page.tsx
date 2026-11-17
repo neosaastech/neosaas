@@ -55,7 +55,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 interface AdminUser {
   id: string
@@ -133,12 +133,12 @@ export default function AdminAppointmentsPage() {
         if (fallbackData.success) {
           setAppointments(fallbackData.data)
         } else {
-          toast.error("Failed to load appointments")
+          notify.error("Failed to load appointments")
         }
       }
     } catch (error) {
       console.error("Failed to fetch appointments:", error)
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setLoading(false)
     }
@@ -175,14 +175,14 @@ export default function AdminAppointmentsPage() {
       })
 
       if (response.ok) {
-        toast.success(`Status updated: ${statusConfig[newStatus as keyof typeof statusConfig]?.label}`)
+        notify.success(`Status updated: ${statusConfig[newStatus as keyof typeof statusConfig]?.label}`)
         fetchAppointments()
       } else {
         const data = await response.json()
-        toast.error(data.error || "Failed to update")
+        notify.error(data.error || "Failed to update")
       }
     } catch (error) {
-      toast.error("Connection error")
+      notify.error("Connection error")
     }
   }
 

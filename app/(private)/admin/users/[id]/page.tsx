@@ -32,7 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useRequireAdmin } from "@/lib/hooks/use-require-admin"
 import { UserEditSheet } from "@/components/admin/user-edit-sheet"
 
@@ -121,7 +121,7 @@ export default function UserProfilePage() {
       if (userData.success) {
         setUserData(userData.data)
       } else {
-        toast.error(userData.error || "User not found")
+        notify.error(userData.error || "User not found")
         router.push("/admin/users")
         return
       }
@@ -135,7 +135,7 @@ export default function UserProfilePage() {
       }
     } catch (error) {
       console.error("Failed to load user data:", error)
-      toast.error("Failed to load user data")
+      notify.error("Failed to load user data")
     } finally {
       setLoading(false)
     }

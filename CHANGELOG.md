@@ -1,3 +1,14 @@
+## [1.31.0](https://github.com/neosaastech/Neosaas-app/compare/v1.30.0...v1.31.0) (2026-11-17)
+
+### Features
+
+* **notifications:** une notification qui arrive s'affiche aussi en toast, types par registre ([8277d11](https://github.com/neosaastech/Neosaas-app/commit/8277d11065d7c23d58c28ac80842714aca8f4103))
+* **notifications:** useConfirm() commun en francais a la place des 18 confirm() natifs ([4bdb02a](https://github.com/neosaastech/Neosaas-app/commit/4bdb02a08eec2c43b7ba1b174bd168933df92675))
+
+### Bug Fixes
+
+* **notifications:** un seul toast (sonner via notify), les ecrans useToast() n'etaient jamais affiches ([629175d](https://github.com/neosaastech/Neosaas-app/commit/629175d4abfc87bde50e590a0d9ff0f533948756))
+
 ## [1.30.0](https://github.com/neosaastech/Neosaas-app/compare/v1.29.2...v1.30.0) (2026-10-27)
 
 ### Features

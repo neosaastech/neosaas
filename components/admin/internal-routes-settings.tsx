@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Shield, Globe, Users, FileText } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getPages, updatePageAccess, syncPages, type AccessLevel } from "@/app/actions/pages"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 interface Page {
   path: string
@@ -103,9 +103,9 @@ export function InternalRoutesSettings() {
 
     const result = await updatePageAccess(path, newAccess)
     if (result.success) {
-      toast.success(`Access updated for ${path}`)
+      notify.success(`Access updated for ${path}`)
     } else {
-      toast.error("Failed to update access")
+      notify.error("Failed to update access")
     }
   }
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import type React from "react"
 
 import { useState, useEffect } from "react"
@@ -12,7 +13,7 @@ import { CompanyLogoUpload } from "@/components/dashboard/company-logo-upload"
 import { Building2, Users, Mail, Phone, MapPin, FileText, UserPlus, Pencil, Check, X, Search, Trash2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 import { cancelInvitation, removeUserFromCompany } from "@/app/actions/company-users"
 import { usePageTitle } from "@/hooks/use-page-title"
@@ -98,7 +99,7 @@ export default function CompanyManagementPage() {
       }
     } catch (error) {
       console.error("Error loading company:", error)
-      toast.error("Failed to load company information")
+      notify.error("Failed to load company information")
     }
   }
 
@@ -111,7 +112,7 @@ export default function CompanyManagementPage() {
       }
     } catch (error) {
       console.error("Error loading team:", error)
-      toast.error("Failed to load team members")
+      notify.error("Failed to load team members")
     }
   }
 
@@ -132,13 +133,13 @@ export default function CompanyManagementPage() {
         // Trigger admin alerts refresh
         window.dispatchEvent(new Event("refreshAdminAlerts"))
         
-        toast.success("Company information updated successfully")
+        notify.success("Company information updated successfully")
       } else {
         const error = await response.json()
-        toast.error(error.error || "Failed to update company")
+        notify.error(error.error || "Failed to update company")
       }
     } catch (error) {
-      toast.error("An error occurred while updating company")
+      notify.error("An error occurred while updating company")
     } finally {
       setIsSaving(false)
     }
@@ -156,15 +157,15 @@ export default function CompanyManagementPage() {
       })
 
       if (response.ok) {
-        toast.success("Invitation sent successfully. The user will appear as pending until they accept.")
+        notify.success("Invitation sent successfully. The user will appear as pending until they accept.")
         setInviteForm({ email: "", role: "reader" })
         loadTeamMembers() // Refresh team list
       } else {
         const error = await response.json()
-        toast.error(error.error || "Failed to send invitation")
+        notify.error(error.error || "Failed to send invitation")
       }
     } catch (error) {
-      toast.error("An error occurred while sending invitation")
+      notify.error("An error occurred while sending invitation")
     } finally {
       setIsInviting(false)
     }
@@ -179,37 +180,39 @@ export default function CompanyManagementPage() {
       })
 
       if (response.ok) {
-        toast.success(`User ${!isActive ? "activated" : "deactivated"} successfully`)
+        notify.success(`User ${!isActive ? "activated" : "deactivated"} successfully`)
         loadTeamMembers()
       } else {
-        toast.error("Failed to update user status")
+        notify.error("Failed to update user status")
       }
     } catch (error) {
-      toast.error("An error occurred")
+      notify.error("An error occurred")
     }
   }
 
+  const confirm = useConfirm()
+
   const handleCancelInvitation = async (invitationId: string) => {
-    if (!confirm("Are you sure you want to cancel this invitation?")) return
+    if (!await confirm({ title: "Annuler cette invitation ?", description: "Le lien envoyé ne fonctionnera plus.", confirmLabel: "Annuler l'invitation", cancelLabel: "Garder", destructive: true })) return
     
     const result = await cancelInvitation(invitationId)
     if (result.success) {
-      toast.success(result.message)
+      notify.success(result.message)
       loadTeamMembers()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
   const handleRemoveUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to remove this user from the company?")) return
+    if (!await confirm({ title: "Retirer cet utilisateur de l'entreprise ?", description: "Il perdra l'accès aux données de l'entreprise.", confirmLabel: "Retirer", destructive: true })) return
 
     const result = await removeUserFromCompany(userId)
     if (result.success) {
-      toast.success(result.message)
+      notify.success(result.message)
       loadTeamMembers()
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
   }
 
@@ -597,7 +600,7 @@ export default function CompanyManagementPage() {
                                 size="sm"
                                 onClick={() => {
                                     // TODO: Implement resend
-                                    toast.info("Resend invitation coming soon")
+                                    notify.info("Resend invitation coming soon")
                                 }}
                                 >
                                 Resend

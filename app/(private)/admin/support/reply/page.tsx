@@ -37,7 +37,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 import { UserProfileOverlay } from "@/components/admin/user-profile-overlay"
 
@@ -195,14 +195,14 @@ export default function SupportReplyPage() {
       if (data.success) {
         setConversation(data.data.conversation)
         setMessages(data.data.messages || [])
-        if (isRefresh) toast.success("Messages refreshed")
+        if (isRefresh) notify.success("Messages refreshed")
       } else {
-        toast.error("Failed to load ticket")
+        notify.error("Failed to load ticket")
         router.push('/admin/support')
       }
     } catch (error) {
       console.error("Failed to fetch conversation:", error)
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -229,12 +229,12 @@ export default function SupportReplyPage() {
         setMessages(prev => [...prev, data.data])
         setReplyContent("")
         messageInputRef.current?.focus()
-        toast.success("Message sent")
+        notify.success("Message sent")
       } else {
-        toast.error("Failed to send message")
+        notify.error("Failed to send message")
       }
     } catch (error) {
-      toast.error("Connection error")
+      notify.error("Connection error")
     } finally {
       setSending(false)
     }
@@ -253,10 +253,10 @@ export default function SupportReplyPage() {
       const data = await response.json()
       if (data.success) {
         setConversation({ ...conversation, status: newStatus as any })
-        toast.success("Status updated")
+        notify.success("Status updated")
       }
     } catch (error) {
-      toast.error("Failed to update status")
+      notify.error("Failed to update status")
     }
   }
 
@@ -271,11 +271,11 @@ export default function SupportReplyPage() {
       })
 
       if (response.ok) {
-        toast.success("Ticket assigned to you")
+        notify.success("Ticket assigned to you")
         fetchConversation()
       }
     } catch (error) {
-      toast.error("Failed to assign ticket")
+      notify.error("Failed to assign ticket")
     }
   }
 

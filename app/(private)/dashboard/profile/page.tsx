@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CroppedFileInput, type CroppedFileInputHandle } from "@/components/ui/cropped-file-input"
 import { Camera, Save, Pencil, Trash2, Loader2, Lock } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { getUserRoleConfig } from "@/lib/status-configs"
@@ -86,11 +86,11 @@ export default function ProfilePage() {
             taxId: "",
           })
         } else {
-          toast.error("Failed to load user data")
+          notify.error("Failed to load user data")
         }
       } catch (error) {
         console.error("Error fetching user data:", error)
-        toast.error("Failed to load user data")
+        notify.error("Failed to load user data")
       } finally {
         setIsLoading(false)
       }
@@ -131,14 +131,14 @@ export default function ProfilePage() {
         // companyLogoUpdated event used for the company logo.
         window.dispatchEvent(new CustomEvent("profileImageUpdated", { detail: { profileImage: data.imagePath } }))
 
-        toast.success("Image updated")
+        notify.success("Image updated")
       } else {
         const errorData = await response.json()
-        toast.error(errorData.error || "Failed to upload image")
+        notify.error(errorData.error || "Failed to upload image")
       }
     } catch (error) {
       console.error("Error uploading image:", error)
-      toast.error("An error occurred while uploading image")
+      notify.error("An error occurred while uploading image")
     }
   }
 
@@ -178,30 +178,30 @@ export default function ProfilePage() {
         window.dispatchEvent(new Event("refreshAdminAlerts"))
 
         setIsEditing(false)
-        toast.success("Profile updated successfully")
+        notify.success("Profile updated successfully")
       } else {
         const errorData = await response.json()
-        toast.error(errorData.error || "Failed to update profile")
+        notify.error(errorData.error || "Failed to update profile")
       }
     } catch (error) {
       console.error("Error updating profile:", error)
-      toast.error("An error occurred while updating profile")
+      notify.error("An error occurred while updating profile")
     }
   }
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill in all password fields")
+      notify.error("Please fill in all password fields")
       return
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error("New passwords do not match")
+      notify.error("New passwords do not match")
       return
     }
 
     if (newPassword.length < 6) {
-      toast.error("New password must be at least 6 characters long")
+      notify.error("New password must be at least 6 characters long")
       return
     }
 
@@ -216,15 +216,15 @@ export default function ProfilePage() {
       const result = await response.json()
 
       if (response.ok) {
-        toast.success("Password updated successfully")
+        notify.success("Password updated successfully")
         setCurrentPassword("")
         setNewPassword("")
         setConfirmPassword("")
       } else {
-        toast.error(result.error || "Failed to update password")
+        notify.error(result.error || "Failed to update password")
       }
     } catch (error) {
-      toast.error("An error occurred while updating password")
+      notify.error("An error occurred while updating password")
     } finally {
       setIsChangingPassword(false)
     }
@@ -232,7 +232,7 @@ export default function ProfilePage() {
 
   const handleDeleteAccount = async () => {
     if (!user.id) {
-      toast.error("User ID not found. Please log in again.")
+      notify.error("User ID not found. Please log in again.")
       return
     }
     
@@ -240,18 +240,18 @@ export default function ProfilePage() {
     try {
       const result = await deleteUser(user.id)
       if (result.success) {
-        toast.success("Account deleted successfully")
+        notify.success("Account deleted successfully")
         // Logout and redirect
         localStorage.removeItem("user")
         localStorage.removeItem("authToken")
         await fetch("/api/auth/logout", { method: "POST" })
         router.push("/auth/login")
       } else {
-        toast.error(result.error || "Failed to delete account")
+        notify.error(result.error || "Failed to delete account")
       }
     } catch (error) {
       console.error(error)
-      toast.error("An error occurred while deleting account")
+      notify.error("An error occurred while deleting account")
     } finally {
       setIsDeleting(false)
     }

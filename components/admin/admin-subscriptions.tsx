@@ -22,7 +22,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   Loader2, RefreshCw, Pause, Play, XCircle, CheckCircle2,
   Clock, ChevronDown, CalendarDays, Building2, ExternalLink,
@@ -169,10 +169,10 @@ export function AdminSubscriptions() {
     setActionLoading(stripeSubId)
     const res = await adminPauseSubscription(stripeSubId)
     if (res.success) {
-      toast.success("Subscription paused")
+      notify.success("Subscription paused")
       await loadSubscriptions()
     } else {
-      toast.error(res.error || "Failed to pause subscription")
+      notify.error(res.error || "Failed to pause subscription")
     }
     setActionLoading(null)
   }
@@ -181,10 +181,10 @@ export function AdminSubscriptions() {
     setActionLoading(stripeSubId)
     const res = await adminUnpauseSubscription(stripeSubId)
     if (res.success) {
-      toast.success("Subscription billing resumed")
+      notify.success("Subscription billing resumed")
       await loadSubscriptions()
     } else {
-      toast.error(res.error || "Failed to resume subscription billing")
+      notify.error(res.error || "Failed to resume subscription billing")
     }
     setActionLoading(null)
   }
@@ -193,10 +193,10 @@ export function AdminSubscriptions() {
     setActionLoading(stripeSubId)
     const res = await adminResumeSubscription(stripeSubId)
     if (res.success) {
-      toast.success("Cancellation reversed — subscription kept")
+      notify.success("Cancellation reversed — subscription kept")
       await loadSubscriptions()
     } else {
-      toast.error(res.error || "Failed to reverse cancellation")
+      notify.error(res.error || "Failed to reverse cancellation")
     }
     setActionLoading(null)
   }
@@ -208,14 +208,14 @@ export function AdminSubscriptions() {
     setActionLoading(subId)
     const res = await adminCancelSubscription(subId, immediately)
     if (res.success) {
-      toast.success(
+      notify.success(
         immediately
           ? "Subscription canceled immediately"
           : "Subscription scheduled for cancellation at period end",
       )
       await loadSubscriptions()
     } else {
-      toast.error(res.error || "Failed to cancel subscription")
+      notify.error(res.error || "Failed to cancel subscription")
     }
     setActionLoading(null)
   }

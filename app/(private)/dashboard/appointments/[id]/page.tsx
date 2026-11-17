@@ -38,7 +38,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 interface Appointment {
   id: string
@@ -91,12 +91,12 @@ export default function AppointmentDetailPage() {
       if (data.success) {
         setAppointment(data.data)
       } else {
-        toast.error("Rendez-vous non trouvé")
+        notify.error("Rendez-vous non trouvé")
         router.push("/dashboard/appointments")
       }
     } catch (error) {
       console.error("Failed to fetch appointment:", error)
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setLoading(false)
     }
@@ -120,13 +120,13 @@ export default function AppointmentDetailPage() {
       })
 
       if (response.ok) {
-        toast.success("Rendez-vous marqué comme terminé")
+        notify.success("Rendez-vous marqué comme terminé")
         fetchAppointment()
       } else {
-        toast.error("Erreur lors de la mise à jour")
+        notify.error("Erreur lors de la mise à jour")
       }
     } catch (error) {
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setActionLoading(false)
     }
@@ -142,13 +142,13 @@ export default function AppointmentDetailPage() {
       })
 
       if (response.ok) {
-        toast.success("Rendez-vous annulé")
+        notify.success("Rendez-vous annulé")
         fetchAppointment()
       } else {
-        toast.error("Erreur lors de l'annulation")
+        notify.error("Erreur lors de l'annulation")
       }
     } catch (error) {
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setActionLoading(false)
     }
@@ -162,13 +162,13 @@ export default function AppointmentDetailPage() {
       })
 
       if (response.ok) {
-        toast.success("Rendez-vous supprimé")
+        notify.success("Rendez-vous supprimé")
         router.push("/dashboard/appointments")
       } else {
-        toast.error("Erreur lors de la suppression")
+        notify.error("Erreur lors de la suppression")
       }
     } catch (error) {
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setActionLoading(false)
     }
@@ -184,13 +184,13 @@ export default function AppointmentDetailPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success("Facture créée avec succès")
+        notify.success("Facture créée avec succès")
         fetchAppointment()
       } else {
-        toast.error(data.error || "Erreur lors de la création de la facture")
+        notify.error(data.error || "Erreur lors de la création de la facture")
       }
     } catch (error) {
-      toast.error("Erreur de connexion")
+      notify.error("Erreur de connexion")
     } finally {
       setActionLoading(false)
     }

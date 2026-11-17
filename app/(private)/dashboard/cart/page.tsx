@@ -17,7 +17,7 @@ import {
   Package,
   AlertCircle
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { notify } from "@/lib/notify"
 import { getCart, updateCartItemQuantity, removeFromCart } from '@/app/actions/ecommerce'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
@@ -86,7 +86,7 @@ export default function CartPage() {
       }
     } catch (error) {
       console.error('[CartPage] ❌ Failed to load cart:', error)
-      toast.error('Error loading cart')
+      notify.error('Error loading cart')
     } finally {
       setLoading(false)
     }
@@ -104,14 +104,14 @@ export default function CartPage() {
       const result = await updateCartItemQuantity(productId, newQuantity)
       
       if (result.success) {
-        toast.success('Quantity updated')
+        notify.success('Quantity updated')
         await loadCart()
       } else {
-        toast.error('Update error')
+        notify.error('Update error')
       }
     } catch (error) {
       console.error('[CartPage] ❌ Failed to update quantity:', error)
-      toast.error('Update error')
+      notify.error('Update error')
     } finally {
       setUpdating(null)
     }
@@ -125,14 +125,14 @@ export default function CartPage() {
       const result = await removeFromCart(productId)
       
       if (result.success) {
-        toast.success('Item removed from cart')
+        notify.success('Item removed from cart')
         await loadCart()
       } else {
-        toast.error('Deletion error')
+        notify.error('Deletion error')
       }
     } catch (error) {
       console.error('[CartPage] ❌ Failed to remove item:', error)
-      toast.error('Deletion error')
+      notify.error('Deletion error')
     } finally {
       setUpdating(null)
     }
@@ -140,7 +140,7 @@ export default function CartPage() {
 
   const proceedToCheckout = () => {
     if (!cartId) {
-      toast.error('Cart not found')
+      notify.error('Cart not found')
       return
     }
     

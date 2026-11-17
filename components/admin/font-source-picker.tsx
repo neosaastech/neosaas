@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { cn } from "@/lib/utils"
 import type { FontSource } from "@/types/theme-config"
 import { GOOGLE_FONTS } from "@/lib/theme/google-fonts"
@@ -43,7 +43,7 @@ export function FontSourcePicker({ label, role, value, onChange, activeFontFamil
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 500 * 1024) {
-      toast.error("Font file too large (max 500KB)")
+      notify.error("Font file too large (max 500KB)")
       return
     }
     const reader = new FileReader()

@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react'
 import { acceptInvitation, getInvitationByToken } from "@/app/actions/invitations"
 import { useState, useEffect, useTransition } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 
 export default function AcceptInvitePage() {
   const searchParams = useSearchParams()
@@ -49,7 +49,7 @@ export default function AcceptInvitePage() {
     const confirmPassword = formData.get("confirmPassword") as string
 
     if (password !== confirmPassword) {
-      toast.error("Passwords do not match")
+      notify.error("Passwords do not match")
       return
     }
 
@@ -61,10 +61,10 @@ export default function AcceptInvitePage() {
       })
       
       if (result.success) {
-        toast.success("Account created successfully")
+        notify.success("Account created successfully")
         router.push("/dashboard")
       } else {
-        toast.error(result.error || "Failed to accept invitation")
+        notify.error(result.error || "Failed to accept invitation")
       }
     })
   }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Package, Calendar, CreditCard, User, MessageSquare, Settings, CheckCircle, Info, Clock, Download, ExternalLink, Truck, FileCheck, AlertTriangle } from "lucide-react"
+import { Bell, Calendar, User, CheckCircle, Clock, Download, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -14,6 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatDistanceToNow } from "date-fns"
 import { useRouter } from "next/navigation"
+import { getNotificationType } from "@/lib/notifications/notification-types"
+import { useNotificationToasts } from "@/hooks/use-notification-toasts"
 import Link from "next/link"
 
 interface Notification {
@@ -60,19 +62,6 @@ interface NotificationStats {
   unread: number
   actionRequired: number
   byType: Record<string, number>
-}
-
-const typeConfig = {
-  order: { icon: Package, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', label: 'Orders' },
-  appointment: { icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30', label: 'Appointments' },
-  payment: { icon: CreditCard, color: 'text-green-600', bg: 'bg-green-100 dark:bg-green-900/30', label: 'Payments' },
-  user: { icon: User, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30', label: 'Users' },
-  profile_update: { icon: User, color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30', label: 'Profile Update' },
-  settings: { icon: Settings, color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-900/30', label: 'Settings' },
-  subscription: { icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30', label: 'Subscription' },
-  support: { icon: MessageSquare, color: 'text-pink-600', bg: 'bg-pink-100 dark:bg-pink-900/30', label: 'Support' },
-  system: { icon: Settings, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-900/30', label: 'System' },
-  content: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-100 dark:bg-red-900/30', label: 'Content' },
 }
 
 export function NotificationBell() {
@@ -190,6 +179,9 @@ export function NotificationBell() {
     }
   }
 
+  // SAAS-179 : une notification qui arrive pendant la navigation s'affiche aussi en toast.
+  useNotificationToasts(notifications, handleNotificationClick)
+
   const filteredNotifications = activeTab === 'all'
     ? notifications
     : activeTab === 'action'
@@ -200,7 +192,7 @@ export function NotificationBell() {
         : notifications.filter(n => n.type === activeTab)
 
   const getTypeIcon = (type: string) => {
-    const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.system
+    const config = getNotificationType(type)
     const Icon = config.icon
     return <Icon className={`h-4 w-4 ${config.color}`} />
   }
@@ -277,7 +269,7 @@ export function NotificationBell() {
               ) : (
                 <div className="divide-y">
                   {filteredNotifications.map((notification) => {
-                    const config = typeConfig[notification.type as keyof typeof typeConfig] || typeConfig.system
+                    const config = getNotificationType(notification.type)
                     const meta = notification.metadata || {}
 
                     // Get appropriate icon for order type

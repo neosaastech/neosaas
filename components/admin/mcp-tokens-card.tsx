@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { AlertCircle, Bot, Check, Copy, Loader2, Plus, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/app/actions/mcp-tokens"
 
 interface McpToken {
@@ -49,7 +50,7 @@ export function McpTokensCard() {
     if (result.success) {
       setTokens(result.data)
     } else {
-      toast.error(result.error)
+      notify.error(result.error)
     }
     setLoading(false)
   }
@@ -60,14 +61,14 @@ export function McpTokensCard() {
 
   async function handleCreate() {
     if (!newTokenName.trim()) {
-      toast.error("Name is required")
+      notify.error("Name is required")
       return
     }
     setCreating(true)
     const result = await createMcpToken(newTokenName.trim())
     setCreating(false)
     if (!result.success) {
-      toast.error(result.error)
+      notify.error(result.error)
       return
     }
     setRevealedKey(result.data.key)
@@ -75,14 +76,16 @@ export function McpTokensCard() {
     await loadTokens()
   }
 
+  const confirm = useConfirm()
+
   async function handleRevoke(id: string, name: string) {
-    if (!confirm(`Revoke MCP token "${name}"? Any agent using it will lose access immediately.`)) return
+    if (!await confirm({ title: `Révoquer le jeton MCP « ${name} » ?`, description: "Tout agent qui l'utilise perdra l'accès immédiatement.", confirmLabel: "Révoquer", destructive: true })) return
     const result = await revokeMcpToken(id)
     if (!result.success) {
-      toast.error(result.error)
+      notify.error(result.error)
       return
     }
-    toast.success("Token revoked")
+    notify.success("Token revoked")
     await loadTokens()
   }
 

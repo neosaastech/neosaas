@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useRef } from "react"
 import {
   Table,
@@ -51,7 +52,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   createCompany,
   deleteCompany,
@@ -222,67 +223,69 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
         if (logoFile && logoFile.size > 0) {
           await uploadCompanyLogo(result.data.id, logoFile)
         }
-        toast.success("Company created successfully")
+        notify.success("Company created successfully")
         setIsCreateOpen(false)
         window.location.reload()
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Company created but logo upload failed")
+        notify.error(error instanceof Error ? error.message : "Company created but logo upload failed")
         window.location.reload()
       }
     } else {
-      toast.error(result.error || "Failed to create company")
+      notify.error(result.error || "Failed to create company")
     }
     setIsLoading(false)
   }
 
+  const confirm = useConfirm()
+
   const handleDeleteCompany = async (companyId: string) => {
     const company = companies.find(c => c.id === companyId)
     if (company && company.users.length > 0) {
-      toast.error(`Cannot delete company with ${company.users.length} user(s). Reassign or delete users first.`)
+      notify.error(`Cannot delete company with ${company.users.length} user(s). Reassign or delete users first.`)
       return
     }
 
-    if (!confirm("Are you sure you want to delete this company?")) return
+    if (!await confirm({ title: "Supprimer cette entreprise ?", description: "Cette action est irréversible.", destructive: true })) return
 
     const result = await deleteCompany(companyId)
     if (result.success) {
-      toast.success("Company deleted successfully")
+      notify.success("Company deleted successfully")
       setCompanies(companies.filter(c => c.id !== companyId))
       setSelectedCompanies(selectedCompanies.filter(id => id !== companyId))
     } else {
-      toast.error(result.error || "Failed to delete company")
+      notify.error(result.error || "Failed to delete company")
     }
   }
 
   const handleStatusUpdate = async (companyId: string, isActive: boolean) => {
     const result = await updateCompanyStatus(companyId, isActive)
     if (result.success) {
-      toast.success(result.message)
+      notify.success(result.message)
       setCompanies(companies.map(c => c.id === companyId ? { ...c, isActive } : c))
     } else {
-      toast.error(result.error || "Failed to update status")
+      notify.error(result.error || "Failed to update status")
     }
   }
 
   const handleBulkStatusUpdate = async (isActive: boolean) => {
     if (selectedCompanies.length === 0) {
-      toast.error("No companies selected")
+      notify.error("No companies selected")
       return
     }
 
     const action = isActive ? "activate" : "deactivate"
-    if (!confirm(`Are you sure you want to ${action} ${selectedCompanies.length} company(ies)? This will also ${action} all users in these companies.`)) return
+    if (!await confirm({ title: `${isActive ? "Activer" : "Désactiver"} ${selectedCompanies.length} entreprise(s) ?`, description: `Tous les utilisateurs de ces entreprises seront aussi ${isActive ? "activés" : "désactivés"}.`, confirmLabel: isActive ? "Activer" : "Désactiver", destructive: !isActive })) return
 
     setIsLoading(true)
     const result = await bulkUpdateCompanyStatus(selectedCompanies, isActive)
     if (result.success) {
-      toast.success(result.message)
+      notify.success(result.message)
       setCompanies(companies.map(c =>
         selectedCompanies.includes(c.id) ? { ...c, isActive } : c
       ))
       setSelectedCompanies([])
     } else {
-      toast.error(result.error || `Failed to ${action} companies`)
+      notify.error(result.error || `Failed to ${action} companies`)
     }
     setIsLoading(false)
   }
@@ -293,7 +296,7 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
       : companies
 
     if (companiesToExport.length === 0) {
-      toast.error("No companies to export")
+      notify.error("No companies to export")
       return
     }
 
@@ -320,7 +323,7 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
     link.download = `companies_export_${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     
-    toast.success(`${companiesToExport.length} company(ies) exported`)
+    notify.success(`${companiesToExport.length} company(ies) exported`)
   }
 
   const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -332,7 +335,7 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
       const lines = text.split('\n')
       
       if (lines.length < 2) {
-        toast.error("CSV file is empty or invalid")
+        notify.error("CSV file is empty or invalid")
         return
       }
 
@@ -374,14 +377,14 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
       }
 
       if (imported > 0) {
-        toast.success(`${imported} company(ies) imported successfully${errors > 0 ? `, ${errors} error(s)` : ''}`)
+        notify.success(`${imported} company(ies) imported successfully${errors > 0 ? `, ${errors} error(s)` : ''}`)
         window.location.reload()
       } else {
-        toast.error(`Import failed: ${errors} error(s)`)
+        notify.error(`Import failed: ${errors} error(s)`)
       }
     } catch (error) {
       console.error('[CompaniesTable] Import error:', error)
-      toast.error("Failed to import CSV file")
+      notify.error("Failed to import CSV file")
     }
 
     // Reset input
@@ -411,11 +414,11 @@ export function CompaniesTable({ initialCompanies }: CompaniesTableProps) {
     const result = await updateCompany(editingCompany.id, data)
 
     if (result.success) {
-      toast.success("Company updated successfully")
+      notify.success("Company updated successfully")
       setEditingCompany(null)
       window.location.reload()
     } else {
-      toast.error(result.error || "Failed to update company")
+      notify.error(result.error || "Failed to update company")
     }
     setIsLoading(false)
   }

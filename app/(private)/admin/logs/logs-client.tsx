@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { format } from "date-fns"
 import { Loader2, Trash2, Search, CalendarIcon, FilterX, Eye } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,7 +45,6 @@ export function LogsClient() {
     startDate: undefined,
     endDate: undefined,
   })
-  const { toast } = useToast()
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -53,11 +52,7 @@ export function LogsClient() {
     if (result.success && result.data) {
       setLogs(result.data)
     } else {
-      toast({
-        title: "Error",
-        description: "Failed to fetch logs",
-        variant: "destructive",
-      })
+      notify.error("Error", { description: "Failed to fetch logs" })
     }
     setLoading(false)
   }
@@ -72,17 +67,10 @@ export function LogsClient() {
   const handleDeleteFilteredLogs = async () => {
     const result = await deleteSystemLogs(filters)
     if (result.success) {
-      toast({
-        title: "Success",
-        description: "Logs deleted successfully based on current filters",
-      })
+      notify.success("Success", { description: "Logs deleted successfully based on current filters" })
       fetchLogs()
     } else {
-      toast({
-        title: "Error",
-        description: "Failed to delete logs",
-        variant: "destructive",
-      })
+      notify.error("Error", { description: "Failed to delete logs" })
     }
   }
 

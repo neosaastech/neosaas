@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   CreditCard, AlertCircle, ExternalLink, Loader2,
   CheckCircle, XCircle, Zap, Webhook,
@@ -88,7 +88,7 @@ export function PaymentSettings() {
         }
       } catch (error) {
         console.error("Failed to fetch payment config", error)
-        toast.error("Failed to load payment settings")
+        notify.error("Failed to load payment settings")
       } finally {
         setIsLoading(false)
       }
@@ -112,9 +112,9 @@ export function PaymentSettings() {
       })
 
       if (!res.ok) throw new Error("Failed to save")
-      toast.success("Payment settings saved")
+      notify.success("Payment settings saved")
     } catch {
-      toast.error("Failed to save payment settings")
+      notify.error("Failed to save payment settings")
     } finally {
       setIsSaving(false)
     }
@@ -123,7 +123,7 @@ export function PaymentSettings() {
   const runStripeTest = async () => {
     setIsTesting(true)
     setTestResult(null)
-    toast.info(`Testing Stripe connection (${config.stripeMode} mode)...`)
+    notify.info(`Testing Stripe connection (${config.stripeMode} mode)...`)
 
     try {
       const res = await fetch(`/api/admin/payments/test-stripe?mode=${config.stripeMode}`)
@@ -131,12 +131,12 @@ export function PaymentSettings() {
       setTestResult(data)
 
       if (data.success) {
-        toast.success(data.summary)
+        notify.success(data.summary)
       } else {
-        toast.error(data.summary)
+        notify.error(data.summary)
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Stripe test failed')
+      notify.error(error instanceof Error ? error.message : 'Stripe test failed')
     } finally {
       setIsTesting(false)
     }
@@ -155,10 +155,10 @@ export function PaymentSettings() {
         const data: StripeCustomersData = await res.json()
         setCustomersData(data)
       } else {
-        toast.error('Failed to load Stripe customers')
+        notify.error('Failed to load Stripe customers')
       }
     } catch {
-      toast.error('Failed to load Stripe customers')
+      notify.error('Failed to load Stripe customers')
     } finally {
       setCustomersLoading(false)
     }
@@ -172,7 +172,7 @@ export function PaymentSettings() {
       neosaas_to_stripe: 'Pushing companies to Stripe…',
       both: 'Syncing customers bidirectionally…',
     }
-    toast.info(labels[direction])
+    notify.info(labels[direction])
     try {
       const res = await fetch('/api/stripe/sync/customers', {
         method: 'POST',
@@ -182,14 +182,14 @@ export function PaymentSettings() {
       const data = await res.json()
       if (data.success) {
         setCustomerSyncResult(data)
-        toast.success('Customer sync completed')
+        notify.success('Customer sync completed')
         // Refresh the customers table if it was loaded
         if (customersData) loadStripeCustomers(customerSearch, customerFilter)
       } else {
-        toast.error(data.error || 'Customer sync failed')
+        notify.error(data.error || 'Customer sync failed')
       }
     } catch {
-      toast.error('Customer sync request failed')
+      notify.error('Customer sync request failed')
     } finally {
       setIsSyncingCustomers(false)
     }
@@ -198,18 +198,18 @@ export function PaymentSettings() {
   const syncSubscriptions = async () => {
     setIsSyncingSubscriptions(true)
     setSubscriptionSyncResult(null)
-    toast.info('Syncing subscriptions from Stripe…')
+    notify.info('Syncing subscriptions from Stripe…')
     try {
       const res = await fetch('/api/stripe/sync/subscriptions', { method: 'POST' })
       const data = await res.json()
       if (data.success) {
         setSubscriptionSyncResult(data)
-        toast.success(data.message || 'Subscription sync completed')
+        notify.success(data.message || 'Subscription sync completed')
       } else {
-        toast.error(data.error || 'Subscription sync failed')
+        notify.error(data.error || 'Subscription sync failed')
       }
     } catch {
-      toast.error('Subscription sync request failed')
+      notify.error('Subscription sync request failed')
     } finally {
       setIsSyncingSubscriptions(false)
     }

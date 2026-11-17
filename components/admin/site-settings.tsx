@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { Globe, Loader2, Save } from "lucide-react"
 
 export function SiteSettings() {
@@ -34,7 +34,7 @@ export function SiteSettings() {
         }
       } catch (error) {
         console.error("Failed to fetch site config", error)
-        toast.error("Failed to load site settings")
+        notify.error("Failed to load site settings")
       } finally {
         setIsLoading(false)
       }
@@ -60,9 +60,9 @@ export function SiteSettings() {
 
       if (!res.ok) throw new Error("Failed to save")
       
-      toast.success("Site settings saved")
+      notify.success("Site settings saved")
     } catch (error) {
-      toast.error("Failed to save site settings")
+      notify.error("Failed to save site settings")
     } finally {
       setIsSaving(false)
     }

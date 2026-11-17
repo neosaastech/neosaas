@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useEffect } from "react"
 import {
   Sheet,
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Plus, Pencil, Trash, Star, X, Check, Percent } from "lucide-react"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import {
   Table,
   TableBody,
@@ -90,15 +91,15 @@ export function VatRatesDialog({ open, onOpenChange, onRatesUpdated }: VatRatesD
       })
 
       if (response.ok) {
-        toast.success(editingId ? 'VAT rate updated' : 'VAT rate created')
+        notify.success(editingId ? 'VAT rate updated' : 'VAT rate created')
         setFormData({ name: "", country: "", rate: "", isActive: true })
         setEditingId(null)
         await fetchVatRates()
       } else {
-        toast.error('Failed to save VAT rate')
+        notify.error('Failed to save VAT rate')
       }
     } catch (error) {
-      toast.error('An error occurred')
+      notify.error('An error occurred')
     } finally {
       setLoading(false)
     }
@@ -114,8 +115,10 @@ export function VatRatesDialog({ open, onOpenChange, onRatesUpdated }: VatRatesD
     })
   }
 
+  const confirm = useConfirm()
+
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this VAT rate?')) return
+    if (!await confirm({ title: "Supprimer ce taux de TVA ?", description: "Cette action est irréversible.", destructive: true })) return
 
     try {
       const response = await fetch(`/api/admin/vat-rates/${id}`, {
@@ -123,13 +126,13 @@ export function VatRatesDialog({ open, onOpenChange, onRatesUpdated }: VatRatesD
       })
 
       if (response.ok) {
-        toast.success('VAT rate deleted')
+        notify.success('VAT rate deleted')
         await fetchVatRates()
       } else {
-        toast.error('Failed to delete VAT rate')
+        notify.error('Failed to delete VAT rate')
       }
     } catch (error) {
-      toast.error('An error occurred')
+      notify.error('An error occurred')
     }
   }
 
@@ -140,13 +143,13 @@ export function VatRatesDialog({ open, onOpenChange, onRatesUpdated }: VatRatesD
       })
 
       if (response.ok) {
-        toast.success('Default VAT rate updated')
+        notify.success('Default VAT rate updated')
         await fetchVatRates()
       } else {
-        toast.error('Failed to set default')
+        notify.error('Failed to set default')
       }
     } catch (error) {
-      toast.error('An error occurred')
+      notify.error('An error occurred')
     }
   }
 
@@ -159,11 +162,11 @@ export function VatRatesDialog({ open, onOpenChange, onRatesUpdated }: VatRatesD
       })
 
       if (response.ok) {
-        toast.success(currentActive ? 'VAT rate deactivated' : 'VAT rate activated')
+        notify.success(currentActive ? 'VAT rate deactivated' : 'VAT rate activated')
         await fetchVatRates()
       }
     } catch (error) {
-      toast.error('Failed to toggle status')
+      notify.error('Failed to toggle status')
     }
   }
 

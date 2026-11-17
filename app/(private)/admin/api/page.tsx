@@ -1,5 +1,6 @@
 "use client"
 
+import { useConfirm } from "@/hooks/use-confirm"
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/collapsible"
 import { Eye, EyeOff, Save, RefreshCw, Key, CheckCircle, XCircle, Loader2, Trash2, Plus, AlertCircle, Copy, Check, ChevronDown, ChevronsUpDown, Rocket, FlaskConical, ShieldAlert } from "lucide-react"
 import { SiStripe, SiPaypal, SiResend, SiScaleway, SiGithub, SiGoogle, SiFacebook, SiDropbox } from "react-icons/si"
-import { useToast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notify"
 import { Badge } from "@/components/ui/badge"
 import { McpTokensCard } from "@/components/admin/mcp-tokens-card"
 
@@ -172,7 +173,6 @@ export default function AdminApiPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingConfig, setEditingConfig] = useState<ApiConfig | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
-  const { toast } = useToast()
 
   // Form state
   const [selectedService, setSelectedService] = useState(services[0].id)
@@ -302,11 +302,7 @@ export default function AdminApiPage() {
       }
     } catch (error) {
       console.error("Error loading configurations:", error)
-      toast({
-        title: "❌ Error",
-        description: "Failed to load API configurations",
-        variant: "destructive",
-      })
+      notify.error("❌ Error", { description: "Failed to load API configurations" })
     } finally {
       setLoading(false)
     }
@@ -512,10 +508,7 @@ export default function AdminApiPage() {
             success: true,
             message: `Valid token for user ${githubUser.login}`
           })
-          toast({
-            title: "✅ Valid GitHub token",
-            description: `Connected as ${githubUser.login}`,
-          })
+          notify.message("✅ Valid GitHub token", { description: `Connected as ${githubUser.login}` })
           setTestingInModal(false)
           return // Exit here, the test has already been handled
       }
@@ -533,27 +526,16 @@ export default function AdminApiPage() {
 
       if (data.success) {
         setModalTestResult({ success: true, message: data.message })
-        toast({
-          title: "Key valid",
-          description: `${data.message} (${data.responseTime}ms)`,
-        })
+        notify.message("Key valid", { description: `${data.message} (${data.responseTime}ms)` })
 
       } else {
         setModalTestResult({ success: false, message: data.message || data.error })
-        toast({
-          title: "❌ Invalid key",
-          description: data.message || data.error,
-          variant: "destructive",
-        })
+        notify.error("❌ Invalid key", { description: data.message || data.error })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to verify the key"
       setModalTestResult({ success: false, message })
-      toast({
-        title: "❌ Erreur",
-        description: message,
-        variant: "destructive",
-      })
+      notify.error("❌ Erreur", { description: message })
     } finally {
       setTestingInModal(false)
     }
@@ -692,11 +674,7 @@ export default function AdminApiPage() {
           } else {
             setDialogOpen(false)
             resetForm()
-            toast({
-              title: "✅ GitHub OAuth Saved",
-              description: githubData.message || "GitHub OAuth credentials have been saved successfully.",
-              duration: 3000,
-            })
+            notify.success("✅ GitHub OAuth Saved", { description: githubData.message || "GitHub OAuth credentials have been saved successfully.", duration: 3000 })
           }
 
           console.log("🔄 [Frontend] Reloading configurations...")
@@ -765,10 +743,7 @@ export default function AdminApiPage() {
         if (silent) {
           setAutoSaveState("saved")
         } else {
-          toast({
-            title: "Configuration Saved",
-            description: `${currentService?.name} configuration has been saved and encrypted.`,
-          })
+          notify.success("Configuration Saved", { description: `${currentService?.name} configuration has been saved and encrypted.` })
           setDialogOpen(false)
           resetForm()
         }
@@ -779,11 +754,7 @@ export default function AdminApiPage() {
       }
     } catch (error) {
       if (silent) setAutoSaveState("error")
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save configuration",
-        variant: "destructive",
-      })
+      notify.error("Error", { description: error instanceof Error ? error.message : "Failed to save configuration" })
     } finally {
       setSaving(false)
     }
@@ -839,33 +810,24 @@ export default function AdminApiPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: "Valid Key",
-          description: `${data.message} (${data.responseTime}ms)`,
-        })
+        notify.message("Valid Key", { description: `${data.message} (${data.responseTime}ms)` })
         await loadAllConfigs()
 
       } else {
-        toast({
-          title: "Invalid Key",
-          description: data.message || data.error,
-          variant: "destructive",
-        })
+        notify.error("Invalid Key", { description: data.message || data.error })
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Unable to verify key",
-        variant: "destructive",
-      })
+      notify.error("Error", { description: error instanceof Error ? error.message : "Unable to verify key" })
     } finally {
       setTestingId(null)
     }
   }
 
+  const confirm = useConfirm()
+
   const handleDelete = async (config: ApiConfig) => {
     const serviceInfo = getServiceInfo(config.serviceName)
-    if (!confirm(`Are you sure you want to delete the ${serviceInfo?.name || config.serviceName} API configuration?`)) {
+    if (!await confirm({ title: `Supprimer la configuration ${serviceInfo?.name || config.serviceName} ?`, description: "Les identifiants enregistrés pour ce service seront effacés.", destructive: true })) {
       return
     }
 
@@ -877,20 +839,13 @@ export default function AdminApiPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: "✅ Configuration Deleted",
-          description: "The configuration has been removed.",
-        })
+        notify.success("✅ Configuration Deleted", { description: "The configuration has been removed." })
         await loadAllConfigs()
       } else {
         throw new Error(data.error || "Failed to delete configuration")
       }
     } catch (error) {
-      toast({
-        title: "❌ Error",
-        description: error instanceof Error ? error.message : "Failed to delete configuration",
-        variant: "destructive",
-      })
+      notify.error("❌ Error", { description: error instanceof Error ? error.message : "Failed to delete configuration" })
     }
   }
 
@@ -1255,11 +1210,7 @@ export default function AdminApiPage() {
           navigator.clipboard.writeText(text);
           setCopiedUrl(true);
           setTimeout(() => setCopiedUrl(false), 2000);
-          toast({
-            title: "✅ Copied!",
-            description: "URL copied to clipboard",
-            duration: 2000,
-          });
+          notify.success("✅ Copied!", { description: "URL copied to clipboard", duration: 2000 });
         };
 
         return (
@@ -1355,11 +1306,7 @@ export default function AdminApiPage() {
                         size="sm"
                         onClick={async () => {
                           if (!githubConfig.clientId || !githubConfig.clientSecret) {
-                            toast({
-                              title: "❌ Error",
-                              description: "Please fill in Client ID and Client Secret",
-                              variant: "destructive",
-                            });
+                            notify.error("❌ Error", { description: "Please fill in Client ID and Client Secret" });
                             return;
                           }
                           setTestingInModal(true);
@@ -1498,7 +1445,7 @@ export default function AdminApiPage() {
                       <Button
                         onClick={async () => {
                           if (!githubApiConfig.personalAccessToken) {
-                            toast.error("Please enter a Personal Access Token");
+                            notify.error("Please enter a Personal Access Token");
                             return;
                           }
 
@@ -1516,12 +1463,12 @@ export default function AdminApiPage() {
                             const data = await response.json();
 
                             if (response.ok) {
-                              toast.success("GitHub API Token saved successfully!");
+                              notify.success("GitHub API Token saved successfully!");
                             } else {
-                              toast.error(data.error || "Failed to save token");
+                              notify.error(data.error || "Failed to save token");
                             }
                           } catch (error) {
-                            toast.error("Error saving token");
+                            notify.error("Error saving token");
                             console.error("Save error:", error);
                           } finally {
                             setSaving(false);
@@ -1547,7 +1494,7 @@ export default function AdminApiPage() {
                         variant="outline"
                         onClick={async () => {
                           if (!githubApiConfig.personalAccessToken) {
-                            toast.error("Please enter a token first");
+                            notify.error("Please enter a token first");
                             return;
                           }
 

@@ -28,7 +28,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useState } from "react"
 import { ChevronDown } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { toast } from "sonner"
+import { notify } from "@/lib/notify"
 import { useUser } from "@/lib/contexts/user-context"
 import { usePlatformConfig } from "@/contexts/platform-config-context"
 import { BrandMark } from "@/components/common/brand-mark"
@@ -219,7 +219,7 @@ export function PrivateSidebar({ isOpen = false, onClose }: PrivateSidebarProps)
     }
     localStorage.removeItem("user")
     localStorage.removeItem("authToken")
-    toast.success("Logged out successfully")
+    notify.success("Logged out successfully")
     window.location.href = "/auth/login"
   }
 
